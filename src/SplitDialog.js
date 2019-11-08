@@ -325,7 +325,9 @@ function SplitDialog(data) {
 
     // Help button
     const HELP_MSG =
-            "<p>Split the image at the specified x (Horizontal split) or y (Vertical split) coordinate.</p>";
+            "<p>Split the image at the specified x (Horizontal split) or y (Vertical split) coordinate. " +
+            "Two new images are created. Each image contains image data one side of the split, " +
+            "plus the overlap region. The other side of the overlap region is set to black (0)</p>";
 
     this.browseDocumentationButton = new ToolButton(this);
     this.browseDocumentationButton.icon = ":/process-interface/browse-documentation.png";
