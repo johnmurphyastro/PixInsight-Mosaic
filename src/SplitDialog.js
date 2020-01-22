@@ -19,17 +19,9 @@
 #feature-info Linear fits target and reference images over the overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
-#include <pjsr/ColorSpace.jsh>
-#include <pjsr/DataType.jsh>
-#include <pjsr/FrameStyle.jsh>
-#include <pjsr/NumericControl.jsh>
-#include <pjsr/Sizer.jsh>
-#include <pjsr/TextAlign.jsh>
-#include <pjsr/StdButton.jsh>
-#include <pjsr/StdIcon.jsh>
-#include <pjsr/StdCursor.jsh>
-#include <pjsr/UndoFlag.jsh>
-#include "mosaicLinearFitLib.js"
+
+#include "DialogLib.js"
+#include "LinearFitLib.js"
 
 #define VERSION  "1.0"
 #define TITLE "Split"
@@ -181,20 +173,15 @@ function SplitDialog(data) {
     //-------------------------------------------------------
     // Create the Program Discription at the top
     //-------------------------------------------------------
-    this.helpLabel = new Label(this);
-    this.helpLabel.frameStyle = FrameStyle_Box;
-    this.helpLabel.margin = 4;
-    this.helpLabel.wordWrapping = true;
-    this.helpLabel.useRichText = true;
-    this.helpLabel.text = "<b>" + TITLE + " v" + VERSION + "</b> &mdash; Splits image into two.";
+    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + "</b> &mdash; Splits image into two.");
 
     //-------------------------------------------------------
     // Create the reference image field
     //-------------------------------------------------------
-    this.targetImage_Label = new Label(this);
-    this.targetImage_Label.text = "Reference View:";
-    this.targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.targetImage_Label.minWidth = labelWidth1;
+    let targetImage_Label = new Label(this);
+    targetImage_Label.text = "Reference View:";
+    targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
     this.targetImage_ViewList.getAll();
@@ -212,18 +199,18 @@ function SplitDialog(data) {
         }
     };
 
-    this.targetImage_Sizer = new HorizontalSizer;
-    this.targetImage_Sizer.spacing = 4;
-    this.targetImage_Sizer.add(this.targetImage_Label);
-    this.targetImage_Sizer.add(this.targetImage_ViewList, 100);
+    let targetImage_Sizer = new HorizontalSizer;
+    targetImage_Sizer.spacing = 4;
+    targetImage_Sizer.add(targetImage_Label);
+    targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
     //-------------------------------------------------------
     // Linear Fit Method Field
     //-------------------------------------------------------
-    this.algorithm_Label = new Label(this);
-    this.algorithm_Label.text = "Split Direction:";
-    this.algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.algorithm_Label.minWidth = labelWidth1;
+    let algorithm_Label = new Label(this);
+    algorithm_Label.text = "Split Direction:";
+    algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    algorithm_Label.minWidth = labelWidth1;
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
@@ -243,11 +230,11 @@ function SplitDialog(data) {
         }
     };
 
-    this.orientationSizer = new HorizontalSizer;
-    this.orientationSizer.spacing = 4;
-    this.orientationSizer.add(this.algorithm_Label);
-    this.orientationSizer.add(this.orientationCombo);
-    this.orientationSizer.addStretch();
+    let orientationSizer = new HorizontalSizer;
+    orientationSizer.spacing = 4;
+    orientationSizer.add(algorithm_Label);
+    orientationSizer.add(this.orientationCombo);
+    orientationSizer.addStretch();
 
     //-------------------------------------------------------
     // Coordinate
@@ -291,78 +278,15 @@ function SplitDialog(data) {
     this.overlap_Control.slider.minWidth = 500;
     this.overlap_Control.setValue(data.overlap);
 
-    //-------------------------------------------------------
-    // Create the ok/cancel buttons
-    //-------------------------------------------------------
-    this.ok_Button = new PushButton(this);
-    this.ok_Button.text = "OK";
-    this.ok_Button.cursor = new Cursor(StdCursor_Checkmark);
-    this.ok_Button.onClick = function () {
-        this.dialog.ok();
-    };
 
-    this.cancel_Button = new PushButton(this);
-    this.cancel_Button.text = "Cancel";
-    this.cancel_Button.cursor = new Cursor(StdCursor_Crossmark);
-    this.cancel_Button.onClick = function () {
-        this.dialog.cancel();
-    };
-
-    this.buttons_Sizer = new HorizontalSizer;
-    this.buttons_Sizer.spacing = 6;
-
-    // New Instance button
-    this.newInstance_Button = new ToolButton(this);
-    this.newInstance_Button.icon = this.scaledResource(":/process-interface/new-instance.png");
-    this.newInstance_Button.setScaledFixedSize(24, 24);
-    this.newInstance_Button.toolTip = "Save as Process Icon";
-    this.newInstance_Button.onMousePress = function () {
-        this.hasFocus = true;
-        this.pushed = false;
-        data.saveParameters();
-        this.dialog.newInstance();
-    };
-
-    // Help button
+    const helpWindowTitle = TITLE + "." + VERSION;
     const HELP_MSG =
             "<p>Split the image at the specified x (Horizontal split) or y (Vertical split) coordinate. " +
             "Two new images are created. Each image contains image data one side of the split, " +
             "plus the overlap region. The other side of the overlap region is set to black (0)</p>";
 
-    this.browseDocumentationButton = new ToolButton(this);
-    this.browseDocumentationButton.icon = ":/process-interface/browse-documentation.png";
-    this.browseDocumentationButton.toolTip =
-            "<p>Opens a browser to view the script's documentation.</p>";
-    this.browseDocumentationButton.onClick = function () {
-        if (!Dialog.browseScriptDocumentation(TITLE)) {
-            (new MessageBox(
-                    HELP_MSG,
-                    TITLE + "." + VERSION,
-                    StdIcon_Information,
-                    StdButton_Ok
-                    )).execute();
-        }
-    };
-
-
-    this.buttons_Sizer.add(this.newInstance_Button);
-    this.buttons_Sizer.add(this.browseDocumentationButton);
-
-    this.resetButton = new ToolButton(this);
-
-    this.resetButton.icon = ":/images/icons/reset.png";
-    this.resetButton.toolTip = "<p>Resets the dialog's parameters.";
-    this.resetButton.onClick = function () {
-        data.resetParameters(this.dialog);
-    };
-
-    this.buttons_Sizer.add(this.resetButton);
-
-
-    this.buttons_Sizer.addStretch();
-    this.buttons_Sizer.add(this.ok_Button);
-    this.buttons_Sizer.add(this.cancel_Button);
-
+    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects
@@ -370,14 +294,13 @@ function SplitDialog(data) {
     this.sizer = new VerticalSizer;
     this.sizer.margin = 6;
     this.sizer.spacing = 6;
-    this.sizer.add(this.helpLabel);
+    this.sizer.add(titleLabel);
     this.sizer.addSpacing(4);
-    this.sizer.add(this.targetImage_Sizer);
-    this.sizer.add(this.targetImage_Sizer);
-    this.sizer.add(this.orientationSizer);
+    this.sizer.add(targetImage_Sizer);
+    this.sizer.add(orientationSizer);
     this.sizer.add(this.coordinate_Control);
     this.sizer.add(this.overlap_Control);
-    this.sizer.add(this.buttons_Sizer);
+    this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------
     // Set all the window data
