@@ -103,7 +103,7 @@ function getDefaultReferenceView(activeWindow) {
     let allWindows = ImageWindow.openWindows;
     let referenceView = null;
     for (let win of allWindows) {
-        if (win.currentView.fullId.toLowerCase().contains(MOSAIC_NAME)) {
+        if (win.currentView.fullId.toLowerCase().contains("mosaic")) {
             referenceView = win.currentView;
             break;
         }
@@ -363,7 +363,7 @@ function mosaicLinearFitDialog(data) {
     this.rejectBrightestN_Control.real = true;
     this.rejectBrightestN_Control.label.text = "Reject Brightest:";
     this.rejectBrightestN_Control.label.minWidth = labelWidth1;
-    this.rejectBrightestN_Control.toolTip = "<p>Removes the brightest N samples from the linear fit</p>";
+    this.rejectBrightestN_Control.toolTip = "<p>Removes the brightest N samples from the linear fit. Usually OK to leave it at zero.</p>";
     this.rejectBrightestN_Control.onValueUpdated = function (value) {
         data.rejectBrightestN = value;
     };
@@ -383,7 +383,7 @@ function mosaicLinearFitDialog(data) {
             "<p>The 'CCD Linear Range' rejects all sample squares that contain a sample above this level. " +
             "This ensures that only the linear part of the CCD's range is used.</p>" +
             "The 'Reject Brightest' rejects the N brightest samples. These samples are likely to contain " +
-            "bright stars. Increase this if the samples diverge from the fitted line at the top left of the graph.</p>" +
+            "bright stars. Increase this if the samples diverge from the fitted line at the top right of the graph.</p>" +
             "<p>The images are divided into 'Sample Size' squares; a sample is the average of a square. " +
             "The 'Sample Size' should be bigger than the diameter of bright stars. " +
             "If set too small, differing FWHM between the two images will affect the linear fit.</p>";

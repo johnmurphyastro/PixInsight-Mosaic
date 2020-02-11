@@ -495,8 +495,6 @@ function gradientLinearFitDialog(data) {
             "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
             "<p>The 'CCD Linear Range' rejects all sample squares that contain a sample above this level. " +
             "This ensures that only the linear part of the CCD's range is used.</p>" +
-            "The 'Reject Brightest' rejects the N brightest samples. These samples are likely to contain " +
-            "bright stars. Increase this if the samples diverge from the fitted line at the top left of the graph.</p>" +
             "<p>The images are divided into 'Sample Size' squares; a sample is the average of a square. " +
             "The 'Sample Size' should be bigger than the diameter of bright stars. " +
             "If set too small, differing FWHM between the two images will affect the linear fit.</p>";
