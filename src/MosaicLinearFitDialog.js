@@ -31,9 +31,9 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 #define TITLE "Mosaic Linear Fit"
 #define MOSAIC_NAME "Mosaic"
 
-function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize, rejectBrightestN) {
+function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize) {
     console.writeln("Channel = ", channel);
-    console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh, ", Reject brightest: ", rejectBrightestN);
+    console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh);
     console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
 }
 
@@ -62,7 +62,7 @@ function mosaicLinearFit(data)
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
         samplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, data.rejectBrightestN);
+                channel, data.sampleSize, data.rejectHigh, 0);
         if (samplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
@@ -70,7 +70,7 @@ function mosaicLinearFit(data)
 
         linearFit[channel] = calculateLinearFit(samplePairArray[channel], getLinearFitX, getLinearFitY);
         displayConsoleInfo(linearFit[channel], samplePairArray[channel].length,
-                channel, data.rejectHigh, data.sampleSize, data.rejectBrightestN);
+                channel, data.rejectHigh, data.sampleSize);
     }
 
     if (data.displayGraphFlag) {
@@ -135,7 +135,6 @@ function MosaicLinearFitData() {
         }
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
-        Parameters.set("rejectBrightestN", this.rejectBrightestN);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displayMosiacFlag", this.displayMosiacFlag);
         Parameters.set("mosiacOverlayFlag", this.mosaicOverlayFlag);
@@ -146,9 +145,7 @@ function MosaicLinearFitData() {
         if (Parameters.has("rejectHigh"))
             this.rejectHigh = Parameters.getReal("rejectHigh");
         if (Parameters.has("sampleSize"))
-            this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("rejectBrightestN"))
-            this.rejectBrightestN = Parameters.getInteger("rejectBrightestN");
+            this.sampleSize = Parameters.getInteger("sampleSize");    
         if (Parameters.has("displayGraphFlag"))
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
         if (Parameters.has("displayMosiacFlag"))
@@ -186,7 +183,6 @@ function MosaicLinearFitData() {
         linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
-        linearFitDialog.rejectBrightestN_Control.setValue(this.rejectBrightestN);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -356,23 +352,6 @@ function mosaicLinearFitDialog(data) {
     this.sampleSize_Control.slider.minWidth = 500;
     this.sampleSize_Control.setValue(data.sampleSize);
 
-    //-------------------------------------------------------
-    // Reject brightest N samples
-    //-------------------------------------------------------
-    this.rejectBrightestN_Control = new NumericControl(this);
-    this.rejectBrightestN_Control.real = true;
-    this.rejectBrightestN_Control.label.text = "Reject Brightest:";
-    this.rejectBrightestN_Control.label.minWidth = labelWidth1;
-    this.rejectBrightestN_Control.toolTip = "<p>Removes the brightest N samples from the linear fit. Usually OK to leave it at zero.</p>";
-    this.rejectBrightestN_Control.onValueUpdated = function (value) {
-        data.rejectBrightestN = value;
-    };
-    this.rejectBrightestN_Control.setRange(0, 500);
-    this.rejectBrightestN_Control.slider.setRange(0, 500);
-    this.rejectBrightestN_Control.setPrecision(0);
-    this.rejectBrightestN_Control.slider.minWidth = 500;
-    this.rejectBrightestN_Control.setValue(data.rejectBrightestN);
-
     const helpWindowTitle = TITLE + "." + VERSION;
     const HELP_MSG =
             "<p>Apply a scale and offset to the target image so that it matches the reference image. The default parameters should work well. " +
@@ -405,7 +384,6 @@ function mosaicLinearFitDialog(data) {
     this.sizer.add(algorithm_Sizer);
     this.sizer.add(mosaic_Sizer);
     this.sizer.add(this.rejectHigh_Control);
-    this.sizer.add(this.rejectBrightestN_Control);
     this.sizer.add(this.sampleSize_Control);
     this.sizer.add(buttons_Sizer);
 
