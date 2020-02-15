@@ -47,7 +47,7 @@ function mosaicLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let samplePairArray = []; // SamplePair[channel][SamplePairArray]
+    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
     let nChannels;      // L = 0; R=0, G=1, B=2
     if (targetView.image.isColor) {
         nChannels = 3;
@@ -61,15 +61,15 @@ function mosaicLinearFit(data)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        samplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, 0);
-        if (samplePairArray[channel].length < 2) {
+        colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
+                channel, data.sampleSize, data.rejectHigh, false, 0);
+        if (colorSamplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
         }
 
-        linearFit[channel] = calculateLinearFit(samplePairArray[channel], getLinearFitX, getLinearFitY);
-        displayConsoleInfo(linearFit[channel], samplePairArray[channel].length,
+        linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getLinearFitX, getLinearFitY);
+        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
                 channel, data.rejectHigh, data.sampleSize);
     }
 
@@ -77,8 +77,8 @@ function mosaicLinearFit(data)
         console.writeln("\nCreating linear fit graph");
         let title = "LinearFit_" + targetView.fullId;
         let graph = new Graph(title, getLinearFitX, getLinearFitY);
-        let imageWindow = graph.createLinearFitWindow(samplePairArray, nChannels, 1000);
-        graph.displayGraphWindow(imageWindow, nChannels, linearFit, samplePairArray);
+        let imageWindow = graph.createLinearFitWindow(colorSamplePairArray, nChannels, 1000);
+        graph.displayGraphWindow(imageWindow, nChannels, linearFit, colorSamplePairArray);
     }
     
     console.writeln("\nApplying linear fit");
@@ -168,7 +168,6 @@ function MosaicLinearFitData() {
     this.setParameters = function () {
         this.rejectHigh = 0.5;
         this.sampleSize = 30;
-        this.rejectBrightestN = 0;
         this.displayGraphFlag = false;
         this.displayMosiacFlag = true;
         this.mosaicOverlayFlag = true;

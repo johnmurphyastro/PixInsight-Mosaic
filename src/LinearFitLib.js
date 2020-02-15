@@ -31,15 +31,19 @@ function Rectangle(x, y, width, height) {
 
 /**
  * 
- * @param {Number} target
- * @param {Number} reference
+ * @param {Number} targetMean
+ * @param {Number} targetMedian
+ * @param {Number} referenceMean
+ * @param {Number} referenceMedian
  * @param {Number} x
  * @param {Number} y
  * @returns {SamplePair}
  */
-function SamplePair(target, reference, x, y) {
-    this.target = target;       // linear fit x coordinate
-    this.reference = reference; // linear fit y coordinate
+function SamplePair(targetMean, targetMedian, referenceMean, referenceMedian, x, y) {
+    this.targetMean = targetMean;       // linear fit x coordinate
+    this.referenceMean = referenceMean; // linear fit y coordinate
+    this.targetMedian = targetMedian;
+    this.referenceMedian = referenceMedian;
     this.x = x;
     this.y = y;
 }
@@ -57,25 +61,36 @@ function LinearFitData(m, b, sampleArea = null) {
     this.sampleArea = sampleArea;
 }
 
+/**
+ * 
+ * @param {Number[]} difArray
+ * @param {Number} minValue
+ * @returns {GradientData}
+ */
+function GradientData(difArray, minValue){
+    this.difArray = difArray;
+    this.minValue = minValue;
+}
+
 function getLinearFitX(samplePair) {
-    return samplePair.target;
+    return samplePair.targetMean;
 }
 function getLinearFitY(samplePair) {
-    return samplePair.reference;
+    return samplePair.referenceMean;
 }
 
 function getHorizontalGradientX(samplePair) {
     return samplePair.x;
 }
 function getHorizontalGradientY(samplePair) {
-    return samplePair.target - samplePair.reference;
+    return samplePair.targetMedian - samplePair.referenceMedian;
 }
 
 function getVerticalGradientX(samplePair) {
     return samplePair.y;
 }
 function getVerticalGradientY(samplePair) {
-    return samplePair.target - samplePair.reference;
+    return samplePair.targetMedian - samplePair.referenceMedian;
 }
 
 /**
@@ -103,13 +118,13 @@ function getElapsedTime(startTime) {
  * @param {Image} referenceImage
  * @param {Number} channel Image channel
  * @param {Number} clipping Samples with pixels > clipping will be excluded.
+ * @param {Boolean} calcMedian If true calculate mean and median values. If false, median value will be set to zero
  * @param {Rectangle} binRect Calculate the average value within this rectangle
  * @return {Object} average reference and target values
  */
-function calculateBinAverage(targetImage, referenceImage, channel, clipping, binRect) {
-    let nth = 0;
-    let referenceSum = 0;
-    let targetSum = 0;
+function calculateBinAverage(targetImage, referenceImage, channel, clipping, calcMedian, binRect) {
+    let referenceValues = [];
+    let targetValues = [];
 
     /**
      * @param sample Pixel value to check
@@ -130,14 +145,24 @@ function calculateBinAverage(targetImage, referenceImage, channel, clipping, bin
                 return null;
             }
 
-            targetSum += targetSample;
-            referenceSum += referenceSample;
-            nth++;
+            targetValues.push(targetSample);
+            referenceValues.push(referenceSample);
         }
     }
 
+    let targetAverage = Math.mean(targetValues);
+    let referenceAverage = Math.mean(referenceValues);
+    let targetMedian;
+    let referenceMedian;
+    if (calcMedian){
+        targetMedian = Math.median(targetValues);
+        referenceMedian = Math.median(referenceValues);
+    } else {
+        targetMedian = 0;
+        referenceMedian = 0;
+    }
     // return average target value, average reference value, x coord, y coord
-    return new SamplePair(targetSum / nth, referenceSum / nth,
+    return new SamplePair(targetAverage, targetMedian, referenceAverage, referenceMedian,
             binRect.x + (binRect.width-1) / 2, binRect.y + (binRect.height-1) / 2);
 }
 
@@ -157,11 +182,12 @@ function calculateBinAverage(targetImage, referenceImage, channel, clipping, bin
  * @param {Number} channel This number Indicates L=0 or R=0, G=1, B=2
  * @param {Number} sampleSize Between 1 and 5 times diameter of brightest stars
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @param {Number} rejectBrightestN Remove the N brightest SamplePairs before returning the array
+ * @param {Boolean} calcMedian If true calculate mean and median values. If false, median value will be set to zero
+ * @param {Number} rejectBrightestPercent Remove the N brightest SamplePairs before returning the array
  * @return {SamplePair[]} Array of target and reference binned sample values
  */
 function createSamplePairs(targetImage, referenceImage, channel, sampleSize,
-        rejectHigh, rejectBrightestN) {
+        rejectHigh, calcMedian, rejectBrightestPercent) {
     // Divide the images into blocks specified by sampleSize.
     let binRect = new Rectangle(0, 0, sampleSize, sampleSize);
     let wBinned = Math.trunc(referenceImage.width / binRect.width);
@@ -172,17 +198,18 @@ function createSamplePairs(targetImage, referenceImage, channel, sampleSize,
         for (let x = 0; x < wBinned; x++) {
             binRect.x = binRect.width * x;
             binRect.y = binRect.height * y;
-            let pairedAverage = calculateBinAverage(targetImage, referenceImage, channel, rejectHigh, binRect);
+            let pairedAverage = calculateBinAverage(targetImage, referenceImage, channel, rejectHigh, calcMedian, binRect);
             if (null !== pairedAverage) {
                 samplePairArray.push(pairedAverage);
             }
         }
     }
 
-    if (rejectBrightestN > 0) {
-        samplePairArray.sort((a, b) => a.reference - b.reference);
+    if (calcMedian && rejectBrightestPercent > 0) {
+        samplePairArray.sort((a, b) => (a.referenceMean - a.referenceMedian) - (b.referenceMean - b.referenceMedian));
         // the array had to be sorted before we could do this
-        samplePairArray.length -= rejectBrightestN;
+        let nSamples = Math.ceil(samplePairArray.length * (100 - rejectBrightestPercent)/100);
+        samplePairArray.length = nSamples;
     }
 
     return samplePairArray;
@@ -321,11 +348,11 @@ function testLeastSquareFitAlgorithm() {
     let lsf = new LeastSquareFitAlgorithm();
 
     let samplePairArray = [];
-    samplePairArray.push(new SamplePair(2.0, 4.0, 2, 4));
-    samplePairArray.push(new SamplePair(3.0, 5.0, 3, 5));
-    samplePairArray.push(new SamplePair(5.0, 7.0, 5, 7));
-    samplePairArray.push(new SamplePair(7.0, 10.0, 7, 10));
-    samplePairArray.push(new SamplePair(9.0, 15.0, 9, 15));
+    samplePairArray.push(new SamplePair(2.0, 0, 4.0, 0, 2, 4));
+    samplePairArray.push(new SamplePair(3.0, 0, 5.0, 0, 3, 5));
+    samplePairArray.push(new SamplePair(5.0, 0, 7.0, 0, 5, 7));
+    samplePairArray.push(new SamplePair(7.0, 0, 10.0, 0, 7, 10));
+    samplePairArray.push(new SamplePair(9.0, 0, 15.0, 0, 9, 15));
 
     lsf.addValues(samplePairArray, getLinearFitX, getLinearFitY);
     let line = lsf.getLinearFit();

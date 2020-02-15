@@ -60,10 +60,10 @@ function Graph(title, getX, getY) {
      * @param {ImageWindow} window
      * @param {Number} nChannels
      * @param {LinearFit[]} linearFit
-     * @param {SamplePair[][]} samplePairArray for each channel
+     * @param {SamplePair[][]} colorSamplePairArray for each channel
      * @returns {undefined}
      */
-    this.displayGraphWindow = function (window, nChannels, linearFit, samplePairArray) {
+    this.displayGraphWindow = function (window, nChannels, linearFit, colorSamplePairArray) {
         let view = window.mainView;
         let image = view.image;
         view.beginProcess();
@@ -74,7 +74,7 @@ function Graph(title, getX, getY) {
         // Draw points on top of lines
         for (let channel = 0; channel < nChannels; channel++) {
             let colour = this.getColor(channel, nChannels);
-            this.drawPoints(samplePairArray[channel], image, colour);
+            this.drawPoints(colorSamplePairArray[channel], image, colour);
         }
         view.endProcess();
         window.show();
@@ -82,17 +82,17 @@ function Graph(title, getX, getY) {
 
     /**
      * Creates a new empty Graph window. Private function.
-     * @param {SamplePair[][]} samplePairArray for each channel
+     * @param {SamplePair[][]} colorSamplePairArray for each channel
      * @param {Number} nChannels
      * @param {Number} maxWindowSize maximum window height and width
      * @returns {ImageWindow}
      */
-    this.createLinearFitWindow = function (samplePairArray, nChannels, maxWindowSize) {
+    this.createLinearFitWindow = function (colorSamplePairArray, nChannels, maxWindowSize) {
         let maxX = 0;
         let maxY = 0;
         // Calculate maxX and maxY
         for (let channel=0; channel<nChannels; channel++) {
-            samplePairArray[channel].forEach(function (samplePair){
+            colorSamplePairArray[channel].forEach(function (samplePair){
                 maxX = Math.max(maxX, getX(samplePair));
                 maxY = Math.max(maxY, getY(samplePair));
             });
@@ -121,25 +121,27 @@ function Graph(title, getX, getY) {
     
     /**
      * Creates a new empty Graph window. Private function.
-     * @param {SamplePair[][]} samplePairArray for each channel
+     * @param {SamplePair[][]} colorSamplePairArray for each channel
      * @param {Number} nChannels
      * @param {Number} graphWidth 
      * @returns {ImageWindow}
      */
-    this.createGradientFitWindow = function (samplePairArray, nChannels, graphWidth) {
+    this.createGradientFitWindow = function (colorSamplePairArray, nChannels, graphWidth) {
         this.graphHeight = 500;
         this.graphWidth = graphWidth;
         // Find max difference
         let maxDif = Number.NEGATIVE_INFINITY;
+        let minDif = Number.POSITIVE_INFINITY;
         for (let channel = 0; channel < nChannels; channel++){
-            for (let samplePair of samplePairArray[channel]){
+            for (let samplePair of colorSamplePairArray[channel]){
                 // works for both horizontal and vertical
-                maxDif = Math.max(maxDif, Math.abs(getY(samplePair)));
+                minDif = Math.min(minDif, getY(samplePair));
+                maxDif = Math.max(maxDif, getY(samplePair));
             }
         }
-        this.zeroYCoord = (this.graphHeight - 1)/2;
         this.scaleX = 1;
-        this.scaleY = (this.zeroYCoord - 10) / maxDif;
+        this.scaleY = (this.graphHeight - 10) / (maxDif - minDif);
+        this.zeroYCoord = this.graphHeight - 1 + (minDif * this.scaleY);
         if (this.scaleY === Number.POSITIVE_INFINITY || this.scaleY === Number.NEGATIVE_INFINITY){
             this.scaleY = 1.0;
         }
@@ -150,6 +152,49 @@ function Graph(title, getX, getY) {
         let color = nChannels > 1;
         return new ImageWindow(this.graphWidth, this.graphHeight,
                 nChannels, bitsPerSample, sampleType, color, this.title);
+    };
+    
+    /**
+     * Create and display gradient graph
+     * @param {ImageWindow} window
+     * @param {Number} nChannels
+     * @param {Number[].GradientData} gradientArray
+     * @param {SamplePair[][]} colorSamplePairArray for each channel
+     * @returns {undefined}
+     */
+    this.displayGradientGraphWindow = function (window, nChannels, gradientArray, colorSamplePairArray) {
+        let view = window.mainView;
+        let image = view.image;
+        view.beginProcess();
+        for (let channel = 0; channel < nChannels; channel++) {
+            let colour = this.getColor(channel, nChannels);
+            this.drawGradientLine(gradientArray, image, colour);
+        }
+        // Draw points on top of lines
+        for (let channel = 0; channel < nChannels; channel++) {
+            let colour = this.getColor(channel, nChannels);
+            this.drawPoints(colorSamplePairArray[channel], image, colour);
+        }
+        view.endProcess();
+        window.show();
+    };
+
+    /**
+     * 
+     * @param {Number[].GradientData} gradientArray
+     * @param {Image} image
+     * @param {Number} channel
+     * @returns {undefined}
+     */
+    this.drawGradientLine = function(gradientArray, image, channel){
+        const LINE_INTENSITY = 0.4;
+        for (let x = 0; x < this.graphWidth; x++) {
+            let y = Math.round(gradientArray[channel].difArray[x] * this.scaleY);
+            let yScreen = this.zeroYCoord - y;
+            if (yScreen >= 0 && yScreen < this.graphHeight) {
+                image.setSample(LINE_INTENSITY, x, yScreen, channel);
+            }
+        }
     };
 
     /**
@@ -198,5 +243,101 @@ function Graph(title, getX, getY) {
             }
         });
     };
+    
+}
 
+/**
+ *
+ * @param {Number[].SamplePair[]} colorSamplePairArray
+ * @param {Number} sampleSize length of square side
+ * @param {View} referenceView 
+ * @param {String} title
+ * @returns {undefined}
+ */
+function drawSampleSquares(colorSamplePairArray, sampleSize, referenceView, title) {
+    let imageWidth = referenceView.image.width;
+    let imageHeight = referenceView.image.height;
+    let bmp = new Bitmap(imageWidth, imageHeight);
+    // AARRGGBB
+    bmp.fill(0x00000000);
+
+    let sampleMap = new Map();
+    let isColor = colorSamplePairArray.length > 1;
+    if (isColor){
+        for (let color = 0; color < colorSamplePairArray.length; color++) {
+            let samplePairArray = colorSamplePairArray[color];
+            samplePairArray.forEach(function (samplePair) {
+                let key = "(" + samplePair.x + "," + samplePair.y + ")";
+                let value = sampleMap.get(key);
+                if (value === undefined) {
+                    value = Math.pow(2, color);
+                } else {
+                    value += Math.pow(2, color);
+                }
+                sampleMap.set(key, value);
+            });
+        }
+    }
+
+    let graphics = new Graphics(bmp);
+    graphics.pen = new Pen(0x0FFFFFFF);
+
+    for (let color = 0; color < colorSamplePairArray.length; color++) {
+        let samplePairArray = colorSamplePairArray[color];
+        let square = new Rect(sampleSize, sampleSize);
+        let offset = (sampleSize - 1) / 2;
+        
+        samplePairArray.forEach(function (samplePair) {
+            if (isColor) {
+                // Square color indicates which color samples exist
+                let key = "(" + samplePair.x + "," + samplePair.y + ")";
+                let value = sampleMap.get(key);
+                switch (value) {
+                    case 1: // 001 Red
+                        graphics.pen = new Pen(0x0FFF0000);
+                        break;
+                    case 2: // 010 Green
+                        graphics.pen = new Pen(0x0F00FF00);
+                        break;
+                    case 3: // 011 Red Green
+                        graphics.pen = new Pen(0x0FFFFF00);
+                        break;
+                    case 4: // 100 Blue
+                        graphics.pen = new Pen(0x0F0000FF);
+                        break;
+                    case 5: // 101 Red Blue
+                        graphics.pen = new Pen(0x0FFF00FF);
+                        break;
+                    case 6: // 110 Green Blue
+                        graphics.pen = new Pen(0x0F00FFFF);
+                        break;
+                    case 7: // 111 Red Green Blue
+                        graphics.pen = new Pen(0x0FFFFFFF);
+                        break;
+                }
+            }
+
+            let x = samplePair.x - offset;
+            let y = samplePair.y - offset;
+            square.moveTo(x, y);
+            graphics.drawRect(square);
+        });
+    }
+
+    graphics.end();
+    
+    let bitsPerSample = 32;
+    let nChannels = isColor ? 3 : 1;
+    let imageWindow = new ImageWindow(imageWidth, imageHeight,
+                nChannels, bitsPerSample, true, isColor, title);
+    
+    let view = imageWindow.mainView;
+    let image = view.image;
+    
+    view.beginProcess();
+    image.assign(referenceView.image);
+    image.blend(bmp);
+    view.endProcess();
+    
+    return imageWindow;
 }

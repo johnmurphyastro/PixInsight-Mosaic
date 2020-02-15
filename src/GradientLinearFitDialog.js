@@ -24,6 +24,7 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #include <pjsr/UndoFlag.jsh>
 #include "DialogLib.js"
 #include "LinearFitLib.js"
+#include "LinearFitGraph.js"
 
 #define VERSION  "1.0"
 #define TITLE "Gradient Linear Fit"
@@ -32,9 +33,9 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #define VERTICAL 1
 #define AUTO 2
 
-function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize) {
+function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize, rejectBrightestPercent) {
     console.writeln("Channel = ", channel);
-    console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh);
+    console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh, ", Reject brightest: ", rejectBrightestPercent + "%");
     console.writeln("  Sample area: x = ", linearFit.sampleArea.x, ", y = ", linearFit.sampleArea.y,
         ", width = ", linearFit.sampleArea.width, ", height = ", linearFit.sampleArea.height);
     console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
@@ -50,14 +51,14 @@ function gradientLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let samplePairArray = []; // SamplePair[channel][SamplePairArray]
+    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
     let nChannels;      // L = 0; R=0, G=1, B=2
     if (targetView.image.isColor) {
         nChannels = 3;
     } else {
         nChannels = 1;
     }
-    
+
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
     let isHorizontal;
     let detectOrientation = false;
@@ -75,13 +76,13 @@ function gradientLinearFit(data)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        samplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, 0);
-        if (samplePairArray[channel].length < 2) {
+        colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
+                channel, data.sampleSize, data.rejectHigh, true, data.rejectBrightestPercent);
+        if (colorSamplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
         }
-        let sampleArea = getSampleArea(samplePairArray[channel]);
+        let sampleArea = getSampleArea(colorSamplePairArray[channel]);
         if (detectOrientation){
             detectOrientation = false;
             isHorizontal = sampleArea.width > sampleArea.height;
@@ -92,35 +93,45 @@ function gradientLinearFit(data)
             }
         }
         if (isHorizontal) {
-            linearFit[channel] = calculateLinearFit(samplePairArray[channel], getHorizontalGradientX, getHorizontalGradientY);
+            linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getHorizontalGradientX, getHorizontalGradientY);
         } else {
-            linearFit[channel] = calculateLinearFit(samplePairArray[channel], getVerticalGradientX, getVerticalGradientY);
+            linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getVerticalGradientX, getVerticalGradientY);
         }
         linearFit[channel].sampleArea = sampleArea;
-        displayConsoleInfo(linearFit[channel], samplePairArray[channel].length,
-                channel, data.rejectHigh, data.sampleSize);
+        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
+                channel, data.rejectHigh, data.sampleSize, data.rejectBrightestPercent);
     }
+
+    let gradientArray = createGradientArray(targetView, linearFit, isHorizontal);
 
     if (data.displayGradientFlag){
         let title = "Gradient_" + targetView.fullId;
-        displayGradient(targetView, linearFit, isHorizontal, title);
+        displayGradient(targetView, title, isHorizontal, gradientArray);
     }
     
-    if (data.displayGradientFlag) { // displayGraphFlag
+    if (data.displaySamplesFlag){
+        let imageWidth = targetView.image.width;
+        let imageHeight = targetView.image.height;
+        let title = "Samples_" + targetView.fullId;
+        let samplesWindow = drawSampleSquares(colorSamplePairArray, data.sampleSize, referenceView, title);
+        samplesWindow.show();
+    }
+
+    if (data.displayGraphFlag) {
         console.writeln("\nCreating linear fit graph");
         let graph;
         let graphWidth;
         if (isHorizontal){
-            let title = "HorizontalFit_" + targetView.fullId;
+            let title = "Horizontal_Gradient_" + targetView.fullId;
             graph = new Graph(title, getHorizontalGradientX, getHorizontalGradientY);
             graphWidth = targetView.image.width;
         } else {
-            let title = "VerticalFit_" + targetView.fullId;
+            let title = "Vertical_Gradient_" + targetView.fullId;
             graph = new Graph(title, getVerticalGradientX, getVerticalGradientY);
             graphWidth = targetView.image.height;
         }
-        let imageWindow = graph.createGradientFitWindow(samplePairArray, nChannels, graphWidth);
-        graph.displayGraphWindow(imageWindow, nChannels, linearFit, samplePairArray);
+        let imageWindow = graph.createGradientFitWindow(colorSamplePairArray, nChannels, graphWidth);
+        graph.displayGradientGraphWindow(imageWindow, nChannels, gradientArray, colorSamplePairArray);
     }
 
     if (isHorizontal) {
@@ -128,7 +139,7 @@ function gradientLinearFit(data)
     } else {
         console.writeln("\nApplying vertical gradient");
     }
-    applyGradient(targetView, linearFit, isHorizontal);
+    applyGradient(targetView, isHorizontal, gradientArray);
 
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
@@ -136,141 +147,112 @@ function gradientLinearFit(data)
 /**
  * Display the detected gradient to the user
  * @param {View} targetView Create a new image with the same dimensions as the target image
- * @param {LinearFit[]} line The detected gradient
- * @param {Boolean} isHorizontal True if displaying a horizontal gradient
  * @param {String} title Title for the displayed gradient window
+ * @param {Boolean} isHorizontal True if displaying a horizontal gradient
+ * @param {GradientArray[]} gradientArray One GradientData structure for each channel.
  * @returns {undefined}
  */
-function displayGradient(targetView, line, isHorizontal, title) {
+function displayGradient(targetView, title, isHorizontal, gradientArray) {
     // Create ImageWindow and View
-    let nChannels = line.length;
+    let nChannels = gradientArray.length;
     let targetImage = targetView.image;
     let window = new ImageWindow(targetImage.width, targetImage.height,
             nChannels, targetImage.bitsPerSample, targetImage.isReal, targetImage.isColor, title);
-
     let view = window.mainView;
-    let targetId = targetView.fullId;
-    createGradient(view, line, isHorizontal, targetId);
-    
-    // Set bg level to ensure no pixels are negative.
-    let image = view.image;
-    let w = image.width;
-    let h = image.height;
-    let min = Number.MAX_VALUE;
-    for (let x = 0; x < w; x++){
-        for (let y = 0; y < h; y++){
-            for (let c = 0; c < nChannels; c++){
-                let value = image.sample(x, y, c);
-                if (0 !== value){
-                    min = Math.min(min, value);
+
+    let minValue = Number.MAX_VALUE;
+    for (let channel = 0; channel < nChannels; channel++){
+        minValue = Math.min(minValue, gradientArray[channel].minValue);
+    }
+
+    view.beginProcess();
+
+    for (let channel = 0; channel < nChannels; channel++) {
+        let difArray = gradientArray[channel].difArray;
+        for (let y = 0; y < targetImage.height; y++) {
+            for (let x = 0; x < targetImage.width; x++) {
+                if (targetImage.sample(x, y, channel) !== 0) {
+                    let value;
+                    if (isHorizontal) {
+                        value = difArray[x];
+                    } else {
+                        value = difArray[y];
+                    }
+                    if (minValue < 0) {
+                        value -= minValue;
+                    }
+                    view.image.setSample(value, x, y, channel);
                 }
             }
         }
     }
-    if (min !== Number.MAX_VALUE){
-        console.writeln("Subtracting ", min.toPrecision(5), " from ", title);
-        let P = new PixelMath;
-        P.expression = "iif($T == 0, 0, $T - " + min + ")";
-        P.symbols = "";
-        P.useSingleExpression = true;
-        P.singleThreaded = false;
-        P.use64BitWorkingImage = true;
-        P.rescale = false;
-        P.truncate = true;
-        P.createNewImage = false;
-        P.executeOn(view, true);
-    }
-    
+
+
+
+    view.endProcess();
     window.show();
 }
 
 /**
- * Create the detected gradient so that it can be displayed to the user
- * @param {View} view A new empty image.
- * @param {LinearFit[]} line
- * @param {Boolean} isHorizontal
- * @param {String} targetId Target image name
- * @returns {undefined}
+ * @param {View} targetView The created gradient is for this image
+ * @param {LinearFit[]} line Gradient linear fit line y = mx + b
+ * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
+ * @return {Number[][]} Gradient array of differences
  */
-function createGradient(view, line, isHorizontal, targetId){
-    // Make sure the pixel math does not create a negative image
-    let minValue = 0;
-    for (let linearFit of line){ // for each channel
-        let dist1;
-        let dist2;
-        if (isHorizontal){
-            dist1 = linearFit.sampleArea.x;
-            dist2 = dist1 + linearFit.sampleArea.width;
-        } else {
-            dist1 = linearFit.sampleArea.y;
-            dist2 = dist1 + linearFit.sampleArea.height;
-        }
-        minValue = Math.min(minValue, linearFit.m * dist1 + linearFit.b); // value at start
-        minValue = Math.min(minValue, linearFit.m * dist2 + linearFit.b); // value at end
-    }
-    // minValue is zero or below zero. Multiply by -1 so we can add it
-    minValue *= -1;
- 
-    let expression;
+function createGradientArray(targetView, line, isHorizontal){
+    let nPoints;
+    let gradientArray = [];
+    let nChannels = line.length;
     if (isHorizontal){
-        expression = "iif(" + targetId + " == 0, 0, x() * ";
+        nPoints = targetView.image.width;
     } else {
-        expression = "iif(" + targetId + " == 0, 0, y() * ";
+        nPoints = targetView.image.height;
     }
-    let P = new PixelMath;
-    P.expression = expression + line[0].m + " + " + line[0].b + " + " + minValue + ")";
-    if (3 === line.length) { // RGB
-        P.expression1 = expression + line[1].m + " + " + line[1].b + " + " + minValue + ")";
-        P.expression2 = expression + line[2].m + " + " + line[2].b + " + " + minValue + ")";
-        P.expression3 = "";
-        P.useSingleExpression = false;
-    } else { // L
-        P.useSingleExpression = true;
+    let minValue = Number.MAX_VALUE;
+    for (let color=0; color< nChannels; color++){
+        let difArray = [];
+        // p represents x (horizontal case) or y (vertical case)
+        for (let p=0; p<nPoints; p++){
+            let dif = p * line[color].m + line[color].b;
+            difArray.push(dif);
+            minValue = Math.min(dif, minValue);
+        }
+        gradientArray[color] = new GradientData(difArray, minValue);
     }
-    P.symbols = "";
-    P.singleThreaded = false;
-    P.use64BitWorkingImage = true;
-    P.rescale = false;
-    P.truncate = true;
-    P.truncateLower = 0;
-    P.truncateUpper = 1;
-    P.createNewImage = false;
-    P.executeOn(view, true);
+    return gradientArray;
 }
 
 /**
  * Subtract the detected gradient from the target view
- * @param {View} targetView Apply the gradient correction to this view
- * @param {LinearFit[]} line Gradient linear fit line y = mx + b, for each channel
+ * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
+ * @param {Number[].GradientData} gradientArray ColourChannel.GradientData diff data
  * @returns {undefined}
  */
-function applyGradient(targetView, line, isHorizontal) {
-    let expression;
-    if (isHorizontal){
-        expression = "iif( $T == 0, 0, $T - (x() * ";
-    } else {
-        expression = "iif( $T == 0, 0, $T - (y() * ";
+function applyGradient(view, isHorizontal, gradientArray) {
+    let nChannels = gradientArray.length;
+    let targetImage = view.image;
+    view.beginProcess();
+
+    for (let channel = 0; channel < nChannels; channel++) {
+        let difArray = gradientArray[channel].difArray;
+        for (let y = 0; y < targetImage.height; y++) {
+            for (let x = 0; x < targetImage.width; x++) {
+                let sample = targetImage.sample(x, y, channel);
+                if (sample !== 0) {
+                    let value;
+                    if (isHorizontal) {
+                        value = sample - difArray[x];
+                    } else {
+                        value = sample - difArray[y];
+                    }
+                    view.image.setSample(value, x, y, channel);
+                }
+            }
+        }
     }
-    let P = new PixelMath;
-    P.expression = expression + line[0].m + " + " + line[0].b + "))";
-    if (3 === line.length) { // RGB
-        P.expression1 = expression + line[1].m + " + " + line[1].b + "))";
-        P.expression2 = expression + line[2].m + " + " + line[2].b + "))";
-        P.expression3 = "";
-        P.useSingleExpression = false;
-    } else { // L
-        P.useSingleExpression = true;
-    }
-    P.symbols = "";
-    P.singleThreaded = false;
-    P.use64BitWorkingImage = true;
-    P.rescale = false;
-    P.truncate = true;
-    P.truncateLower = 0;
-    P.truncateUpper = 1;
-    P.createNewImage = false;
-    P.executeOn(targetView, true);
+
+    view.endProcess();
 }
 
 /**
@@ -309,7 +291,10 @@ function MosaicLinearFitData() {
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
+        Parameters.set("rejectBrightestPercent", this.rejectBrightestPercent);
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
+        Parameters.set("displayGraphFlag", this.displayGraphFlag);
+        Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
     };
 
     // Reload our script's data from a process icon
@@ -320,8 +305,14 @@ function MosaicLinearFitData() {
             this.rejectHigh = Parameters.getReal("rejectHigh");
         if (Parameters.has("sampleSize"))
             this.sampleSize = Parameters.getInteger("sampleSize");
+        if (Parameters.has("rejectBrightestPercent"))
+            this.rejectBrightestPercent = Parameters.getInteger("rejectBrightestPercent");
         if (Parameters.has("displayGradientFlag"))
             this.displayGradientFlag = Parameters.getBoolean("displayGradientFlag");
+        if (Parameters.has("displayGraphFlag"))
+            this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
+        if (Parameters.has("displaySamplesFlag"))
+            this.displaySamplesFlag = Parameters.getBoolean("displaySamplesFlag");
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
             this.targetView = View.viewById(viewId)
@@ -336,8 +327,11 @@ function MosaicLinearFitData() {
     this.setParameters = function () {
         this.orientation = AUTO;
         this.rejectHigh = 0.5;
-        this.sampleSize = 25;
-        this.displayGradientFlag = true;
+        this.sampleSize = 9;
+        this.rejectBrightestPercent = 10;
+        this.displayGradientFlag = false;
+        this.displayGraphFlag = true;
+        this.displaySamplesFlag = true;
     };
 
     // Used when the user presses the reset button
@@ -345,8 +339,11 @@ function MosaicLinearFitData() {
         this.setParameters();
         linearFitDialog.orientationCombo.currentItem = AUTO;
         linearFitDialog.displayGradientControl.checked = this.displayGradientFlag;
+        linearFitDialog.displayGraphControl.checked = this.displayGraphFlag;
+        linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
+        linearFitDialog.rejectBrightestPercent_Control.setValue(this.rejectBrightestPercent);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -370,7 +367,7 @@ function gradientLinearFitDialog(data) {
 
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + "</b> &mdash; Linear fits target and reference images over the overlaping area.");
-    
+
     //-------------------------------------------------------
     // Create the reference image field
     //-------------------------------------------------------
@@ -446,13 +443,31 @@ function gradientLinearFitDialog(data) {
     this.displayGradientControl.onClick = function (checked) {
         data.displayGradientFlag = checked;
     };
+    this.displayGraphControl = new CheckBox(this);
+    this.displayGraphControl.text = "Display Graph";
+    this.displayGraphControl.toolTip = "Display the sample points and their least squares fit line";
+    this.displayGraphControl.checked = data.displayGraphFlag;
+    this.displayGraphControl.onClick = function (checked) {
+        data.displayGraphFlag = checked;
+    };
+    this.displaySampleControl = new CheckBox(this);
+    this.displaySampleControl.text = "Display Samples";
+    this.displaySampleControl.toolTip = "Display the sample squares";
+    this.displaySampleControl.checked = data.displaySamplesFlag;
+    this.displaySampleControl.onClick = function (checked) {
+        data.displaySamplesFlag = checked;
+    };
 
     let orientationSizer = new HorizontalSizer;
     orientationSizer.spacing = 4;
     orientationSizer.add(algorithm_Label);
     orientationSizer.add(this.orientationCombo);
-    orientationSizer.addSpacing(50);
+    orientationSizer.addSpacing(10);
     orientationSizer.add(this.displayGradientControl);
+    orientationSizer.addSpacing(10);
+    orientationSizer.add(this.displayGraphControl);
+    orientationSizer.addSpacing(10);
+    orientationSizer.add(this.displaySampleControl);
     orientationSizer.addStretch();
 
     //-------------------------------------------------------
@@ -488,6 +503,23 @@ function gradientLinearFitDialog(data) {
     this.sampleSize_Control.setPrecision(0);
     this.sampleSize_Control.slider.minWidth = 500;
     this.sampleSize_Control.setValue(data.sampleSize);
+    
+    //-------------------------------------------------------
+    // Reject brightest N samples
+    //-------------------------------------------------------
+    this.rejectBrightestPercent_Control = new NumericControl(this);
+    this.rejectBrightestPercent_Control.real = true;
+    this.rejectBrightestPercent_Control.label.text = "Reject Brightest%:";
+    this.rejectBrightestPercent_Control.label.minWidth = labelWidth1;
+    this.rejectBrightestPercent_Control.toolTip = "<p>Rejects samples that contain bright objects. The brightness is relative to the samples background level.</p>";
+    this.rejectBrightestPercent_Control.onValueUpdated = function (value) {
+        data.rejectBrightestPercent = value;
+    };
+    this.rejectBrightestPercent_Control.setRange(0, 90);
+    this.rejectBrightestPercent_Control.slider.setRange(0, 90);
+    this.rejectBrightestPercent_Control.setPrecision(0);
+    this.rejectBrightestPercent_Control.slider.minWidth = 500;
+    this.rejectBrightestPercent_Control.setValue(data.rejectBrightestPercent);
 
     const helpWindowTitle = TITLE + "." + VERSION;
     const HELP_MSG =
@@ -501,7 +533,7 @@ function gradientLinearFitDialog(data) {
 
     let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
-    
+
     //-------------------------------------------------------
     // Vertically stack all the objects
     //-------------------------------------------------------
@@ -514,6 +546,7 @@ function gradientLinearFitDialog(data) {
     this.sizer.add(targetImage_Sizer);
     this.sizer.add(orientationSizer);
     this.sizer.add(this.rejectHigh_Control);
+    this.sizer.add(this.rejectBrightestPercent_Control);
     this.sizer.add(this.sampleSize_Control);
     this.sizer.add(buttons_Sizer);
 
