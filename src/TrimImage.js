@@ -20,7 +20,7 @@
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
 #include <pjsr/UndoFlag.jsh>
-#include "DialogLib.js"
+#include "lib/DialogLib.js"
 
 #define VERSION "1.0"
 #define TITLE "Trim Image"

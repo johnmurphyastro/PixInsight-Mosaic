@@ -30,8 +30,8 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 #include <pjsr/StdCursor.jsh>
 #include <pjsr/UndoFlag.jsh>
 
-#include "LinearFitLib.js"
-#include "LinearFitGraph.js"
+#include "lib/LinearFitLib.js"
+#include "lib/LinearFitGraph.js"
 
 #define VERSION  "1.0"
 #define TITLE "CFA colour balance (Linear Fit)"

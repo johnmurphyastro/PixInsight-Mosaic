@@ -19,9 +19,8 @@
 #feature-info Linear fits target and reference images over the overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
-
-#include "DialogLib.js"
-#include "LinearFitLib.js"
+#include "lib/DialogLib.js"
+#include "lib/LinearFitLib.js"
 
 #define VERSION  "1.0"
 #define TITLE "Split"
