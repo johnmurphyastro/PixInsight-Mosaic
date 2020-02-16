@@ -337,7 +337,7 @@ function trimImageDialog(data) {
     targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getAll();
+    this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
     this.targetImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
@@ -436,7 +436,7 @@ function main() {
         trimImage(data);
 
         // Quit after successful execution.
-        // break;
+        break;
     }
 
     return;
