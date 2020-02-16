@@ -47,7 +47,7 @@ function gradientLinearFit(data)
     }
 
     applyGradient(targetView, data.coordinate, data.overlap, isHorizontal);
-
+    data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
@@ -184,7 +184,7 @@ function SplitDialog(data) {
     targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getAll();
+    this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
     this.targetImage_ViewList.toolTip = "<p>Image to split</p>";
