@@ -184,20 +184,22 @@ function calculateBinAverage(targetImage, referenceImage, channel, clipping, cal
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
  * @param {Boolean} calcMedian If true calculate mean and median values. If false, median value will be set to zero
  * @param {Number} rejectBrightestPercent Remove the N brightest SamplePairs before returning the array
+ * @param {Rectangle} sampleArea Reject samples outside this area
  * @return {SamplePair[]} Array of target and reference binned sample values
  */
 function createSamplePairs(targetImage, referenceImage, channel, sampleSize,
-        rejectHigh, calcMedian, rejectBrightestPercent) {
+        rejectHigh, calcMedian, rejectBrightestPercent, sampleArea) {
     // Divide the images into blocks specified by sampleSize.
     let binRect = new Rectangle(0, 0, sampleSize, sampleSize);
-    let wBinned = Math.trunc(referenceImage.width / binRect.width);
-    let hBinned = Math.trunc(referenceImage.height / binRect.height);
-
+    let x1 = sampleArea.x;
+    let y1 = sampleArea.y;
+    let x2 = sampleArea.x + sampleArea.width - sampleSize;
+    let y2 = sampleArea.y + sampleArea.height - sampleSize;
     let samplePairArray = [];
-    for (let y = 0; y < hBinned; y++) {
-        for (let x = 0; x < wBinned; x++) {
-            binRect.x = binRect.width * x;
-            binRect.y = binRect.height * y;
+    for (let y = y1; y < y2; y+= sampleSize) {
+        for (let x = x1; x < x2; x+= sampleSize) {
+            binRect.x = x;
+            binRect.y = y;
             let pairedAverage = calculateBinAverage(targetImage, referenceImage, channel, rejectHigh, calcMedian, binRect);
             if (null !== pairedAverage) {
                 samplePairArray.push(pairedAverage);
