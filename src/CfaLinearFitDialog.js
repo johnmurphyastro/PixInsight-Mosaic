@@ -84,7 +84,7 @@ function cfaLinearFit(data)
         let imageWindow = graph.createLinearFitWindow(samplePairArray, nChannels, 1000);
         graph.displayGraphWindow(imageWindow, nChannels, linearFit, samplePairArray);
     }
-    
+    data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
@@ -201,7 +201,7 @@ function cfaLinearFitDialog(data) {
     this.referenceImage_Label.minWidth = labelWidth1;
 
     this.referenceImage_ViewList = new ViewList(this);
-    this.referenceImage_ViewList.getAll();
+    this.referenceImage_ViewList.getMainViews();
     this.referenceImage_ViewList.minWidth = 300;
     this.referenceImage_ViewList.currentView = data.referenceView;
     this.referenceImage_ViewList.toolTip = "<p>Select the colour balanced CFA image</p>";
@@ -223,7 +223,7 @@ function cfaLinearFitDialog(data) {
     this.targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getAll();
+    this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
     this.targetImage_ViewList.toolTip = "<p>Select the RAW CFA image</p>";
@@ -434,7 +434,7 @@ function main() {
         console.hide();
 
         // Quit after successful execution.
-        // break;
+        break;
     }
 
     return;
