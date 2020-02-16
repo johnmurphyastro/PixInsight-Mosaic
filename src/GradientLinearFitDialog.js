@@ -72,12 +72,19 @@ function gradientLinearFit(data)
         detectOrientation = true;
     }
 
+    let samplePreviewArea;
+//    if (data.hasAreaOfInterest){
+//        sampleArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
+//    } else {
+        samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
+//    }
+
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
         colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, true, data.rejectBrightestPercent);
+                channel, data.sampleSize, data.rejectHigh, true, data.rejectBrightestPercent, samplePreviewArea);
         if (colorSamplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
@@ -110,8 +117,6 @@ function gradientLinearFit(data)
     }
     
     if (data.displaySamplesFlag){
-        let imageWidth = targetView.image.width;
-        let imageHeight = targetView.image.height;
         let title = "Samples_" + targetView.fullId;
         let samplesWindow = drawSampleSquares(colorSamplePairArray, data.sampleSize, referenceView, title);
         samplesWindow.show();
@@ -140,7 +145,7 @@ function gradientLinearFit(data)
         console.writeln("\nApplying vertical gradient");
     }
     applyGradient(targetView, isHorizontal, gradientArray);
-
+    data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
@@ -327,7 +332,7 @@ function MosaicLinearFitData() {
     this.setParameters = function () {
         this.orientation = AUTO;
         this.rejectHigh = 0.5;
-        this.sampleSize = 9;
+        this.sampleSize = 15;
         this.rejectBrightestPercent = 10;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
@@ -609,7 +614,7 @@ function main() {
         console.hide();
 
         // Quit after successful execution.
-        // break;
+        break;
     }
 
     return;
