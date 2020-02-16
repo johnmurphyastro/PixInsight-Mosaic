@@ -56,16 +56,22 @@ function mosaicLinearFit(data)
     }
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
+    let samplePreviewArea;
+    if (data.hasAreaOfInterest){
+        samplePreviewArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
+    } else {
+        samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
+    }
 
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
         colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, false, 0);
+                channel, data.sampleSize, data.rejectHigh, false, 0, samplePreviewArea);
         if (colorSamplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
-            return;
+            return false;
         }
 
         linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getLinearFitX, getLinearFitY);
@@ -81,6 +87,12 @@ function mosaicLinearFit(data)
         graph.displayGraphWindow(imageWindow, nChannels, linearFit, colorSamplePairArray);
     }
     
+    if (data.displaySamplesFlag){
+        let title = "Samples_" + targetView.fullId;
+        let samplesWindow = drawSampleSquares(colorSamplePairArray, data.sampleSize, referenceView, title);
+        samplesWindow.show();
+    }
+    
     console.writeln("\nApplying linear fit");
     applyLinearFit(targetView, linearFit);
 
@@ -88,7 +100,9 @@ function mosaicLinearFit(data)
         console.writeln("\nCreating " + MOSAIC_NAME);
         createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME);
     }
+    data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+    return true;
 }
 
 /**
@@ -136,8 +150,15 @@ function MosaicLinearFitData() {
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
+        Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
         Parameters.set("displayMosiacFlag", this.displayMosiacFlag);
         Parameters.set("mosiacOverlayFlag", this.mosaicOverlayFlag);
+        
+        Parameters.set("hasAreaOfInterest", this.hasAreaOfInterest);
+        Parameters.set("areaOfInterestX", this.areaOfInterest_X);
+        Parameters.set("areaOfInterestY", this.areaOfInterest_Y);
+        Parameters.set("areaOfInterestW", this.areaOfInterest_W);
+        Parameters.set("areaOfInterestH", this.areaOfInterest_H);
     };
 
     // Reload our script's data from a process icon
@@ -148,6 +169,8 @@ function MosaicLinearFitData() {
             this.sampleSize = Parameters.getInteger("sampleSize");    
         if (Parameters.has("displayGraphFlag"))
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
+        if (Parameters.has("displaySamplesFlag"))
+            this.displaySamplesFlag = Parameters.getBoolean("displaySamplesFlag");
         if (Parameters.has("displayMosiacFlag"))
             this.displayMosiacFlag = Parameters.getBoolean("displayMosiacFlag");
         if (Parameters.has("mosiacOverlayFlag")) {
@@ -162,26 +185,55 @@ function MosaicLinearFitData() {
             let viewId = Parameters.getString("referenceView");
             this.referenceView = View.viewById(viewId)
         }
+        
+        if (Parameters.has("hasAreaOfInterest"))
+            this.hasAreaOfInterest = Parameters.getBoolean("hasAreaOfInterest");
+        if (Parameters.has("areaOfInterestX")){
+            this.areaOfInterest_X = Parameters.getInteger("areaOfInterestX"); 
+        }
+        if (Parameters.has("areaOfInterestY")){
+            this.areaOfInterest_Y = Parameters.getInteger("areaOfInterestY"); 
+        }
+        if (Parameters.has("areaOfInterestW")){
+            this.areaOfInterest_W = Parameters.getInteger("areaOfInterestW"); 
+        }
+        if (Parameters.has("areaOfInterestH")){
+            this.areaOfInterest_H = Parameters.getInteger("areaOfInterestH"); 
+        }
     };
 
     // Initialise the scripts data
     this.setParameters = function () {
         this.rejectHigh = 0.5;
-        this.sampleSize = 30;
+        this.sampleSize = 15;
         this.displayGraphFlag = false;
+        this.displaySamplesFlag = false;
         this.displayMosiacFlag = true;
         this.mosaicOverlayFlag = true;
         this.mosaicRandomFlag = false;
+        
+        this.hasAreaOfInterest = false;
+        this.areaOfInterest_X = 0;
+        this.areaOfInterest_Y = 0;
+        this.areaOfInterest_W = 0;
+        this.areaOfInterest_H = 0;
     };
 
     // Used when the user presses the reset button
     this.resetParameters = function (linearFitDialog) {
         this.setParameters();
         linearFitDialog.displayGraphControl.checked = this.displayGraphFlag;
+        linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.displayMosaicControl.checked = this.displayMosiacFlag;
         linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
+        
+        linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
+        linearFitDialog.rectangleX_Control.setValue(this.areaOfInterest_X);
+        linearFitDialog.rectangleY_Control.setValue(this.areaOfInterest_Y);
+        linearFitDialog.rectangleW_Control.setValue(this.areaOfInterest_W);
+        linearFitDialog.rectangleH_Control.setValue(this.areaOfInterest_H);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -191,6 +243,36 @@ function MosaicLinearFitData() {
     }
     // Initialise the script's data
     this.setParameters();
+}
+
+function setTargetPreview(previewImage_ViewList, data, targetView){
+    let previews = targetView.window.previews;
+    if (previews.length > 0) {
+        previewImage_ViewList.currentView = previews[0];
+        data.preview = previews[0];
+    }
+}
+
+/**
+ * 
+ * @param {String} label
+ * @param {String} tooltip
+ * @param {Number} initialValue
+ * @param {Number} labelWidth
+ * @param {Number} editWidth
+ * @returns {NumericEdit}
+ */
+function createNumericEdit(label, tooltip, initialValue, labelWidth, editWidth){
+    let numericEditControl = new NumericEdit();
+    numericEditControl.setReal(false);
+    numericEditControl.setRange(0, 100000);
+    numericEditControl.setValue(initialValue);
+    numericEditControl.label.text = label;
+    numericEditControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+//    numericEditControl.label.setFixedWidth(labelWidth);
+    numericEditControl.edit.setFixedWidth(editWidth);
+    numericEditControl.toolTip = tooltip;
+    return numericEditControl;
 }
 
 // The main dialog function
@@ -213,7 +295,7 @@ function mosaicLinearFitDialog(data) {
     referenceImage_Label.minWidth = labelWidth1;
 
     this.referenceImage_ViewList = new ViewList(this);
-    this.referenceImage_ViewList.getAll();
+    this.referenceImage_ViewList.getMainViews();
     this.referenceImage_ViewList.minWidth = 300;
     this.referenceImage_ViewList.currentView = data.referenceView;
     this.referenceImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
@@ -235,12 +317,13 @@ function mosaicLinearFitDialog(data) {
     targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getAll();
+    this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
     this.targetImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
     this.targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
+        setTargetPreview(this.dialog.previewImage_ViewList, data, view);
     };
 
     let targetImage_Sizer = new HorizontalSizer;
@@ -267,11 +350,21 @@ function mosaicLinearFitDialog(data) {
     this.displayGraphControl.onClick = function (checked) {
         data.displayGraphFlag = checked;
     };
+    
+    this.displaySampleControl = new CheckBox(this);
+    this.displaySampleControl.text = "Display Samples";
+    this.displaySampleControl.toolTip = "Display the sample squares";
+    this.displaySampleControl.checked = data.displaySamplesFlag;
+    this.displaySampleControl.onClick = function (checked) {
+        data.displaySamplesFlag = checked;
+    };
 
     let algorithm_Sizer = new HorizontalSizer;
     algorithm_Sizer.spacing = 4;
     algorithm_Sizer.add(algorithm_Label);
     algorithm_Sizer.add(this.displayGraphControl);
+    algorithm_Sizer.addSpacing(20);
+    algorithm_Sizer.add(this.displaySampleControl);
     algorithm_Sizer.addStretch();
 
     //-------------------------------------------------------
@@ -350,6 +443,100 @@ function mosaicLinearFitDialog(data) {
     this.sampleSize_Control.setPrecision(0);
     this.sampleSize_Control.slider.minWidth = 500;
     this.sampleSize_Control.setValue(data.sampleSize);
+    
+    // Area of interest
+    let labelWidth2 = this.font.width("Height:_");
+    let areaOfInterest_GroupBox = new GroupBox(this);
+    areaOfInterest_GroupBox.title = "Area of Interest";
+    areaOfInterest_GroupBox.sizer = new VerticalSizer;
+    areaOfInterest_GroupBox.sizer.margin = 6;
+    areaOfInterest_GroupBox.sizer.spacing = 6;
+    
+    this.rectangleX_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X, labelWidth2, 50);
+    this.rectangleX_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X = value;
+    };
+    this.rectangleY_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y, labelWidth2, 50);
+    this.rectangleY_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y = value;
+    };
+    this.rectangleW_Control = createNumericEdit("Width:", "Rectangle width.", data.areaOfInterest_W, labelWidth2, 50);
+    this.rectangleW_Control.onValueUpdated = function (value){
+        data.areaOfInterest_W = value;
+    };
+    this.rectangleH_Control = createNumericEdit("Height:", "Rectangle height.", data.areaOfInterest_H, labelWidth2, 50);
+    this.rectangleH_Control.onValueUpdated = function (value){
+        data.areaOfInterest_H = value;
+    };
+    
+    this.areaOfInterestCheckBox = new CheckBox(this);
+    this.areaOfInterestCheckBox.text = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+    this.areaOfInterestCheckBox.onClick = function (checked) {
+        data.hasAreaOfInterest = checked;
+    };
+    
+    let coordHorizontalSizer = new HorizontalSizer;
+    coordHorizontalSizer.spacing = 30;
+    coordHorizontalSizer.add(this.rectangleX_Control);
+    coordHorizontalSizer.add(this.rectangleY_Control);
+    coordHorizontalSizer.add(this.rectangleW_Control);
+    coordHorizontalSizer.add(this.rectangleH_Control);
+    coordHorizontalSizer.addStretch();
+
+    // Area of interest Target->preview
+    let previewImage_Label = new Label(this);
+    previewImage_Label.text = "Get area from preview:";
+    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    previewImage_Label.minWidth = labelWidth1;
+
+    this.previewImage_ViewList = new ViewList(this);
+    this.previewImage_ViewList.getPreviews();
+    this.previewImage_ViewList.minWidth = 300;
+    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
+    this.previewImage_ViewList.onViewSelected = function (view) {
+        data.preview = view;
+    };
+    setTargetPreview(this.previewImage_ViewList, data, data.targetView);
+    
+    let previewUpdateButton = new PushButton();
+    previewUpdateButton.hasFocus = false;
+    previewUpdateButton.text = "Update";
+    previewUpdateButton.onClick = function () {
+        if (!this.isUnderMouse){
+            // Ensure pressing return in a different field does not trigger this callback!
+            return;
+        }
+        let view = data.preview;
+        if (view.isPreview) {
+            data.hasAreaOfInterest = true;
+            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            ///let imageWindow = view.window;
+            let rect = view.window.previewRect(view);
+            data.areaOfInterest_X = rect.x0;
+            data.areaOfInterest_Y = rect.y0;
+            data.areaOfInterest_W = rect.width;
+            data.areaOfInterest_H = rect.height;
+            
+            // Console.writeln("Preview rectangle: (" + rect.x0 + "," + rect.y0 + ") (" + rect.x1 + "," + rect.y1 + ") Width: " + rect.width + " Height: " + rect.height);
+            this.dialog.rectangleX_Control.setValue(data.areaOfInterest_X);
+            this.dialog.rectangleY_Control.setValue(data.areaOfInterest_Y);
+            this.dialog.rectangleW_Control.setValue(data.areaOfInterest_W);
+            this.dialog.rectangleH_Control.setValue(data.areaOfInterest_H);
+        }
+    };
+
+    let previewImage_Sizer = new HorizontalSizer;
+    previewImage_Sizer.spacing = 4;
+    previewImage_Sizer.add(previewImage_Label);
+    previewImage_Sizer.add(this.previewImage_ViewList, 100);
+    previewImage_Sizer.addSpacing(10);
+    previewImage_Sizer.add(previewUpdateButton);
+
+    areaOfInterest_GroupBox.sizer.add(this.areaOfInterestCheckBox);
+    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
+    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
     const helpWindowTitle = TITLE + "." + VERSION;
     const HELP_MSG =
@@ -384,6 +571,8 @@ function mosaicLinearFitDialog(data) {
     this.sizer.add(mosaic_Sizer);
     this.sizer.add(this.rejectHigh_Control);
     this.sizer.add(this.sampleSize_Control);
+    this.sizer.addSpacing(10);
+    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------
@@ -441,11 +630,16 @@ function main() {
         }
 
         // Calculate and apply the linear fit
-        mosaicLinearFit(data);
+        let ok = mosaicLinearFit(data);
+        if (!ok){
+            // Give the user a chance to correct the error
+            continue;
+        }
+        
         console.hide();
 
         // Quit after successful execution.
-        // break;
+        break;
     }
 
     return;
