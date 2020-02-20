@@ -25,7 +25,7 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
 #include "lib/DialogLib.js"
 #include "lib/LinearFitLib.js"
-#include "lib/LinearFitGraph.js"
+#include "lib/Graph.js"
 #include "lib/DisplaySamples.js"
 
 #define VERSION  "1.0"
@@ -82,10 +82,8 @@ function mosaicLinearFit(data)
 
     if (data.displayGraphFlag) {
         console.writeln("\nCreating linear fit graph");
-        let title = "LinearFit_" + targetView.fullId;
-        let graph = new Graph(title, getLinearFitX, getLinearFitY);
-        let imageWindow = graph.createLinearFitWindow(colorSamplePairArray, nChannels, 1000);
-        graph.displayGraphWindow(imageWindow, nChannels, linearFit, colorSamplePairArray);
+        displayGraph(targetView.fullId, referenceView.fullId, 730, 
+            colorSamplePairArray, linearFit);
     }
     
     if (data.displaySamplesFlag){
@@ -104,6 +102,74 @@ function mosaicLinearFit(data)
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
     return true;
+}
+
+function SamplePairMinMax() {
+    this.maxReferenceMean = Number.NEGATIVE_INFINITY;
+    this.maxTargetMean = Number.NEGATIVE_INFINITY;
+    this.minReferenceMean = Number.POSITIVE_INFINITY; 
+    this.minTargetMean = Number.POSITIVE_INFINITY;
+
+    this.calculateMinMax = function(samplePairArray){
+        for (let samplePair of samplePairArray) {
+            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
+            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
+            this.minReferenceMean = Math.min(this.minReferenceMean, samplePair.referenceMean);
+            this.minTargetMean = Math.min(this.minTargetMean, samplePair.targetMean);
+        }
+    };
+}
+
+function displayGraph(targetName, referenceName, height, colorSamplePairArray, linearFit){
+    
+    let imageWindow = null;
+    let windowTitle = targetName + "_to_" + referenceName + "_LeastSquaresFit";
+    let targetLabel = "Target (" + targetName + ") sample mean value";
+    let referenceLabel = "Reference (" + referenceName + ") sample mean value";
+    
+    // Create the graph axis and annotation.
+    let minMax = new SamplePairMinMax();
+    colorSamplePairArray.forEach(function (samplePairArray) {
+        minMax.calculateMinMax(samplePairArray);
+    });
+    //let graphWithAxis = new Graph(minMax.minTargetMean, minMax.minReferenceMean, minMax.maxTargetMean, minMax.maxReferenceMean);
+    let graphWithAxis = new Graph(0, 0, minMax.maxTargetMean, minMax.maxReferenceMean);
+    graphWithAxis.setYAxisLength(height);
+    graphWithAxis.createGraph(targetLabel, referenceLabel);
+
+    // Now add the data to the graph...
+    if (colorSamplePairArray.length === 1){ // B&W
+        drawLineAndPoints(graphWithAxis, linearFit[0], 0xFF777777, colorSamplePairArray[0], 0xFFFFFFFF);
+        imageWindow = graphWithAxis.createWindow(windowTitle, false);
+    } else {
+        // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
+        // if three samples are on the same pixel we get white and not the last color drawn
+        let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
+        let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+        for (let c = 0; c < colorSamplePairArray.length; c++){
+            let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+            drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairArray[c], pointColors[c]);
+            graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+        }
+        imageWindow = graphWithAxis.createWindow(windowTitle, true);
+    }
+    
+    imageWindow.show();
+}
+
+/**
+ * @param {Graph} graph
+ * @param {LinearFitData} linearFit
+ * @param {Number} lineColor e.g. 0xAARRGGBB
+ * @param {SamplePair[]} samplePairArray
+ * @param {Number} pointColor e.g. 0xAARRGGBB
+ * @returns {undefined}
+ */
+function drawLineAndPoints(graph, linearFit, lineColor, samplePairArray, pointColor){
+    graph.drawLine(linearFit.m, linearFit.b, lineColor);
+    samplePairArray.forEach(function (samplePair) {
+        graph.drawPoint(samplePair.targetMean, samplePair.referenceMean, pointColor);
+    });
 }
 
 /**
@@ -205,7 +271,7 @@ function MosaicLinearFitData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.rejectHigh = 0.5;
+        this.rejectHigh = 0.8;
         this.sampleSize = 15;
         this.displayGraphFlag = false;
         this.displaySamplesFlag = false;

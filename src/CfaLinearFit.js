@@ -31,18 +31,26 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 #include <pjsr/UndoFlag.jsh>
 
 #include "lib/LinearFitLib.js"
-#include "lib/LinearFitGraph.js"
+#include "lib/Graph.js"
 
 #define VERSION  "1.0"
 #define TITLE "CFA colour balance (Linear Fit)"
 #define MOSAIC_NAME "Mosaic"
 
-function displayConsoleInfo(linearFit, channel, rejectHigh) {
+function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh) {
     console.writeln("Pixel = ", channel);
-    console.writeln("  Reject high: ", rejectHigh);
+    console.writeln("  Samples: ", nSamples, ", Reject high: ", rejectHigh);
     console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
 }
 
+function displayWhiteBalance(linearFit, minGradient){
+    console.writeln("Color balance: ");
+    console.writeln("Top Left    : " + (linearFit[1].m / minGradient).toPrecision(7));
+    console.writeln("Top Right   : " + (linearFit[0].m / minGradient).toPrecision(7));
+    console.writeln("Bottom Right: " + (linearFit[2].m / minGradient).toPrecision(7));
+    console.writeln("Bottom Left : " + (linearFit[3].m / minGradient).toPrecision(7));
+    
+}
 /**
  * Controller. Processing starts here!
  * @param {MosaicLinearFitData} data Values from user interface
@@ -53,7 +61,7 @@ function cfaLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let samplePairArray = []; // SamplePair[channel][SamplePairArray]
+    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
     let nChannels = 4;      // 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
     if (targetView.image.isColor || referenceView.image.isColor) {
         new MessageBox("Error: both images must be CFA", TITLE, StdIcon_Error, StdButton_Ok).execute();
@@ -62,30 +70,93 @@ function cfaLinearFit(data)
 
     console.writeln("CFA Reference: ", referenceView.fullId, ", CFA Raw: ", targetView.fullId);
 
+    let minGradient = Number.POSITIVE_INFINITY;
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        samplePairArray[channel] = createCfaSamplePairs(targetView.image, referenceView.image,
+        colorSamplePairArray[channel] = createCfaSamplePairs(targetView.image, referenceView.image,
                 channel, data.rejectHigh);
-        if (samplePairArray[channel].length < 2) {
+        if (colorSamplePairArray[channel].length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
         }
 
-        linearFit[channel] = calculateLinearFit(samplePairArray[channel], getLinearFitX, getLinearFitY);
-        displayConsoleInfo(linearFit[channel], channel, data.rejectHigh);
+        linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getLinearFitX, getLinearFitY);
+        minGradient = Math.min(minGradient, linearFit[channel].m);
+        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
+                channel, data.rejectHigh);
     }
+    displayWhiteBalance(linearFit, minGradient);
 
     if (data.displayGraphFlag) {
         console.writeln("\nCreating linear fit graph");
-        let title = "LinearFit_" + targetView.fullId;
-        let graph = new Graph(title, getLinearFitX, getLinearFitY);
-        let imageWindow = graph.createLinearFitWindow(samplePairArray, nChannels, 1000);
-        graph.displayGraphWindow(imageWindow, nChannels, linearFit, samplePairArray);
+        displayGraph(targetView.fullId, referenceView.fullId, 730, 
+            colorSamplePairArray, linearFit);
     }
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+}
+
+function SamplePairMinMax() {
+    this.maxReferenceMean = Number.NEGATIVE_INFINITY;
+    this.maxTargetMean = Number.NEGATIVE_INFINITY;
+    this.minReferenceMean = Number.POSITIVE_INFINITY; 
+    this.minTargetMean = Number.POSITIVE_INFINITY;
+
+    this.calculateMinMax = function(samplePairArray){
+        for (let samplePair of samplePairArray) {
+            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
+            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
+            this.minReferenceMean = Math.min(this.minReferenceMean, samplePair.referenceMean);
+            this.minTargetMean = Math.min(this.minTargetMean, samplePair.targetMean);
+        }
+    };
+}
+
+function displayGraph(targetName, referenceName, height, colorSamplePairArray, linearFit){
+    let imageWindow = null;
+    let windowTitle = targetName + "_to_" + referenceName + "_LeastSquaresFit";
+    let targetLabel = "Pure RAW (" + targetName + ") sample value";
+    let referenceLabel = "White Balance RAW (" + referenceName + ") sample value";
+    
+    // Create the graph axis and annotation.
+    let minMax = new SamplePairMinMax();
+    colorSamplePairArray.forEach(function (samplePairArray) {
+        minMax.calculateMinMax(samplePairArray);
+    });
+    let graphWithAxis = new Graph(minMax.minTargetMean, minMax.minReferenceMean, minMax.maxTargetMean, minMax.maxReferenceMean);
+    //let graphWithAxis = new Graph(0, 0, minMax.maxTargetMean, minMax.maxReferenceMean);
+    graphWithAxis.setYAxisLength(height);
+    graphWithAxis.createGraph(targetLabel, referenceLabel);
+
+    // Now add the data to the graph...
+    // Color. Need to create 4 graphs for r, g, g, b and then merge them (binary OR) so that
+    // if three samples are on the same pixel we get white and not the last color drawn
+    let lineColors = [0xFF770000, 0xFF007700, 0xFF007700, 0xFF000077]; // r, g, b
+    let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+    for (let c = 0; c < colorSamplePairArray.length; c++) {
+        let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+        drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairArray[c], pointColors[c]);
+        graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+    }
+    imageWindow = graphWithAxis.createWindow(windowTitle, true);
+    imageWindow.show();
+}
+
+/**
+ * @param {Graph} graph
+ * @param {LinearFitData} linearFit
+ * @param {Number} lineColor e.g. 0xAARRGGBB
+ * @param {SamplePair[]} samplePairArray
+ * @param {Number} pointColor e.g. 0xAARRGGBB
+ * @returns {undefined}
+ */
+function drawLineAndPoints(graph, linearFit, lineColor, samplePairArray, pointColor){
+    graph.drawLine(linearFit.m, linearFit.b, lineColor);
+    samplePairArray.forEach(function (samplePair) {
+        graph.drawPoint(samplePair.targetMean, samplePair.referenceMean, pointColor);
+    });
 }
 
 /**
@@ -180,7 +251,7 @@ function cfaLinearFitDialog(data) {
     //-------------------------------------------------------
     // Set some basic widths from dialog text
     //-------------------------------------------------------
-    let labelWidth1 = this.font.width("CCD linear range:_");
+    let labelWidth1 = this.font.width("RAW (White Balance):_");
 
     //-------------------------------------------------------
     // Create the Program Discription at the top
@@ -196,7 +267,7 @@ function cfaLinearFitDialog(data) {
     // Create the reference image field
     //-------------------------------------------------------
     this.referenceImage_Label = new Label(this);
-    this.referenceImage_Label.text = "Reference View:";
+    this.referenceImage_Label.text = "RAW (White Balance):";
     this.referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     this.referenceImage_Label.minWidth = labelWidth1;
 
@@ -218,7 +289,7 @@ function cfaLinearFitDialog(data) {
     // Create the target image field
     //-------------------------------------------------------
     this.targetImage_Label = new Label(this);
-    this.targetImage_Label.text = "Target View:";
+    this.targetImage_Label.text = "Pure RAW:";
     this.targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     this.targetImage_Label.minWidth = labelWidth1;
 
@@ -241,7 +312,7 @@ function cfaLinearFitDialog(data) {
     // Linear Fit Method Field
     //-------------------------------------------------------
     this.algorithm_Label = new Label(this);
-    this.algorithm_Label.text = "LinearFit:";
+    this.algorithm_Label.text = "Least Squares Fit:";
     this.algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     this.algorithm_Label.minWidth = labelWidth1;
 
@@ -313,18 +384,7 @@ function cfaLinearFitDialog(data) {
 
     // Help button
     const HELP_MSG =
-            "<p>Apply a scale and offset to the target image so that it matches the reference image. The default parameters should work well. " +
-            "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
-            "<p>The 'LinearFit Method' is 'Least Squares'.</p>" +
-            "<p>The optional graph displays the sample points and the best fit line.</p>" +
-            "<p>The optional test mosaic is used to visually judge how well the target image was scaled.</p>" +
-            "<p>The 'CCD Linear Range' rejects all sample squares that contain a sample above this level. " +
-            "This ensures that only the linear part of the CCD's range is used.</p>" +
-            "The 'Reject Brightest' rejects the N brightest samples. These samples are likely to contain " +
-            "bright stars. Increase this if the samples diverge from the fitted line at the top left of the graph.</p>" +
-            "<p>The images are divided into 'Sample Size' squares; a sample is the average of a square. " +
-            "The 'Sample Size' should be bigger than the diameter of bright stars. " +
-            "If set too small, differing FWHM between the two images will affect the linear fit.</p>";
+            "<p>Not yet implemented</p>";
 
     this.browseDocumentationButton = new ToolButton(this);
     this.browseDocumentationButton.icon = ":/process-interface/browse-documentation.png";

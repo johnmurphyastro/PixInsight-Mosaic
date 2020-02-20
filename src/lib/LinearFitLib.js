@@ -65,11 +65,13 @@ function LinearFitData(m, b, sampleArea = null) {
  * 
  * @param {Number[]} difArray
  * @param {Number} minValue
+ * @param {Number} maxValue
  * @returns {GradientData}
  */
-function GradientData(difArray, minValue){
+function GradientData(difArray, minValue, maxValue){
     this.difArray = difArray;
     this.minValue = minValue;
+    this.maxValue = maxValue;
 }
 
 function getLinearFitX(samplePair) {
@@ -264,7 +266,7 @@ function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) 
             if (isBlackOrClipped(referenceSample, rejectHigh)) {
                 continue;
             }
-            let pairedAverage = new SamplePair(targetSample, referenceSample, x, y);
+            let pairedAverage = new SamplePair(targetSample, 0, referenceSample, 0, x, y);
             samplePairArray.push(pairedAverage);
         }
     }

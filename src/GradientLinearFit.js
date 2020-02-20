@@ -24,7 +24,7 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
 #include "lib/LinearFitLib.js"
-#include "lib/LinearFitGraph.js"
+#include "lib/Graph.js"
 #include "lib/DisplaySamples.js"
 
 #define VERSION  "1.0"
@@ -125,19 +125,7 @@ function gradientLinearFit(data)
 
     if (data.displayGraphFlag) {
         console.writeln("\nCreating linear fit graph");
-        let graph;
-        let graphWidth;
-        if (isHorizontal){
-            let title = "Horizontal_Gradient_" + targetView.fullId;
-            graph = new Graph(title, getHorizontalGradientX, getHorizontalGradientY);
-            graphWidth = targetView.image.width;
-        } else {
-            let title = "Vertical_Gradient_" + targetView.fullId;
-            graph = new Graph(title, getVerticalGradientX, getVerticalGradientY);
-            graphWidth = targetView.image.height;
-        }
-        let imageWindow = graph.createGradientFitWindow(colorSamplePairArray, nChannels, graphWidth);
-        graph.displayGradientGraphWindow(imageWindow, nChannels, gradientArray, colorSamplePairArray);
+        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairArray);
     }
 
     if (isHorizontal) {
@@ -148,6 +136,91 @@ function gradientLinearFit(data)
     applyGradient(targetView, isHorizontal, gradientArray);
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+}
+
+function displayGraph(targetView, referenceView, width, isHorizontal, gradientArray, colorSamplePairArray){
+    let axisWidth;
+    let maxCoordinate;
+    let imageWindow = null;
+    let windowTitle = "GradientBetween_" + targetView.fullId + "_and_" + referenceView.fullId + "_LeastSquaresFit";
+    let xLabel;
+    if (isHorizontal){
+        xLabel = "Mosaic tile join X-coordinate";
+        maxCoordinate = targetView.image.width;       
+    } else {
+        xLabel = "Mosaic tile join Y-coordinate";
+        maxCoordinate = targetView.image.height;
+    }
+    let yLabel = "(" + targetView.fullId + " sample median) - (" + referenceView.fullId + " sample median)";
+    axisWidth = Math.min(width, maxCoordinate);
+    // gradientArray stores min / max of fitted lines.
+    // also need min / max of sample points.
+    let minMax = new SamplePairDifMinMax(colorSamplePairArray, gradientArray);
+
+    let graphWithAxis = new Graph(0, minMax.minDif, maxCoordinate, minMax.maxDif);
+    graphWithAxis.setAxisLength(axisWidth + 2, 500);
+    graphWithAxis.createGraph(xLabel, yLabel);
+    
+    if (colorSamplePairArray.length === 1){ // B&W
+        drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[0], 0xFF777777,
+            colorSamplePairArray[0], 0xFFFFFFFF);
+        imageWindow = graphWithAxis.createWindow(windowTitle, false);
+    } else {
+        // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
+        // if three samples are on the same pixel we get white and not the last color drawn
+        let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
+        let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+        for (let c = 0; c < colorSamplePairArray.length; c++){
+            let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+            drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[c], lineColors[c],
+                colorSamplePairArray[c], pointColors[c]);
+            graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+        }
+        imageWindow = graphWithAxis.createWindow(windowTitle, true);
+    }
+    imageWindow.show();
+}
+
+function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, samplePairArray, pointColor) {
+    let difArray = gradientData.difArray;
+    for (let x = 0; x < difArray.length; x++) {
+        // Draw the best fit line(s)
+        graph.drawPoint(x, difArray[x], lineColor);
+    }
+    for (let samplePair of samplePairArray) {
+        // Draw the sample points
+        let dif = samplePair.targetMedian - samplePair.referenceMedian;
+        let coord;
+        if (isHorizontal) {
+            coord = samplePair.x;
+        } else {
+            coord = samplePair.y;
+        }
+        graph.drawPoint(coord, dif, pointColor);
+    }
+}
+
+/**
+ * Calculates maximum and minimum values for the samples and the best fit line(s)
+ * @param {type} colorSamplePairArray
+ * @param {GradientData} gradientData
+ * @returns {SamplePairDifMinMax}
+ */
+function SamplePairDifMinMax(colorSamplePairArray, gradientData) {
+// TODO investigate why this is wrong...
+//    this.minDif = Math.min(Math.min(gradientData[0].min, gradientData[1].min), gradientData[2].min); 
+//    this.maxDif = Math.max(Math.max(gradientData[0].max, gradientData[1].max), gradientData[2].max);
+
+    this.minDif = Number.POSITIVE_INFINITY;
+    this.maxDif = Number.NEGATIVE_INFINITY;
+
+    for (let samplePairArray of colorSamplePairArray) {
+        for (let samplePair of samplePairArray) {
+            // works for both horizontal and vertical
+            this.minDif = Math.min(this.minDif, samplePair.targetMedian - samplePair.referenceMedian);
+            this.maxDif = Math.max(this.maxDif, samplePair.targetMedian - samplePair.referenceMedian);
+        }
+    }
 }
 
 /**
@@ -214,7 +287,8 @@ function createGradientArray(targetView, line, isHorizontal){
     } else {
         nPoints = targetView.image.height;
     }
-    let minValue = Number.MAX_VALUE;
+    let minValue = Number.POSITIVE_INFINITY;
+    let maxValue = Number.NEGATIVE_INFINITY;
     for (let color=0; color< nChannels; color++){
         let difArray = [];
         // p represents x (horizontal case) or y (vertical case)
@@ -222,8 +296,9 @@ function createGradientArray(targetView, line, isHorizontal){
             let dif = p * line[color].m + line[color].b;
             difArray.push(dif);
             minValue = Math.min(dif, minValue);
+            maxValue = Math.max(dif, maxValue);
         }
-        gradientArray[color] = new GradientData(difArray, minValue);
+        gradientArray[color] = new GradientData(difArray, minValue, maxValue);
     }
     return gradientArray;
 }
@@ -332,7 +407,7 @@ function MosaicLinearFitData() {
     // Initialise the scripts data
     this.setParameters = function () {
         this.orientation = AUTO;
-        this.rejectHigh = 0.5;
+        this.rejectHigh = 0.8;
         this.sampleSize = 15;
         this.rejectBrightestPercent = 10;
         this.displayGradientFlag = false;

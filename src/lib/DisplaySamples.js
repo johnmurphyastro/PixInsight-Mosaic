@@ -150,9 +150,9 @@ function SampleRectangle(x, y, bitFlag) {
     
     /**
      * @param {Number} alpha (0 to 255) << 24
-     * @param {type} red (0 to 255) << 16
-     * @param {type} green (0 to 255) << 8
-     * @param {type} blue (0 to 255) 
+     * @param {Number} red (0 to 255) << 16
+     * @param {Number} green (0 to 255) << 8
+     * @param {Number} blue (0 to 255) 
      * @returns {Number} Hex color AARRGGBB
      */
     this.getHexColor = function (alpha, red, green, blue){
