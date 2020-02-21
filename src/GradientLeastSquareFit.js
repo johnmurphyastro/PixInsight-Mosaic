@@ -16,23 +16,24 @@
 "use strict";
 #feature-id Utilities > gradientLinearFit
 
-#feature-info Linear fits target and reference images over the overlaping area.<br/>\
+#feature-info Calculates the gradient between two images over their overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
 #include <pjsr/ColorSpace.jsh>
 #include <pjsr/DataType.jsh>
 #include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
-#include "lib/LinearFitLib.js"
+#include "lib/SamplePair.js"
+#include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/DisplaySamples.js"
 
 #define VERSION  "1.0"
-#define TITLE "Gradient Linear Fit"
-#define MOSAIC_NAME "Mosaic"
+#define TITLE "Gradient Least Squares Fit"
 #define HORIZONTAL 0
 #define VERTICAL 1
 #define AUTO 2
+#define MOSAIC_NAME "Mosaic"
 
 function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize, rejectBrightestPercent) {
     console.writeln("Channel = ", channel);
@@ -52,13 +53,8 @@ function gradientLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
-    let nChannels;      // L = 0; R=0, G=1, B=2
-    if (targetView.image.isColor) {
-        nChannels = 3;
-    } else {
-        nChannels = 1;
-    }
+    let colorSamplePairs = []; // SamplePairs[channel]
+    let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
     let isHorizontal;
@@ -74,23 +70,23 @@ function gradientLinearFit(data)
     }
 
     let samplePreviewArea;
-//    if (data.hasAreaOfInterest){
-//        sampleArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
-//    } else {
+    if (data.hasAreaOfInterest) {
+        samplePreviewArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
+    } else {
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
-//    }
+    }
 
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, true, data.rejectBrightestPercent, samplePreviewArea);
-        if (colorSamplePairArray[channel].length < 2) {
+        let samplePairs = createSamplePairs(targetView.image, referenceView.image,
+                channel, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent, samplePreviewArea, true);
+        if (samplePairs.samplePairArray.length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
         }
-        let sampleArea = getSampleArea(colorSamplePairArray[channel]);
+        let sampleArea = samplePairs.getSampleArea();
         if (detectOrientation){
             detectOrientation = false;
             isHorizontal = sampleArea.width > sampleArea.height;
@@ -101,12 +97,14 @@ function gradientLinearFit(data)
             }
         }
         if (isHorizontal) {
-            linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getHorizontalGradientX, getHorizontalGradientY);
+            linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getHorizontalGradientX, getHorizontalGradientY);
         } else {
-            linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getVerticalGradientX, getVerticalGradientY);
+            linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getVerticalGradientX, getVerticalGradientY);
         }
-        linearFit[channel].sampleArea = sampleArea;
-        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
+        linearFit[channel].sampleArea = samplePreviewArea;
+        colorSamplePairs[channel] = samplePairs;
+        
+        displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
                 channel, data.rejectHigh, data.sampleSize, data.rejectBrightestPercent);
     }
 
@@ -117,15 +115,15 @@ function gradientLinearFit(data)
         displayGradient(targetView, title, isHorizontal, gradientArray);
     }
     
+    if (data.displayGraphFlag) {
+        console.writeln("\nCreating least squares fit graph");
+        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairs);
+    }
+    
     if (data.displaySamplesFlag){
         let title = "Samples_" + targetView.fullId;
-        let samplesWindow = drawSampleSquares(colorSamplePairArray, data.sampleSize, referenceView, title);
+        let samplesWindow = drawSampleSquares(colorSamplePairs, referenceView, title);
         samplesWindow.show();
-    }
-
-    if (data.displayGraphFlag) {
-        console.writeln("\nCreating linear fit graph");
-        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairArray);
     }
 
     if (isHorizontal) {
@@ -138,7 +136,7 @@ function gradientLinearFit(data)
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
-function displayGraph(targetView, referenceView, width, isHorizontal, gradientArray, colorSamplePairArray){
+function displayGraph(targetView, referenceView, width, isHorizontal, gradientArray, colorSamplePairs){
     let axisWidth;
     let maxCoordinate;
     let imageWindow = null;
@@ -155,25 +153,25 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     axisWidth = Math.min(width, maxCoordinate);
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
-    let minMax = new SamplePairDifMinMax(colorSamplePairArray, gradientArray);
+    let minMax = new SamplePairDifMinMax(colorSamplePairs, gradientArray);
 
     let graphWithAxis = new Graph(0, minMax.minDif, maxCoordinate, minMax.maxDif);
     graphWithAxis.setAxisLength(axisWidth + 2, 500);
     graphWithAxis.createGraph(xLabel, yLabel);
     
-    if (colorSamplePairArray.length === 1){ // B&W
+    if (colorSamplePairs.length === 1){ // B&W
         drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[0], 0xFF777777,
-            colorSamplePairArray[0], 0xFFFFFFFF);
+            colorSamplePairs[0], 0xFFFFFFFF);
         imageWindow = graphWithAxis.createWindow(windowTitle, false);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
         let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
         let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        for (let c = 0; c < colorSamplePairArray.length; c++){
+        for (let c = 0; c < colorSamplePairs.length; c++){
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
             drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[c], lineColors[c],
-                colorSamplePairArray[c], pointColors[c]);
+                colorSamplePairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
@@ -181,13 +179,13 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     imageWindow.show();
 }
 
-function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, samplePairArray, pointColor) {
+function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, samplePairs, pointColor) {
     let difArray = gradientData.difArray;
     for (let x = 0; x < difArray.length; x++) {
         // Draw the best fit line(s)
         graph.drawPoint(x, difArray[x], lineColor);
     }
-    for (let samplePair of samplePairArray) {
+    for (let samplePair of samplePairs.samplePairArray) {
         // Draw the sample points
         let dif = samplePair.targetMedian - samplePair.referenceMedian;
         let coord;
@@ -202,20 +200,21 @@ function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, sampleP
 
 /**
  * Calculates maximum and minimum values for the samples and the best fit line(s)
- * @param {type} colorSamplePairArray
+ * @param {type} colorSamplePairs
  * @param {GradientData} gradientData
  * @returns {SamplePairDifMinMax}
  */
-function SamplePairDifMinMax(colorSamplePairArray, gradientData) {
-// TODO investigate why this is wrong...
-//    this.minDif = Math.min(Math.min(gradientData[0].min, gradientData[1].min), gradientData[2].min); 
-//    this.maxDif = Math.max(Math.max(gradientData[0].max, gradientData[1].max), gradientData[2].max);
+function SamplePairDifMinMax(colorSamplePairs, gradientData) {
+    if (gradientData.length === 3){
+        this.minDif = Math.min(gradientData[0].minValue, gradientData[1].minValue, gradientData[2].minValue); 
+        this.maxDif = Math.max(gradientData[0].maxValue, gradientData[1].maxValue, gradientData[2].maxValue);
+    } else {
+        this.minDif = gradientData[0].minValue;
+        this.maxDif = gradientData[0].maxValue;
+    }
 
-    this.minDif = Number.POSITIVE_INFINITY;
-    this.maxDif = Number.NEGATIVE_INFINITY;
-
-    for (let samplePairArray of colorSamplePairArray) {
-        for (let samplePair of samplePairArray) {
+    for (let samplePairs of colorSamplePairs) {
+        for (let samplePair of samplePairs.samplePairArray) {
             // works for both horizontal and vertical
             this.minDif = Math.min(this.minDif, samplePair.targetMedian - samplePair.referenceMedian);
             this.maxDif = Math.max(this.maxDif, samplePair.targetMedian - samplePair.referenceMedian);
@@ -274,7 +273,7 @@ function displayGradient(targetView, title, isHorizontal, gradientArray) {
 
 /**
  * @param {View} targetView The created gradient is for this image
- * @param {LinearFit[]} line Gradient linear fit line y = mx + b
+ * @param {LinearFitData[]} line Gradient linear fit line y = mx + b
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
  * @return {Number[][]} Gradient array of differences
  */
@@ -282,10 +281,16 @@ function createGradientArray(targetView, line, isHorizontal){
     let nPoints;
     let gradientArray = [];
     let nChannels = line.length;
+    let start;
+    let end;
     if (isHorizontal){
         nPoints = targetView.image.width;
+        start = line[0].sampleArea.x;
+        end = start + line[0].sampleArea.width;
     } else {
         nPoints = targetView.image.height;
+        start = line[0].sampleArea.y;
+        end = start + line[0].sampleArea.height;
     }
     let minValue = Number.POSITIVE_INFINITY;
     let maxValue = Number.NEGATIVE_INFINITY;
@@ -293,7 +298,14 @@ function createGradientArray(targetView, line, isHorizontal){
         let difArray = [];
         // p represents x (horizontal case) or y (vertical case)
         for (let p=0; p<nPoints; p++){
-            let dif = p * line[color].m + line[color].b;
+            let dif;
+            if (p < start){
+                dif = start * line[color].m + line[color].b;
+            } else if (p > end){
+                dif = end * line[color].m + line[color].b;
+            } else {
+                dif = p * line[color].m + line[color].b;
+            }
             difArray.push(dif);
             minValue = Math.min(dif, minValue);
             maxValue = Math.max(dif, maxValue);
@@ -337,7 +349,8 @@ function applyGradient(view, isHorizontal, gradientArray) {
 }
 
 /**
- * Default the Reference view to any view that is NOT the current view
+ * Default the Reference view to the open view named "Mosaic".
+ * If this view does not exist, default to any view that is NOT the current view
  * (the Target view will be set to the current view)
  * @param {ImageWindow} activeWindow
  * @return {View} default reference view
@@ -347,9 +360,17 @@ function getDefaultReferenceView(activeWindow) {
     let allWindows = ImageWindow.openWindows;
     let referenceView = null;
     for (let win of allWindows) {
-        if (activeWindow.currentView.fullId !== win.currentView.fullId) {
+        if (win.currentView.fullId.toLowerCase().contains("mosaic")) {
             referenceView = win.currentView;
             break;
+        }
+    }
+    if (null === referenceView) {
+        for (let win of allWindows) {
+            if (activeWindow.currentView.fullId !== win.currentView.fullId) {
+                referenceView = win.currentView;
+                break;
+            }
         }
     }
     return referenceView;
@@ -376,6 +397,12 @@ function MosaicLinearFitData() {
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
+        
+        Parameters.set("hasAreaOfInterest", this.hasAreaOfInterest);
+        Parameters.set("areaOfInterestX", this.areaOfInterest_X);
+        Parameters.set("areaOfInterestY", this.areaOfInterest_Y);
+        Parameters.set("areaOfInterestW", this.areaOfInterest_W);
+        Parameters.set("areaOfInterestH", this.areaOfInterest_H);
     };
 
     // Reload our script's data from a process icon
@@ -402,6 +429,21 @@ function MosaicLinearFitData() {
             let viewId = Parameters.getString("referenceView");
             this.referenceView = View.viewById(viewId)
         }
+        
+        if (Parameters.has("hasAreaOfInterest"))
+            this.hasAreaOfInterest = Parameters.getBoolean("hasAreaOfInterest");
+        if (Parameters.has("areaOfInterestX")){
+            this.areaOfInterest_X = Parameters.getInteger("areaOfInterestX"); 
+        }
+        if (Parameters.has("areaOfInterestY")){
+            this.areaOfInterest_Y = Parameters.getInteger("areaOfInterestY"); 
+        }
+        if (Parameters.has("areaOfInterestW")){
+            this.areaOfInterest_W = Parameters.getInteger("areaOfInterestW"); 
+        }
+        if (Parameters.has("areaOfInterestH")){
+            this.areaOfInterest_H = Parameters.getInteger("areaOfInterestH"); 
+        }
     };
 
     // Initialise the scripts data
@@ -413,6 +455,12 @@ function MosaicLinearFitData() {
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
         this.displaySamplesFlag = true;
+        
+        this.hasAreaOfInterest = false;
+        this.areaOfInterest_X = 0;
+        this.areaOfInterest_Y = 0;
+        this.areaOfInterest_W = 0;
+        this.areaOfInterest_H = 0;
     };
 
     // Used when the user presses the reset button
@@ -425,6 +473,12 @@ function MosaicLinearFitData() {
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.rejectBrightestPercent_Control.setValue(this.rejectBrightestPercent);
+        
+        linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
+        linearFitDialog.rectangleX_Control.setValue(this.areaOfInterest_X);
+        linearFitDialog.rectangleY_Control.setValue(this.areaOfInterest_Y);
+        linearFitDialog.rectangleW_Control.setValue(this.areaOfInterest_W);
+        linearFitDialog.rectangleH_Control.setValue(this.areaOfInterest_H);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -434,6 +488,14 @@ function MosaicLinearFitData() {
     }
     // Initialise the script's data
     this.setParameters();
+}
+
+function setTargetPreview(previewImage_ViewList, data, targetView){
+    let previews = targetView.window.previews;
+    if (previews.length > 0) {
+        previewImage_ViewList.currentView = previews[0];
+        data.preview = previews[0];
+    }
 }
 
 // The main dialog function
@@ -447,7 +509,8 @@ function gradientLinearFitDialog(data) {
     let labelWidth1 = this.font.width("Gradient Direction:_");
 
     // Create the Program Discription at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + "</b> &mdash; Linear fits target and reference images over the overlaping area.");
+    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + 
+            "</b> &mdash; Calculates the gradient between two images over their overlaping area.");
 
     //-------------------------------------------------------
     // Create the reference image field
@@ -601,8 +664,104 @@ function gradientLinearFitDialog(data) {
     this.rejectBrightestPercent_Control.setPrecision(0);
     this.rejectBrightestPercent_Control.slider.minWidth = 500;
     this.rejectBrightestPercent_Control.setValue(data.rejectBrightestPercent);
+    
+        //-------------------------------------------------------
+    // Area of interest
+    //-------------------------------------------------------
+    let labelWidth2 = this.font.width("Height:_");
+    let areaOfInterest_GroupBox = new GroupBox(this);
+    areaOfInterest_GroupBox.title = "Area of Interest";
+    areaOfInterest_GroupBox.sizer = new VerticalSizer;
+    areaOfInterest_GroupBox.sizer.margin = 6;
+    areaOfInterest_GroupBox.sizer.spacing = 6;
+    
+    this.rectangleX_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X, labelWidth2, 50);
+    this.rectangleX_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X = value;
+    };
+    this.rectangleY_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y, labelWidth2, 50);
+    this.rectangleY_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y = value;
+    };
+    this.rectangleW_Control = createNumericEdit("Width:", "Rectangle width.", data.areaOfInterest_W, labelWidth2, 50);
+    this.rectangleW_Control.onValueUpdated = function (value){
+        data.areaOfInterest_W = value;
+    };
+    this.rectangleH_Control = createNumericEdit("Height:", "Rectangle height.", data.areaOfInterest_H, labelWidth2, 50);
+    this.rectangleH_Control.onValueUpdated = function (value){
+        data.areaOfInterest_H = value;
+    };
+    
+    this.areaOfInterestCheckBox = new CheckBox(this);
+    this.areaOfInterestCheckBox.text = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+    this.areaOfInterestCheckBox.onClick = function (checked) {
+        data.hasAreaOfInterest = checked;
+    };
+    
+    let coordHorizontalSizer = new HorizontalSizer;
+    coordHorizontalSizer.spacing = 30;
+    coordHorizontalSizer.add(this.rectangleX_Control);
+    coordHorizontalSizer.add(this.rectangleY_Control);
+    coordHorizontalSizer.add(this.rectangleW_Control);
+    coordHorizontalSizer.add(this.rectangleH_Control);
+    coordHorizontalSizer.addStretch();
 
-    const helpWindowTitle = TITLE + "." + VERSION;
+    // Area of interest Target->preview
+    let previewImage_Label = new Label(this);
+    previewImage_Label.text = "Get area from preview:";
+    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    previewImage_Label.minWidth = labelWidth1;
+
+    this.previewImage_ViewList = new ViewList(this);
+    this.previewImage_ViewList.getPreviews();
+    this.previewImage_ViewList.minWidth = 300;
+    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
+    this.previewImage_ViewList.onViewSelected = function (view) {
+        data.preview = view;
+    };
+    setTargetPreview(this.previewImage_ViewList, data, data.targetView);
+    
+    let previewUpdateButton = new PushButton();
+    previewUpdateButton.hasFocus = false;
+    previewUpdateButton.text = "Update";
+    previewUpdateButton.onClick = function () {
+        if (!this.isUnderMouse){
+            // Ensure pressing return in a different field does not trigger this callback!
+            return;
+        }
+        let view = data.preview;
+        if (view.isPreview) {
+            data.hasAreaOfInterest = true;
+            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            ///let imageWindow = view.window;
+            let rect = view.window.previewRect(view);
+            data.areaOfInterest_X = rect.x0;
+            data.areaOfInterest_Y = rect.y0;
+            data.areaOfInterest_W = rect.width;
+            data.areaOfInterest_H = rect.height;
+            
+            // Console.writeln("Preview rectangle: (" + rect.x0 + "," + rect.y0 + ") (" + rect.x1 + "," + rect.y1 + ") Width: " + rect.width + " Height: " + rect.height);
+            this.dialog.rectangleX_Control.setValue(data.areaOfInterest_X);
+            this.dialog.rectangleY_Control.setValue(data.areaOfInterest_Y);
+            this.dialog.rectangleW_Control.setValue(data.areaOfInterest_W);
+            this.dialog.rectangleH_Control.setValue(data.areaOfInterest_H);
+        }
+    };
+
+    let previewImage_Sizer = new HorizontalSizer;
+    previewImage_Sizer.spacing = 4;
+    previewImage_Sizer.add(previewImage_Label);
+    previewImage_Sizer.add(this.previewImage_ViewList, 100);
+    previewImage_Sizer.addSpacing(10);
+    previewImage_Sizer.add(previewUpdateButton);
+
+    areaOfInterest_GroupBox.sizer.add(this.areaOfInterestCheckBox);
+    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
+    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
+
+    const helpWindowTitle = TITLE + " v" + VERSION;
     const HELP_MSG =
             "<p>Apply a gradient to the target image so that it matches the reference image. The default parameters should work well. " +
             "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
@@ -612,8 +771,7 @@ function gradientLinearFitDialog(data) {
             "The 'Sample Size' should be bigger than the diameter of bright stars. " +
             "If set too small, differing FWHM between the two images will affect the linear fit.</p>";
 
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects
@@ -629,6 +787,7 @@ function gradientLinearFitDialog(data) {
     this.sizer.add(this.rejectHigh_Control);
     this.sizer.add(this.rejectBrightestPercent_Control);
     this.sizer.add(this.sampleSize_Control);
+    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------
@@ -664,7 +823,7 @@ function main() {
             break;
         console.show();
         console.writeln("=================================================");
-        console.writeln("<b>Gradient Linear Fit ", VERSION, "</b>:");
+        console.writeln("<b>Gradient Least Squares Fit ", VERSION, "</b>:");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {

@@ -27,25 +27,6 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #define DEFAULT_TRIM 3;
 
 /**
- * Returns the elapsed time since startTime.
- * If the elapsed time is less than a second, it is returned as milliseconds, with a 'ms' postfix.
- * Otherwise it is returned as seconds, with a 's' postfix.
- *
- * @param {number} startTime
- * @return {string} Time elapsed since startTime
- */
-function getElapsedTime(startTime) {
-    let totalTime = new Date().getTime() - startTime;
-    if (totalTime < 1000) {
-        totalTime += " ms";
-    } else {
-        totalTime /= 1000;
-        totalTime += " s";
-    }
-    return totalTime;
-}
-
-/**
  * @param {Image} image
  * @param {number} x x-coordinate
  * @param {number} y y-coordinate
@@ -374,12 +355,11 @@ function trimImageDialog(data) {
         data.bottom = value;
     };
 
-    const helpWindowTitle = TITLE + "." + VERSION;
+    const helpWindowTitle = TITLE + " v" + VERSION;
     const helpMsg = "<p>Trim the pixels at the edge of the non zero part of an image. " +
             "Black pixels are ignored. Modified pixels are set to black.</p>";
 
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, helpMsg);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, helpMsg);
 
     // Vertically stack all the objects
     this.sizer = new VerticalSizer;

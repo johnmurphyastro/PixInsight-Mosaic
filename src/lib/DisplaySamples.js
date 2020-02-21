@@ -17,24 +17,22 @@
 
 /**
  *
- * @param {Number[].SamplePair[]} colorSamplePairArray
- * @param {Number} sampleSize length of square side
+ * @param {SamplePairs[]} colorSamplePairs
  * @param {View} referenceView 
  * @param {String} title
  * @returns {ImageWindow} PixInsight window of reference image with sample squares drawn
  */
-function drawSampleSquares(colorSamplePairArray, sampleSize, referenceView, title) {
-    
+function drawSampleSquares(colorSamplePairs, referenceView, title) {
     // If all three colors have a sample in the same place, we need to draw a
     // white square. To do this we create a map. The key is the sample central 
     // coordinate. The value stores a binary number. The first three bits 
     // represent R, G, B
     let sampleMap = new Map();
-    let isColor = colorSamplePairArray.length > 1;
+    let isColor = colorSamplePairs.length > 1;
     if (isColor){
-        for (let color = 0; color < colorSamplePairArray.length; color++) {
+        for (let color = 0; color < colorSamplePairs.length; color++) {
             let bitFlag = colorToBitFlag(color);
-            let samplePairArray = colorSamplePairArray[color];
+            let samplePairArray = colorSamplePairs[color].samplePairArray;
             samplePairArray.forEach(function (samplePair) {
                 let key = samplePair.x + "," + samplePair.y;
                 let value = sampleMap.get(key);
@@ -59,8 +57,8 @@ function drawSampleSquares(colorSamplePairArray, sampleSize, referenceView, titl
     // get brightness range of sample values
     let maxValue = Number.MIN_VALUE;
     let minValue = Number.MAX_VALUE;
-    for(let i=0; i < colorSamplePairArray.length; i++){
-        let samplePairArray = colorSamplePairArray[i];
+    for(let i=0; i < colorSamplePairs.length; i++){
+        let samplePairArray = colorSamplePairs[i].samplePairArray;
         samplePairArray.forEach(function (samplePair) {
             let value = samplePair.referenceMean;
             maxValue = Math.max(maxValue, value);
@@ -74,6 +72,7 @@ function drawSampleSquares(colorSamplePairArray, sampleSize, referenceView, titl
     penValue = Math.min(255, penValue);
 
     // Draw the samples into a bitmap
+    let sampleSize = colorSamplePairs[0].sampleSize;
     let square = new Rect(sampleSize, sampleSize);
     let offset = (sampleSize - 1) / 2;
     if (isColor) {
@@ -91,7 +90,7 @@ function drawSampleSquares(colorSamplePairArray, sampleSize, referenceView, titl
         }
     } else {
         graphics.pen = new Pen((128 << 24) + (penValue << 16) + (penValue << 8) + penValue);
-        let samplePairArray = colorSamplePairArray[0];
+        let samplePairArray = colorSamplePairs[0].samplePairArray;
         samplePairArray.forEach(function (samplePair) {
             let x = samplePair.x - offset;
             let y = samplePair.y - offset;

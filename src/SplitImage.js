@@ -14,16 +14,15 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 "use strict";
-#feature-id Utilities > gradientLinearFit
+#feature-id Utilities > splitImage
 
-#feature-info Linear fits target and reference images over the overlaping area.<br/>\
+#feature-info Splits an image into two overlapping images.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
 #include "lib/DialogLib.js"
-#include "lib/LinearFitLib.js"
 
 #define VERSION  "1.0"
-#define TITLE "Split"
+#define TITLE "SplitImage"
 #define HORIZONTAL 0
 #define VERTICAL 1
 
@@ -31,7 +30,7 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
  * Controller. Processing starts here!
  * @param {SplitData} data Values from user interface
  */
-function gradientLinearFit(data)
+function splitImage(data)
 {
     let startTime = new Date().getTime();
     let targetView = data.targetView;
@@ -45,19 +44,20 @@ function gradientLinearFit(data)
         isHorizontal = false;
     }
 
-    applyGradient(targetView, data.coordinate, data.overlap, isHorizontal);
+    createSplitImages(targetView, data.coordinate, data.overlap, isHorizontal);
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
 /**
- * Subtract the detected gradient from the target view
- * @param {View} targetView Apply the gradient correction to this view
- * @param {LinearFit[]} line Gradient linear fit line y = mx + b, for each channel
- * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
+ * Create two overlapping images from the supplied target image
+ * @param {View} targetView Contains the image to be split into two
+ * @param {Number} coord Split is centered at this coordinage
+ * @param {Number} overlap Number of pixels of overlap
+ * @param {Boolean} isHorizontal True if left / right split
  * @returns {undefined}
  */
-function applyGradient(targetView, coord, overlap, isHorizontal) {
+function createSplitImages(targetView, coord, overlap, isHorizontal) {
     let expression1;
     let expression2;
     let imageId1;
@@ -139,7 +139,7 @@ function SplitData() {
     // Initialise the scripts data
     this.setParameters = function () {
         this.orientation = VERTICAL;
-        this.overlap = 1;
+        this.overlap = 25;
         this.coordinate = 500;
     };
 
@@ -178,7 +178,7 @@ function SplitDialog(data) {
     // Create the reference image field
     //-------------------------------------------------------
     let targetImage_Label = new Label(this);
-    targetImage_Label.text = "Reference View:";
+    targetImage_Label.text = "Target View:";
     targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     targetImage_Label.minWidth = labelWidth1;
 
@@ -278,14 +278,13 @@ function SplitDialog(data) {
     this.overlap_Control.setValue(data.overlap);
 
 
-    const helpWindowTitle = TITLE + "." + VERSION;
+    const helpWindowTitle = TITLE + " v" + VERSION;
     const HELP_MSG =
             "<p>Split the image at the specified x (Horizontal split) or y (Vertical split) coordinate. " +
             "Two new images are created. Each image contains image data one side of the split, " +
             "plus the overlap region. The other side of the overlap region is set to black (0)</p>";
 
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects
@@ -333,7 +332,7 @@ function main() {
             break;
         console.show();
         console.writeln("=================================================");
-        console.writeln("<b>Split ", VERSION, "</b>:");
+        console.writeln("<b>SplitImage ", VERSION, "</b>:");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
@@ -342,7 +341,7 @@ function main() {
         }
 
         // Calculate and apply the linear fit
-        gradientLinearFit(data);
+        splitImage(data);
         console.hide();
 
         // Quit after successful execution.

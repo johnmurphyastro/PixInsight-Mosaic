@@ -23,6 +23,24 @@
 #include <pjsr/StdCursor.jsh>
 
 /**
+ * Returns the elapsed time since startTime.
+ * If the elapsed time is less than a second, it is returned as milliseconds, with a 'ms' postfix.
+ * Otherwise it is returned as seconds, with a 's' postfix.
+ * @param {Number} startTime
+ * @returns {String} Time elapsed since startTime
+ */
+function getElapsedTime(startTime) {
+    let totalTime = new Date().getTime() - startTime;
+    if (totalTime < 1000) {
+        totalTime += " ms";
+    } else {
+        totalTime /= 1000;
+        totalTime += " s";
+    }
+    return totalTime;
+}
+
+/**
  * @param {String} text
  * @returns {Label} label in FrameStyle_Box
  */
@@ -38,13 +56,15 @@ function createTitleLabel(text){
 
 /**
  * Create HorizontalSizer that contains newInstance, documentation, Cancel & OK buttons
- * @param {type} dialog
- * @param {type} data
- * @param {type} newInstanceIcon
- * @param {type} helpMsg
+ * @param {Dialog} dialog
+ * @param {Object} data
+ * @param {String} helpMsgTitle
+ * @param {String} helpMsg
  * @returns {HorizontalSizer}
  */
-function createWindowControlButtons(dialog, data, newInstanceIcon, helpMsgTitle, helpMsg){
+function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg){
+    let newInstanceIcon = dialog.scaledResource(":/process-interface/new-instance.png");
+    
     let ok_Button = new PushButton();
     ok_Button.text = "OK";
     ok_Button.cursor = new Cursor(StdCursor_Checkmark);
@@ -103,4 +123,26 @@ function createWindowControlButtons(dialog, data, newInstanceIcon, helpMsgTitle,
     buttons_Sizer.add(ok_Button);
     buttons_Sizer.add(cancel_Button);
     return buttons_Sizer;
+}
+
+/**
+ * 
+ * @param {String} label
+ * @param {String} tooltip
+ * @param {Number} initialValue
+ * @param {Number} labelWidth
+ * @param {Number} editWidth
+ * @returns {NumericEdit}
+ */
+function createNumericEdit(label, tooltip, initialValue, labelWidth, editWidth){
+    let numericEditControl = new NumericEdit();
+    numericEditControl.setReal(false);
+    numericEditControl.setRange(0, 100000);
+    numericEditControl.setValue(initialValue);
+    numericEditControl.label.text = label;
+    numericEditControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+//    numericEditControl.label.setFixedWidth(labelWidth);
+    numericEditControl.edit.setFixedWidth(editWidth);
+    numericEditControl.toolTip = tooltip;
+    return numericEditControl;
 }

@@ -16,7 +16,7 @@
 "use strict";
 #feature-id Utilities > mosaicLinearFit
 
-#feature-info Linear fits target and reference images over the overlaping area.<br/>\
+#feature-info Determines the background offset and brightness multiple betweeen the target and reference images over the overlaping area.<br/>\
 Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
 #include <pjsr/ColorSpace.jsh>
@@ -24,14 +24,23 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 #include <pjsr/UndoFlag.jsh>
 
 #include "lib/DialogLib.js"
-#include "lib/LinearFitLib.js"
+#include "lib/SamplePair.js"
+#include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/DisplaySamples.js"
 
 #define VERSION  "1.0"
-#define TITLE "Mosaic Linear Fit"
+#define TITLE "Mosaic Least Squares Fit"
 #define MOSAIC_NAME "Mosaic"
 
+/**
+ * @param {LinearFitData} linearFit
+ * @param {Number} nSamples
+ * @param {Number} channel
+ * @param {Number} rejectHigh
+ * @param {Number} sampleSize
+ * @returns {undefined}
+ */
 function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize) {
     console.writeln("Channel = ", channel);
     console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh);
@@ -48,18 +57,14 @@ function mosaicLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
-    let nChannels;      // L = 0; R=0, G=1, B=2
-    if (targetView.image.isColor) {
-        nChannels = 3;
-    } else {
-        nChannels = 1;
-    }
+    let colorSamplePairs = []; // SamplePairs[channel]
+    let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
     let samplePreviewArea;
     if (data.hasAreaOfInterest){
-        samplePreviewArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
+        samplePreviewArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y,
+            data.areaOfInterest_W, data.areaOfInterest_H);
     } else {
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
     }
@@ -68,27 +73,27 @@ function mosaicLinearFit(data)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        colorSamplePairArray[channel] = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, false, 0, samplePreviewArea);
-        if (colorSamplePairArray[channel].length < 2) {
+        let samplePairs = createSamplePairs(targetView.image, referenceView.image,
+                channel, data.sampleSize, data.rejectHigh, 0, samplePreviewArea, false);
+        if (samplePairs.samplePairArray.length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return false;
         }
-
-        linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getLinearFitX, getLinearFitY);
-        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
-                channel, data.rejectHigh, data.sampleSize);
+        linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getLinearFitX, getLinearFitY);
+        colorSamplePairs[channel] = samplePairs;
+        
+        displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
+                channel, data.rejectHigh, data.sampleSize); 
     }
 
     if (data.displayGraphFlag) {
-        console.writeln("\nCreating linear fit graph");
-        displayGraph(targetView.fullId, referenceView.fullId, 730, 
-            colorSamplePairArray, linearFit);
+        console.writeln("\nCreating least squares fit graph");
+        displayGraph(targetView, referenceView, 730, colorSamplePairs, linearFit);
     }
     
     if (data.displaySamplesFlag){
         let title = "Samples_" + targetView.fullId;
-        let samplesWindow = drawSampleSquares(colorSamplePairArray, data.sampleSize, referenceView, title);
+        let samplesWindow = drawSampleSquares(colorSamplePairs, referenceView, title);
         samplesWindow.show();
     }
     
@@ -104,24 +109,17 @@ function mosaicLinearFit(data)
     return true;
 }
 
-function SamplePairMinMax() {
-    this.maxReferenceMean = Number.NEGATIVE_INFINITY;
-    this.maxTargetMean = Number.NEGATIVE_INFINITY;
-    this.minReferenceMean = Number.POSITIVE_INFINITY; 
-    this.minTargetMean = Number.POSITIVE_INFINITY;
-
-    this.calculateMinMax = function(samplePairArray){
-        for (let samplePair of samplePairArray) {
-            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
-            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
-            this.minReferenceMean = Math.min(this.minReferenceMean, samplePair.referenceMean);
-            this.minTargetMean = Math.min(this.minTargetMean, samplePair.targetMean);
-        }
-    };
-}
-
-function displayGraph(targetName, referenceName, height, colorSamplePairArray, linearFit){
-    
+/**
+ * @param {String} targetView
+ * @param {String} referenceView
+ * @param {Number} height
+ * @param {SamplePairs[]} colorSamplePairs SamplePairs for L or R,G,B
+ * @param {LinearFitData[]} linearFit Least Squares Fit for L or R,G,B
+ * @returns {undefined}
+ */
+function displayGraph(targetView, referenceView, height, colorSamplePairs, linearFit){
+    let targetName = targetView.fullId;
+    let referenceName = referenceView.fullId;
     let imageWindow = null;
     let windowTitle = targetName + "_to_" + referenceName + "_LeastSquaresFit";
     let targetLabel = "Target (" + targetName + ") sample mean value";
@@ -129,8 +127,9 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
     
     // Create the graph axis and annotation.
     let minMax = new SamplePairMinMax();
-    colorSamplePairArray.forEach(function (samplePairArray) {
-        minMax.calculateMinMax(samplePairArray);
+    colorSamplePairs.forEach(function (samplePairs) {
+        //minMax.calculateMinMax(samplePairs.samplePairArray);
+        minMax.calculateMax(samplePairs.samplePairArray);
     });
     //let graphWithAxis = new Graph(minMax.minTargetMean, minMax.minReferenceMean, minMax.maxTargetMean, minMax.maxReferenceMean);
     let graphWithAxis = new Graph(0, 0, minMax.maxTargetMean, minMax.maxReferenceMean);
@@ -138,17 +137,17 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
     graphWithAxis.createGraph(targetLabel, referenceLabel);
 
     // Now add the data to the graph...
-    if (colorSamplePairArray.length === 1){ // B&W
-        drawLineAndPoints(graphWithAxis, linearFit[0], 0xFF777777, colorSamplePairArray[0], 0xFFFFFFFF);
+    if (colorSamplePairs.length === 1){ // B&W
+        drawLineAndPoints(graphWithAxis, linearFit[0], 0xFF777777, colorSamplePairs[0], 0xFFFFFFFF);
         imageWindow = graphWithAxis.createWindow(windowTitle, false);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
         let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
         let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        for (let c = 0; c < colorSamplePairArray.length; c++){
+        for (let c = 0; c < colorSamplePairs.length; c++){
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairArray[c], pointColors[c]);
+            drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
@@ -158,18 +157,19 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
 }
 
 /**
+ * Draw graph lines and points for a single color
  * @param {Graph} graph
  * @param {LinearFitData} linearFit
  * @param {Number} lineColor e.g. 0xAARRGGBB
- * @param {SamplePair[]} samplePairArray
+ * @param {SamplePairs} samplePairs Contains the array of SamplePair
  * @param {Number} pointColor e.g. 0xAARRGGBB
  * @returns {undefined}
  */
-function drawLineAndPoints(graph, linearFit, lineColor, samplePairArray, pointColor){
+function drawLineAndPoints(graph, linearFit, lineColor, samplePairs, pointColor){
     graph.drawLine(linearFit.m, linearFit.b, lineColor);
-    samplePairArray.forEach(function (samplePair) {
+    for (let samplePair of samplePairs.samplePairArray){
         graph.drawPoint(samplePair.targetMean, samplePair.referenceMean, pointColor);
-    });
+    }
 }
 
 /**
@@ -320,28 +320,6 @@ function setTargetPreview(previewImage_ViewList, data, targetView){
     }
 }
 
-/**
- * 
- * @param {String} label
- * @param {String} tooltip
- * @param {Number} initialValue
- * @param {Number} labelWidth
- * @param {Number} editWidth
- * @returns {NumericEdit}
- */
-function createNumericEdit(label, tooltip, initialValue, labelWidth, editWidth){
-    let numericEditControl = new NumericEdit();
-    numericEditControl.setReal(false);
-    numericEditControl.setRange(0, 100000);
-    numericEditControl.setValue(initialValue);
-    numericEditControl.label.text = label;
-    numericEditControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-//    numericEditControl.label.setFixedWidth(labelWidth);
-    numericEditControl.edit.setFixedWidth(editWidth);
-    numericEditControl.toolTip = tooltip;
-    return numericEditControl;
-}
-
 // The main dialog function
 function mosaicLinearFitDialog(data) {
     this.__base__ = Dialog;
@@ -351,7 +329,8 @@ function mosaicLinearFitDialog(data) {
     let labelWidth1 = this.font.width("CCD linear range:_");
 
     // Create the Program Discription at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + "</b> &mdash; Linear fits target and reference images over the overlaping area.");
+    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION +
+            "</b> &mdash; Determines the background offset and brightness multiple betweeen the target and reference images over the overlaping area.");
     
     //-------------------------------------------------------
     // Create the reference image field
@@ -403,7 +382,7 @@ function mosaicLinearFitDialog(data) {
     // Linear Fit Method Field
     //-------------------------------------------------------
     let algorithm_Label = new Label(this);
-    algorithm_Label.text = "LinearFit:";
+    algorithm_Label.text = "Least Squares Fit:";
     algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     algorithm_Label.minWidth = labelWidth1;
 
@@ -511,7 +490,9 @@ function mosaicLinearFitDialog(data) {
     this.sampleSize_Control.slider.minWidth = 500;
     this.sampleSize_Control.setValue(data.sampleSize);
     
+    //-------------------------------------------------------
     // Area of interest
+    //-------------------------------------------------------
     let labelWidth2 = this.font.width("Height:_");
     let areaOfInterest_GroupBox = new GroupBox(this);
     areaOfInterest_GroupBox.title = "Area of Interest";
@@ -605,7 +586,7 @@ function mosaicLinearFitDialog(data) {
     areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
     areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
-    const helpWindowTitle = TITLE + "." + VERSION;
+    const helpWindowTitle = TITLE + " v" + VERSION;
     const HELP_MSG =
             "<p>Apply a scale and offset to the target image so that it matches the reference image. The default parameters should work well. " +
             "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
@@ -621,8 +602,7 @@ function mosaicLinearFitDialog(data) {
             "If set too small, differing FWHM between the two images will affect the linear fit.</p>";
 
 
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects

@@ -22,7 +22,6 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 #include <pjsr/UndoFlag.jsh>
 
 #include "lib/DialogLib.js"
-#include "lib/LinearFitLib.js"
 
 #define VERSION  "1.0"
 #define TITLE "CFA Flat colour correction"
@@ -320,7 +319,7 @@ function CfaLinearFitDialog(data) {
     let pixelMultRow4Sizer = createPixelMultRowSizer(this.pixelMult2Control); // Bottom Left
     
 
-    const helpWindowTitle = TITLE + "." + VERSION;
+    const helpWindowTitle = TITLE + " v" + VERSION;
     const helpMsg =
             "<p>DSLR cameras are calibrated for accurate color balance. " +
             "This script uses the DSLR white balance factors to produce excellent " +
@@ -334,8 +333,7 @@ function CfaLinearFitDialog(data) {
             "PixInsight no longer reads the top line of the image. This changes the bayer pattern from RGGB to GBRG " +
             "and changes the order of the multipliers; e.g. 1.000000 1.689453 1.000000 2.202148 </p>"
     ;
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, helpMsg);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, helpMsg);
 
 
     // Vertically stack all the objects

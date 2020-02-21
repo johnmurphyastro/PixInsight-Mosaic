@@ -14,43 +14,45 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 "use strict";
-#feature-id Utilities > cfaLinearFit
+#feature-id Utilities > cfaFlatColorCorrection
 
-#feature-info Linear fits target and reference images.<br/>\
+#feature-info Determines CFA white balance factors.<br/>\
 Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
-#include <pjsr/ColorSpace.jsh>
-#include <pjsr/DataType.jsh>
-#include <pjsr/FrameStyle.jsh>
-#include <pjsr/NumericControl.jsh>
-#include <pjsr/Sizer.jsh>
-#include <pjsr/TextAlign.jsh>
-#include <pjsr/StdButton.jsh>
-#include <pjsr/StdIcon.jsh>
-#include <pjsr/StdCursor.jsh>
-#include <pjsr/UndoFlag.jsh>
-
-#include "lib/LinearFitLib.js"
+#include "lib/DialogLib.js"
+#include "lib/SamplePair.js"
+#include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 
 #define VERSION  "1.0"
-#define TITLE "CFA colour balance (Linear Fit)"
-#define MOSAIC_NAME "Mosaic"
+#define TITLE "CFA White Balance Factors"
 
+/**
+ * @param {LinearFitData} linearFit
+ * @param {Number} nSamples
+ * @param {Number} channel
+ * @param {Number} rejectHigh
+ * @returns {undefined}
+ */
 function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh) {
     console.writeln("Pixel = ", channel);
     console.writeln("  Samples: ", nSamples, ", Reject high: ", rejectHigh);
     console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
 }
 
-function displayWhiteBalance(linearFit, minGradient){
-    console.writeln("Color balance: ");
+/**
+ * @param {LinearFitData} linearFit
+ * @returns {undefined}
+ */
+function displayWhiteBalance(linearFit){
+    let minGradient = Math.min(linearFit[0].m, linearFit[1].m, linearFit[2].m, linearFit[3].m);
+    console.writeln("\nColor balance: ");
     console.writeln("Top Left    : " + (linearFit[1].m / minGradient).toPrecision(7));
     console.writeln("Top Right   : " + (linearFit[0].m / minGradient).toPrecision(7));
     console.writeln("Bottom Right: " + (linearFit[2].m / minGradient).toPrecision(7));
     console.writeln("Bottom Left : " + (linearFit[3].m / minGradient).toPrecision(7));
-    
 }
+
 /**
  * Controller. Processing starts here!
  * @param {MosaicLinearFitData} data Values from user interface
@@ -61,7 +63,7 @@ function cfaLinearFit(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let linearFit = []; // linear fit details (m and b) for all channels
-    let colorSamplePairArray = []; // SamplePair[channel][SamplePairArray]
+    let colorSamplePairs = []; // SamplePairs[channel]
     let nChannels = 4;      // 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
     if (targetView.image.isColor || referenceView.image.isColor) {
         new MessageBox("Error: both images must be CFA", TITLE, StdIcon_Error, StdButton_Ok).execute();
@@ -70,51 +72,41 @@ function cfaLinearFit(data)
 
     console.writeln("CFA Reference: ", referenceView.fullId, ", CFA Raw: ", targetView.fullId);
 
-    let minGradient = Number.POSITIVE_INFINITY;
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        colorSamplePairArray[channel] = createCfaSamplePairs(targetView.image, referenceView.image,
+        let samplePairs = createCfaSamplePairs(targetView.image, referenceView.image,
                 channel, data.rejectHigh);
-        if (colorSamplePairArray[channel].length < 2) {
+        if (samplePairs.samplePairArray.length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
         }
 
-        linearFit[channel] = calculateLinearFit(colorSamplePairArray[channel], getLinearFitX, getLinearFitY);
-        minGradient = Math.min(minGradient, linearFit[channel].m);
-        displayConsoleInfo(linearFit[channel], colorSamplePairArray[channel].length,
+        linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getLinearFitX, getLinearFitY);
+        displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
                 channel, data.rejectHigh);
+        colorSamplePairs[channel] = samplePairs;
     }
-    displayWhiteBalance(linearFit, minGradient);
+    displayWhiteBalance(linearFit);
 
     if (data.displayGraphFlag) {
-        console.writeln("\nCreating linear fit graph");
-        displayGraph(targetView.fullId, referenceView.fullId, 730, 
-            colorSamplePairArray, linearFit);
+        console.writeln("\nCreating least squares fit graph");
+        displayGraph(targetView.fullId, referenceView.fullId, 730, colorSamplePairs, linearFit);
     }
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
-function SamplePairMinMax() {
-    this.maxReferenceMean = Number.NEGATIVE_INFINITY;
-    this.maxTargetMean = Number.NEGATIVE_INFINITY;
-    this.minReferenceMean = Number.POSITIVE_INFINITY; 
-    this.minTargetMean = Number.POSITIVE_INFINITY;
-
-    this.calculateMinMax = function(samplePairArray){
-        for (let samplePair of samplePairArray) {
-            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
-            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
-            this.minReferenceMean = Math.min(this.minReferenceMean, samplePair.referenceMean);
-            this.minTargetMean = Math.min(this.minTargetMean, samplePair.targetMean);
-        }
-    };
-}
-
-function displayGraph(targetName, referenceName, height, colorSamplePairArray, linearFit){
+/**
+ * @param {String} targetName
+ * @param {String} referenceName
+ * @param {Number} height
+ * @param {SamplePairs[]} colorSamplePairs SamplePairs for L or R,G,B
+ * @param {LinearFitData[]} linearFit Least Squares Fit for L or R,G,B
+ * @returns {undefined}
+ */
+function displayGraph(targetName, referenceName, height, colorSamplePairs, linearFit){
     let imageWindow = null;
     let windowTitle = targetName + "_to_" + referenceName + "_LeastSquaresFit";
     let targetLabel = "Pure RAW (" + targetName + ") sample value";
@@ -122,8 +114,8 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
     
     // Create the graph axis and annotation.
     let minMax = new SamplePairMinMax();
-    colorSamplePairArray.forEach(function (samplePairArray) {
-        minMax.calculateMinMax(samplePairArray);
+    colorSamplePairs.forEach(function (samplePairs) {
+        minMax.calculateMinMax(samplePairs.samplePairArray);
     });
     let graphWithAxis = new Graph(minMax.minTargetMean, minMax.minReferenceMean, minMax.maxTargetMean, minMax.maxReferenceMean);
     //let graphWithAxis = new Graph(0, 0, minMax.maxTargetMean, minMax.maxReferenceMean);
@@ -135,9 +127,9 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
     // if three samples are on the same pixel we get white and not the last color drawn
     let lineColors = [0xFF770000, 0xFF007700, 0xFF007700, 0xFF000077]; // r, g, b
     let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-    for (let c = 0; c < colorSamplePairArray.length; c++) {
+    for (let c = 0; c < colorSamplePairs.length; c++) {
         let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-        drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairArray[c], pointColors[c]);
+        drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairs[c], pointColors[c]);
         graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
     }
     imageWindow = graphWithAxis.createWindow(windowTitle, true);
@@ -145,46 +137,47 @@ function displayGraph(targetName, referenceName, height, colorSamplePairArray, l
 }
 
 /**
+ * Draw graph lines and points for a single color
  * @param {Graph} graph
  * @param {LinearFitData} linearFit
  * @param {Number} lineColor e.g. 0xAARRGGBB
- * @param {SamplePair[]} samplePairArray
+ * @param {SamplePairs} samplePairs Contains the array of SamplePair
  * @param {Number} pointColor e.g. 0xAARRGGBB
  * @returns {undefined}
  */
-function drawLineAndPoints(graph, linearFit, lineColor, samplePairArray, pointColor){
+function drawLineAndPoints(graph, linearFit, lineColor, samplePairs, pointColor){
     graph.drawLine(linearFit.m, linearFit.b, lineColor);
-    samplePairArray.forEach(function (samplePair) {
+    for (let samplePair of samplePairs.samplePairArray){
         graph.drawPoint(samplePair.targetMean, samplePair.referenceMean, pointColor);
-    });
+    }
 }
 
 /**
- * Default the Reference view to the open view named "Mosaic".
+ * Return the view with 'searchString' in its ID.
  * If this view does not exist, default to any view that is NOT the current view
  * (the Target view will be set to the current view)
  * @param {ImageWindow} activeWindow
- * @return {View} default reference view
+ * @param {String} searchString Look for a window ID that contains this string
+ * @return {View} default view
  */
-function getDefaultReferenceView(activeWindow) {
+function getDefaultView(activeWindow, searchString) {
     // Get access to the active image window
     let allWindows = ImageWindow.openWindows;
-    let referenceView = null;
+    let view = null;
+    
     for (let win of allWindows) {
-        if (MOSAIC_NAME === win.currentView.fullId) {
-            referenceView = win.currentView;
+        if (win.currentView.fullId.toLowerCase().contains(searchString)) {
+            view = win.currentView;
             break;
         }
     }
-    if (null === referenceView) {
-        for (let win of allWindows) {
-            if (activeWindow.currentView.fullId !== win.currentView.fullId) {
-                referenceView = win.currentView;
-                break;
-            }
+    
+    if (null === view) {
+        if (!activeWindow.isNull) {
+            view = activeWindow.currentView;
         }
     }
-    return referenceView;
+    return view;
 }
 
 // -----------------------------------------------------------------------------
@@ -223,7 +216,7 @@ function cfaLinearFitData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.rejectHigh = 0.9;
+        this.rejectHigh = 0.8;
         this.displayGraphFlag = false;
     };
 
@@ -235,10 +228,9 @@ function cfaLinearFitData() {
     };
 
     let activeWindow = ImageWindow.activeWindow;
-    this.referenceView = getDefaultReferenceView(activeWindow);
-    if (!activeWindow.isNull) {
-        this.targetView = activeWindow.currentView;
-    }
+    this.referenceView = getDefaultView(activeWindow, "wb");
+    this.targetView = getDefaultView(activeWindow, "raw");
+    
     // Initialise the script's data
     this.setParameters();
 }
@@ -248,28 +240,20 @@ function cfaLinearFitDialog(data) {
     this.__base__ = Dialog;
     this.__base__();
 
-    //-------------------------------------------------------
     // Set some basic widths from dialog text
-    //-------------------------------------------------------
     let labelWidth1 = this.font.width("RAW (White Balance):_");
 
-    //-------------------------------------------------------
     // Create the Program Discription at the top
-    //-------------------------------------------------------
-    this.helpLabel = new Label(this);
-    this.helpLabel.frameStyle = FrameStyle_Box;
-    this.helpLabel.margin = 4;
-    this.helpLabel.wordWrapping = true;
-    this.helpLabel.useRichText = true;
-    this.helpLabel.text = "<b>" + TITLE + " v" + VERSION + "</b> &mdash; Linear fits target and reference images.";
+    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION +
+            "</b> &mdash; Determines CFA white balance factors.");
 
     //-------------------------------------------------------
     // Create the reference image field
     //-------------------------------------------------------
-    this.referenceImage_Label = new Label(this);
-    this.referenceImage_Label.text = "RAW (White Balance):";
-    this.referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.referenceImage_Label.minWidth = labelWidth1;
+    let referenceImage_Label = new Label(this);
+    referenceImage_Label.text = "RAW (White Balance):";
+    referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    referenceImage_Label.minWidth = labelWidth1;
 
     this.referenceImage_ViewList = new ViewList(this);
     this.referenceImage_ViewList.getMainViews();
@@ -280,18 +264,18 @@ function cfaLinearFitDialog(data) {
         data.referenceView = view;
     };
 
-    this.referenceImage_Sizer = new HorizontalSizer;
-    this.referenceImage_Sizer.spacing = 4;
-    this.referenceImage_Sizer.add(this.referenceImage_Label);
-    this.referenceImage_Sizer.add(this.referenceImage_ViewList, 100);
+    let referenceImage_Sizer = new HorizontalSizer;
+    referenceImage_Sizer.spacing = 4;
+    referenceImage_Sizer.add(referenceImage_Label);
+    referenceImage_Sizer.add(this.referenceImage_ViewList, 100);
 
     //-------------------------------------------------------
     // Create the target image field
     //-------------------------------------------------------
-    this.targetImage_Label = new Label(this);
-    this.targetImage_Label.text = "Pure RAW:";
-    this.targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.targetImage_Label.minWidth = labelWidth1;
+    let targetImage_Label = new Label(this);
+    targetImage_Label.text = "Pure RAW:";
+    targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
     this.targetImage_ViewList.getMainViews();
@@ -302,19 +286,19 @@ function cfaLinearFitDialog(data) {
         data.targetView = view;
     };
 
-    this.targetImage_Sizer = new HorizontalSizer;
-    this.targetImage_Sizer.spacing = 4;
-    this.targetImage_Sizer.add(this.targetImage_Label);
-    this.targetImage_Sizer.add(this.targetImage_ViewList, 100);
+    let targetImage_Sizer = new HorizontalSizer;
+    targetImage_Sizer.spacing = 4;
+    targetImage_Sizer.add(targetImage_Label);
+    targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
 
     //-------------------------------------------------------
     // Linear Fit Method Field
     //-------------------------------------------------------
-    this.algorithm_Label = new Label(this);
-    this.algorithm_Label.text = "Least Squares Fit:";
-    this.algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.algorithm_Label.minWidth = labelWidth1;
+    let algorithm_Label = new Label(this);
+    algorithm_Label.text = "Least Squares Fit:";
+    algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    algorithm_Label.minWidth = labelWidth1;
 
     //-------------------------------------------------------
     // Display Graph, Display Test Mosaic
@@ -327,99 +311,36 @@ function cfaLinearFitDialog(data) {
         data.displayGraphFlag = checked;
     };
 
-    this.algorithm_Sizer = new HorizontalSizer;
-    this.algorithm_Sizer.spacing = 4;
-    this.algorithm_Sizer.add(this.algorithm_Label);
-    this.algorithm_Sizer.add(this.displayGraphControl);
-    this.algorithm_Sizer.addStretch();
+    let algorithm_Sizer = new HorizontalSizer;
+    algorithm_Sizer.spacing = 4;
+    algorithm_Sizer.add(algorithm_Label);
+    algorithm_Sizer.add(this.displayGraphControl);
+    algorithm_Sizer.addStretch();
 
     //-------------------------------------------------------
     // Rejection High
     //-------------------------------------------------------
-    this.rejectHigh_Control = new NumericControl(this);
-    this.rejectHigh_Control.real = true;
-    this.rejectHigh_Control.label.text = "CCD Linear Range:";
-    this.rejectHigh_Control.label.minWidth = labelWidth1;
-    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range. 0.5 works well.</p>";
-    this.rejectHigh_Control.onValueUpdated = function (value) {
+    let rejectHigh_Control = new NumericControl(this);
+    rejectHigh_Control.real = true;
+    rejectHigh_Control.label.text = "CCD Linear Range:";
+    rejectHigh_Control.label.minWidth = labelWidth1;
+    rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range. 0.5 works well.</p>";
+    rejectHigh_Control.onValueUpdated = function (value) {
         data.rejectHigh = value;
     };
-    this.rejectHigh_Control.setRange(0.001, 1.0);
-    this.rejectHigh_Control.slider.setRange(0, 5000);
-    this.rejectHigh_Control.setPrecision(4);
-    this.rejectHigh_Control.slider.minWidth = 500;
-    this.rejectHigh_Control.setValue(data.rejectHigh);
+    rejectHigh_Control.setRange(0.001, 1.0);
+    rejectHigh_Control.slider.setRange(0, 5000);
+    rejectHigh_Control.setPrecision(4);
+    rejectHigh_Control.slider.minWidth = 500;
+    rejectHigh_Control.setValue(data.rejectHigh);
 
-    //-------------------------------------------------------
-    // Create the ok/cancel buttons
-    //-------------------------------------------------------
-    this.ok_Button = new PushButton(this);
-    this.ok_Button.text = "OK";
-    this.ok_Button.cursor = new Cursor(StdCursor_Checkmark);
-    this.ok_Button.onClick = function () {
-        this.dialog.ok();
-    };
-
-    this.cancel_Button = new PushButton(this);
-    this.cancel_Button.text = "Cancel";
-    this.cancel_Button.cursor = new Cursor(StdCursor_Crossmark);
-    this.cancel_Button.onClick = function () {
-        this.dialog.cancel();
-    };
-
-    this.buttons_Sizer = new HorizontalSizer;
-    this.buttons_Sizer.spacing = 6;
-
-    // New Instance button
-    this.newInstance_Button = new ToolButton(this);
-    this.newInstance_Button.icon = this.scaledResource(":/process-interface/new-instance.png");
-    this.newInstance_Button.setScaledFixedSize(24, 24);
-    this.newInstance_Button.toolTip = "Save as Process Icon";
-    this.newInstance_Button.onMousePress = function () {
-        this.hasFocus = true;
-        this.pushed = false;
-        data.saveParameters();
-        this.dialog.newInstance();
-    };
+    const helpWindowTitle = TITLE + " v" + VERSION;
 
     // Help button
     const HELP_MSG =
             "<p>Not yet implemented</p>";
 
-    this.browseDocumentationButton = new ToolButton(this);
-    this.browseDocumentationButton.icon = ":/process-interface/browse-documentation.png";
-    this.browseDocumentationButton.toolTip =
-            "<p>Opens a browser to view the script's documentation.</p>";
-    this.browseDocumentationButton.onClick = function () {
-        if (!Dialog.browseScriptDocumentation(TITLE)) {
-            (new MessageBox(
-                    HELP_MSG,
-                    TITLE + "." + VERSION,
-                    StdIcon_Information,
-                    StdButton_Ok
-                    )).execute();
-        }
-    };
-
-
-    this.buttons_Sizer.add(this.newInstance_Button);
-    this.buttons_Sizer.add(this.browseDocumentationButton);
-
-    this.resetButton = new ToolButton(this);
-
-    this.resetButton.icon = ":/images/icons/reset.png";
-    this.resetButton.toolTip = "<p>Resets the dialog's parameters.";
-    this.resetButton.onClick = function () {
-        data.resetParameters(this.dialog);
-    };
-
-    this.buttons_Sizer.add(this.resetButton);
-
-
-    this.buttons_Sizer.addStretch();
-    this.buttons_Sizer.add(this.ok_Button);
-    this.buttons_Sizer.add(this.cancel_Button);
-
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects
@@ -427,13 +348,13 @@ function cfaLinearFitDialog(data) {
     this.sizer = new VerticalSizer;
     this.sizer.margin = 6;
     this.sizer.spacing = 6;
-    this.sizer.add(this.helpLabel);
+    this.sizer.add(titleLabel);
     this.sizer.addSpacing(4);
-    this.sizer.add(this.referenceImage_Sizer);
-    this.sizer.add(this.targetImage_Sizer);
-    this.sizer.add(this.algorithm_Sizer);
-    this.sizer.add(this.rejectHigh_Control);
-    this.sizer.add(this.buttons_Sizer);
+    this.sizer.add(referenceImage_Sizer);
+    this.sizer.add(targetImage_Sizer);
+    this.sizer.add(algorithm_Sizer);
+    this.sizer.add(rejectHigh_Control);
+    this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------
     // Set all the window data
@@ -468,7 +389,7 @@ function main() {
             break;
         console.show();
         console.writeln("=================================================");
-        console.writeln("<b>CFA Linear Fit ", VERSION, "</b>:");
+        console.writeln("<b>CFA White Balance Factors ", VERSION, "</b>:");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
@@ -491,7 +412,6 @@ function main() {
 
         // Calculate and apply the linear fit
         cfaLinearFit(data);
-        console.hide();
 
         // Quit after successful execution.
         break;

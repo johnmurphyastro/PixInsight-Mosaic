@@ -17,7 +17,7 @@
 
 #include "lib/Graph.js"
 #include "lib/DialogLib.js"
-#include "lib/LinearFitLib.js"
+#include "lib/LeastSquareFit.js"
 
 /**
  * Controller. Processing starts here!
@@ -108,8 +108,7 @@ function GraphDialog(data) {
     const helpWindowTitle = "TestGraph" + "." + "1.0";
     const HELP_MSG = "<p>Test Graph</p>";
 
-    let newInstanceIcon = this.scaledResource(":/process-interface/new-instance.png");
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, newInstanceIcon, helpWindowTitle, HELP_MSG);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
     //-------------------------------------------------------
     // Vertically stack all the objects
