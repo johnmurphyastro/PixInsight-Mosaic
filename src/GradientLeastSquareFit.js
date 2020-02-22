@@ -113,7 +113,7 @@ function gradientLinearFit(data)
                 return;
             }
         }
-        sampleSections = joinSectionLines(sampleSections, 2);
+        sampleSections = joinSectionLines(sampleSections);
         gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
         colorSamplePairs[channel] = samplePairs;
     }
