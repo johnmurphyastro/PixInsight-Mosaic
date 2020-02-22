@@ -21,13 +21,11 @@
  * y = mx + b
  * @param {Number} m
  * @param {Number} b
- * @param {Rectangle} sampleArea The line was created from samples within this area
  * @returns {LinearFitData}
  */
-function LinearFitData(m, b, sampleArea = null) {
+function LinearFitData(m, b) {
     this.m = m;
     this.b = b;
-    this.sampleArea = sampleArea;
 }
 
 /**
