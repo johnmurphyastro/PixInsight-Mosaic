@@ -128,7 +128,7 @@ function applyWhiteBalance(data)
     let max1_1 = meanMax1_1.max * scale1_1;
     let resultMax = Math.max(max0_0, max0_1, max1_0, max1_1);
     if (resultMax > 1){
-        Console.writeln("Warning, max value ", resultMax, " is bigger than 1. Rescaling");
+        Console.warningln("Warning, max value ", resultMax, " is bigger than 1. Rescaling");
         scale0_0 /= resultMax;
         scale0_1 /= resultMax;
         scale1_0 /= resultMax;

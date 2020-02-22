@@ -199,7 +199,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         if (x >= 0 && y >= 0 && x < this.bitmap.width && y < this.bitmap.height){
             this.bitmap.setPixel(x, y, color);
         } else {
-            Console.writeln("Out of range: (" + x + "," + y + ") bitmap width: "
+            Console.criticalln("Out of range: (" + x + "," + y + ") bitmap width: "
                     + this.bitmap.width + " heigth: " + this.bitmap.height);
         }
     };

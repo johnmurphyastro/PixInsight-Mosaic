@@ -567,7 +567,6 @@ function mosaicLinearFitDialog(data) {
             data.areaOfInterest_W = rect.width;
             data.areaOfInterest_H = rect.height;
             
-            // Console.writeln("Preview rectangle: (" + rect.x0 + "," + rect.y0 + ") (" + rect.x1 + "," + rect.y1 + ") Width: " + rect.width + " Height: " + rect.height);
             this.dialog.rectangleX_Control.setValue(data.areaOfInterest_X);
             this.dialog.rectangleY_Control.setValue(data.areaOfInterest_Y);
             this.dialog.rectangleW_Control.setValue(data.areaOfInterest_W);
