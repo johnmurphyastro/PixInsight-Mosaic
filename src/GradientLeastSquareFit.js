@@ -35,12 +35,17 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #define AUTO 2
 #define MOSAIC_NAME "Mosaic"
 
-function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh, sampleSize, rejectBrightestPercent) {
+/**
+ * @param {Number} channel
+ * @param {Number} nSamples
+ * @param {Number} sampleSize
+ * @param {Number} rejectHigh
+ * @param {Number} rejectBrightestPercent
+ * @returns {undefined}
+ */
+function displayConsoleInfo(channel, nSamples, sampleSize, rejectHigh, rejectBrightestPercent) {
     console.writeln("Channel = ", channel);
     console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh, ", Reject brightest: ", rejectBrightestPercent + "%");
-    console.writeln("  Sample area: x = ", linearFit.sampleArea.x, ", y = ", linearFit.sampleArea.y,
-        ", width = ", linearFit.sampleArea.width, ", height = ", linearFit.sampleArea.height);
-    console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
 }
 
 /**
@@ -52,7 +57,6 @@ function gradientLinearFit(data)
     let startTime = new Date().getTime();
     let targetView = data.targetView;
     let referenceView = data.referenceView;
-    let linearFit = []; // linear fit details (m and b) for all channels
     let colorSamplePairs = []; // SamplePairs[channel]
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
@@ -76,12 +80,15 @@ function gradientLinearFit(data)
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
     }
 
+    let gradientArray = [];
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
         let samplePairs = createSamplePairs(targetView.image, referenceView.image,
                 channel, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent, samplePreviewArea, true);
+                
+        displayConsoleInfo(channel, samplePairs.samplePairArray.length, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent);
         if (samplePairs.samplePairArray.length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
@@ -96,19 +103,20 @@ function gradientLinearFit(data)
                 console.writeln("<b>Mode auto selected: Vertical Gradient</b>");
             }
         }
-        if (isHorizontal) {
-            linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getHorizontalGradientX, getHorizontalGradientY);
-        } else {
-            linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getVerticalGradientX, getVerticalGradientY);
-        }
-        linearFit[channel].sampleArea = samplePreviewArea;
-        colorSamplePairs[channel] = samplePairs;
         
-        displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
-                channel, data.rejectHigh, data.sampleSize, data.rejectBrightestPercent);
+        // Divide into sections and calculate linearFit
+        let nLineSegments = (data.nLineSegments + 1)/2;
+        let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
+        for (let section of sampleSections) {
+            if (!Number.isFinite(section.linearFitData.m) || !Number.isFinite(section.linearFitData.b)) {
+                new MessageBox("ERROR: Too few samples per line to create Least Squares Fit.", "Gradient Least Squares Fit").execute();
+                return;
+            }
+        }
+        sampleSections = joinSectionLines(sampleSections, 2);
+        gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
+        colorSamplePairs[channel] = samplePairs;
     }
-
-    let gradientArray = createGradientArray(targetView, linearFit, isHorizontal);
 
     if (data.displayGradientFlag){
         let title = "Gradient_" + targetView.fullId;
@@ -136,6 +144,270 @@ function gradientLinearFit(data)
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
+/**
+ * Split the sample coverage area into sections and calculate the gradient linear fit
+ * for each section.
+ * Returns an array of all the sections.
+ * @param {SamplePairs} samplePairs Contains the SamplePairArray and selection areas )
+ * @param {Number} nSections The number of sections to create
+ * @param {Boolean} isHorizontal True if the mosaic join is a horizontal strip
+ * @returns {SampleSection[]}
+ */
+function getSampleSections(samplePairs, nSections, isHorizontal){
+    // Start the first section at the start of the SamplePair area
+    let sampleAreaStart;
+    let sampleAreaEnd;
+    let sampleCoverageArea = samplePairs.getSampleArea();
+    if (isHorizontal){
+        sampleAreaStart = sampleCoverageArea.x;
+        sampleAreaEnd = sampleAreaStart + sampleCoverageArea.width;
+    } else {
+        sampleAreaStart = sampleCoverageArea.y;
+        sampleAreaEnd = sampleAreaStart + sampleCoverageArea.height;
+    }
+    let interval = (sampleAreaEnd - sampleAreaStart) / nSections;
+    
+    // Split the SamplePair area into sections of equal size.
+    let sections = [];
+    for (let i=0; i<nSections; i++){
+        // ...Coord is x if horizontal join, y if vertical join
+        let minCoord = Math.floor(sampleAreaStart + interval * i);
+        let maxCoord = Math.floor(sampleAreaStart + interval * (i+1));
+        let newSampleSection = new SampleSection(minCoord, maxCoord, isHorizontal);
+        newSampleSection.calcLinearFit(samplePairs);
+        sections[i] = newSampleSection;
+    }
+    return sections;
+}
+
+/**
+ * Represents a single section of the mosaic join
+ * @param {type} minCoord Minimum coordinate of section boundary
+ * @param {type} maxCoord Maximum coordinate of section boundary
+ * @param {type} isHorizontal
+ * @returns {SampleSection}
+ */
+function SampleSection(minCoord, maxCoord, isHorizontal){
+    this.linearFitData = null;
+    this.minCoord = minCoord;
+    this.maxCoord = maxCoord;
+    this.isHorizontal = isHorizontal;
+    
+    /**
+     * Determine which SamplePair are within this section's area, store them
+     * and calculate their linear fit
+     * @param {SamplePairs} samplePairs Contains samplePairArray
+     * @returns {undefined}
+     */
+    this.calcLinearFit = function (samplePairs) {
+        let samplePairArray = [];
+        for (let samplePair of samplePairs.samplePairArray) {
+            // Discover which SamplePair are within this section's area and store them
+            if (this.isHorizontal) {
+                if (samplePair.x >= this.minCoord && samplePair.x < this.maxCoord) {
+                    samplePairArray.push(samplePair);
+                }
+            } else {
+                if (samplePair.y >= this.minCoord && samplePair.y < this.maxCoord) {
+                    samplePairArray.push(samplePair);
+                }
+            }
+        }
+        // Calculate the linear fit
+        if (isHorizontal) {
+            this.linearFitData = calculateLinearFit(samplePairArray, getHorizontalGradientX, getHorizontalGradientY);
+        } else {
+            this.linearFitData = calculateLinearFit(samplePairArray, getVerticalGradientX, getVerticalGradientY);
+        }
+    };
+    
+    /**
+     * Calculate this section's linear fit line from where two lines intersect this section's boundary.
+     * We first calculate the two intersection points:
+     * The first point is where the line linearFit0 intersects with this section's minimum boundary.
+     * The second point is where the line linearFit1 intersects with this section's maximum boundary.
+     * We can then calculate the equation of the line that joins these two points.
+     * This method is used when we insert a new section between two others inorder
+     * to round off the gradient curve corners.
+     * @param {LinearFitData} linearFit0 Line that intersects this sections minimum boundary
+     * @param {LinearFitData} linearFit1 Line that intersects this sections maximum boundary
+     * @returns {undefined}
+     */
+    this.calcLineBetween = function(linearFit0, linearFit1){
+        // y = mx + b
+        // m = (y1 - y0)/(x1 - x0)
+        // b = y0 - mx0
+        let x0 = this.minCoord;
+        let x1 = this.maxCoord;
+        let y0 = linearFit0.m * x0 + linearFit0.b;
+        let y1 = linearFit1.m * x1 + linearFit1.b;
+        let m = (y1 - y0)/(x1 - x0);
+        let b = y0 - m * x0;
+        this.linearFitData = new LinearFitData(m, b);
+    };
+}
+
+/**
+ * Join section lines together by adding dummy SampleSection between each genuine one.
+ * The boundaries of the existing SampleSection's are adjusted to make room.
+ * The new SampleSection contains a line that 'cuts the corner' between
+ * where the original lines ended
+ * @param {SampleSection[]} sampleSections
+ * @returns {SampleSection[]}
+ */
+function joinSectionLines(sampleSections){
+    if (sampleSections.length < 2) {
+        return sampleSections;
+    }
+
+    // Calculate how far to move the existing SampleSection boundaries.
+    // The newly inserted SampleSection will be (dist * 2) wide.
+    let s = sampleSections[1];
+    let dist = Math.round((s.maxCoord - s.minCoord) / 6);
+    if (dist < 6) {
+        return sampleSections;
+    }
+    let roundedSampleSections = [];
+    let s0 = sampleSections[0];
+    for (let i = 1; i < sampleSections.length; i++) {
+        let s1 = sampleSections[i];
+        s0.maxCoord -= dist;
+        s1.minCoord += dist;
+        // Create a new dummy SampleSection. It will not contain any samples, 
+        // but we do calcuate and set its 'linear fit' line which joins it to
+        // the previous and next SampleSection's
+        let ss = new SampleSection(s0.maxCoord, s1.minCoord, s0.isHorizontal);
+        ss.calcLineBetween(s0.linearFitData, s1.linearFitData);
+        roundedSampleSections.push(s0);
+        roundedSampleSections.push(ss);
+        s0 = s1;
+    }
+    roundedSampleSections.push(s0);
+    sampleSections = roundedSampleSections;
+    
+    Console.writeln("Gradients:")
+    for (let n = 0; n < sampleSections.length; n++) {
+        let line = sampleSections[n];
+        Console.writeln("Line[" + n + "] from: " + line.minCoord + ", to: " + line.maxCoord
+                + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
+    }
+    
+    return sampleSections;
+}
+/**
+ * Create the gradient as an array of pixel differences, stored in the GradientData structure.
+ * How the difference values are calculated:
+ * (1) The SampleArea is the bounding rectangle of all the SamplePairs.
+ * (2) The previewArea is the area selected by the user (e.g. by a preview). If
+ * the user made no selection, the previewArea is the area as the image. The 
+ * SampleArea is a subset of the previewArea (it can be the same size, but not bigger.)
+ * (3) The SampleArea is divided into SampleSection. Each of these sections 
+ * defines a gradient line. The dif value within the sample area is calculated 
+ * from the equation of this line: dif = mx + b
+ * (4) From the start of the image to the start of the previewArea, the dif value
+ * is held constant.
+ * (5) From the start of the previewArea (or the start of the image if the 
+ * preview area does not exist) to the first SampleSection, the line from that first
+ * SampleSection is extended.
+ * (6) From the last SampleSection to the end of the previewArea (or the end of 
+ * the image if the preview area does not exist) the line from that last
+ * SampleSection is extended.
+ * (7) From the end of the previewArea to the end of the image, the dif value
+ * is held constant.
+ *  
+ * @param {SampleSection[]} sampleSections
+ * @param {Rectangle} previewArea
+ * @param {Rectangle} targetImage
+ * @param {Boolean} isHorizontal
+ * @returns {GradientData}
+ */
+function createGradient(sampleSections, previewArea, targetImage, isHorizontal) {
+    let previewMinCoord;
+    let previewMaxCoord;
+    let imageMaxCoord;
+    if (isHorizontal) {
+        previewMinCoord = previewArea.x;
+        previewMaxCoord = previewArea.x + previewArea.width - 1;
+        imageMaxCoord = targetImage.width;
+    } else {
+        previewMinCoord = previewArea.y;
+        previewMaxCoord = previewArea.y + previewArea.height - 1;
+        imageMaxCoord = targetImage.height;
+    }
+    
+    let difArray = [];
+
+    // From start of image to start of previewArea, the dif value is held constant.
+    let firstSection = sampleSections[0];
+    let firstB = firstSection.linearFitData.b;
+    let firstM = firstSection.linearFitData.m;
+    let firstDif = previewMinCoord * firstM + firstB;
+    for (let p = 0; p < previewMinCoord; p++) {
+        difArray.push(firstDif);
+    }
+    let minValue = firstDif;
+    let maxValue = firstDif;
+
+    // From the start of the previewArea (or the start of the image if the 
+    // preview area does not exist) to the first SampleSection, the line from that first
+    // SampleSection is extended.
+    for (let p = previewMinCoord; p < firstSection.minCoord; p++) {
+        let dif = p * firstM + firstB;
+        difArray.push(dif);
+        minValue = Math.min(minValue, dif);
+        maxValue = Math.max(maxValue, dif);
+    }
+
+    // for each section, calculate the difference from equation of the line (dif = mx + b)
+    for (let section of sampleSections) {
+        let m = section.linearFitData.m;
+        let b = section.linearFitData.b;
+        let pStart = section.minCoord;
+        let pEnd = section.maxCoord;
+        for (let p = pStart; p < pEnd; p++) {
+            let dif = p * m + b;
+            difArray.push(dif);
+            minValue = Math.min(minValue, dif);
+            maxValue = Math.max(maxValue, dif);
+        }
+    }
+
+    // From the last SampleSection to the end of the previewArea (or the end of 
+    // the image if the preview area does not exist) the line from that last
+    // SampleSection is extended.
+    let lastSection = sampleSections[sampleSections.length - 1];
+    let lastB = lastSection.linearFitData.b;
+    let lastM = lastSection.linearFitData.m;
+    for (let p = lastSection.maxCoord; p < previewMaxCoord; p++) {
+        let dif = p * lastM + lastB;
+        difArray.push(dif);
+        minValue = Math.min(minValue, dif);
+        maxValue = Math.max(maxValue, dif);
+    }
+
+    // From end of previewArea to end of image, dif value is held constant
+    let lastDif = difArray[difArray.length - 1];
+    for (let p = previewMaxCoord; p < imageMaxCoord; p++) {
+        difArray.push(lastDif);
+    }
+
+    if (difArray.length !== imageMaxCoord) {
+        Console.criticalln("Error: DifArray length = " + difArray.length + "image size = " + imageMaxCoord);
+    }
+
+    return new GradientData(difArray, minValue, maxValue);
+}
+
+/**
+ * Display graph of (difference between images) / (pixel distance across image)
+ * @param {View} targetView Used for view name and image size (max graph size is limited to image size)
+ * @param {View} referenceView Used for view name
+ * @param {Number} width Width or Height. Limited to target image size.
+ * @param {Boolean} isHorizontal
+ * @param {GradientData[]} gradientArray The gradient to be displayed
+ * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
+ * @returns {undefined}
+ */
 function displayGraph(targetView, referenceView, width, isHorizontal, gradientArray, colorSamplePairs){
     let axisWidth;
     let maxCoordinate;
@@ -151,16 +423,16 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     }
     let yLabel = "(" + targetView.fullId + " sample median) - (" + referenceView.fullId + " sample median)";
     axisWidth = Math.min(width, maxCoordinate);
+    // Graph scale
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
     let minMax = new SamplePairDifMinMax(colorSamplePairs, gradientArray);
-
     let graphWithAxis = new Graph(0, minMax.minDif, maxCoordinate, minMax.maxDif);
     graphWithAxis.setAxisLength(axisWidth + 2, 500);
     graphWithAxis.createGraph(xLabel, yLabel);
     
     if (colorSamplePairs.length === 1){ // B&W
-        drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[0], 0xFF777777,
+        drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[0], 0xFF999999,
             colorSamplePairs[0], 0xFFFFFFFF);
         imageWindow = graphWithAxis.createWindow(windowTitle, false);
     } else {
@@ -179,6 +451,16 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     imageWindow.show();
 }
 
+/**
+ * Draw gradient line and sample points for a single color channel.
+ * @param {Graph} graph
+ * @param {Boolean} isHorizontal
+ * @param {GradientData} gradientData
+ * @param {Number} lineColor
+ * @param {SamplePairs} samplePairs
+ * @param {Number} pointColor
+ * @returns {undefined}
+ */
 function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, samplePairs, pointColor) {
     let difArray = gradientData.difArray;
     for (let x = 0; x < difArray.length; x++) {
@@ -271,49 +553,6 @@ function displayGradient(targetView, title, isHorizontal, gradientArray) {
     window.show();
 }
 
-/**
- * @param {View} targetView The created gradient is for this image
- * @param {LinearFitData[]} line Gradient linear fit line y = mx + b
- * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
- * @return {Number[][]} Gradient array of differences
- */
-function createGradientArray(targetView, line, isHorizontal){
-    let nPoints;
-    let gradientArray = [];
-    let nChannels = line.length;
-    let start;
-    let end;
-    if (isHorizontal){
-        nPoints = targetView.image.width;
-        start = line[0].sampleArea.x;
-        end = start + line[0].sampleArea.width;
-    } else {
-        nPoints = targetView.image.height;
-        start = line[0].sampleArea.y;
-        end = start + line[0].sampleArea.height;
-    }
-    let minValue = Number.POSITIVE_INFINITY;
-    let maxValue = Number.NEGATIVE_INFINITY;
-    for (let color=0; color< nChannels; color++){
-        let difArray = [];
-        // p represents x (horizontal case) or y (vertical case)
-        for (let p=0; p<nPoints; p++){
-            let dif;
-            if (p < start){
-                dif = start * line[color].m + line[color].b;
-            } else if (p > end){
-                dif = end * line[color].m + line[color].b;
-            } else {
-                dif = p * line[color].m + line[color].b;
-            }
-            difArray.push(dif);
-            minValue = Math.min(dif, minValue);
-            maxValue = Math.max(dif, maxValue);
-        }
-        gradientArray[color] = new GradientData(difArray, minValue, maxValue);
-    }
-    return gradientArray;
-}
 
 /**
  * Subtract the detected gradient from the target view
@@ -344,7 +583,12 @@ function applyGradient(view, isHorizontal, gradientArray) {
             }
         }
     }
-
+    let minValue = view.image.minimum();
+    let maxValue = view.image.maximum();
+    if (minValue < 0 || maxValue > 1){
+        Console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
+        view.image.truncate(0, 1);
+    }
     view.endProcess();
 }
 
@@ -394,6 +638,7 @@ function MosaicLinearFitData() {
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("rejectBrightestPercent", this.rejectBrightestPercent);
+        Parameters.set("nLineSegments", this.nLineSegments);
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
@@ -415,6 +660,8 @@ function MosaicLinearFitData() {
             this.sampleSize = Parameters.getInteger("sampleSize");
         if (Parameters.has("rejectBrightestPercent"))
             this.rejectBrightestPercent = Parameters.getInteger("rejectBrightestPercent");
+        if (Parameters.has("nLineSegments"))
+            this.nLineSegments = Parameters.getInteger("nLineSegments");
         if (Parameters.has("displayGradientFlag"))
             this.displayGradientFlag = Parameters.getBoolean("displayGradientFlag");
         if (Parameters.has("displayGraphFlag"))
@@ -452,6 +699,7 @@ function MosaicLinearFitData() {
         this.rejectHigh = 0.8;
         this.sampleSize = 15;
         this.rejectBrightestPercent = 10;
+        this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
         this.displaySamplesFlag = true;
@@ -473,6 +721,7 @@ function MosaicLinearFitData() {
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.rejectBrightestPercent_Control.setValue(this.rejectBrightestPercent);
+        linearFitDialog.LineSegments_Control.setValue(this.nLineSegments);
         
         linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
         linearFitDialog.rectangleX_Control.setValue(this.areaOfInterest_X);
@@ -665,7 +914,24 @@ function gradientLinearFitDialog(data) {
     this.rejectBrightestPercent_Control.slider.minWidth = 500;
     this.rejectBrightestPercent_Control.setValue(data.rejectBrightestPercent);
     
-        //-------------------------------------------------------
+    //-------------------------------------------------------
+    // Number of linear fit line segments
+    //-------------------------------------------------------
+    this.lineSegments_Control = new NumericControl(this);
+    this.lineSegments_Control.real = true;
+    this.lineSegments_Control.label.text = "Line Segments:";
+    this.lineSegments_Control.label.minWidth = labelWidth1;
+    this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data.</p>";
+    this.lineSegments_Control.onValueUpdated = function (value) {
+        data.nLineSegments = value;
+    };
+    this.lineSegments_Control.setRange(1, 49);
+    this.lineSegments_Control.slider.setRange(1, 25);
+    this.lineSegments_Control.setPrecision(0);
+    this.lineSegments_Control.slider.minWidth = 500;
+    this.lineSegments_Control.setValue(data.nLineSegments);
+    
+    //-------------------------------------------------------
     // Area of interest
     //-------------------------------------------------------
     let labelWidth2 = this.font.width("Height:_");
@@ -742,7 +1008,6 @@ function gradientLinearFitDialog(data) {
             data.areaOfInterest_W = rect.width;
             data.areaOfInterest_H = rect.height;
             
-            // Console.writeln("Preview rectangle: (" + rect.x0 + "," + rect.y0 + ") (" + rect.x1 + "," + rect.y1 + ") Width: " + rect.width + " Height: " + rect.height);
             this.dialog.rectangleX_Control.setValue(data.areaOfInterest_X);
             this.dialog.rectangleY_Control.setValue(data.areaOfInterest_Y);
             this.dialog.rectangleW_Control.setValue(data.areaOfInterest_W);
@@ -785,8 +1050,9 @@ function gradientLinearFitDialog(data) {
     this.sizer.add(targetImage_Sizer);
     this.sizer.add(orientationSizer);
     this.sizer.add(this.rejectHigh_Control);
-    this.sizer.add(this.rejectBrightestPercent_Control);
     this.sizer.add(this.sampleSize_Control);
+    this.sizer.add(this.rejectBrightestPercent_Control);
+    this.sizer.add(this.lineSegments_Control);
     this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(buttons_Sizer);
 
