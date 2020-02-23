@@ -19,6 +19,7 @@
 #feature-info Determines CFA white balance factors.<br/>\
 Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
+#include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
 #include "lib/SamplePair.js"
 #include "lib/LeastSquareFit.js"

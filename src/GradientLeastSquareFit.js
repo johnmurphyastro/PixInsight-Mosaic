@@ -50,7 +50,7 @@ function displayConsoleInfo(channel, nSamples, sampleSize, rejectHigh, rejectBri
 
 /**
  * Controller. Processing starts here!
- * @param {MosaicLinearFitData} data Values from user interface
+ * @param {GradientLeastSquareFitData} data Values from user interface
  */
 function gradientLinearFit(data)
 {
@@ -79,7 +79,7 @@ function gradientLinearFit(data)
     } else {
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
     }
-
+    
     let gradientArray = [];
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
@@ -139,8 +139,8 @@ function gradientLinearFit(data)
     } else {
         console.writeln("\nApplying vertical gradient");
     }
-    applyGradient(targetView, isHorizontal, gradientArray);
-    data.saveParameters();
+    applyGradient(targetView, isHorizontal, gradientArray, data);
+    
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
@@ -525,7 +525,7 @@ function displayGradient(targetView, title, isHorizontal, gradientArray) {
         minValue = Math.min(minValue, gradientArray[channel].minValue);
     }
 
-    view.beginProcess();
+    view.beginProcess(UndoFlag_NoSwapFile);
 
     for (let channel = 0; channel < nChannels; channel++) {
         let difArray = gradientArray[channel].difArray;
@@ -559,9 +559,10 @@ function displayGradient(targetView, title, isHorizontal, gradientArray) {
  * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
  * @param {Number[].GradientData} gradientArray ColourChannel.GradientData diff data
+ * @param {GradientLeastSquareFitData} data Values from user interface
  * @returns {undefined}
  */
-function applyGradient(view, isHorizontal, gradientArray) {
+function applyGradient(view, isHorizontal, gradientArray, data) {
     let nChannels = gradientArray.length;
     let targetImage = view.image;
     view.beginProcess();
@@ -589,6 +590,8 @@ function applyGradient(view, isHorizontal, gradientArray) {
         Console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
         view.image.truncate(0, 1);
     }
+    // Save parameters to PixInsight history
+    data.saveParameters();
     view.endProcess();
 }
 
@@ -623,7 +626,7 @@ function getDefaultReferenceView(activeWindow) {
 // -----------------------------------------------------------------------------
 // Form/Dialog data
 // -----------------------------------------------------------------------------
-function MosaicLinearFitData() {
+function GradientLeastSquareFitData() {
     // Used to poplulate the contents of a saved process icon
     // It would normally also be called at the end of our script to populate the history entry,
     // but because we use PixelMath to modify the image, the history entry is automatically populated.
@@ -1077,7 +1080,7 @@ function main() {
     }
 
     // Create dialog, start looping
-    let data = new MosaicLinearFitData();
+    let data = new GradientLeastSquareFitData();
 
     if (Parameters.isGlobalTarget || Parameters.isViewTarget) {
         data.loadParameters();

@@ -109,7 +109,7 @@ function drawSampleSquares(colorSamplePairs, referenceView, title) {
     let view = imageWindow.mainView;
     let image = view.image;
     
-    view.beginProcess();
+    view.beginProcess(UndoFlag_NoSwapFile);
     image.assign(referenceView.image);
     image.blend(bmp);
     view.endProcess();

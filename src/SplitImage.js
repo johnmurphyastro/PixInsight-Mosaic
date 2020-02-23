@@ -45,7 +45,9 @@ function splitImage(data)
     }
 
     createSplitImages(targetView, data.coordinate, data.overlap, isHorizontal);
-    data.saveParameters();
+    
+    // Images created by PixelMath, so nothing to add to history
+    //data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 

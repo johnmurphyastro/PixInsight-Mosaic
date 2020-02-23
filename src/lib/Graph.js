@@ -218,7 +218,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         let view = imageWindow.mainView;
         let image = view.image;
 
-        view.beginProcess();
+        view.beginProcess(UndoFlag_NoSwapFile);
         image.blend(this.bitmap);
         view.endProcess();
 

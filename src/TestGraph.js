@@ -15,6 +15,7 @@
 // =================================================================================
 "use strict";
 
+#include <pjsr/UndoFlag.jsh>
 #include "lib/Graph.js"
 #include "lib/DialogLib.js"
 #include "lib/LeastSquareFit.js"

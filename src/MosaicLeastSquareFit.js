@@ -104,7 +104,11 @@ function mosaicLinearFit(data)
         console.writeln("\nCreating " + MOSAIC_NAME);
         createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME);
     }
-    data.saveParameters();
+// Takes too long and adds extra undo on history list
+//    console.writeln("Saving script parameters");
+//    targetView.beginProcess();
+//    data.saveParameters();
+//    targetView.endProcess();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
     return true;
 }

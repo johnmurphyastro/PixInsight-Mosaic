@@ -136,6 +136,7 @@ function testLeastSquareFitAlgorithm() {
  */
 function applyLinearFit(view, line) {
     let P = new PixelMath;
+    P.setDescription("Apply Least Squares Fit to " + view.fullId);
     P.expression = "iif($T == 0, 0, $T * " + line[0].m + " + " + line[0].b +")";
     if (3 === line.length) { // RGB
         P.expression1 = "iif($T == 0, 0, $T * " + line[1].m + " + " + line[1].b +")";
@@ -172,6 +173,7 @@ function createMosaic(topView, bottomView, overlayFlag, mosaicImageName = "Mosai
     let createMosaicView = mosaicView.isNull;
 
     let P = new PixelMath;
+    P.setDescription("Create Mosaic from " + topView.fullId + ", " + bottomView.fullId);
     let expression;
     if (overlayFlag) {
         expression = format("iif(%s != 0, %s, %s)", topView.fullId, topView.fullId, bottomView.fullId);
