@@ -5,6 +5,9 @@
 // /_/     \____/ /____//_/ |_|    PJSR Version 1.0
 // ----------------------------------------------------------------------------
 // pjsr/StarDetector.jsh - Released 2019-04-29T18:55:31Z
+// John Murphy: Modified Star data structure to include background value.
+//      Modification follows suggestion by Juan Conejero, PixInsight forum:
+//      https://pixinsight.com/forum/index.php?topic=14574.0
 // ----------------------------------------------------------------------------
 // This file is part of the PixInsight JavaScript Runtime (PJSR).
 // PJSR is an ECMA-262-5 compliant framework for development of scripts on the
@@ -101,7 +104,7 @@
  */
 #ifndef __PJSR_STAR_OBJECT_DEFINED
 #define __PJSR_STAR_OBJECT_DEFINED  1
-function Star( pos, flux, size )
+function Star( pos, flux, size, bkg )
 {
    // Centroid position in pixels, image coordinates.
    this.pos = new Point( pos.x, pos.y );
@@ -109,6 +112,8 @@ function Star( pos, flux, size )
    this.flux = flux;
    // Area of detected star structure in square pixels.
    this.size = size;
+   // Local background estimate.
+   this.bkg = bkg;
 }
 #endif
 
@@ -575,7 +580,7 @@ function StarDetector()
                               {
                                  let m = Matrix.fromImage( wrk, r );
                                  if ( m.median() < this.peakResponse*p.peak )
-                                    S.push( new Star( p.pos, p.flux, p.size ) );
+                                    S.push( new Star( p.pos, p.flux, p.size, p.bkg ) );
                               }
                      }
                   }
