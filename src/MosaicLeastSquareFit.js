@@ -98,7 +98,7 @@ function mosaicLinearFit(data)
     }
     
     console.writeln("\nApplying linear fit");
-    applyLinearFit(targetView, linearFit);
+    applyLinearFit(targetView, linearFit, true);
 
     if (data.displayMosiacFlag) {
         console.writeln("\nCreating " + MOSAIC_NAME);

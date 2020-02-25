@@ -84,12 +84,19 @@ function LeastSquareFitAlgorithm() {
      * @return {LinearFitData} Fitted line (y = mx + b)
      */
     this.getLinearFit = function () {
-        let m = ((this.n * this.sumXY) - (this.sumX * this.sumY)) /
-                ((this.n * this.sumSquaredX) - (this.sumX * this.sumX));
+        if (this.n > 1) {
+            let m = ((this.n * this.sumXY) - (this.sumX * this.sumY)) /
+                    ((this.n * this.sumSquaredX) - (this.sumX * this.sumX));
 
-        let b = (this.sumY - (m * this.sumX)) / this.n;
-
-        return new LinearFitData(m, b);
+            let b = (this.sumY - (m * this.sumX)) / this.n;
+            return new LinearFitData(m, b);
+        } else if (this.n === 1){
+            Console.warningln("WARNING: Least Squares Fit only has one point. Assuming origin as second point.");
+            return new LinearFitData(this.sumY / this.sumX, 0);
+        } else {
+            Console.criticalln("ERROR: Least Squares Fit has no points to fit...");
+            return new LinearFitData(1, 0);
+        }
     };
 }
 
@@ -132,9 +139,10 @@ function testLeastSquareFitAlgorithm() {
  * If the resulting pixels are less than zero or greater than 1.0, they are clipped.
  * @param {View} view Target view
  * @param {LinearFitData[]} line LinearFitData for each channel
+ * @param {Boolean} allowUndo
  * @returns {undefined}
  */
-function applyLinearFit(view, line) {
+function applyLinearFit(view, line, allowUndo) {
     let P = new PixelMath;
     P.setDescription("Apply Least Squares Fit to " + view.fullId);
     P.expression = "iif($T == 0, 0, $T * " + line[0].m + " + " + line[0].b +")";
@@ -154,7 +162,7 @@ function applyLinearFit(view, line) {
     P.truncateLower = 0;
     P.truncateUpper = 1;
     P.createNewImage = false;
-    P.executeOn(view, true);
+    P.executeOn(view, allowUndo);
 }
 
 /**
