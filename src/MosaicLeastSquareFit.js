@@ -19,8 +19,6 @@
 #feature-info Determines the background offset and brightness multiple betweeen the target and reference images over the overlaping area.<br/>\
 Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
-#include <pjsr/ColorSpace.jsh>
-#include <pjsr/DataType.jsh>
 #include <pjsr/UndoFlag.jsh>
 
 #include "lib/DialogLib.js"
