@@ -114,7 +114,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         let g = new Graphics();
         let font = g.font;
         let maxNumberLength = font.width("8.88e+88");
-        let minDistBetweenTicks = maxNumberLength * 1.2;
+        let minDistBetweenTicks = maxNumberLength * 1.3;
         let fontHeight = font.ascent + font.descent;
         let tickLength = 4;
         
