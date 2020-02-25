@@ -19,14 +19,13 @@
 #feature-info Calculates the gradient between two images over their overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
-#include <pjsr/ColorSpace.jsh>
-#include <pjsr/DataType.jsh>
 #include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
 #include "lib/SamplePair.js"
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/DisplaySamples.js"
+#include "lib/StarLib.js"
 
 #define VERSION  "1.0"
 #define TITLE "Gradient Least Squares Fit"
@@ -34,19 +33,6 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #define VERTICAL 1
 #define AUTO 2
 #define MOSAIC_NAME "Mosaic"
-
-/**
- * @param {Number} channel
- * @param {Number} nSamples
- * @param {Number} sampleSize
- * @param {Number} rejectHigh
- * @param {Number} rejectBrightestPercent
- * @returns {undefined}
- */
-function displayConsoleInfo(channel, nSamples, sampleSize, rejectHigh, rejectBrightestPercent) {
-    console.writeln("Channel = ", channel);
-    console.writeln("  Samples: ", nSamples, ", Size: ", sampleSize, ", Reject high: ", rejectHigh, ", Reject brightest: ", rejectBrightestPercent + "%");
-}
 
 /**
  * Controller. Processing starts here!
@@ -80,6 +66,19 @@ function gradientLinearFit(data)
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
     }
     
+    console.writeln("\n<b>Calculating scale factors:</b>");
+    let colorStarPairs = calcScaleMult(referenceView, targetView, samplePreviewArea, 
+            data.logStarDetection, data.rejectHigh);
+            
+    console.writeln("\n<b>Applying scale factors to '" + targetView.fullId + "':</b>");
+    // We must apply the scale factor to the target image before calculating the gradient offsets
+    targetView.beginProcess();
+    let scaleFactor = [];
+    for (let starPairs of colorStarPairs){
+        scaleFactor.push(starPairs.linearFitData);
+    }
+    applyLinearFit(targetView, scaleFactor, false);
+    
     let gradientArray = [];
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
@@ -87,8 +86,6 @@ function gradientLinearFit(data)
     for (let channel = 0; channel < nChannels; channel++) {
         let samplePairs = createSamplePairs(targetView.image, referenceView.image,
                 channel, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent, samplePreviewArea, true);
-                
-        displayConsoleInfo(channel, samplePairs.samplePairArray.length, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent);
         if (samplePairs.samplePairArray.length < 2) {
             new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
             return;
@@ -98,24 +95,43 @@ function gradientLinearFit(data)
             detectOrientation = false;
             isHorizontal = sampleArea.width > sampleArea.height;
             if (isHorizontal){
-                console.writeln("<b>Mode auto selected: Horizontal Gradient</b>");
+                console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
             } else {
-                console.writeln("<b>Mode auto selected: Vertical Gradient</b>");
+                console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
             }
         }
         
-        // Divide into sections and calculate linearFit
-        let nLineSegments = (data.nLineSegments + 1)/2;
-        let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
-        for (let section of sampleSections) {
-            if (!Number.isFinite(section.linearFitData.m) || !Number.isFinite(section.linearFitData.b)) {
-                new MessageBox("ERROR: Too few samples per line to create Least Squares Fit.", "Gradient Least Squares Fit").execute();
-                return;
+        if (data.nLineSegments > 0){
+            // Divide into sections and calculate linearFit
+            let nLineSegments = (data.nLineSegments + 1)/2;
+            let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
+            sampleSections = joinSectionLines(sampleSections);
+            gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
+
+            console.writeln("<b>Gradients (channel " + channel + "):<\b>");
+            for (let n = 0; n < sampleSections.length; n++) {
+                let line = sampleSections[n];
+                console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
+                        + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
             }
         }
-        sampleSections = joinSectionLines(sampleSections);
-        gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
+        
         colorSamplePairs[channel] = samplePairs;
+    }
+    
+    applyGradient(targetView, isHorizontal, gradientArray);
+    
+    // Save parameters to PixInsight history
+    data.saveParameters();
+    targetView.endProcess();
+    
+    for (let i=0; i < colorStarPairs.length; i++){
+        let starPairs = colorStarPairs[i];
+        console.writeln("Scale (channel " + i + "): " + starPairs.linearFitData.m.toPrecision(5)
+                + " from " + starPairs.starPairArray.length + " detected stars.");
+        if (data.displayStarsFlag){
+            displayDetectedStars(targetView, starPairs.starPairArray, i, referenceView.image.isColor);
+        }
     }
 
     if (data.displayGradientFlag){
@@ -123,24 +139,24 @@ function gradientLinearFit(data)
         displayGradient(targetView, title, isHorizontal, gradientArray);
     }
     
-    if (data.displayGraphFlag) {
-        console.writeln("\nCreating least squares fit graph");
-        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairs);
-    }
-    
     if (data.displaySamplesFlag){
         let title = "Samples_" + targetView.fullId;
         let samplesWindow = drawSampleSquares(colorSamplePairs, referenceView, title);
         samplesWindow.show();
     }
-
-    if (isHorizontal) {
-        console.writeln("\nApplying horizontal gradient");
-    } else {
-        console.writeln("\nApplying vertical gradient");
-    }
-    applyGradient(targetView, isHorizontal, gradientArray, data);
     
+    if (data.photometryGraphFlag){
+        displayStarGraph(referenceView, targetView, 730, colorStarPairs);
+    }
+    
+    if (data.displayGraphFlag) {
+        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairs);
+    }
+    
+    if (data.displayMosiacFlag){
+        console.writeln("\nCreating " + MOSAIC_NAME);
+        createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME);
+    }
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
@@ -256,40 +272,31 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
  * @returns {SampleSection[]}
  */
 function joinSectionLines(sampleSections){
-    if (sampleSections.length < 2) {
-        return sampleSections;
-    }
-
-    // Calculate how far to move the existing SampleSection boundaries.
-    // The newly inserted SampleSection will be (dist * 2) wide.
-    let s = sampleSections[1];
-    let dist = Math.round((s.maxCoord - s.minCoord) / 6);
-    if (dist < 6) {
-        return sampleSections;
-    }
-    let roundedSampleSections = [];
-    let s0 = sampleSections[0];
-    for (let i = 1; i < sampleSections.length; i++) {
-        let s1 = sampleSections[i];
-        s0.maxCoord -= dist;
-        s1.minCoord += dist;
-        // Create a new dummy SampleSection. It will not contain any samples, 
-        // but we do calcuate and set its 'linear fit' line which joins it to
-        // the previous and next SampleSection's
-        let ss = new SampleSection(s0.maxCoord, s1.minCoord, s0.isHorizontal);
-        ss.calcLineBetween(s0.linearFitData, s1.linearFitData);
+    if (sampleSections.length > 1) {
+        // Calculate how far to move the existing SampleSection boundaries.
+        // The newly inserted SampleSection will be (dist * 2) wide.
+        let s = sampleSections[1];
+        let dist = Math.round((s.maxCoord - s.minCoord) / 6);
+        if (dist < 6) {
+            return sampleSections;
+        }
+        let roundedSampleSections = [];
+        let s0 = sampleSections[0];
+        for (let i = 1; i < sampleSections.length; i++) {
+            let s1 = sampleSections[i];
+            s0.maxCoord -= dist;
+            s1.minCoord += dist;
+            // Create a new dummy SampleSection. It will not contain any samples, 
+            // but we do calcuate and set its 'linear fit' line which joins it to
+            // the previous and next SampleSection's
+            let ss = new SampleSection(s0.maxCoord, s1.minCoord, s0.isHorizontal);
+            ss.calcLineBetween(s0.linearFitData, s1.linearFitData);
+            roundedSampleSections.push(s0);
+            roundedSampleSections.push(ss);
+            s0 = s1;
+        }
         roundedSampleSections.push(s0);
-        roundedSampleSections.push(ss);
-        s0 = s1;
-    }
-    roundedSampleSections.push(s0);
-    sampleSections = roundedSampleSections;
-    
-    Console.writeln("Gradients:")
-    for (let n = 0; n < sampleSections.length; n++) {
-        let line = sampleSections[n];
-        Console.writeln("Line[" + n + "] from: " + line.minCoord + ", to: " + line.maxCoord
-                + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
+        sampleSections = roundedSampleSections;
     }
     
     return sampleSections;
@@ -392,7 +399,7 @@ function createGradient(sampleSections, previewArea, targetImage, isHorizontal) 
     }
 
     if (difArray.length !== imageMaxCoord) {
-        Console.criticalln("Error: DifArray length = " + difArray.length + "image size = " + imageMaxCoord);
+        console.criticalln("Error: DifArray length = " + difArray.length + "image size = " + imageMaxCoord);
     }
 
     return new GradientData(difArray, minValue, maxValue);
@@ -559,13 +566,11 @@ function displayGradient(targetView, title, isHorizontal, gradientArray) {
  * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
  * @param {Number[].GradientData} gradientArray ColourChannel.GradientData diff data
- * @param {GradientLeastSquareFitData} data Values from user interface
  * @returns {undefined}
  */
-function applyGradient(view, isHorizontal, gradientArray, data) {
+function applyGradient(view, isHorizontal, gradientArray) {
     let nChannels = gradientArray.length;
     let targetImage = view.image;
-    view.beginProcess();
 
     for (let channel = 0; channel < nChannels; channel++) {
         let difArray = gradientArray[channel].difArray;
@@ -587,12 +592,9 @@ function applyGradient(view, isHorizontal, gradientArray, data) {
     let minValue = view.image.minimum();
     let maxValue = view.image.maximum();
     if (minValue < 0 || maxValue > 1){
-        Console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
+        console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
         view.image.truncate(0, 1);
     }
-    // Save parameters to PixInsight history
-    data.saveParameters();
-    view.endProcess();
 }
 
 /**
@@ -637,6 +639,9 @@ function GradientLeastSquareFitData() {
         if (this.referenceView.isMainView) {
             Parameters.set("referenceView", this.referenceView.fullId);
         }
+        Parameters.set("starDetection", this.logStarDetection);
+        Parameters.set("displayStars", this.displayStarsFlag);
+        Parameters.set("photometryGraph", this.photometryGraphFlag);
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
@@ -645,6 +650,8 @@ function GradientLeastSquareFitData() {
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
+        Parameters.set("displayMosiacFlag", this.displayMosiacFlag);
+        Parameters.set("mosiacOverlayFlag", this.mosaicOverlayFlag);
         
         Parameters.set("hasAreaOfInterest", this.hasAreaOfInterest);
         Parameters.set("areaOfInterestX", this.areaOfInterest_X);
@@ -655,6 +662,12 @@ function GradientLeastSquareFitData() {
 
     // Reload our script's data from a process icon
     this.loadParameters = function () {
+        if (Parameters.has("starDetection"))
+            this.logStarDetection = Parameters.getReal("starDetection");
+        if (Parameters.has("displayStars"))
+            this.displayStarsFlag = Parameters.getBoolean("displayStars");
+        if (Parameters.has("photometryGraph"))
+            this.photometryGraphFlag = Parameters.getBoolean("photometryGraph");
         if (Parameters.has("orientation"))
             this.orientation = Parameters.getInteger("orientation");
         if (Parameters.has("rejectHigh"))
@@ -671,6 +684,12 @@ function GradientLeastSquareFitData() {
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
         if (Parameters.has("displaySamplesFlag"))
             this.displaySamplesFlag = Parameters.getBoolean("displaySamplesFlag");
+        if (Parameters.has("displayMosiacFlag"))
+            this.displayMosiacFlag = Parameters.getBoolean("displayMosiacFlag");
+        if (Parameters.has("mosiacOverlayFlag")) {
+            this.mosaicOverlayFlag = Parameters.getBoolean("mosiacOverlayFlag");
+            this.mosaicRandomFlag = !(this.mosaicOverlayFlag);
+        }
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
             this.targetView = View.viewById(viewId)
@@ -698,6 +717,9 @@ function GradientLeastSquareFitData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
+        this.logStarDetection = -1;
+        this.displayStarsFlag = false;
+        this.photometryGraphFlag = true;
         this.orientation = AUTO;
         this.rejectHigh = 0.8;
         this.sampleSize = 15;
@@ -705,7 +727,10 @@ function GradientLeastSquareFitData() {
         this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
-        this.displaySamplesFlag = true;
+        this.displaySamplesFlag = false;
+        this.displayMosiacFlag = true;
+        this.mosaicOverlayFlag = true;
+        this.mosaicRandomFlag = false;
         
         this.hasAreaOfInterest = false;
         this.areaOfInterest_X = 0;
@@ -718,13 +743,18 @@ function GradientLeastSquareFitData() {
     this.resetParameters = function (linearFitDialog) {
         this.setParameters();
         linearFitDialog.orientationCombo.currentItem = AUTO;
+        linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
+        linearFitDialog.displayStarsControl.checked = this.displayStarsFlag;
+        linearFitDialog.photometryGraphControl.checked = this.photometryGraphFlag;
         linearFitDialog.displayGradientControl.checked = this.displayGradientFlag;
         linearFitDialog.displayGraphControl.checked = this.displayGraphFlag;
         linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.rejectBrightestPercent_Control.setValue(this.rejectBrightestPercent);
-        linearFitDialog.LineSegments_Control.setValue(this.nLineSegments);
+        linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
+        linearFitDialog.displayMosaicControl.checked = this.displayMosiacFlag;
+        linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
         
         linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
         linearFitDialog.rectangleX_Control.setValue(this.areaOfInterest_X);
@@ -808,14 +838,53 @@ function gradientLinearFitDialog(data) {
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
-
+    //----------------------------------------------------
+    // Star detection
+    //----------------------------------------------------
+    this.starDetectionControl = new NumericEdit();
+    this.starDetectionControl.setReal(false);
+    this.starDetectionControl.setRange(-10, 10);
+    this.starDetectionControl.setValue(data.logStarDetection);
+    this.starDetectionControl.label.text = "Star Detection:";
+    this.starDetectionControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    this.starDetectionControl.label.setFixedWidth(labelWidth1);
+    this.starDetectionControl.edit.setFixedWidth(97);
+    this.starDetectionControl.toolTip = "Smaller values detect more stars.";
+    this.starDetectionControl.onValueUpdated = function (value){
+        data.logStarDetection = value;
+    };
+    
+    this.displayStarsControl = new CheckBox(this);
+    this.displayStarsControl.text = "Display Stars";
+    this.displayStarsControl.toolTip = "Creates an image mask with circles marking star size and position.";
+    this.displayStarsControl.checked = data.displayStarsFlag;
+    this.displayStarsControl.onClick = function (checked) {
+        data.displayStarsFlag = checked;
+    };
+    this.photometryGraphControl = new CheckBox(this);
+    this.photometryGraphControl.text = "Photometry Graph";
+    this.photometryGraphControl.toolTip = "Graph comparing star flux and their least squares fit line";
+    this.photometryGraphControl.checked = data.photometryGraphFlag;
+    this.photometryGraphControl.onClick = function (checked) {
+        data.photometryGraphFlag = checked;
+    };
+    
+    let photometrySizer = new HorizontalSizer;
+    photometrySizer.spacing = 4;
+    photometrySizer.add(this.starDetectionControl);
+    photometrySizer.addSpacing(10);
+    photometrySizer.add(this.photometryGraphControl);
+    photometrySizer.addSpacing(10);
+    photometrySizer.add(this.displayStarsControl);
+    photometrySizer.addStretch();
+    
     //-------------------------------------------------------
-    // Linear Fit Method Field
+    // Gradient direction
     //-------------------------------------------------------
-    let algorithm_Label = new Label(this);
-    algorithm_Label.text = "Gradient Direction:";
-    algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    algorithm_Label.minWidth = labelWidth1;
+    let directionLabel = new Label(this);
+    directionLabel.text = "Gradient Direction:";
+    directionLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    directionLabel.minWidth = labelWidth1;
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
@@ -833,15 +902,15 @@ function gradientLinearFitDialog(data) {
     // Display Graph, Display Test Mosaic
     //-------------------------------------------------------
     this.displayGradientControl = new CheckBox(this);
-    this.displayGradientControl.text = "Display Gradient";
+    this.displayGradientControl.text = "Create Gradient";
     this.displayGradientControl.toolTip = "Display the background model";
     this.displayGradientControl.checked = data.displayGradientFlag;
     this.displayGradientControl.onClick = function (checked) {
         data.displayGradientFlag = checked;
     };
     this.displayGraphControl = new CheckBox(this);
-    this.displayGraphControl.text = "Display Graph";
-    this.displayGraphControl.toolTip = "Display the sample points and their least squares fit line";
+    this.displayGraphControl.text = "Gradient Graph";
+    this.displayGraphControl.toolTip = "Graph displays difference between the two images along the join";
     this.displayGraphControl.checked = data.displayGraphFlag;
     this.displayGraphControl.onClick = function (checked) {
         data.displayGraphFlag = checked;
@@ -856,14 +925,14 @@ function gradientLinearFitDialog(data) {
 
     let orientationSizer = new HorizontalSizer;
     orientationSizer.spacing = 4;
-    orientationSizer.add(algorithm_Label);
+    orientationSizer.add(directionLabel);
     orientationSizer.add(this.orientationCombo);
-    orientationSizer.addSpacing(10);
-    orientationSizer.add(this.displayGradientControl);
     orientationSizer.addSpacing(10);
     orientationSizer.add(this.displayGraphControl);
     orientationSizer.addSpacing(10);
     orientationSizer.add(this.displaySampleControl);
+    orientationSizer.addSpacing(10);
+    orientationSizer.add(this.displayGradientControl);
     orientationSizer.addStretch();
 
     //-------------------------------------------------------
@@ -933,6 +1002,49 @@ function gradientLinearFitDialog(data) {
     this.lineSegments_Control.setPrecision(0);
     this.lineSegments_Control.slider.minWidth = 500;
     this.lineSegments_Control.setValue(data.nLineSegments);
+    
+    //-------------------------------------------------------
+    // Mosaic
+    //-------------------------------------------------------
+    let mosaic_Label = new Label(this);
+    mosaic_Label.text = "Mosaic:";
+    mosaic_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    mosaic_Label.minWidth = labelWidth1;
+
+    this.displayMosaicControl = new CheckBox(this);
+    this.displayMosaicControl.text = "Create Mosaic";
+    this.displayMosaicControl.toolTip = "Adds reference & target frames and displays in a 'MosaicTest' window";
+    this.displayMosaicControl.checked = data.displayMosiacFlag;
+    this.displayMosaicControl.onClick = function (checked) {
+        data.displayMosiacFlag = checked;
+    };
+
+    this.mosaicOverlayControl = new RadioButton(this);
+    this.mosaicOverlayControl.text = "Overlay";
+    this.mosaicOverlayControl.toolTip = "Overlays reference image on top of the target image";
+    this.mosaicOverlayControl.checked = data.mosaicOverlayFlag;
+    this.mosaicOverlayControl.onClick = function (checked) {
+        data.mosaicOverlayFlag = checked;
+        data.mosaicRandomFlag = !checked;
+    };
+
+    this.mosaicRandomControl = new RadioButton(this);
+    this.mosaicRandomControl.text = "Random";
+    this.mosaicRandomControl.toolTip = "Randomly choose pixels from the reference and target image";
+    this.mosaicRandomControl.checked = data.mosaicRandomFlag;
+    this.mosaicRandomControl.onClick = function (checked) {
+        data.mosaicRandomFlag = checked;
+        data.mosaicOverlayFlag = !checked;
+    };
+
+    let mosaic_Sizer = new HorizontalSizer;
+    mosaic_Sizer.spacing = 4;
+    mosaic_Sizer.add(mosaic_Label);
+    mosaic_Sizer.add(this.displayMosaicControl);
+    mosaic_Sizer.addSpacing(20);
+    mosaic_Sizer.add(this.mosaicOverlayControl);
+    mosaic_Sizer.add(this.mosaicRandomControl);
+    mosaic_Sizer.addStretch();
     
     //-------------------------------------------------------
     // Area of interest
@@ -1051,11 +1163,16 @@ function gradientLinearFitDialog(data) {
     this.sizer.addSpacing(4);
     this.sizer.add(referenceImage_Sizer);
     this.sizer.add(targetImage_Sizer);
+    this.sizer.addSpacing(2);
+    this.sizer.add(photometrySizer);
     this.sizer.add(orientationSizer);
     this.sizer.add(this.rejectHigh_Control);
     this.sizer.add(this.sampleSize_Control);
     this.sizer.add(this.rejectBrightestPercent_Control);
     this.sizer.add(this.lineSegments_Control);
+    this.sizer.addSpacing(10);
+    this.sizer.add(mosaic_Sizer);
+    this.sizer.addSpacing(10);
     this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(buttons_Sizer);
 
