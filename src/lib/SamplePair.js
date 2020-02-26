@@ -31,36 +31,17 @@ function Rectangle(x, y, width, height) {
 
 /**
  * 
- * @param {Number} targetMean
  * @param {Number} targetMedian
- * @param {Number} referenceMean
  * @param {Number} referenceMedian
  * @param {Number} x X-Coordinate at the center of the sample
  * @param {Number} y Y-Coordinate at the center of the sample
  * @returns {SamplePair}
  */
-function SamplePair(targetMean, targetMedian, referenceMean, referenceMedian, x, y) {
-    this.targetMean = targetMean;       // linear fit x coordinate
-    this.referenceMean = referenceMean; // linear fit y coordinate
+function SamplePair(targetMedian, referenceMedian, x, y) {
     this.targetMedian = targetMedian;
     this.referenceMedian = referenceMedian;
     this.x = x;
     this.y = y;
-}
-
-/**
- * @param {type} samplePair
- * @returns {Number} targetMean
- */
-function getLinearFitX(samplePair) {
-    return samplePair.targetMean;
-}
-/**
- * @param {type} samplePair
- * @returns {Number} referenceMean
- */
-function getLinearFitY(samplePair) {
-    return samplePair.referenceMean;
 }
 
 /**
@@ -98,19 +79,15 @@ function getVerticalGradientY(samplePair) {
  * @param {SamplePair[]} samplePairArray
  * @param {Number} sampleSize
  * @param {Rectangle} selectedArea Area selected by user (e.g. via preview)
- * @param {Boolean} hasMedianValues
  * @returns {SamplePairs}
  */
-function SamplePairs(samplePairArray, sampleSize, selectedArea, hasMedianValues = false){
+function SamplePairs(samplePairArray, sampleSize, selectedArea){
     /** SamplePair[] */
     this.samplePairArray = samplePairArray;
     /** Number */
     this.sampleSize = sampleSize;
-    /** Boolean */
-    this.hasMedianValues = hasMedianValues;
     /** Rectangle */
     this.selectedArea = selectedArea;
-    
     /** Rectangle, Private */
     this.sampleArea = null;                             // Private
 
@@ -133,153 +110,168 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea, hasMedianValues 
         }
         return this.sampleArea;
     };
-    
-    /**
-     * Reject the brightest percent from the samplePairArray.
-     * Sorts the array based on (referenceMean - referenceMedian) and then
-     * removes the values at the end of the array.
-     * @param {type} percent Percentage of SamplePair to reject
-     * @returns {undefined}
-     */
-    this.rejectBrightest = function(percent){
-        if (this.hasMedianValues && percent > 0) {
-            this.samplePairArray.sort((a, b) => (a.referenceMean - a.referenceMedian) - (b.referenceMean - b.referenceMedian));
-            // the array had to be sorted before we could do this
-            let nSamples = Math.ceil(samplePairArray.length * (100 - percent) / 100);
-            this.samplePairArray.length = nSamples;
-        }
-    };
-}
-
-
-function SamplePairMinMax() {
-    this.maxReferenceMean = Number.MIN_VALUE;
-    this.maxTargetMean = Number.MIN_VALUE;
-    this.minReferenceMean = Number.MAX_VALUE; 
-    this.minTargetMean = Number.MAX_VALUE;
-
-    this.calculateMinMax = function(samplePairArray){
-        for (let samplePair of samplePairArray) {
-            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
-            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
-            this.minReferenceMean = Math.min(this.minReferenceMean, samplePair.referenceMean);
-            this.minTargetMean = Math.min(this.minTargetMean, samplePair.targetMean);
-        }
-    };
-    
-    this.calculateMax = function(samplePairArray){
-        for (let samplePair of samplePairArray) {
-            this.maxReferenceMean = Math.max(this.maxReferenceMean, samplePair.referenceMean);
-            this.maxTargetMean = Math.max(this.maxTargetMean, samplePair.targetMean);
-        }
-    };
 }
 
 // ============ Algorithms ============
-
 /**
- * Calculate the average value within a rectange for both reference and target images.
+ * Create SamplePairs for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
- * @param {Number} channel Image channel
- * @param {Number} clipping Samples with pixels > clipping will be excluded.
- * @param {Boolean} calcMedian If true calculate mean and median values. If false, median value will be set to zero
- * @param {Rectangle} binRect Calculate the average value within this rectangle
- * @return {SamplePair} average reference and target values
+ * @param {Image} starRegionMask Bitmap image with overlapping region set to 1
+ * @param {Number} sampleSize
+ * @param {Number} logStarDetectionSensitivity
+ * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
+ * @param {Number} rejectNearBrightStars Remove the N brightest SamplePairs before returning the array
+ * @param {Rectangle} selectedArea Reject samples outside this area
+ * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
-function calculateBinAverage(targetImage, referenceImage, channel, clipping, calcMedian, binRect) {
-    let referenceValues = [];
-    let targetValues = [];
+function createColorSamplePairs(targetImage, referenceImage, starRegionMask,
+        sampleSize, logStarDetectionSensitivity, rejectHigh, rejectNearBrightStars, selectedArea) {
+    
+    let starDetector = new StarDetector();
+    starDetector.mask = starRegionMask;
+    starDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
+    starDetector.upperLimit = 1;
+    //starDetector.noiseReductionFilterRadius = 1;
+    let stars = starDetector.stars(referenceImage);
 
+    // Sort the Star array so that the brightest stars are at the top
+    stars.sort((a, b) => b.flux - a.flux);
+            
+    // Create colorSamplePairs with empty SamplePairsArrays
+    let nChannels = referenceImage.isColor ? 3 : 1;
+    let colorSamplePairs = new Array(nChannels);
+    for (let c=0; c<nChannels; c++){
+        colorSamplePairs[c] = new SamplePairs([], sampleSize, selectedArea, true);
+    }
+    
+    // Create the sample
+    let binRect = new Rectangle(0, 0, sampleSize, sampleSize);
+    let x1 = selectedArea.x;
+    let y1 = selectedArea.y;
+    let x2 = selectedArea.x + selectedArea.width - sampleSize;
+    let y2 = selectedArea.y + selectedArea.height - sampleSize;
+    
+    for (let y = y1; y < y2; y+= sampleSize) {
+        for (let x = x1; x < x2; x+= sampleSize) {
+            binRect.x = x;
+            binRect.y = y;
+            addSamplePair(colorSamplePairs, targetImage, referenceImage, nChannels,
+                    stars, rejectHigh, rejectNearBrightStars, binRect);
+        }
+    }
+    return colorSamplePairs;
+}
+
+/**
+ * Create a SamplePair and add it to the supplied colorSamplePairs array
+ * @param {SamplePairs[]} colorSamplePairs
+ * @param {Image} targetImage
+ * @param {Image} referenceImage
+ * @param {Number} nChannels
+ * @param {Star[]} stars
+ * @param {Number} clipping
+ * @param {Number} rejectNearBrightStars
+ * @param {Rectangle} binRect
+ */
+function addSamplePair(colorSamplePairs, targetImage, referenceImage, nChannels,
+        stars, clipping, rejectNearBrightStars, binRect){
+    
     /**
      * @param sample Pixel value to check
      * @param clipping Maximum allowed pixel value
      * @return true if the sample is out of range and should therefore be excluded
      */
     let isBlackOrClipped = (sample, clipping) => sample === 0 || sample > clipping;
-
-    // Process all pixels within sample
-    for (let y = 0; y < binRect.height; y++) {
-        for (let x = 0; x < binRect.width; x++) {
-            let targetSample = targetImage.sample(binRect.x + x, binRect.y + y, channel);
-            if (isBlackOrClipped(targetSample, clipping)) {
-                return null;
-            }
-
-            let referenceSample = referenceImage.sample(binRect.x + x, binRect.y + y, channel);
-            if (isBlackOrClipped(referenceSample, clipping)) {
-                return null;
-            }
-
-            targetValues.push(targetSample);
-            referenceValues.push(referenceSample);
-        }
-    }
-
-    let targetAverage = Math.mean(targetValues);
-    let referenceAverage = Math.mean(referenceValues);
-    let targetMedian;
-    let referenceMedian;
-    if (calcMedian){
-        targetMedian = Math.median(targetValues);
-        referenceMedian = Math.median(referenceValues);
-    } else {
-        targetMedian = 0;
-        referenceMedian = 0;
-    }
-    // return average target value, average reference value, x coord, y coord
-    return new SamplePair(targetAverage, targetMedian, referenceAverage, referenceMedian,
-            binRect.x + (binRect.width-1) / 2, binRect.y + (binRect.height-1) / 2);
-}
-
-/**
- * Create samplePairArray. Divide the target and reference images into Rectangles.
- * The rectanles have dimension sampleSize * sampleSize.
- * For each rectangle, calculate the average sample value for the specified channel.
- * If either the target or reference rectange contains a black sample or a samples
- * greater than rejectHigh, the SamplePair is not added to the array.
- * Using a super binned sample makes fitting the data to a line more robust because
- * it ensures that stars have the same size (less than a single pixel) in both
- * the target and reference images. SampleSize should be between 1 and 5 times
- * greater than the diameter of bright stars. 3 times works well.
- *
- * @param {Image} targetImage
- * @param {Image} referenceImage
- * @param {Number} channel This number Indicates L=0 or R=0, G=1, B=2
- * @param {Number} sampleSize Between 1 and 5 times diameter of brightest stars
- * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @param {Number} rejectBrightestPercent Remove the N brightest SamplePairs before returning the array
- * @param {Rectangle} selectedArea Reject samples outside this area
- * @param {Boolean} calcMedian If true calculate mean and median values. If false, median value will be set to zero
- * @return {SamplePairs} Array of target and reference binned sample values
- */
-function createSamplePairs(targetImage, referenceImage, channel, sampleSize,
-        rejectHigh, rejectBrightestPercent, selectedArea, calcMedian = false) {
-    // Divide the images into blocks specified by sampleSize.
-    let binRect = new Rectangle(0, 0, sampleSize, sampleSize);
-    let x1 = selectedArea.x;
-    let y1 = selectedArea.y;
-    let x2 = selectedArea.x + selectedArea.width - sampleSize;
-    let y2 = selectedArea.y + selectedArea.height - sampleSize;
-    let samplePairArray = [];
-    for (let y = y1; y < y2; y+= sampleSize) {
-        for (let x = x1; x < x2; x+= sampleSize) {
-            binRect.x = x;
-            binRect.y = y;
-            let pairedAverage = calculateBinAverage(targetImage, referenceImage, channel, rejectHigh, calcMedian, binRect);
-            if (null !== pairedAverage) {
-                samplePairArray.push(pairedAverage);
-            }
-        }
-    }
     
-    let samplePairs = new SamplePairs(samplePairArray, sampleSize, selectedArea, calcMedian);
-    if (calcMedian && rejectBrightestPercent > 0) {
-        samplePairs.rejectBrightest(rejectBrightestPercent);
+    let samplePairX = binRect.x + (binRect.width-1) / 2;
+    let samplePairY = binRect.y + (binRect.height-1) / 2;
+    let squareRoot2 = Math.pow(2, 0.5);
+    
+    for (let c=0; c<nChannels; c++){
+        let refValues = [];
+        let tgtValues = [];
+        
+        // Process all pixels within this sample
+        for (let y = 0; y < binRect.height; y++) {
+            for (let x = 0; x < binRect.width; x++) {
+                let tgtSample = targetImage.sample(binRect.x + x, binRect.y + y, c);
+                if (isBlackOrClipped(tgtSample, clipping)) {
+                    return;
+                }
+
+                let refSample = referenceImage.sample(binRect.x + x, binRect.y + y, c);
+                if (isBlackOrClipped(refSample, clipping)) {
+                    return;
+                }
+
+                tgtValues.push(tgtSample);
+                refValues.push(refSample);
+            }
+        }
+        
+        // is sample too close to a star?
+        let nStars = Math.floor(stars.length * rejectNearBrightStars / 100);
+        if (nStars > 1) {
+            let starArea = stars[0].size;
+            let starRadius = Math.sqrt(starArea)/2;
+            let minDist = starRadius + squareRoot2 * binRect.width/2;
+            let squaredMinDist = minDist * minDist;
+            for (let i = 0; i < nStars; i++) {
+                let star = stars[i];
+                let deltaX = star.pos.x - samplePairX;
+                let deltaY = star.pos.y - samplePairY;
+                if (deltaX * deltaX + deltaY * deltaY < squaredMinDist) {
+                    return;
+                }
+            }
+        }
+        
+        let tgtMedian = Math.median(tgtValues);
+        let refMedian = Math.median(refValues);
+        let samplePair = new SamplePair(tgtMedian, refMedian, samplePairX, samplePairY);
+        let samplePairs = colorSamplePairs[c];
+        samplePairs.samplePairArray.push(samplePair);
     }
-    return samplePairs;
 }
 
+/** Display the SamplePair by drawing them into a mask image
+ * @param {Image} view Determine bitmap size from this view's image.
+ * @param {SamplePairs} samplePairs The samplePairs to be displayed.
+ * @param {String} title Window title
+ */
+function displaySampleSquares(view, samplePairs, title) {
+    let sampleSize = samplePairs.sampleSize;
+    let square = new Rect(sampleSize, sampleSize);
+    let offset = (sampleSize - 1) / 2;
+    
+    let image = view.image;
+    let bmp = new Bitmap(image.width, image.height);
+    bmp.fill(0xffffffff);
+    //let G = new VectorGraphics(bmp);
+    let G = new Graphics(bmp);
+    G.pen = new Pen(0xff000000);
+    samplePairs.samplePairArray.forEach(function (samplePair) {
+        let x = samplePair.x - offset;
+        let y = samplePair.y - offset;
+        square.moveTo(x, y);
+        G.drawRect(square);
+    });
+    G.end();
+
+    let w = new ImageWindow(bmp.width, bmp.height,
+            1, // numberOfChannels
+            8, // bitsPerSample
+            false, // floatSample
+            false, // color
+            title);
+    w.mainView.beginProcess(UndoFlag_NoSwapFile);
+    w.mainView.image.blend(bmp);
+    w.mainView.endProcess();
+    w.show();
+    //w.zoomToFit();
+}
+        
 /**
  * Create samplePairArray. Divide the target and reference images into Rectangles.
  * The rectanles have dimension sampleSize x sampleSize.
@@ -327,7 +319,7 @@ function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) 
             if (isBlackOrClipped(referenceSample, rejectHigh)) {
                 continue;
             }
-            let pairedAverage = new SamplePair(targetSample, 0, referenceSample, 0, x, y);
+            let pairedAverage = new SamplePair(targetSample, referenceSample, x, y);
             samplePairArray.push(pairedAverage);
         }
     }

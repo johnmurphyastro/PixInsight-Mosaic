@@ -24,7 +24,6 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #include "lib/SamplePair.js"
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
-#include "lib/DisplaySamples.js"
 #include "lib/StarLib.js"
 
 #define VERSION  "1.0"
@@ -43,7 +42,6 @@ function gradientLinearFit(data)
     let startTime = new Date().getTime();
     let targetView = data.targetView;
     let referenceView = data.referenceView;
-    let colorSamplePairs = []; // SamplePairs[channel]
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
@@ -66,57 +64,59 @@ function gradientLinearFit(data)
         samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
     }
     
-    console.writeln("\n<b>Calculating scale factors:</b>");
-    let colorStarPairs = calcScaleMult(referenceView, targetView, samplePreviewArea, 
+    console.writeln("\n<b>Detecting stars</b>");
+    let starRegionMask = createStarRegionMask(referenceView.image, targetView.image, samplePreviewArea);
+    let colorStarPairs = getColorStarPairs(referenceView, targetView, starRegionMask, 
             data.logStarDetection, data.rejectHigh);
             
     console.writeln("\n<b>Applying scale factors to '" + targetView.fullId + "':</b>");
-    // We must apply the scale factor to the target image before calculating the gradient offsets
+    // Apply scale to target image. Must be done before calculating the gradient
     targetView.beginProcess();
     let scaleFactor = [];
     for (let starPairs of colorStarPairs){
+        // For each color
+        starPairs.linearFitData = calculateScale(starPairs);
         scaleFactor.push(starPairs.linearFitData);
     }
     applyLinearFit(targetView, scaleFactor, false);
+    
+    let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, starRegionMask,
+        data.sampleSize, data.logStarDetection, data.rejectHigh, data.avoidBrightStarsPercent, samplePreviewArea);
+    let samplePairs = colorSamplePairs[0];
+    if (samplePairs.samplePairArray.length < 2) {
+        new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
+        return;
+    }
+    
+    let sampleArea = samplePairs.getSampleArea();
+    if (detectOrientation) {
+        detectOrientation = false;
+        isHorizontal = sampleArea.width > sampleArea.height;
+        if (isHorizontal) {
+            console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
+        } else {
+            console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
+        }
+    }
     
     let gradientArray = [];
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
     for (let channel = 0; channel < nChannels; channel++) {
-        let samplePairs = createSamplePairs(targetView.image, referenceView.image,
-                channel, data.sampleSize, data.rejectHigh, data.rejectBrightestPercent, samplePreviewArea, true);
-        if (samplePairs.samplePairArray.length < 2) {
-            new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
-            return;
-        }
-        let sampleArea = samplePairs.getSampleArea();
-        if (detectOrientation){
-            detectOrientation = false;
-            isHorizontal = sampleArea.width > sampleArea.height;
-            if (isHorizontal){
-                console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
-            } else {
-                console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
-            }
-        }
-        
-        if (data.nLineSegments > 0){
-            // Divide into sections and calculate linearFit
-            let nLineSegments = (data.nLineSegments + 1)/2;
-            let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
-            sampleSections = joinSectionLines(sampleSections);
-            gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
+        samplePairs = colorSamplePairs[channel];
+        // Divide into sections and calculate linearFit
+        let nLineSegments = (data.nLineSegments + 1) / 2;
+        let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
+        sampleSections = joinSectionLines(sampleSections);
+        gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
 
-            console.writeln("<b>Gradients (channel " + channel + "):<\b>");
-            for (let n = 0; n < sampleSections.length; n++) {
-                let line = sampleSections[n];
-                console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
-                        + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
-            }
+        console.writeln("<b>Gradients (channel " + channel + "):<\b>");
+        for (let n = 0; n < sampleSections.length; n++) {
+            let line = sampleSections[n];
+            console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
+                    + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
         }
-        
-        colorSamplePairs[channel] = samplePairs;
     }
     
     applyGradient(targetView, isHorizontal, gradientArray);
@@ -141,8 +141,7 @@ function gradientLinearFit(data)
     
     if (data.displaySamplesFlag){
         let title = "Samples_" + targetView.fullId;
-        let samplesWindow = drawSampleSquares(colorSamplePairs, referenceView, title);
-        samplesWindow.show();
+        displaySampleSquares(referenceView, colorSamplePairs[0], title);
     }
     
     if (data.photometryGraphFlag){
@@ -158,6 +157,42 @@ function gradientLinearFit(data)
         createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME);
     }
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+}
+
+/**
+ * @param {type} refView
+ * @param {type} tgtView
+ * @param {type} starRegionMask Limit star detection to region were pixels = 1)
+ * @param {type} logStarDetectionSensitivity
+ * @param {type} upperLimit Exclude stars with core brighter than this
+ * @returns {StarPairs[]} Array of StarPairs for all color channels
+ */
+function getColorStarPairs(refView, tgtView, starRegionMask, 
+        logStarDetectionSensitivity, upperLimit){
+    let colorStarPairs = [];
+    let nChannels = refView.image.isColor ? 3 : 1;
+    for (let i=0; i < nChannels; i++){
+        let starPairs = getStarPairs(refView, tgtView, starRegionMask, 
+                logStarDetectionSensitivity, upperLimit, i);
+        colorStarPairs.push(starPairs);
+    }
+    return colorStarPairs;
+}
+
+/**
+ * @param {StarPairs} starPairs
+ * @returns {LinearFitData} Least Square Fit between reference & target star flux
+ */
+function calculateScale(starPairs) {
+    let leastSquareFit = new LeastSquareFitAlgorithm();
+    for (let starPair of starPairs.starPairArray) {
+        leastSquareFit.addValue(starPair.getTgtFlux(), starPair.getRefFlux());
+    }
+    // We are only interested in the scale, not the intercept.
+    // Any intercept would be an artifact of the photometry
+    let linearFit = leastSquareFit.getLinearFit();
+    linearFit.b = 0;
+    return linearFit;
 }
 
 /**
@@ -645,7 +680,7 @@ function GradientLeastSquareFitData() {
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
-        Parameters.set("rejectBrightestPercent", this.rejectBrightestPercent);
+        Parameters.set("avoidBrightStarsPercent", this.avoidBrightStarsPercent);
         Parameters.set("nLineSegments", this.nLineSegments);
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
@@ -674,8 +709,8 @@ function GradientLeastSquareFitData() {
             this.rejectHigh = Parameters.getReal("rejectHigh");
         if (Parameters.has("sampleSize"))
             this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("rejectBrightestPercent"))
-            this.rejectBrightestPercent = Parameters.getInteger("rejectBrightestPercent");
+        if (Parameters.has("avoidBrightStarsPercent"))
+            this.avoidBrightStarsPercent = Parameters.getInteger("avoidBrightStarsPercent");
         if (Parameters.has("nLineSegments"))
             this.nLineSegments = Parameters.getInteger("nLineSegments");
         if (Parameters.has("displayGradientFlag"))
@@ -722,8 +757,8 @@ function GradientLeastSquareFitData() {
         this.photometryGraphFlag = true;
         this.orientation = AUTO;
         this.rejectHigh = 0.8;
-        this.sampleSize = 15;
-        this.rejectBrightestPercent = 10;
+        this.sampleSize = 10;
+        this.avoidBrightStarsPercent = 100;
         this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
@@ -751,7 +786,7 @@ function GradientLeastSquareFitData() {
         linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
-        linearFitDialog.rejectBrightestPercent_Control.setValue(this.rejectBrightestPercent);
+        linearFitDialog.avoidBrightStarsPercent_Control.setValue(this.avoidBrightStarsPercent);
         linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
         linearFitDialog.displayMosaicControl.checked = this.displayMosiacFlag;
         linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
@@ -785,11 +820,6 @@ function gradientLinearFitDialog(data) {
     this.__base__ = Dialog;
     this.__base__();
 
-    //-------------------------------------------------------
-    // Set some basic widths from dialog text
-    //-------------------------------------------------------
-    let labelWidth1 = this.font.width("Gradient Direction:_");
-
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + 
             "</b> &mdash; Calculates the gradient between two images over their overlaping area.");
@@ -797,6 +827,7 @@ function gradientLinearFitDialog(data) {
     //-------------------------------------------------------
     // Create the reference image field
     //-------------------------------------------------------
+    let labelWidth1 = this.font.width("Reference View:");
     let referenceImage_Label = new Label(this);
     referenceImage_Label.text = "Reference View:";
     referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
@@ -839,16 +870,31 @@ function gradientLinearFitDialog(data) {
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
     //----------------------------------------------------
-    // Star detection
+    // Star detection group box
     //----------------------------------------------------
+    let starGroupLabelSize = this.font.width("CCD Linear Range:");
+    this.rejectHigh_Control = new NumericControl(this);
+    this.rejectHigh_Control.real = true;
+    this.rejectHigh_Control.label.text = "CCD Linear Range:";
+    this.rejectHigh_Control.label.minWidth = starGroupLabelSize;
+    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range.</p>";
+    this.rejectHigh_Control.onValueUpdated = function (value) {
+        data.rejectHigh = value;
+    };
+    this.rejectHigh_Control.setRange(0.001, 1.0);
+    this.rejectHigh_Control.slider.setRange(0, 5000);
+    this.rejectHigh_Control.setPrecision(4);
+    this.rejectHigh_Control.slider.minWidth = 500;
+    this.rejectHigh_Control.setValue(data.rejectHigh);
+    
     this.starDetectionControl = new NumericEdit();
     this.starDetectionControl.setReal(false);
     this.starDetectionControl.setRange(-10, 10);
     this.starDetectionControl.setValue(data.logStarDetection);
     this.starDetectionControl.label.text = "Star Detection:";
     this.starDetectionControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.starDetectionControl.label.setFixedWidth(labelWidth1);
-    this.starDetectionControl.edit.setFixedWidth(97);
+    this.starDetectionControl.label.setFixedWidth(starGroupLabelSize);
+    this.starDetectionControl.edit.setFixedWidth(30);
     this.starDetectionControl.toolTip = "Smaller values detect more stars.";
     this.starDetectionControl.onValueUpdated = function (value){
         data.logStarDetection = value;
@@ -878,13 +924,18 @@ function gradientLinearFitDialog(data) {
     photometrySizer.add(this.displayStarsControl);
     photometrySizer.addStretch();
     
+    let photometryGroupBox = createGroupBox(this, "Photometric Scale");
+    photometryGroupBox.sizer.add(photometrySizer);
+    photometryGroupBox.sizer.add(this.rejectHigh_Control);
+    
     //-------------------------------------------------------
-    // Gradient direction
+    // Gradient detection group box
     //-------------------------------------------------------
+    let gradientGroupLabelSize = this.font.width("Gradient Direction:");
     let directionLabel = new Label(this);
     directionLabel.text = "Gradient Direction:";
     directionLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    directionLabel.minWidth = labelWidth1;
+    directionLabel.minWidth = gradientGroupLabelSize;
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
@@ -898,9 +949,6 @@ function gradientLinearFitDialog(data) {
         data.orientation = this.currentItem;
     };
 
-    //-------------------------------------------------------
-    // Display Graph, Display Test Mosaic
-    //-------------------------------------------------------
     this.displayGradientControl = new CheckBox(this);
     this.displayGradientControl.text = "Create Gradient";
     this.displayGradientControl.toolTip = "Display the background model";
@@ -935,30 +983,10 @@ function gradientLinearFitDialog(data) {
     orientationSizer.add(this.displayGradientControl);
     orientationSizer.addStretch();
 
-    //-------------------------------------------------------
-    // Rejection High
-    //-------------------------------------------------------
-    this.rejectHigh_Control = new NumericControl(this);
-    this.rejectHigh_Control.real = true;
-    this.rejectHigh_Control.label.text = "CCD Linear Range:";
-    this.rejectHigh_Control.label.minWidth = labelWidth1;
-    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range. 0.5 works well.</p>";
-    this.rejectHigh_Control.onValueUpdated = function (value) {
-        data.rejectHigh = value;
-    };
-    this.rejectHigh_Control.setRange(0.001, 1.0);
-    this.rejectHigh_Control.slider.setRange(0, 5000);
-    this.rejectHigh_Control.setPrecision(4);
-    this.rejectHigh_Control.slider.minWidth = 500;
-    this.rejectHigh_Control.setValue(data.rejectHigh);
-
-    //-------------------------------------------------------
-    // Sample Size
-    //-------------------------------------------------------
     this.sampleSize_Control = new NumericControl(this);
     this.sampleSize_Control.real = true;
     this.sampleSize_Control.label.text = "Sample Size:";
-    this.sampleSize_Control.label.minWidth = labelWidth1;
+    this.sampleSize_Control.label.minWidth = gradientGroupLabelSize;
     this.sampleSize_Control.toolTip = "<p>Sample binning size. Set between 1 and 3 times bright star diameter. Example: if star diameter = 10 then 30 would work well.</p>";
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
@@ -969,30 +997,24 @@ function gradientLinearFitDialog(data) {
     this.sampleSize_Control.slider.minWidth = 500;
     this.sampleSize_Control.setValue(data.sampleSize);
     
-    //-------------------------------------------------------
-    // Reject brightest N samples
-    //-------------------------------------------------------
-    this.rejectBrightestPercent_Control = new NumericControl(this);
-    this.rejectBrightestPercent_Control.real = true;
-    this.rejectBrightestPercent_Control.label.text = "Reject Brightest%:";
-    this.rejectBrightestPercent_Control.label.minWidth = labelWidth1;
-    this.rejectBrightestPercent_Control.toolTip = "<p>Rejects samples that contain bright objects. The brightness is relative to the samples background level.</p>";
-    this.rejectBrightestPercent_Control.onValueUpdated = function (value) {
-        data.rejectBrightestPercent = value;
+    this.avoidBrightStarsPercent_Control = new NumericControl(this);
+    this.avoidBrightStarsPercent_Control.real = true;
+    this.avoidBrightStarsPercent_Control.label.text = "Avoid Stars (%)";
+    this.avoidBrightStarsPercent_Control.label.minWidth = gradientGroupLabelSize;
+    this.avoidBrightStarsPercent_Control.toolTip = "<p>Rejects samples close to specified percentage of brightest stars.</p>";
+    this.avoidBrightStarsPercent_Control.onValueUpdated = function (value) {
+        data.avoidBrightStarsPercent = value;
     };
-    this.rejectBrightestPercent_Control.setRange(0, 90);
-    this.rejectBrightestPercent_Control.slider.setRange(0, 90);
-    this.rejectBrightestPercent_Control.setPrecision(0);
-    this.rejectBrightestPercent_Control.slider.minWidth = 500;
-    this.rejectBrightestPercent_Control.setValue(data.rejectBrightestPercent);
+    this.avoidBrightStarsPercent_Control.setRange(0, 100);
+    this.avoidBrightStarsPercent_Control.slider.setRange(0, 100);
+    this.avoidBrightStarsPercent_Control.setPrecision(0);
+    this.avoidBrightStarsPercent_Control.slider.minWidth = 500;
+    this.avoidBrightStarsPercent_Control.setValue(data.avoidBrightStarsPercent);
     
-    //-------------------------------------------------------
-    // Number of linear fit line segments
-    //-------------------------------------------------------
     this.lineSegments_Control = new NumericControl(this);
     this.lineSegments_Control.real = true;
     this.lineSegments_Control.label.text = "Line Segments:";
-    this.lineSegments_Control.label.minWidth = labelWidth1;
+    this.lineSegments_Control.label.minWidth = gradientGroupLabelSize;
     this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data.</p>";
     this.lineSegments_Control.onValueUpdated = function (value) {
         data.nLineSegments = value;
@@ -1003,13 +1025,19 @@ function gradientLinearFitDialog(data) {
     this.lineSegments_Control.slider.minWidth = 500;
     this.lineSegments_Control.setValue(data.nLineSegments);
     
+    let gradientGroupBox = createGroupBox(this, "Gradient Offset");
+    gradientGroupBox.sizer.add(orientationSizer);
+    gradientGroupBox.sizer.add(this.sampleSize_Control);
+    gradientGroupBox.sizer.add(this.avoidBrightStarsPercent_Control);
+    gradientGroupBox.sizer.add(this.lineSegments_Control);
+    
     //-------------------------------------------------------
-    // Mosaic
+    // Mosaic Group Box
     //-------------------------------------------------------
     let mosaic_Label = new Label(this);
     mosaic_Label.text = "Mosaic:";
     mosaic_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    mosaic_Label.minWidth = labelWidth1;
+    mosaic_Label.minWidth = this.font.width(mosaic_Label.text);
 
     this.displayMosaicControl = new CheckBox(this);
     this.displayMosaicControl.text = "Create Mosaic";
@@ -1046,16 +1074,14 @@ function gradientLinearFitDialog(data) {
     mosaic_Sizer.add(this.mosaicRandomControl);
     mosaic_Sizer.addStretch();
     
+    let mosaicGroupBox = createGroupBox(this, "Mosaic");
+    mosaicGroupBox.sizer.add(mosaic_Sizer);
+    
     //-------------------------------------------------------
     // Area of interest
     //-------------------------------------------------------
     let labelWidth2 = this.font.width("Height:_");
-    let areaOfInterest_GroupBox = new GroupBox(this);
-    areaOfInterest_GroupBox.title = "Area of Interest";
-    areaOfInterest_GroupBox.sizer = new VerticalSizer;
-    areaOfInterest_GroupBox.sizer.margin = 6;
-    areaOfInterest_GroupBox.sizer.spacing = 6;
-    
+
     this.rectangleX_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X, labelWidth2, 50);
     this.rectangleX_Control.onValueUpdated = function (value){
         data.areaOfInterest_X = value;
@@ -1093,7 +1119,6 @@ function gradientLinearFitDialog(data) {
     let previewImage_Label = new Label(this);
     previewImage_Label.text = "Get area from preview:";
     previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    previewImage_Label.minWidth = labelWidth1;
 
     this.previewImage_ViewList = new ViewList(this);
     this.previewImage_ViewList.getPreviews();
@@ -1137,6 +1162,7 @@ function gradientLinearFitDialog(data) {
     previewImage_Sizer.addSpacing(10);
     previewImage_Sizer.add(previewUpdateButton);
 
+    let areaOfInterest_GroupBox = createGroupBox(this, "Gradient correction area");
     areaOfInterest_GroupBox.sizer.add(this.areaOfInterestCheckBox);
     areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
     areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
@@ -1163,17 +1189,10 @@ function gradientLinearFitDialog(data) {
     this.sizer.addSpacing(4);
     this.sizer.add(referenceImage_Sizer);
     this.sizer.add(targetImage_Sizer);
-    this.sizer.addSpacing(2);
-    this.sizer.add(photometrySizer);
-    this.sizer.add(orientationSizer);
-    this.sizer.add(this.rejectHigh_Control);
-    this.sizer.add(this.sampleSize_Control);
-    this.sizer.add(this.rejectBrightestPercent_Control);
-    this.sizer.add(this.lineSegments_Control);
-    this.sizer.addSpacing(10);
-    this.sizer.add(mosaic_Sizer);
-    this.sizer.addSpacing(10);
+    this.sizer.add(photometryGroupBox);
+    this.sizer.add(gradientGroupBox);
     this.sizer.add(areaOfInterest_GroupBox);
+    this.sizer.add(mosaicGroupBox);
     this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------

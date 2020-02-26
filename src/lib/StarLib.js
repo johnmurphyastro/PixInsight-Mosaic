@@ -18,25 +18,53 @@
 #include "StarDetector.jsh"
 
 /**
- * 
- * @param {type} refView
- * @param {type} tgtView
- * @param {type} previewArea
- * @param {type} logStarDetectionSensitivity
- * @param {type} upperLimit
- * @returns {StarPairs[]} Array of StarPairs for all color channels
+ * @param {Star} refStar
+ * @param {Star} tgtStar
+ * @returns {StarPair}
  */
-function calcScaleMult(refView, tgtView, previewArea, 
-        logStarDetectionSensitivity, upperLimit){
-    let colorStarPairs = [];
-    let nChannels = refView.image.isColor ? 3 : 1;
-    for (let i=0; i < nChannels; i++){
-        let starPairs = getStarPairs(refView, tgtView, previewArea, 
-                logStarDetectionSensitivity, upperLimit, i);
-        colorStarPairs.push(starPairs);
-    }
-    return colorStarPairs;
+function StarPair(refStar, tgtStar){
+    this.tgtStar = tgtStar;
+    this.refStar = refStar;
+    
+    this.getTgtFlux = function(){
+        return getFlux(tgtStar);
+    };
+    this.getRefFlux = function(){
+        return getFlux(refStar);
+    };
+    this.getTgtX = function(){
+        return tgtStar.pos.x;
+    };
+    this.getTgtY = function(){
+        return tgtStar.pos.y;
+    };
+    this.getRefX = function(){
+        return refStar.pos.x;
+    };
+    this.getRefY = function(){
+        return refStar.pos.y;
+    };
 }
+
+/**
+ * Stores the array of StarPair and the LinearFitData that was calculated from them
+ * @param {StarPair[]} starPairArray
+ * @returns {StarPairs}
+ */
+function StarPairs(starPairArray){
+    this.starPairArray = starPairArray;
+    this.linearFitData = null;
+}
+
+/**
+ * The StarDetector does not subtract the background from the star, so we neeed
+ * to do this here
+ * @param {Star} star
+ * @returns {Number} Star flux corrected for background level
+ */
+function getFlux(star) {
+    return star.flux - star.bkg * star.size;
+};
 
 /**
  * Finds the stars that exist in both images
@@ -44,13 +72,13 @@ function calcScaleMult(refView, tgtView, previewArea,
  * reference and target images.
  * @param {View} refView Reference view.
  * @param {View} tgtView Target view.
- * @param {Rectange} previewArea Preview area or area of whole image
+ * @param {Image} starRegionMask Limit star detection to region were pixels = 1)
  * @param {Number} logStarDetectionSensitivity Smaller values detect more stars. -1, to 1 good values
  * @param {Number} upperLimit Ignore stars with a peak value greater than this.
  * @param {Number} channel Detect stars in this RGB channel. B&W = 0, R=0,G=1,B=2
  * @returns {StarPairs}
  */
-function getStarPairs(refView, tgtView, previewArea, 
+function getStarPairs(refView, tgtView, starRegionMask, 
         logStarDetectionSensitivity, upperLimit, channel){
     let isColor = refView.image.isColor;
     let imgRefWindow = null;
@@ -87,9 +115,10 @@ function getStarPairs(refView, tgtView, previewArea,
         starTgtView = tgtView;
     }
         
-    // Detect the stars within the image
-    let starPairs = getStarPairsMonoImages(starRefView, starTgtView, previewArea,
-            logStarDetectionSensitivity, upperLimit);
+    // Detect stars in target and reference images
+    let tgtStars = detectStars(starTgtView.image, starRegionMask, logStarDetectionSensitivity, upperLimit);
+    let refStars = detectStars(starRefView.image, starRegionMask, logStarDetectionSensitivity, upperLimit);
+    let starPairs = findMatchingStars(refStars, tgtStars);
 
     if (isColor){
         // We must close the temporary windows we created
@@ -100,61 +129,14 @@ function getStarPairs(refView, tgtView, previewArea,
     return starPairs;
 }
 
-/** Private method
- * Finds the stars that exist in both images.
- * Images must be monochrome
- * If the supplied images are color, the luminance is used.
- * Call this method 3 times with R, G, B images to get data for individual channels
- * @param {View} refView Reference view.
- * @param {View} tgtView Target view.
- * @param {Rectange} previewArea Preview area or area of whole image
- * @param {Number} logStarDetectionSensitivity Smaller values detect more stars. -1, to 1 good values
- * @param {Number} upperLimit Ignore stars with a peak value greater than this.
+/**
+ * Finds the stars that exist in both images using a search window of 1x1 pixels.
+ * @param {Star[]} refStars Stars detected in reference image.
+ * @param {Star[]} tgtStars Stars detected in target image.
  * @returns {StarPairs}
  */
-function getStarPairsMonoImages(refView, tgtView, previewArea, logStarDetectionSensitivity, upperLimit){
-            
-    let refImage = refView.image;
-    let tgtImage = tgtView.image;
-    let mask = new Image(refImage.width, refImage.height, 1);
-    mask.fill(0);
-  
-    let nChannels = refView.image.isColor ? 3 : 1;
-  
-    // Create a mask to restrict the star detection to the overlapping area and previewArea
-    let xMin = previewArea.x;
-    let xMax = previewArea.x + previewArea.width;
-    let yMin = previewArea.y;
-    let yMax = previewArea.y + previewArea.height;
-    for (let x = xMin; x < xMax; x++){
-        for (let y = yMin; y < yMax; y++){
-            let value = 1;
-            for (let c = nChannels-1; c >= 0; c--){
-                if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0){
-                    value = 0;
-                    break;
-                }
-            }
-            mask.setSample(value, x, y);
-        }
-    }
-    
-    // Detect stars in target image
-    let starTargetDetector = new StarDetector();
-    starTargetDetector.mask = mask;
-    starTargetDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
-    starTargetDetector.upperLimit = upperLimit;
-    let tgtStars = starTargetDetector.stars(tgtImage);
-    
-    // Detect stars in reference image
-    let starReferenceDetector = new StarDetector();
-    starReferenceDetector.mask = mask;
-    starReferenceDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
-    starReferenceDetector.upperLimit = upperLimit;
-    let refStars = starTargetDetector.stars(refImage);
-    
-    console.writeln("\nMatching stars");
-    let leastSquareFit = new LeastSquareFitAlgorithm();
+function findMatchingStars(refStars, tgtStars){
+    // Find stars that are in both images, using a search radius of 1 pixel
     let starPairArray = [];
     for (let ref=0; ref<refStars.length; ref++){
         let x1 = refStars[ref].pos.x;
@@ -164,67 +146,62 @@ function getStarPairsMonoImages(refView, tgtView, previewArea, logStarDetectionS
             let deltaY = y1 - tgtStars[tgt].pos.y;
             if (deltaX < 1 && deltaY < 1 && deltaX*deltaX + deltaY*deltaY < 1){
                 let starPair = new StarPair(refStars[ref], tgtStars[tgt]);
-                leastSquareFit.addValue(starPair.getTgtFlux(), starPair.getRefFlux());
                 starPairArray.push(starPair);
                 break;
             }
         }
     }
-    console.writeln("Found " + starPairArray.length + " matching stars");
-    // We are only interested in the scale, not the intercept.
-    // Any intercept would be an artifact of the photometry
-    let linearFit= leastSquareFit.getLinearFit();
-    linearFit.b = 0;
-    return new StarPairs(starPairArray, linearFit);
+    return new StarPairs(starPairArray);
 }
 
 /**
- * The StarDetector does not subtract the background from the star, so we neeed
- * to do this here
- * @param {Star} star
- * @returns {Number} Star flux corrected for background level
+ * Create bitmap image with overlapping region set to 1
+ * @param {type} refImage
+ * @param {type} tgtImage
+ * @param {rectangle} previewArea Mask is also limitted by this area
+ * @returns {Image} A image mask for the overlapping region
  */
-function getFlux(star){
-    return star.flux - star.bkg * star.size;
+function createStarRegionMask(refImage, tgtImage, previewArea){
+    let nChannels = refImage.isColor ? 3 : 1;
+    
+    let mask = new Image(refImage.width, refImage.height, 1);
+    mask.fill(0);
+  
+    // Create a mask to restrict the star detection to the overlapping area and previewArea
+    let xMin = previewArea.x;
+    let xMax = previewArea.x + previewArea.width;
+    let yMin = previewArea.y;
+    let yMax = previewArea.y + previewArea.height;
+    for (let x = xMin; x < xMax; x++){
+        for (let y = yMin; y < yMax; y++){
+            let isOverlap = true;
+            for (let c = nChannels-1; c >= 0; c--){
+                if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0){
+                    isOverlap = false;
+                    break;
+                }
+            }
+            if (isOverlap){
+                mask.setSample(1, x, y);
+            }
+        }
+    }
+    return mask;
 }
 
 /**
- * @param {Star} refStar
- * @param {Star} tgtStar
- * @returns {StarPair}
+ * @param {Image} image Find stars in this image
+ * @param {Image} starRegionMask Bitmask used to limit star search region
+ * @param {type} logStarDetectionSensitivity
+ * @param {type} upperLimit Dont include stars with a peak above this value
+ * @returns {Star[]} Detected stars
  */
-function StarPair(refStar, tgtStar){
-    this.tgtStar = tgtStar;
-    this.refStar = refStar;
-    this.getTgtFlux = function(){
-        return getFlux(tgtStar);
-    };
-    this.getRefFlux = function(){
-        return getFlux(refStar);
-    };
-    this.getTgtX = function(){
-        return tgtStar.pos.x;
-    };
-    this.getTgtY = function(){
-        return tgtStar.pos.y;
-    };
-    this.getRefX = function(){
-        return refStar.pos.x;
-    };
-    this.getRefY = function(){
-        return refStar.pos.y;
-    };
-}
-
-/**
- * Stores the array of StarPair and the LinearFitData that was calculated from them
- * @param {StarPair[]} starPairArray
- * @param {LinearFitData} linearFitData
- * @returns {StarPairs}
- */
-function StarPairs(starPairArray, linearFitData){
-    this.starPairArray = starPairArray;
-    this.linearFitData = linearFitData;
+function detectStars(image, starRegionMask, logStarDetectionSensitivity, upperLimit){
+    let starDetector = new StarDetector();
+    starDetector.mask = starRegionMask;
+    starDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
+    starDetector.upperLimit = upperLimit;
+    return starDetector.stars(image);
 }
 
 /**
