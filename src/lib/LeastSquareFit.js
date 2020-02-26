@@ -116,21 +116,21 @@ function calculateLinearFit(samplePairArray, getX, getY) {
 /**
  * Test method and data to check the Least Square Fit algorithm
  */
-function testLeastSquareFitAlgorithm() {
-    let lsf = new LeastSquareFitAlgorithm();
-
-    let samplePairArray = [];
-    samplePairArray.push(new SamplePair(2.0, 0, 4.0, 0, 2, 4));
-    samplePairArray.push(new SamplePair(3.0, 0, 5.0, 0, 3, 5));
-    samplePairArray.push(new SamplePair(5.0, 0, 7.0, 0, 5, 7));
-    samplePairArray.push(new SamplePair(7.0, 0, 10.0, 0, 7, 10));
-    samplePairArray.push(new SamplePair(9.0, 0, 15.0, 0, 9, 15));
-
-    lsf.addValues(samplePairArray, getLinearFitX, getLinearFitY);
-    let line = lsf.getLinearFit();
-    console.writeln("m (1.51829268292682926) = " + line.m);
-    console.writeln("b (0.3048780487804878) = " + line.b);
-}
+//function testLeastSquareFitAlgorithm() {
+//    let lsf = new LeastSquareFitAlgorithm();
+//
+//    let samplePairArray = [];
+//    samplePairArray.push(new SamplePair(2.0, 4.0, 2, 4));
+//    samplePairArray.push(new SamplePair(3.0, 5.0, 3, 5));
+//    samplePairArray.push(new SamplePair(5.0, 7.0, 5, 7));
+//    samplePairArray.push(new SamplePair(7.0, 10.0, 7, 10));
+//    samplePairArray.push(new SamplePair(9.0, 15.0, 9, 15));
+//
+//    lsf.addValues(samplePairArray, getLinearFitX, getLinearFitY);
+//    let line = lsf.getLinearFit();
+//    console.writeln("m (1.51829268292682926) = " + line.m);
+//    console.writeln("b (0.3048780487804878) = " + line.b);
+//}
 
 // ============ PixelMath =============
 
