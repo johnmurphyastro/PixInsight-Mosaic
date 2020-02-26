@@ -146,3 +146,12 @@ function createNumericEdit(label, tooltip, initialValue, labelWidth, editWidth){
     numericEditControl.toolTip = tooltip;
     return numericEditControl;
 }
+
+function createGroupBox(dialog, title){
+    let groupBox = new GroupBox(dialog);
+    groupBox.title = title;
+    groupBox.sizer = new VerticalSizer;
+    groupBox.sizer.margin = 6;
+    groupBox.sizer.spacing = 6;
+    return groupBox;
+}
