@@ -80,50 +80,76 @@ function getFlux(star) {
  */
 function getStarPairs(refView, tgtView, starRegionMask, 
         logStarDetectionSensitivity, upperLimit, channel){
+            
+    const useColorManagement = false;
+            
     let isColor = refView.image.isColor;
     let imgRefWindow = null;
     let imgTgtWindow = null;
-    let starRefView;
-    let starTgtView;
+    let refImage = refView.image;
+    let tgtImage = tgtView.image;
+    let starRefImage;
+    let starTgtImage;
     if (isColor){
-        // Extract the specified color channel from both target and reference images
-        // ChannelExtraction creates a new B&W image for the extracted channel
-        let P = new ChannelExtraction;
-        P.colorSpace = ChannelExtraction.prototype.RGB;
-        P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
-        P.channels = [// enabled, id
-            [channel % 3 === 0, "REF_CHANNEL"],
-            [channel % 3 === 1, "REF_CHANNEL"],
-            [channel % 3 === 2, "REF_CHANNEL"]
-        ];
-        P.executeOn(refView);
+        if (useColorManagement){
+            // Extract the specified color channel from both target and reference images
+            // Slightly more accurate, but slow
+            // ChannelExtraction creates a new B&W image for the extracted channel
+            let P = new ChannelExtraction;
+            P.colorSpace = ChannelExtraction.prototype.RGB;
+            P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
+            P.channels = [// enabled, id
+                [channel % 3 === 0, "REF_CHANNEL"],
+                [channel % 3 === 1, "REF_CHANNEL"],
+                [channel % 3 === 2, "REF_CHANNEL"]
+            ];
+            P.executeOn(refView);
 
-        P.channels = [// enabled, id
-            [channel % 3 === 0, "TGT_CHANNEL"],
-            [channel % 3 === 1, "TGT_CHANNEL"],
-            [channel % 3 === 2, "TGT_CHANNEL"]
-        ];
-        P.executeOn(tgtView);
+            P.channels = [// enabled, id
+                [channel % 3 === 0, "TGT_CHANNEL"],
+                [channel % 3 === 1, "TGT_CHANNEL"],
+                [channel % 3 === 2, "TGT_CHANNEL"]
+            ];
+            P.executeOn(tgtView);
 
-        imgRefWindow = ImageWindow.windowById( "REF_CHANNEL" );
-        imgTgtWindow = ImageWindow.windowById( "TGT_CHANNEL" );
-        starRefView = imgRefWindow.mainView;
-        starTgtView = imgTgtWindow.mainView;
+            imgRefWindow = ImageWindow.windowById( "REF_CHANNEL" );
+            imgTgtWindow = ImageWindow.windowById( "TGT_CHANNEL" );
+            starRefImage = imgRefWindow.mainView.image;
+            starRefImage = imgTgtWindow.mainView.image;
+        } else {
+            // Dont color manage to increase speed
+            // The extra error when the scale is calculated is small:
+            // Example: slow method gives 1.100000299505084, this method: 1.1003654077279212
+
+            // Create grey scale 32bit floating point images
+            let width = refImage.width;
+            let height = refImage.height;
+            starRefImage = new Image(width, height, 1);
+            starTgtImage = new Image(width, height, 1);
+            for (let x = width - 1; x !== 0; x-- ){
+                for (let y = height - 1; y !== 0; y--){
+                    starTgtImage.setSample(tgtImage.sample(x, y, channel), x, y);
+                    starRefImage.setSample(refImage.sample(x, y, channel), x, y);
+                }
+            }
+        }
     } else {
         // Input images are B&W so we can use them directly
-        starRefView = refView;
-        starTgtView = tgtView;
+        starRefImage = refImage;
+        starTgtImage = tgtImage;
     }
-        
+    
     // Detect stars in target and reference images
-    let tgtStars = detectStars(starTgtView.image, starRegionMask, logStarDetectionSensitivity, upperLimit);
-    let refStars = detectStars(starRefView.image, starRegionMask, logStarDetectionSensitivity, upperLimit);
+    let tgtStars = detectStars(starTgtImage, starRegionMask, logStarDetectionSensitivity, upperLimit);
+    let refStars = detectStars(starRefImage, starRegionMask, logStarDetectionSensitivity, upperLimit);
     let starPairs = findMatchingStars(refStars, tgtStars);
 
-    if (isColor){
-        // We must close the temporary windows we created
-        imgRefWindow.forceClose();
-        imgTgtWindow.forceClose();
+    if (useColorManagement){
+        if (isColor){
+            // We must close the temporary windows we created
+            imgRefWindow.forceClose();
+            imgTgtWindow.forceClose();
+        }
     }
     
     return starPairs;
@@ -136,19 +162,21 @@ function getStarPairs(refView, tgtView, starRegionMask,
  * @returns {StarPairs}
  */
 function findMatchingStars(refStars, tgtStars){
+    let createKey = function(star){
+        return "" + Math.round(star.pos.x) + "," + Math.round(star.pos.y);
+    };
+    
+    let starMap = new Map();
+    for (let star of refStars){
+        starMap.set(createKey(star), star);
+    }
+    
     // Find stars that are in both images, using a search radius of 1 pixel
     let starPairArray = [];
-    for (let ref=0; ref<refStars.length; ref++){
-        let x1 = refStars[ref].pos.x;
-        let y1 = refStars[ref].pos.y;
-        for (let tgt = 0; tgt < tgtStars.length; tgt++){
-            let deltaX = x1 - tgtStars[tgt].pos.x;
-            let deltaY = y1 - tgtStars[tgt].pos.y;
-            if (deltaX < 1 && deltaY < 1 && deltaX*deltaX + deltaY*deltaY < 1){
-                let starPair = new StarPair(refStars[ref], tgtStars[tgt]);
-                starPairArray.push(starPair);
-                break;
-            }
+    for (let tgtStar of tgtStars){
+        const key = createKey(tgtStar);
+        if (starMap.has(key)){
+            starPairArray.push(new StarPair(starMap.get(key), tgtStar));
         }
     }
     return new StarPairs(starPairArray);
@@ -156,9 +184,9 @@ function findMatchingStars(refStars, tgtStars){
 
 /**
  * Create bitmap image with overlapping region set to 1
- * @param {type} refImage
- * @param {type} tgtImage
- * @param {rectangle} previewArea Mask is also limitted by this area
+ * @param {Image} refImage
+ * @param {Image} tgtImage
+ * @param {Rect} previewArea Mask is also limitted by this area
  * @returns {Image} A image mask for the overlapping region
  */
 function createStarRegionMask(refImage, tgtImage, previewArea){
@@ -168,10 +196,10 @@ function createStarRegionMask(refImage, tgtImage, previewArea){
     mask.fill(0);
   
     // Create a mask to restrict the star detection to the overlapping area and previewArea
-    let xMin = previewArea.x;
-    let xMax = previewArea.x + previewArea.width;
-    let yMin = previewArea.y;
-    let yMax = previewArea.y + previewArea.height;
+    let xMin = previewArea.x0;
+    let xMax = previewArea.x1;
+    let yMin = previewArea.y0;
+    let yMax = previewArea.y1;
     for (let x = xMin; x < xMax; x++){
         for (let y = yMin; y < yMax; y++){
             let isOverlap = true;
@@ -280,23 +308,22 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
  * @param {StarPair[]} starPairArray Detected stars
  * @param {Number} channel
  * @param {Boolean} isColor
- * @returns {undefined}
  */
 function displayDetectedStars(view, starPairArray, channel, isColor) {
     let title = view.fullId;
     switch (channel) {
         case 0:
             if (isColor){
-                title += "_red_stars";
+                title += "_red_photometry";
             } else {
-                title += "_stars";
+                title += "_photometry";
             }
             break;
         case 1:
-            title += "_green_stars";
+            title += "_green_photometry";
             break;
         case 2:
-            title += "_blue_stars";
+            title += "_blue_photometry";
     }
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
@@ -306,8 +333,11 @@ function displayDetectedStars(view, starPairArray, channel, isColor) {
     G.pen = new Pen(0xff000000);
     for (let i = 0; i < starPairArray.length; ++i){
         let starPair = starPairArray[i];
-        let s = starPair.tgtStar;
-        G.strokeCircle(s.pos, Math.max(3, Math.round(Math.sqrt(s.size)) | 1));
+        let tgtStar = starPair.tgtStar;
+        let refStar = starPair.refStar;
+        let maxSize = Math.max(tgtStar.size,refStar.size);
+        let radius = Math.sqrt(maxSize)/2;
+        G.strokeCircle(refStar.pos, radius);
     }
     G.end();
 
@@ -322,6 +352,41 @@ function displayDetectedStars(view, starPairArray, channel, isColor) {
     w.mainView.endProcess();
     w.show();
     //w.zoomToFit();
+}
+
+function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAdd){
+    let title = view.fullId + "_MOSAIC_mask";
+    let bmp = new Bitmap(view.image.width, view.image.height);
+    bmp.fill(0xffffffff);
+    
+    let firstNstars;
+    if (limitMaskStarsPercent < 100){
+        firstNstars = Math.floor(allStars.length * limitMaskStarsPercent / 100);
+    } else {
+        firstNstars = allStars.length;
+    }
+    
+    let G = new VectorGraphics(bmp);
+    G.antialiasing = true;
+    G.brush = new Brush();
+    for (let i = 0; i < firstNstars; ++i){
+        let star = allStars[i];
+        let radius = Math.sqrt(star.size)/2;
+        G.fillCircle(star.pos, radius * radiusMult + radiusAdd);
+    }
+    G.end();
+    bmp.invert();
+
+    let w = new ImageWindow(bmp.width, bmp.height,
+            1, // numberOfChannels
+            8, // bitsPerSample
+            false, // floatSample
+            false, // color
+            title);
+    w.mainView.beginProcess(UndoFlag_NoSwapFile);
+    w.mainView.image.blend(bmp);
+    w.mainView.endProcess();
+    w.show();
 }
     
 /**
@@ -340,55 +405,52 @@ function drawStarLineAndPoints(graph, lineColor, starPairs, pointColor){
     }
 }
 
-// ====================================
-// Example code / usage
-// Indexs required to access this data from the StarAlignment output array
-//#define NUMBER_OF_PAIR_MATCHES    2
-//#define REFERENCE_X              29
-//#define REFERENCE_Y              30
-//#define TARGET_X                 31
-//#define TARGET_Y                 32
-
-// To display header file, type this into Console window:
-// open "$PXI_INCDIR/pjsr/StarDetector.jsh"
-// 
-// PixInsight example code: how to use StarAlignment
-//let SA = new StarAlignment;
-//if (SA.executeOn(view))
-//{
-//    let stars = [];
-//    let n = SA.outputData[0][NUMBER_OF_PAIR_MATCHES];
-//    for (let i = 0; i < n; ++i)
-//        stars.push({refX: SA.outputData[0][REFERENCE_X][i],
-//            refY: SA.outputData[0][REFERENCE_Y][i],
-//            tgtX: SA.outputData[0][TARGET_X][i],
-//            tgtY: SA.outputData[0][TARGET_Y][i]});
-//}
-
-
-// PixInsight Star data structure
-// 
-//    function Star(pos, flux, size)
-//    {
-//        // Centroid position in pixels, image coordinates.
-//        this.pos = new Point(pos.x, pos.y);
-//        // Total flux, normalized intensity units.
-//        this.flux = flux;
-//        // Area of detected star structure in square pixels.
-//        this.size = size;
-//    }
-
-// PixInsight example to get R.A. & Dec for detected stars
-//    var window = ImageWindow.activeWindow;
-//    var S = new StarDetector;
-//    var stars = S.stars( window.mainView.image );
-//    var f = File.createFileForWriting( "/tmp/stars.txt" );
-//    f.outTextLn( "Star      X        Y      Flux       R.A.         Dec.    " );
-//    f.outTextLn( "===== ======== ======== ======== ============ ============" );
-//    for ( let i = 0; i < stars.length; ++i )
-//    {
-//       let q = window.imageToCelestial( stars[i].pos );
-//       f.outTextLn( format( "%5d %8.2f %8.2f %8.3f %12.8f %+12.8f", i, stars[i].pos.x, stars[i].pos.y, stars[i].flux, q.x, q.y ) );
-//    }
-//    f.close();
+/**
+ * Use star with maximum flux
+ */
+function CombienStarPairArrays(){
+    this.starMap = new Map();
     
+    /**
+     * @param {StarPair[]} starPairArray
+     */
+    this.addStarPairArray = function(starPairArray){
+        for (let starPair of starPairArray){
+            // keep star with maximum flux
+            let star = this.brightestStar(starPair.tgtStar, starPair.refStar);
+            let key = this.starToKey(star);
+            let mapStar = this.starMap.get(key);
+            if (mapStar === undefined || mapStar.flux < star.flux){
+                this.starMap.set(key, star);
+            }
+        }
+    };
+    
+    /**
+     * @returns {Star[]} All stars, sorted by brightness (brightest first)
+     */
+    this.getSortedStars = function(){
+        let stars = [];
+        for (let star of this.starMap.values()){
+            stars.push(star);
+        }
+        return stars.sort((a, b) => b.flux - a.flux);
+    };
+    
+    /** Private function
+     * @param {Star} star
+     * @returns {String}
+     */
+    this.starToKey = function(star){
+        return "" + star.pos.x + "," + star.pos.y;
+    };
+    
+    /** Private functin
+     * @param {Star} star1
+     * @param {Star} star2
+     * @returns {Star} The brightest of the two stars
+     */
+    this.brightestStar = function(star1, star2){
+        return star1.flux > star2.flux ? star1 : star2;
+    };
+}

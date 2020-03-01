@@ -26,12 +26,12 @@ Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 #include "lib/Graph.js"
 #include "lib/StarLib.js"
 
-#define VERSION  "1.0"
-#define TITLE "Gradient Least Squares Fit"
-#define HORIZONTAL 0
-#define VERTICAL 1
-#define AUTO 2
-#define MOSAIC_NAME "Mosaic"
+function VERSION(){return  "1.0";}
+function TITLE(){return "Gradient Least Squares Fit";}
+function HORIZONTAL(){return 0;}
+function VERTICAL(){return 1;}
+function AUTO(){return 2;}
+function MOSAIC_NAME(){return "Mosaic";}
 
 /**
  * Controller. Processing starts here!
@@ -45,30 +45,33 @@ function gradientLinearFit(data)
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
-    let isHorizontal;
-    let detectOrientation = false;
-    if (data.orientation === HORIZONTAL){
-        console.writeln("<b>Mode: Horizontal Gradient</b>");
-        isHorizontal = true;
-    } else if (data.orientation === VERTICAL){
-        console.writeln("<b>Mode: Vertical Gradient</b>");
-        isHorizontal = false;
-    } else {
-        detectOrientation = true;
-    }
 
     let samplePreviewArea;
     if (data.hasAreaOfInterest) {
-        samplePreviewArea = new Rectangle(data.areaOfInterest_X, data.areaOfInterest_Y, data.areaOfInterest_W, data.areaOfInterest_H);
+        samplePreviewArea = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, data.areaOfInterest_X1, data.areaOfInterest_Y1);
     } else {
-        samplePreviewArea = new Rectangle(0, 0, targetView.image.width, targetView.image.height);
+        samplePreviewArea = targetView.image.bounds;
     }
-    
+
+    let detectStarTime = new Date().getTime();
     console.writeln("\n<b>Detecting stars</b>");
     let starRegionMask = createStarRegionMask(referenceView.image, targetView.image, samplePreviewArea);
-    let colorStarPairs = getColorStarPairs(referenceView, targetView, starRegionMask, 
+    let colorStarPairs = getColorStarPairs(referenceView, targetView, starRegionMask,
             data.logStarDetection, data.rejectHigh);
-            
+    let combienStarPairArrays = new CombienStarPairArrays();
+    for (let c=0; c<nChannels; c++){
+        combienStarPairArrays.addStarPairArray(colorStarPairs[c].starPairArray);
+    }
+    let allStars = combienStarPairArrays.getSortedStars();
+    console.writeln("Detecting stars time: ", getElapsedTime(detectStarTime));
+    
+    if (data.testMaskOnly){
+        displayMask(targetView, allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd);
+        console.writeln("\n" + TITLE() + ":Mask Creation Total time ", getElapsedTime(startTime));
+        return;
+    }
+
+    let scaleTime = new Date().getTime();
     console.writeln("\n<b>Applying scale factors to '" + targetView.fullId + "':</b>");
     // Apply scale to target image. Must be done before calculating the gradient
     targetView.beginProcess();
@@ -79,26 +82,24 @@ function gradientLinearFit(data)
         scaleFactor.push(starPairs.linearFitData);
     }
     applyLinearFit(targetView, scaleFactor, false);
-    
-    let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, starRegionMask,
-        data.sampleSize, data.logStarDetection, data.rejectHigh, data.avoidBrightStarsPercent, samplePreviewArea);
+    console.writeln("Apply scale time: ", getElapsedTime(scaleTime));
+
+    let createSamplesTime = new Date().getTime();
+    let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
+        data.sampleSize, allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
+    console.writeln("creating samples... (", getElapsedTime(createSamplesTime), ")");
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
-        new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
+        new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    
+
+    let sampleAreaTime = new Date().getTime();
     let sampleArea = samplePairs.getSampleArea();
-    if (detectOrientation) {
-        detectOrientation = false;
-        isHorizontal = sampleArea.width > sampleArea.height;
-        if (isHorizontal) {
-            console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
-        } else {
-            console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
-        }
-    }
-    
+    console.writeln("Calculating sample area... (", getElapsedTime(sampleAreaTime), ")");
+    let isHorizontal = isJoinHorizontal(data, sampleArea);
+
+    let calculateGradientTime = new Date().getTime();
     let gradientArray = [];
     // For each channel (L or RGB)
     // Calculate the linear fit line y = mx + b
@@ -111,52 +112,71 @@ function gradientLinearFit(data)
         sampleSections = joinSectionLines(sampleSections);
         gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
 
-        console.writeln("<b>Gradients (channel " + channel + "):<\b>");
+        console.writeln("Gradients (channel " + channel + "):");
         for (let n = 0; n < sampleSections.length; n++) {
             let line = sampleSections[n];
             console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
                     + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
         }
     }
-    
+    console.writeln("Calculating gradients time... (", getElapsedTime(calculateGradientTime), ")");
+
+    let applyGradientTime = new Date().getTime();
     applyGradient(targetView, isHorizontal, gradientArray);
-    
+    console.writeln("Apply gradients time... (", getElapsedTime(applyGradientTime), ")");
+
     // Save parameters to PixInsight history
     data.saveParameters();
     targetView.endProcess();
-    
-    for (let i=0; i < colorStarPairs.length; i++){
-        let starPairs = colorStarPairs[i];
-        console.writeln("Scale (channel " + i + "): " + starPairs.linearFitData.m.toPrecision(5)
-                + " from " + starPairs.starPairArray.length + " detected stars.");
-        if (data.displayStarsFlag){
+
+    if (data.displayStarsFlag) {
+        let time = new Date().getTime();
+        for (let i = 0; i < colorStarPairs.length; i++) {
+            let starPairs = colorStarPairs[i];
             displayDetectedStars(targetView, starPairs.starPairArray, i, referenceView.image.isColor);
         }
+        console.writeln("Displaying photometric stars... (", getElapsedTime(time), ")");
     }
 
+
     if (data.displayGradientFlag){
+        let time = new Date().getTime();
         let title = "Gradient_" + targetView.fullId;
         displayGradient(targetView, title, isHorizontal, gradientArray);
+        console.writeln("Creating gradient image... (", getElapsedTime(time), ")");
     }
-    
+
     if (data.displaySamplesFlag){
+        let time = new Date().getTime();
         let title = "Samples_" + targetView.fullId;
-        displaySampleSquares(referenceView, colorSamplePairs[0], title);
+        displaySampleSquares(referenceView, colorSamplePairs[0], allStars, data.limitSampleStarsPercent, title);
+        console.writeln("Displaying samples... (", getElapsedTime(time), ")");
     }
-    
+
     if (data.photometryGraphFlag){
+        let time = new Date().getTime();
         displayStarGraph(referenceView, targetView, 730, colorStarPairs);
+        console.writeln("Displaying photometry graph... (", getElapsedTime(time), ")");
     }
-    
+
     if (data.displayGraphFlag) {
+        let time = new Date().getTime();
         displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairs);
+        console.write("Displaying gradient graph... (", getElapsedTime(time), ")");
+    }
+
+    if (data.displayMosiacFlag){
+        let time = new Date().getTime();
+        createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME());
+        console.writeln("Creating ", MOSAIC_NAME(), " (", getElapsedTime(time), ")");
     }
     
-    if (data.displayMosiacFlag){
-        console.writeln("\nCreating " + MOSAIC_NAME);
-        createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME);
+    if (data.displayMaskFlag){
+        let time = new Date().getTime();
+        displayMask(targetView, allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd);
+        console.writeln("Creating mask for ", targetView.fullId, " (", getElapsedTime(time), ")");
     }
-    console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+    console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
 }
 
 /**
@@ -167,12 +187,12 @@ function gradientLinearFit(data)
  * @param {type} upperLimit Exclude stars with core brighter than this
  * @returns {StarPairs[]} Array of StarPairs for all color channels
  */
-function getColorStarPairs(refView, tgtView, starRegionMask, 
+function getColorStarPairs(refView, tgtView, starRegionMask,
         logStarDetectionSensitivity, upperLimit){
     let colorStarPairs = [];
     let nChannels = refView.image.isColor ? 3 : 1;
     for (let i=0; i < nChannels; i++){
-        let starPairs = getStarPairs(refView, tgtView, starRegionMask, 
+        let starPairs = getStarPairs(refView, tgtView, starRegionMask,
                 logStarDetectionSensitivity, upperLimit, i);
         colorStarPairs.push(starPairs);
     }
@@ -210,14 +230,14 @@ function getSampleSections(samplePairs, nSections, isHorizontal){
     let sampleAreaEnd;
     let sampleCoverageArea = samplePairs.getSampleArea();
     if (isHorizontal){
-        sampleAreaStart = sampleCoverageArea.x;
-        sampleAreaEnd = sampleAreaStart + sampleCoverageArea.width;
+        sampleAreaStart = sampleCoverageArea.x0;
+        sampleAreaEnd = sampleCoverageArea.x1;
     } else {
-        sampleAreaStart = sampleCoverageArea.y;
-        sampleAreaEnd = sampleAreaStart + sampleCoverageArea.height;
+        sampleAreaStart = sampleCoverageArea.y0;
+        sampleAreaEnd = sampleCoverageArea.y1;
     }
     let interval = (sampleAreaEnd - sampleAreaStart) / nSections;
-    
+
     // Split the SamplePair area into sections of equal size.
     let sections = [];
     for (let i=0; i<nSections; i++){
@@ -243,7 +263,7 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
     this.minCoord = minCoord;
     this.maxCoord = maxCoord;
     this.isHorizontal = isHorizontal;
-    
+
     /**
      * Determine which SamplePair are within this section's area, store them
      * and calculate their linear fit
@@ -255,23 +275,31 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
         for (let samplePair of samplePairs.samplePairArray) {
             // Discover which SamplePair are within this section's area and store them
             if (this.isHorizontal) {
-                if (samplePair.x >= this.minCoord && samplePair.x < this.maxCoord) {
+                const x = samplePair.rect.center.x;
+                if (x >= this.minCoord && x < this.maxCoord) {
                     samplePairArray.push(samplePair);
                 }
             } else {
-                if (samplePair.y >= this.minCoord && samplePair.y < this.maxCoord) {
+                const y = samplePair.rect.center.y;
+                if (y >= this.minCoord && y < this.maxCoord) {
                     samplePairArray.push(samplePair);
                 }
             }
         }
         // Calculate the linear fit
+        let algorithm = new LeastSquareFitAlgorithm();
         if (isHorizontal) {
-            this.linearFitData = calculateLinearFit(samplePairArray, getHorizontalGradientX, getHorizontalGradientY);
+            samplePairArray.forEach((samplePair) => {
+                algorithm.addValue(samplePair.rect.center.x, samplePair.targetMedian - samplePair.referenceMedian);
+            });
         } else {
-            this.linearFitData = calculateLinearFit(samplePairArray, getVerticalGradientX, getVerticalGradientY);
+            samplePairArray.forEach((samplePair) => {
+                algorithm.addValue(samplePair.rect.center.y, samplePair.targetMedian - samplePair.referenceMedian);
+            });
         }
+        this.linearFitData = algorithm.getLinearFit();
     };
-    
+
     /**
      * Calculate this section's linear fit line from where two lines intersect this section's boundary.
      * We first calculate the two intersection points:
@@ -321,7 +349,7 @@ function joinSectionLines(sampleSections){
             let s1 = sampleSections[i];
             s0.maxCoord -= dist;
             s1.minCoord += dist;
-            // Create a new dummy SampleSection. It will not contain any samples, 
+            // Create a new dummy SampleSection. It will not contain any samples,
             // but we do calcuate and set its 'linear fit' line which joins it to
             // the previous and next SampleSection's
             let ss = new SampleSection(s0.maxCoord, s1.minCoord, s0.isHorizontal);
@@ -333,7 +361,7 @@ function joinSectionLines(sampleSections){
         roundedSampleSections.push(s0);
         sampleSections = roundedSampleSections;
     }
-    
+
     return sampleSections;
 }
 /**
@@ -341,25 +369,25 @@ function joinSectionLines(sampleSections){
  * How the difference values are calculated:
  * (1) The SampleArea is the bounding rectangle of all the SamplePairs.
  * (2) The previewArea is the area selected by the user (e.g. by a preview). If
- * the user made no selection, the previewArea is the area as the image. The 
+ * the user made no selection, the previewArea is the area as the image. The
  * SampleArea is a subset of the previewArea (it can be the same size, but not bigger.)
- * (3) The SampleArea is divided into SampleSection. Each of these sections 
- * defines a gradient line. The dif value within the sample area is calculated 
+ * (3) The SampleArea is divided into SampleSection. Each of these sections
+ * defines a gradient line. The dif value within the sample area is calculated
  * from the equation of this line: dif = mx + b
  * (4) From the start of the image to the start of the previewArea, the dif value
  * is held constant.
- * (5) From the start of the previewArea (or the start of the image if the 
+ * (5) From the start of the previewArea (or the start of the image if the
  * preview area does not exist) to the first SampleSection, the line from that first
  * SampleSection is extended.
- * (6) From the last SampleSection to the end of the previewArea (or the end of 
+ * (6) From the last SampleSection to the end of the previewArea (or the end of
  * the image if the preview area does not exist) the line from that last
  * SampleSection is extended.
  * (7) From the end of the previewArea to the end of the image, the dif value
  * is held constant.
- *  
+ *
  * @param {SampleSection[]} sampleSections
- * @param {Rectangle} previewArea
- * @param {Rectangle} targetImage
+ * @param {Rect} previewArea
+ * @param {Image} targetImage
  * @param {Boolean} isHorizontal
  * @returns {GradientData}
  */
@@ -368,15 +396,15 @@ function createGradient(sampleSections, previewArea, targetImage, isHorizontal) 
     let previewMaxCoord;
     let imageMaxCoord;
     if (isHorizontal) {
-        previewMinCoord = previewArea.x;
-        previewMaxCoord = previewArea.x + previewArea.width - 1;
+        previewMinCoord = previewArea.x0;
+        previewMaxCoord = previewArea.x1 - 1;
         imageMaxCoord = targetImage.width;
     } else {
-        previewMinCoord = previewArea.y;
-        previewMaxCoord = previewArea.y + previewArea.height - 1;
+        previewMinCoord = previewArea.y0;
+        previewMaxCoord = previewArea.y1 - 1;
         imageMaxCoord = targetImage.height;
     }
-    
+
     let difArray = [];
 
     // From start of image to start of previewArea, the dif value is held constant.
@@ -390,7 +418,7 @@ function createGradient(sampleSections, previewArea, targetImage, isHorizontal) 
     let minValue = firstDif;
     let maxValue = firstDif;
 
-    // From the start of the previewArea (or the start of the image if the 
+    // From the start of the previewArea (or the start of the image if the
     // preview area does not exist) to the first SampleSection, the line from that first
     // SampleSection is extended.
     for (let p = previewMinCoord; p < firstSection.minCoord; p++) {
@@ -414,7 +442,7 @@ function createGradient(sampleSections, previewArea, targetImage, isHorizontal) 
         }
     }
 
-    // From the last SampleSection to the end of the previewArea (or the end of 
+    // From the last SampleSection to the end of the previewArea (or the end of
     // the image if the preview area does not exist) the line from that last
     // SampleSection is extended.
     let lastSection = sampleSections[sampleSections.length - 1];
@@ -458,7 +486,7 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     let xLabel;
     if (isHorizontal){
         xLabel = "Mosaic tile join X-coordinate";
-        maxCoordinate = targetView.image.width;       
+        maxCoordinate = targetView.image.width;
     } else {
         xLabel = "Mosaic tile join Y-coordinate";
         maxCoordinate = targetView.image.height;
@@ -472,7 +500,7 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     let graphWithAxis = new Graph(0, minMax.minDif, maxCoordinate, minMax.maxDif);
     graphWithAxis.setAxisLength(axisWidth + 2, 500);
     graphWithAxis.createGraph(xLabel, yLabel);
-    
+
     if (colorSamplePairs.length === 1){ // B&W
         drawLineAndPoints(graphWithAxis, isHorizontal, gradientArray[0], 0xFF999999,
             colorSamplePairs[0], 0xFFFFFFFF);
@@ -514,9 +542,9 @@ function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, sampleP
         let dif = samplePair.targetMedian - samplePair.referenceMedian;
         let coord;
         if (isHorizontal) {
-            coord = samplePair.x;
+            coord = samplePair.rect.center.x;
         } else {
-            coord = samplePair.y;
+            coord = samplePair.rect.center.y;
         }
         graph.drawPoint(coord, dif, pointColor);
     }
@@ -530,7 +558,7 @@ function drawLineAndPoints(graph, isHorizontal, gradientData, lineColor, sampleP
  */
 function SamplePairDifMinMax(colorSamplePairs, gradientData) {
     if (gradientData.length === 3){
-        this.minDif = Math.min(gradientData[0].minValue, gradientData[1].minValue, gradientData[2].minValue); 
+        this.minDif = Math.min(gradientData[0].minValue, gradientData[1].minValue, gradientData[2].minValue);
         this.maxDif = Math.max(gradientData[0].maxValue, gradientData[1].maxValue, gradientData[2].maxValue);
     } else {
         this.minDif = gradientData[0].minValue;
@@ -633,6 +661,30 @@ function applyGradient(view, isHorizontal, gradientArray) {
 }
 
 /**
+ *
+ * @param {Data} data
+ * @param {Rect} sampleArea
+ * @returns {Boolean} True if the mosaic join is mostly horizontal
+ */
+function isJoinHorizontal(data, sampleArea){
+    if (data.orientation === HORIZONTAL()){
+        console.writeln("<b>Mode: Horizontal Gradient</b>");
+        return true;
+    }
+    if (data.orientation === VERTICAL()){
+        console.writeln("<b>Mode: Vertical Gradient</b>");
+        return false;
+    }
+    let isHorizontal = sampleArea.width > sampleArea.height;
+    if (isHorizontal) {
+        console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
+    } else {
+        console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
+    }
+    return isHorizontal;
+}
+
+/**
  * Default the Reference view to the open view named "Mosaic".
  * If this view does not exist, default to any view that is NOT the current view
  * (the Target view will be set to the current view)
@@ -680,19 +732,24 @@ function GradientLeastSquareFitData() {
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("sampleSize", this.sampleSize);
-        Parameters.set("avoidBrightStarsPercent", this.avoidBrightStarsPercent);
+        Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("nLineSegments", this.nLineSegments);
         Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
         Parameters.set("displayMosiacFlag", this.displayMosiacFlag);
         Parameters.set("mosiacOverlayFlag", this.mosaicOverlayFlag);
+        Parameters.set("displayMaskFlag", this.displayMaskFlag);
+        Parameters.set("testMaskOnly", this.testMaskOnly);
+        Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
+        Parameters.set("multiplyStarRadius", this.radiusMult);
+        Parameters.set("addStarRadius", this.radiusAdd);
         
         Parameters.set("hasAreaOfInterest", this.hasAreaOfInterest);
-        Parameters.set("areaOfInterestX", this.areaOfInterest_X);
-        Parameters.set("areaOfInterestY", this.areaOfInterest_Y);
-        Parameters.set("areaOfInterestW", this.areaOfInterest_W);
-        Parameters.set("areaOfInterestH", this.areaOfInterest_H);
+        Parameters.set("areaOfInterest_X0", this.areaOfInterest_X0);
+        Parameters.set("areaOfInterest_Y0", this.areaOfInterest_Y0);
+        Parameters.set("areaOfInterest_X1", this.areaOfInterest_X1);
+        Parameters.set("areaOfInterest_Y1", this.areaOfInterest_Y1);
     };
 
     // Reload our script's data from a process icon
@@ -709,8 +766,8 @@ function GradientLeastSquareFitData() {
             this.rejectHigh = Parameters.getReal("rejectHigh");
         if (Parameters.has("sampleSize"))
             this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("avoidBrightStarsPercent"))
-            this.avoidBrightStarsPercent = Parameters.getInteger("avoidBrightStarsPercent");
+        if (Parameters.has("limitSampleStarsPercent"))
+            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
         if (Parameters.has("nLineSegments"))
             this.nLineSegments = Parameters.getInteger("nLineSegments");
         if (Parameters.has("displayGradientFlag"))
@@ -725,6 +782,16 @@ function GradientLeastSquareFitData() {
             this.mosaicOverlayFlag = Parameters.getBoolean("mosiacOverlayFlag");
             this.mosaicRandomFlag = !(this.mosaicOverlayFlag);
         }
+        if (Parameters.has("displayMaskFlag"))
+            this.displayMaskFlag = Parameters.getBoolean("displayMaskFlag");
+        if (Parameters.has("testMaskOnly"))
+            this.testMaskOnly = Parameters.getBoolean("testMaskOnly");
+        if (Parameters.has("limitMaskStarsPercent"))
+            this.limitMaskStarsPercent = Parameters.getInteger("limitMaskStarsPercent");
+        if (Parameters.has("multiplyStarRadius"))
+            this.radiusMult = Parameters.getReal("multiplyStarRadius");
+        if (Parameters.has("addStarRadius"))
+            this.radiusAdd = Parameters.getReal("addStarRadius");
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
             this.targetView = View.viewById(viewId)
@@ -733,20 +800,20 @@ function GradientLeastSquareFitData() {
             let viewId = Parameters.getString("referenceView");
             this.referenceView = View.viewById(viewId)
         }
-        
+
         if (Parameters.has("hasAreaOfInterest"))
             this.hasAreaOfInterest = Parameters.getBoolean("hasAreaOfInterest");
-        if (Parameters.has("areaOfInterestX")){
-            this.areaOfInterest_X = Parameters.getInteger("areaOfInterestX"); 
+        if (Parameters.has("areaOfInterest_X0")){
+            this.areaOfInterest_X0 = Parameters.getInteger("areaOfInterest_X0");
         }
-        if (Parameters.has("areaOfInterestY")){
-            this.areaOfInterest_Y = Parameters.getInteger("areaOfInterestY"); 
+        if (Parameters.has("areaOfInterest_Y0")){
+            this.areaOfInterest_Y0 = Parameters.getInteger("areaOfInterest_Y0");
         }
-        if (Parameters.has("areaOfInterestW")){
-            this.areaOfInterest_W = Parameters.getInteger("areaOfInterestW"); 
+        if (Parameters.has("areaOfInterest_X1")){
+            this.areaOfInterest_X1 = Parameters.getInteger("areaOfInterest_X1");
         }
-        if (Parameters.has("areaOfInterestH")){
-            this.areaOfInterest_H = Parameters.getInteger("areaOfInterestH"); 
+        if (Parameters.has("areaOfInterest_Y1")){
+            this.areaOfInterest_Y1 = Parameters.getInteger("areaOfInterest_Y1");
         }
     };
 
@@ -755,10 +822,10 @@ function GradientLeastSquareFitData() {
         this.logStarDetection = -1;
         this.displayStarsFlag = false;
         this.photometryGraphFlag = true;
-        this.orientation = AUTO;
+        this.orientation = AUTO();
         this.rejectHigh = 0.8;
         this.sampleSize = 10;
-        this.avoidBrightStarsPercent = 100;
+        this.limitSampleStarsPercent = 100;
         this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
@@ -766,18 +833,24 @@ function GradientLeastSquareFitData() {
         this.displayMosiacFlag = true;
         this.mosaicOverlayFlag = true;
         this.mosaicRandomFlag = false;
-        
+        this.displayMaskFlag = true;
+        this.testMaskOnly = false;
+        this.limitMaskStarsPercent = 20;
+        this.radiusMult = 2.5;
+        this.radiusAdd = -1;
+
         this.hasAreaOfInterest = false;
-        this.areaOfInterest_X = 0;
-        this.areaOfInterest_Y = 0;
-        this.areaOfInterest_W = 0;
-        this.areaOfInterest_H = 0;
+        this.areaOfInterest_X0 = 0;
+        this.areaOfInterest_Y0 = 0;
+        this.areaOfInterest_X1 = 0;
+        this.areaOfInterest_Y1 = 0;
+        
     };
 
     // Used when the user presses the reset button
     this.resetParameters = function (linearFitDialog) {
         this.setParameters();
-        linearFitDialog.orientationCombo.currentItem = AUTO;
+        linearFitDialog.orientationCombo.currentItem = AUTO();
         linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
         linearFitDialog.displayStarsControl.checked = this.displayStarsFlag;
         linearFitDialog.photometryGraphControl.checked = this.photometryGraphFlag;
@@ -786,16 +859,21 @@ function GradientLeastSquareFitData() {
         linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
-        linearFitDialog.avoidBrightStarsPercent_Control.setValue(this.avoidBrightStarsPercent);
+        linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
         linearFitDialog.displayMosaicControl.checked = this.displayMosiacFlag;
         linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
+        linearFitDialog.starMaskFlagControl.checked = this.displayMaskFlag;
+        linearFitDialog.testMaskFlagControl.checked = this.testMaskOnly;
+        linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
+        linearFitDialog.StarRadiusMultiply_Control.setValue(this.radiusMult);
+        linearFitDialog.StarRadiusAdd_Control.setValue(this.radiusAdd);
         
         linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
-        linearFitDialog.rectangleX_Control.setValue(this.areaOfInterest_X);
-        linearFitDialog.rectangleY_Control.setValue(this.areaOfInterest_Y);
-        linearFitDialog.rectangleW_Control.setValue(this.areaOfInterest_W);
-        linearFitDialog.rectangleH_Control.setValue(this.areaOfInterest_H);
+        linearFitDialog.rectangleX0_Control.setValue(this.areaOfInterest_X0);
+        linearFitDialog.rectangleY0_Control.setValue(this.areaOfInterest_Y0);
+        linearFitDialog.rectangleX1_Control.setValue(this.areaOfInterest_X1);
+        linearFitDialog.rectangleY1_Control.setValue(this.areaOfInterest_Y1);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -821,7 +899,7 @@ function gradientLinearFitDialog(data) {
     this.__base__();
 
     // Create the Program Discription at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + 
+    let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
             "</b> &mdash; Calculates the gradient between two images over their overlaping area.");
 
     //-------------------------------------------------------
@@ -834,7 +912,7 @@ function gradientLinearFitDialog(data) {
     referenceImage_Label.minWidth = labelWidth1;
 
     this.referenceImage_ViewList = new ViewList(this);
-    this.referenceImage_ViewList.getAll();
+    this.referenceImage_ViewList.getMainViews();
     this.referenceImage_ViewList.minWidth = 300;
     this.referenceImage_ViewList.currentView = data.referenceView;
     this.referenceImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
@@ -856,7 +934,7 @@ function gradientLinearFitDialog(data) {
     targetImage_Label.minWidth = labelWidth1;
 
     this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getAll();
+    this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
     this.targetImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
@@ -869,44 +947,47 @@ function gradientLinearFitDialog(data) {
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
+    let labelSize = this.font.width("Line Segments:");
     //----------------------------------------------------
     // Star detection group box
     //----------------------------------------------------
-    let starGroupLabelSize = this.font.width("CCD Linear Range:");
-    this.rejectHigh_Control = new NumericControl(this);
-    this.rejectHigh_Control.real = true;
-    this.rejectHigh_Control.label.text = "CCD Linear Range:";
-    this.rejectHigh_Control.label.minWidth = starGroupLabelSize;
-    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range.</p>";
-    this.rejectHigh_Control.onValueUpdated = function (value) {
-        data.rejectHigh = value;
-    };
-    this.rejectHigh_Control.setRange(0.001, 1.0);
-    this.rejectHigh_Control.slider.setRange(0, 5000);
-    this.rejectHigh_Control.setPrecision(4);
-    this.rejectHigh_Control.slider.minWidth = 500;
-    this.rejectHigh_Control.setValue(data.rejectHigh);
-    
     this.starDetectionControl = new NumericEdit();
     this.starDetectionControl.setReal(false);
     this.starDetectionControl.setRange(-10, 10);
     this.starDetectionControl.setValue(data.logStarDetection);
     this.starDetectionControl.label.text = "Star Detection:";
     this.starDetectionControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.starDetectionControl.label.setFixedWidth(starGroupLabelSize);
-    this.starDetectionControl.edit.setFixedWidth(30);
+    this.starDetectionControl.label.setFixedWidth(labelSize);
+//    this.starDetectionControl.edit.setFixedWidth(30);
     this.starDetectionControl.toolTip = "Smaller values detect more stars.";
     this.starDetectionControl.onValueUpdated = function (value){
         data.logStarDetection = value;
     };
     
-    this.displayStarsControl = new CheckBox(this);
-    this.displayStarsControl.text = "Display Stars";
-    this.displayStarsControl.toolTip = "Creates an image mask with circles marking star size and position.";
-    this.displayStarsControl.checked = data.displayStarsFlag;
-    this.displayStarsControl.onClick = function (checked) {
-        data.displayStarsFlag = checked;
+    let starDetectionSizer = new HorizontalSizer;
+    starDetectionSizer.spacing = 4;
+    starDetectionSizer.add(this.starDetectionControl);
+    starDetectionSizer.addStretch();
+
+    let starDetectionGroupBox = createGroupBox(this, "Star Detection");
+    starDetectionGroupBox.sizer.add(starDetectionSizer);
+    //----------------------------------------------------
+    // photometry group box
+    //----------------------------------------------------
+    this.rejectHigh_Control = new NumericControl(this);
+    this.rejectHigh_Control.real = true;
+    this.rejectHigh_Control.label.text = "Linear Range:";
+    this.rejectHigh_Control.label.minWidth = labelSize;
+    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range.</p>";
+    this.rejectHigh_Control.onValueUpdated = function (value) {
+        data.rejectHigh = value;
     };
+    this.rejectHigh_Control.setRange(0.3, 1.0);
+    this.rejectHigh_Control.slider.setRange(0, 500);
+    this.rejectHigh_Control.setPrecision(2);
+    this.rejectHigh_Control.slider.minWidth = 200;
+    this.rejectHigh_Control.setValue(data.rejectHigh);
+
     this.photometryGraphControl = new CheckBox(this);
     this.photometryGraphControl.text = "Photometry Graph";
     this.photometryGraphControl.toolTip = "Graph comparing star flux and their least squares fit line";
@@ -914,28 +995,34 @@ function gradientLinearFitDialog(data) {
     this.photometryGraphControl.onClick = function (checked) {
         data.photometryGraphFlag = checked;
     };
-    
+
+    this.displayStarsControl = new CheckBox(this);
+    this.displayStarsControl.text = "Photometry Stars";
+    this.displayStarsControl.toolTip = "Creates mask which indicates stars used for photometry.";
+    this.displayStarsControl.checked = data.displayStarsFlag;
+    this.displayStarsControl.onClick = function (checked) {
+        data.displayStarsFlag = checked;
+    };
+
     let photometrySizer = new HorizontalSizer;
     photometrySizer.spacing = 4;
-    photometrySizer.add(this.starDetectionControl);
+    photometrySizer.add(this.rejectHigh_Control);
     photometrySizer.addSpacing(10);
     photometrySizer.add(this.photometryGraphControl);
     photometrySizer.addSpacing(10);
     photometrySizer.add(this.displayStarsControl);
     photometrySizer.addStretch();
-    
+
     let photometryGroupBox = createGroupBox(this, "Photometric Scale");
     photometryGroupBox.sizer.add(photometrySizer);
-    photometryGroupBox.sizer.add(this.rejectHigh_Control);
-    
+
     //-------------------------------------------------------
     // Gradient detection group box
     //-------------------------------------------------------
-    let gradientGroupLabelSize = this.font.width("Gradient Direction:");
     let directionLabel = new Label(this);
-    directionLabel.text = "Gradient Direction:";
+    directionLabel.text = "Direction:";
     directionLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    directionLabel.minWidth = gradientGroupLabelSize;
+    directionLabel.minWidth = labelSize;
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
@@ -986,35 +1073,35 @@ function gradientLinearFitDialog(data) {
     this.sampleSize_Control = new NumericControl(this);
     this.sampleSize_Control.real = true;
     this.sampleSize_Control.label.text = "Sample Size:";
-    this.sampleSize_Control.label.minWidth = gradientGroupLabelSize;
+    this.sampleSize_Control.label.minWidth = labelSize;
     this.sampleSize_Control.toolTip = "<p>Sample binning size. Set between 1 and 3 times bright star diameter. Example: if star diameter = 10 then 30 would work well.</p>";
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
     };
-    this.sampleSize_Control.setRange(1, 50);
-    this.sampleSize_Control.slider.setRange(1, 50);
+    this.sampleSize_Control.setRange(3, 50);
+    this.sampleSize_Control.slider.setRange(3, 50);
     this.sampleSize_Control.setPrecision(0);
-    this.sampleSize_Control.slider.minWidth = 500;
+    this.sampleSize_Control.slider.minWidth = 200;
     this.sampleSize_Control.setValue(data.sampleSize);
-    
-    this.avoidBrightStarsPercent_Control = new NumericControl(this);
-    this.avoidBrightStarsPercent_Control.real = true;
-    this.avoidBrightStarsPercent_Control.label.text = "Avoid Stars (%)";
-    this.avoidBrightStarsPercent_Control.label.minWidth = gradientGroupLabelSize;
-    this.avoidBrightStarsPercent_Control.toolTip = "<p>Rejects samples close to specified percentage of brightest stars.</p>";
-    this.avoidBrightStarsPercent_Control.onValueUpdated = function (value) {
-        data.avoidBrightStarsPercent = value;
+
+    this.limitSampleStarsPercent_Control = new NumericControl(this);
+    this.limitSampleStarsPercent_Control.real = true;
+    this.limitSampleStarsPercent_Control.label.text = "Limit Stars %:";
+    this.limitSampleStarsPercent_Control.label.minWidth = labelSize;
+    this.limitSampleStarsPercent_Control.toolTip = "<p>Reduce to increase number of sample points.</p>";
+    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
     };
-    this.avoidBrightStarsPercent_Control.setRange(0, 100);
-    this.avoidBrightStarsPercent_Control.slider.setRange(0, 100);
-    this.avoidBrightStarsPercent_Control.setPrecision(0);
-    this.avoidBrightStarsPercent_Control.slider.minWidth = 500;
-    this.avoidBrightStarsPercent_Control.setValue(data.avoidBrightStarsPercent);
-    
+    this.limitSampleStarsPercent_Control.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.slider.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.setPrecision(0);
+    this.limitSampleStarsPercent_Control.slider.minWidth = 200;
+    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
+
     this.lineSegments_Control = new NumericControl(this);
     this.lineSegments_Control.real = true;
     this.lineSegments_Control.label.text = "Line Segments:";
-    this.lineSegments_Control.label.minWidth = gradientGroupLabelSize;
+    this.lineSegments_Control.label.minWidth = labelSize;
     this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data.</p>";
     this.lineSegments_Control.onValueUpdated = function (value) {
         data.nLineSegments = value;
@@ -1022,15 +1109,15 @@ function gradientLinearFitDialog(data) {
     this.lineSegments_Control.setRange(1, 49);
     this.lineSegments_Control.slider.setRange(1, 25);
     this.lineSegments_Control.setPrecision(0);
-    this.lineSegments_Control.slider.minWidth = 500;
+    this.lineSegments_Control.slider.minWidth = 200;
     this.lineSegments_Control.setValue(data.nLineSegments);
-    
+
     let gradientGroupBox = createGroupBox(this, "Gradient Offset");
     gradientGroupBox.sizer.add(orientationSizer);
     gradientGroupBox.sizer.add(this.sampleSize_Control);
-    gradientGroupBox.sizer.add(this.avoidBrightStarsPercent_Control);
+    gradientGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
     gradientGroupBox.sizer.add(this.lineSegments_Control);
-    
+
     //-------------------------------------------------------
     // Mosaic Group Box
     //-------------------------------------------------------
@@ -1073,46 +1160,126 @@ function gradientLinearFitDialog(data) {
     mosaic_Sizer.add(this.mosaicOverlayControl);
     mosaic_Sizer.add(this.mosaicRandomControl);
     mosaic_Sizer.addStretch();
-    
+
     let mosaicGroupBox = createGroupBox(this, "Mosaic");
     mosaicGroupBox.sizer.add(mosaic_Sizer);
     
+    //-------------------------------------------------------
+    // Mask Generation Group Box
+    //-------------------------------------------------------
+    this.starMaskFlagControl = new CheckBox(this);
+    this.starMaskFlagControl.text = "Create Star Mask";
+    this.starMaskFlagControl.toolTip = "Create a star mask to help fix ragged star edges after 'Random' join";
+    this.starMaskFlagControl.checked = data.displayMaskFlag;
+    this.starMaskFlagControl.onClick = function (checked) {
+        data.displayMaskFlag = checked;
+    };
+    
+    this.testMaskFlagControl = new CheckBox(this);
+    this.testMaskFlagControl.text = "Test Mask";
+    this.testMaskFlagControl.toolTip = "Only create a star mask";
+    this.testMaskFlagControl.checked = data.testMaskOnly;
+    this.testMaskFlagControl.onClick = function (checked) {
+        data.testMaskOnly = checked;
+    };
+    
+    let mask_Sizer = new HorizontalSizer;
+    mask_Sizer.spacing = 4;
+    mask_Sizer.add(this.starMaskFlagControl);
+    mask_Sizer.addSpacing(20);
+    mask_Sizer.add(this.testMaskFlagControl);
+    mask_Sizer.addStretch();
+    
+    let starMaskLabelSize = this.font.width("Multiply Star Radius:");
+    this.LimitMaskStars_Control = new NumericControl(this);
+//    this.LimitMaskStars_Control.real = true;
+    this.LimitMaskStars_Control.label.text = "Limit Stars %:";
+    this.LimitMaskStars_Control.toolTip = "<p>Increase to include more faint stars.</p>";
+    this.LimitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
+    this.LimitMaskStars_Control.setRange(0, 100);
+    this.LimitMaskStars_Control.slider.setRange(0, 100);
+    this.LimitMaskStars_Control.setPrecision(0);
+    this.LimitMaskStars_Control.slider.minWidth = 200;
+    this.LimitMaskStars_Control.setValue(data.limitMaskStarsPercent);
+    this.LimitMaskStars_Control.onValueUpdated = function (value) {
+        data.limitMaskStarsPercent = value;
+    };
+    
+    this.StarRadiusMultiply_Control = new NumericControl(this);
+    this.StarRadiusMultiply_Control.real = true;
+    this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
+    this.StarRadiusMultiply_Control.toolTip = "<p>Multiply star's radius.</p>";
+    this.StarRadiusMultiply_Control.setRange(1, 5);
+    this.StarRadiusMultiply_Control.slider.setRange(1, 150);
+    this.StarRadiusMultiply_Control.setPrecision(1);
+    this.StarRadiusMultiply_Control.slider.minWidth = 150;
+    this.StarRadiusMultiply_Control.setValue(data.radiusMult);
+    this.StarRadiusMultiply_Control.onValueUpdated = function (value) {
+        data.radiusMult = value;
+    };
+    
+    this.StarRadiusAdd_Control = new NumericControl(this);
+    this.StarRadiusAdd_Control.real = true;
+    this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
+    this.StarRadiusAdd_Control.toolTip = "<p>Add to star's radius.</p>";
+    this.StarRadiusAdd_Control.setRange(-5, 10);
+    this.StarRadiusAdd_Control.slider.setRange(0, 150);
+    this.StarRadiusAdd_Control.setPrecision(1);
+    this.StarRadiusAdd_Control.slider.minWidth = 150;
+    this.StarRadiusAdd_Control.setValue(data.radiusAdd);
+    this.StarRadiusAdd_Control.onValueUpdated = function (value) {
+        data.radiusAdd = value;
+    };
+    
+    let radiusHorizontalSizer = new HorizontalSizer;
+    radiusHorizontalSizer.spacing = 20;
+    radiusHorizontalSizer.add(this.StarRadiusMultiply_Control);
+    radiusHorizontalSizer.add(this.StarRadiusAdd_Control);
+    //radiusHorizontalSizer.addStretch();
+
+    let starMaskGroupBox = createGroupBox(this, "Star Mask");
+    starMaskGroupBox.sizer.add(mask_Sizer);
+    starMaskGroupBox.sizer.add(this.LimitMaskStars_Control);
+    starMaskGroupBox.sizer.add(radiusHorizontalSizer);
+
     //-------------------------------------------------------
     // Area of interest
     //-------------------------------------------------------
     let labelWidth2 = this.font.width("Height:_");
 
-    this.rectangleX_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X, labelWidth2, 50);
-    this.rectangleX_Control.onValueUpdated = function (value){
-        data.areaOfInterest_X = value;
+    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
+    this.rectangleX0_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X0 = value;
     };
-    this.rectangleY_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y, labelWidth2, 50);
-    this.rectangleY_Control.onValueUpdated = function (value){
-        data.areaOfInterest_Y = value;
+    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
+    this.rectangleY0_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y0 = value;
     };
-    this.rectangleW_Control = createNumericEdit("Width:", "Rectangle width.", data.areaOfInterest_W, labelWidth2, 50);
-    this.rectangleW_Control.onValueUpdated = function (value){
-        data.areaOfInterest_W = value;
+    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
+    this.rectangleX1_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X1 = value;
     };
-    this.rectangleH_Control = createNumericEdit("Height:", "Rectangle height.", data.areaOfInterest_H, labelWidth2, 50);
-    this.rectangleH_Control.onValueUpdated = function (value){
-        data.areaOfInterest_H = value;
+    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
+    this.rectangleY1_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y1 = value;
     };
-    
+
     this.areaOfInterestCheckBox = new CheckBox(this);
-    this.areaOfInterestCheckBox.text = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.text = "Area of Interest";
     this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
     this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     this.areaOfInterestCheckBox.onClick = function (checked) {
         data.hasAreaOfInterest = checked;
     };
-    
+
     let coordHorizontalSizer = new HorizontalSizer;
-    coordHorizontalSizer.spacing = 30;
-    coordHorizontalSizer.add(this.rectangleX_Control);
-    coordHorizontalSizer.add(this.rectangleY_Control);
-    coordHorizontalSizer.add(this.rectangleW_Control);
-    coordHorizontalSizer.add(this.rectangleH_Control);
+    coordHorizontalSizer.spacing = 10;
+    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
+    coordHorizontalSizer.addSpacing(20);
+    coordHorizontalSizer.add(this.rectangleX0_Control);
+    coordHorizontalSizer.add(this.rectangleY0_Control);
+    coordHorizontalSizer.add(this.rectangleX1_Control);
+    coordHorizontalSizer.add(this.rectangleY1_Control);
     coordHorizontalSizer.addStretch();
 
     // Area of interest Target->preview
@@ -1128,7 +1295,7 @@ function gradientLinearFitDialog(data) {
         data.preview = view;
     };
     setTargetPreview(this.previewImage_ViewList, data, data.targetView);
-    
+
     let previewUpdateButton = new PushButton();
     previewUpdateButton.hasFocus = false;
     previewUpdateButton.text = "Update";
@@ -1143,15 +1310,15 @@ function gradientLinearFitDialog(data) {
             this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
             ///let imageWindow = view.window;
             let rect = view.window.previewRect(view);
-            data.areaOfInterest_X = rect.x0;
-            data.areaOfInterest_Y = rect.y0;
-            data.areaOfInterest_W = rect.width;
-            data.areaOfInterest_H = rect.height;
-            
-            this.dialog.rectangleX_Control.setValue(data.areaOfInterest_X);
-            this.dialog.rectangleY_Control.setValue(data.areaOfInterest_Y);
-            this.dialog.rectangleW_Control.setValue(data.areaOfInterest_W);
-            this.dialog.rectangleH_Control.setValue(data.areaOfInterest_H);
+            data.areaOfInterest_X0 = rect.x0;
+            data.areaOfInterest_Y0 = rect.y0;
+            data.areaOfInterest_X1 = rect.x1;
+            data.areaOfInterest_Y1 = rect.y1;
+
+            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
+            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
+            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
+            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
         }
     };
 
@@ -1162,12 +1329,11 @@ function gradientLinearFitDialog(data) {
     previewImage_Sizer.addSpacing(10);
     previewImage_Sizer.add(previewUpdateButton);
 
-    let areaOfInterest_GroupBox = createGroupBox(this, "Gradient correction area");
-    areaOfInterest_GroupBox.sizer.add(this.areaOfInterestCheckBox);
+    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
     areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
     areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
-    const helpWindowTitle = TITLE + " v" + VERSION;
+    const helpWindowTitle = TITLE() + " v" + VERSION();
     const HELP_MSG =
             "<p>Apply a gradient to the target image so that it matches the reference image. The default parameters should work well. " +
             "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
@@ -1184,21 +1350,23 @@ function gradientLinearFitDialog(data) {
     //-------------------------------------------------------
     this.sizer = new VerticalSizer;
     this.sizer.margin = 6;
-    this.sizer.spacing = 6;
+    this.sizer.spacing = 4;
     this.sizer.add(titleLabel);
-    this.sizer.addSpacing(4);
+//    this.sizer.addSpacing(4);
     this.sizer.add(referenceImage_Sizer);
     this.sizer.add(targetImage_Sizer);
+    this.sizer.add(starDetectionGroupBox);
     this.sizer.add(photometryGroupBox);
     this.sizer.add(gradientGroupBox);
     this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(mosaicGroupBox);
+    this.sizer.add(starMaskGroupBox);
     this.sizer.add(buttons_Sizer);
 
     //-------------------------------------------------------
     // Set all the window data
     //-------------------------------------------------------
-    this.windowTitle = TITLE;
+    this.windowTitle = TITLE();
     this.adjustToContents();
     this.setFixedSize();
 }
@@ -1211,7 +1379,7 @@ function main() {
 //    testLeastSquareFitAlgorithm();
 
     if (ImageWindow.openWindows.length < 2) {
-        (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;
     }
 
@@ -1228,24 +1396,24 @@ function main() {
             break;
         console.show();
         console.writeln("=================================================");
-        console.writeln("<b>Gradient Least Squares Fit ", VERSION, "</b>:");
+        console.writeln("<b>Gradient Least Squares Fit ", VERSION(), "</b>:");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
-            (new MessageBox("WARNING: Target view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("WARNING: Target view must be selected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
         if (data.referenceView.isNull) {
-            (new MessageBox("WARNING: Reference view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("WARNING: Reference view must be selected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
         if (data.targetView.image.isColor !== data.referenceView.image.isColor) {
-            (new MessageBox("ERROR: Cannot linear fit a B&W image with a colour image", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("ERROR: Cannot linear fit a B&W image with a colour image", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
         if (data.targetView.image.width !== data.referenceView.image.width ||
                 data.targetView.image.height !== data.referenceView.image.height) {
-            (new MessageBox("ERROR: Both images must have the same dimensions", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
 
@@ -1254,7 +1422,7 @@ function main() {
         console.hide();
 
         // Quit after successful execution.
-        break;
+        //break;
     }
 
     return;

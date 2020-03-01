@@ -16,69 +16,23 @@
 //"use strict";
 
 /**
- * @param {Number} x
- * @param {Number} y
- * @param {Number} width Rectangle width
- * @param {Number} height Rectangle height
- * @returns {Rectangle}
- */
-function Rectangle(x, y, width, height) {
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
-}
-
-/**
  * 
  * @param {Number} targetMedian
  * @param {Number} referenceMedian
- * @param {Number} x X-Coordinate at the center of the sample
- * @param {Number} y Y-Coordinate at the center of the sample
+ * @param {Rect} rect Bounding box of sample
  * @returns {SamplePair}
  */
-function SamplePair(targetMedian, referenceMedian, x, y) {
+function SamplePair(targetMedian, referenceMedian, rect) {
     this.targetMedian = targetMedian;
     this.referenceMedian = referenceMedian;
-    this.x = x;
-    this.y = y;
-}
-
-/**
- * @param {type} samplePair
- * @returns {Number} x
- */
-function getHorizontalGradientX(samplePair) {
-    return samplePair.x;
-}
-/**
- * @param {type} samplePair
- * @returns {Number} targetMedian - referenceMedian
- */
-function getHorizontalGradientY(samplePair) {
-    return samplePair.targetMedian - samplePair.referenceMedian;
-}
-
-/**
- * @param {type} samplePair
- * @returns {Number} y
- */
-function getVerticalGradientX(samplePair) {
-    return samplePair.y;
-}
-/**
- * @param {type} samplePair
- * @returns {Number} targetMedian - referenceMedian
- */
-function getVerticalGradientY(samplePair) {
-    return samplePair.targetMedian - samplePair.referenceMedian;
+    this.rect = rect;
 }
 
 /**
  * Contains SamplePair[]
  * @param {SamplePair[]} samplePairArray
  * @param {Number} sampleSize
- * @param {Rectangle} selectedArea Area selected by user (e.g. via preview)
+ * @param {Rect} selectedArea Area selected by user (e.g. via preview)
  * @returns {SamplePairs}
  */
 function SamplePairs(samplePairArray, sampleSize, selectedArea){
@@ -86,13 +40,13 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
     this.samplePairArray = samplePairArray;
     /** Number */
     this.sampleSize = sampleSize;
-    /** Rectangle */
+    /** Rect */
     this.selectedArea = selectedArea;
-    /** Rectangle, Private */
+    /** Rect, Private */
     this.sampleArea = null;                             // Private
 
     /**
-     * @returns {Rectangle} Bounding rectangle of all samplePair
+     * @returns {Rect} Bounding rectangle of all samplePair centers
      */
     this.getSampleArea = function(){
         if (this.sampleArea === null) {
@@ -101,12 +55,14 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
             let maxX = 0;
             let maxY = 0;
             for (let samplePair of samplePairArray) {
-                minX = Math.min(minX, samplePair.x);
-                maxX = Math.max(maxX, samplePair.x);
-                minY = Math.min(minY, samplePair.y);
-                maxY = Math.max(maxY, samplePair.y);
+                let centerX = samplePair.rect.center.x;
+                let centerY = samplePair.rect.center.y;
+                minX = Math.min(minX, centerX);
+                maxX = Math.max(maxX, centerX);
+                minY = Math.min(minY, centerY);
+                maxY = Math.max(maxY, centerY);
             }
-            this.sampleArea = new Rectangle(minX, minY, maxX - minX, maxY - minY);
+            this.sampleArea = new Rect(minX, minY, maxX, maxY);
         }
         return this.sampleArea;
     };
@@ -117,146 +73,285 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
  * Create SamplePairs for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
- * @param {Image} starRegionMask Bitmap image with overlapping region set to 1
  * @param {Number} sampleSize
- * @param {Number} logStarDetectionSensitivity
+ * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @param {Number} rejectNearBrightStars Remove the N brightest SamplePairs before returning the array
- * @param {Rectangle} selectedArea Reject samples outside this area
+ * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars
+ * @param {Rect} selectedArea Reject samples outside this area
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
-function createColorSamplePairs(targetImage, referenceImage, starRegionMask,
-        sampleSize, logStarDetectionSensitivity, rejectHigh, rejectNearBrightStars, selectedArea) {
-    
-    let starDetector = new StarDetector();
-    starDetector.mask = starRegionMask;
-    starDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
-    starDetector.upperLimit = 1;
-    //starDetector.noiseReductionFilterRadius = 1;
-    let stars = starDetector.stars(referenceImage);
+function createColorSamplePairs(targetImage, referenceImage,
+        sampleSize, stars, rejectHigh, limitSampleStarsPercent, selectedArea) {
 
-    // Sort the Star array so that the brightest stars are at the top
-    stars.sort((a, b) => b.flux - a.flux);
-            
+    let firstNstars;
+    if (limitSampleStarsPercent < 100){
+        firstNstars = Math.floor(stars.length * limitSampleStarsPercent / 100);
+    } else {
+        firstNstars = stars.length;
+    }
+                
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
-    let colorSamplePairs = new Array(nChannels);
-    for (let c=0; c<nChannels; c++){
-        colorSamplePairs[c] = new SamplePairs([], sampleSize, selectedArea, true);
-    }
-    
-    // Create the sample
-    let binRect = new Rectangle(0, 0, sampleSize, sampleSize);
-    let x1 = selectedArea.x;
-    let y1 = selectedArea.y;
-    let x2 = selectedArea.x + selectedArea.width - sampleSize;
-    let y2 = selectedArea.y + selectedArea.height - sampleSize;
-    
-    for (let y = y1; y < y2; y+= sampleSize) {
-        for (let x = x1; x < x2; x+= sampleSize) {
-            binRect.x = x;
-            binRect.y = y;
-            addSamplePair(colorSamplePairs, targetImage, referenceImage, nChannels,
-                    stars, rejectHigh, rejectNearBrightStars, binRect);
+    let bins = new SampleBinMap(selectedArea, sampleSize, nChannels);
+    let xMax = bins.getNumberOfColumns();
+    let yMax = bins.getNumberOfRows();
+    for (let xKey = 0; xKey < xMax; xKey++){
+        for (let yKey = 0; yKey < yMax; yKey++){
+            bins.addBinRect(targetImage, referenceImage, xKey, yKey, rejectHigh);
         }
+    }
+    bins.removeBinRectWithStars(stars, firstNstars);
+    // Use the radius of the brightest detected star * 2
+    let radius = Math.sqrt(stars[0].size);
+    bins.removeBinRectWithSaturatedStars(radius);
+    let colorSamplePairs = [];
+    for (let c=0; c<nChannels; c++){
+        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, c);
+        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleSize, selectedArea));
     }
     return colorSamplePairs;
 }
 
 /**
- * Create a SamplePair and add it to the supplied colorSamplePairs array
- * @param {SamplePairs[]} colorSamplePairs
- * @param {Image} targetImage
- * @param {Image} referenceImage
- * @param {Number} nChannels
- * @param {Star[]} stars
- * @param {Number} clipping
- * @param {Number} rejectNearBrightStars
- * @param {Rectangle} binRect
+ * Used to create the SamplePair array.
+ * SamplePair[] are used to model the background level and gradient
+ * Samples are discarded if they include black pixels or stars
+ * @param {Rect} selectedArea Whole image area or selected preview area
+ * @param {Number} binSize bin size (SamplePair size)
+ * @param {Number} nChannels 1 for B&W, 3 for color
+ * @returns {SampleBinMap} 
  */
-function addSamplePair(colorSamplePairs, targetImage, referenceImage, nChannels,
-        stars, clipping, rejectNearBrightStars, binRect){
+function SampleBinMap(selectedArea, binSize, nChannels){
+    //Sample size
+    this.binSize = binSize;
+    // Coordinate of top left bin
+    this.x0 = selectedArea.x0;
+    this.y0 = selectedArea.y0;
+    // Coordinate of the first bin that is beyond the selected area
+    this.x1 = selectedArea.x1;
+    this.y1 = selectedArea.y1;
+    // For stars too bright to have been detected by StarDetector
+    this.tooBrightMap = new Map();
+    // binRect maps for all colors
+    this.binRectMapArray = [];
+    for (let c=0; c<nChannels; c++){
+        this.binRectMapArray.push(new Map());
+    }
     
     /**
-     * @param sample Pixel value to check
-     * @param clipping Maximum allowed pixel value
-     * @return true if the sample is out of range and should therefore be excluded
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @param {Number} yKey Nth bin in y direction (starting at zero)
+     * @returns {Point} The (x,y) coordinate of the bin's center
      */
-    let isBlackOrClipped = (sample, clipping) => sample === 0 || sample > clipping;
+    this.getBinCenter = function(xKey, yKey){
+        return new Point(this.getX(xKey) + this.binSize/2, this.getY(yKey) + this.binSize/2);
+    };
+    /**
+     * @returns {Number}
+     */
+    this.getNumberOfColumns = function(){
+        return Math.floor((this.x1 - this.x0) / this.binSize);
+    };
+    /**
+     * 
+     * @returns {Number}
+     */
+    this.getNumberOfRows = function(){
+        return Math.floor((this.y1 - this.y0) / this.binSize);
+    };
+    /**
+     * @param {Number} x Any X-Coordinate within a bin, including left edge
+     * @returns {Number} Nth sample in x direction (starting at zero)
+     */
+    this.getXKey = function(x){
+        return Math.floor((x - this.x0) / this.binSize);
+    };
+    /**
+     * @param {Number} y Any Y-Coordinate within a bin, including top edge
+     * @returns {Number} Nth sample in y direction (starting at zero)
+     */
+    this.getYKey = function(y){
+        return Math.floor((y - this.y0) / this.binSize);
+    };
+    /**
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @returns {Number} X-Coordinate of bin's left edge
+     */
+    this.getX = function (xKey){
+        return this.x0 + xKey * this.binSize;
+    };
+    /**
+     * @param {Number} yKey Nth sample in y direction (starting at zero)
+     * @returns {Number} Y-Coordinate of bin's top edge
+     */
+    this.getY = function (yKey){
+        return this.y0 + yKey * this.binSize;
+    };
+    /**
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @param {Number} yKey Nth bin in y direction (starting at zero)
+     * @returns {String} Key has format "xKey,yKey" e.g. "3,28"
+     */
+    this.createKey = function(xKey, yKey){
+        return "" + xKey + "," + yKey;
+    };
+//    this.getKey = function(x, y){
+//        let xKey = Math.floor((x - this.x0) / this.binSize);
+//        let yKey = Math.floor((y - this.y0) / this.binSize);
+//        return this.createKey(xKey, yKey);
+//    };
     
-    let samplePairX = binRect.x + (binRect.width-1) / 2;
-    let samplePairY = binRect.y + (binRect.height-1) / 2;
-    let squareRoot2 = Math.pow(2, 0.5);
+    /**
+     * If the specified bin does not contain pixels that are zero or > rejectHigh
+     * add an entry to our binRect map. If the sample contains a 
+     * pixel > rejectHigh save it to a 'too bright' map, with the coordinate of 
+     * the brightest pixel. This will probably be a star that was too bright to
+     * be picked up by StarDetector.
+     * @param {Image} tgtImage
+     * @param {Image} refImage
+     * @param {Number} xKey Nth sample in x direction (starting at zero)
+     * @param {Number} yKey Nth sample in y direction (starting at zero)
+     * @param {Number} rejectHigh Reject samples with pixels greater than this
+     */
+    this.addBinRect = function(tgtImage, refImage, xKey, yKey, rejectHigh){
+        let nChannels = this.binRectMapArray.length;
+        let binRect = new Rect(this.binSize, this.binSize);
+        binRect.moveTo(this.getX(xKey), this.getY(yKey));
+        for (let c=0; c < nChannels; c++){
+            // Dont add sample if it contains 1 or more pixels that are black
+            if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
+                // exclude this sample from this channel.
+                continue;
+            }
+            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
+                // Star will not be in star array, so deal with it seperately
+                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
+                return;
+            }
+            this.binRectMapArray[c].set(this.createKey(xKey, yKey), binRect);
+        }
+    };
     
-    for (let c=0; c<nChannels; c++){
-        let refValues = [];
-        let tgtValues = [];
-        
-        // Process all pixels within this sample
-        for (let y = 0; y < binRect.height; y++) {
-            for (let x = 0; x < binRect.width; x++) {
-                let tgtSample = targetImage.sample(binRect.x + x, binRect.y + y, c);
-                if (isBlackOrClipped(tgtSample, clipping)) {
-                    return;
+    /**
+     * Remove all bin entries that are fully or partially covered by a star
+     * @param {Star[]} stars Must be sorted by flux before calling this function
+     * @param {Number} firstNstars Only use this number of the brightest stars
+     */
+    this.removeBinRectWithStars = function(stars, firstNstars){
+        for (let i=0; i<firstNstars; i++){
+            let star = stars[i];
+            // This will allow the star to clip the box corner, but that will
+            // not significantly affect the bin's median value
+            let starRadius = Math.sqrt(star.size)/2;
+            this.removeBinsInCircle(star.pos, starRadius);
+        }
+    };
+    
+    /**
+     * Remove all bin entries that are fully or partially covered by a saturated star
+     * addBinRect() records these to the 'tooBrightMap', along with the
+     * position of the brightest pixel. We treat this brightest pixel as the 
+     * center of a bright star.
+     * @param {Number} starRadius
+     */
+    this.removeBinRectWithSaturatedStars = function(starRadius){
+        for (let point of this.tooBrightMap.values()){
+            this.removeBinsInCircle(point, starRadius);
+        }
+    };
+    
+    /**
+     * Reject bin entries from the map if:
+     * DISTANCE > (starRadius + binSize/2)
+     * where DISTANCE = (center of star) to (center of bin)
+     * @param {Point} p
+     * @param {Number} starRadius
+     */
+    this.removeBinsInCircle = function (p, starRadius) {
+        let starToCenter = starRadius + binSize/2;
+        let starXKey = this.getXKey(p.x);
+        let starYKey = this.getYKey(p.y);
+        let minXKey = this.getXKey(p.x - starRadius);
+        let maxXKey = this.getXKey(p.x + starRadius);
+        let minYKey = this.getYKey(p.y - starRadius);
+        let maxYKey = this.getYKey(p.y + starRadius);
+        for (let xKey = minXKey; xKey <= maxXKey; xKey++) {
+            for (let yKey = minYKey; yKey <= maxYKey; yKey++) {
+                if (xKey === starXKey || yKey === starYKey) {
+                    this.removeBinRect(xKey, yKey);
+                } else {
+                    let binCenter = this.getBinCenter(xKey, yKey);
+                    if (p.distanceTo(binCenter) < starToCenter) {
+                        this.removeBinRect(xKey, yKey);
+                    }
                 }
-
-                let refSample = referenceImage.sample(binRect.x + x, binRect.y + y, c);
-                if (isBlackOrClipped(refSample, clipping)) {
-                    return;
-                }
-
-                tgtValues.push(tgtSample);
-                refValues.push(refSample);
             }
         }
-        
-        // is sample too close to a star?
-        let nStars = Math.floor(stars.length * rejectNearBrightStars / 100);
-        if (nStars > 1) {
-            let starArea = stars[0].size;
-            let starRadius = Math.sqrt(starArea)/2;
-            let minDist = starRadius + squareRoot2 * binRect.width/2;
-            let squaredMinDist = minDist * minDist;
-            for (let i = 0; i < nStars; i++) {
-                let star = stars[i];
-                let deltaX = star.pos.x - samplePairX;
-                let deltaY = star.pos.y - samplePairY;
-                if (deltaX * deltaX + deltaY * deltaY < squaredMinDist) {
-                    return;
-                }
-            }
+    };
+    
+    /**
+     * Remove specified binRect from the map
+     * @param {Number} xKey Nth sample in x direction (starting at zero)
+     * @param {Number} yKey Nth sample in y direction (starting at zero)
+     */
+    this.removeBinRect = function(xKey, yKey){
+        let key = this.createKey(xKey, yKey);
+        for (let c=0; c < this.binRectMapArray.length; c++){
+            this.binRectMapArray[c].delete(key);
         }
-        
-        let tgtMedian = Math.median(tgtValues);
-        let refMedian = Math.median(refValues);
-        let samplePair = new SamplePair(tgtMedian, refMedian, samplePairX, samplePairY);
-        let samplePairs = colorSamplePairs[c];
-        samplePairs.samplePairArray.push(samplePair);
-    }
+    };
+    
+    /**
+     * Calculates SamplePair[] for specified channel
+     * Calculates median of each bin for both target and reference images,
+     * creates a SamplePair and adds it to the SamplePair[] array
+     * @param {Image} tgtImage
+     * @param {Image} refImage
+     * @param {Number} channel 0 for B&W, 0,1,2 for RGB
+     * @returns {Array|SampleBinMap.createSamplePairArray.samplePairArray}
+     */
+    this.createSamplePairArray = function(tgtImage, refImage, channel){
+        let samplePairArray = [];
+        for (let binRect of this.binRectMapArray[channel].values()) {
+            let tgtMedian = tgtImage.median(binRect, channel, channel);
+            let refMedian = refImage.median(binRect, channel, channel);
+            samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
+        }
+        return samplePairArray;
+    };
 }
 
 /** Display the SamplePair by drawing them into a mask image
  * @param {Image} view Determine bitmap size from this view's image.
  * @param {SamplePairs} samplePairs The samplePairs to be displayed.
+ * @param {Star[]} stars 
+ * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars 
  * @param {String} title Window title
  */
-function displaySampleSquares(view, samplePairs, title) {
-    let sampleSize = samplePairs.sampleSize;
-    let square = new Rect(sampleSize, sampleSize);
-    let offset = (sampleSize - 1) / 2;
-    
+function displaySampleSquares(view, samplePairs, 
+        stars, limitSampleStarsPercent, title) {
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
     bmp.fill(0xffffffff);
-    //let G = new VectorGraphics(bmp);
-    let G = new Graphics(bmp);
+    let G = new VectorGraphics(bmp);
+    //let G = new Graphics(bmp);  // good for debug
     G.pen = new Pen(0xff000000);
     samplePairs.samplePairArray.forEach(function (samplePair) {
-        let x = samplePair.x - offset;
-        let y = samplePair.y - offset;
-        square.moveTo(x, y);
-        G.drawRect(square);
+        G.drawRect(samplePair.rect);
     });
+
+    let firstNstars;
+    if (limitSampleStarsPercent < 100){
+        firstNstars = Math.floor(stars.length * limitSampleStarsPercent / 100);
+    } else {
+        firstNstars = stars.length;
+    }
+    G.antialiasing = true;
+    for (let i = 0; i < firstNstars; ++i){
+        let star = stars[i];
+        let radius = Math.sqrt(star.size)/2;
+        G.strokeCircle(star.pos, radius);
+    }
     G.end();
 
     let w = new ImageWindow(bmp.width, bmp.height,
@@ -270,60 +365,4 @@ function displaySampleSquares(view, samplePairs, title) {
     w.mainView.endProcess();
     w.show();
     //w.zoomToFit();
-}
-        
-/**
- * Create samplePairArray. Divide the target and reference images into Rectangles.
- * The rectanles have dimension sampleSize x sampleSize.
- * For each rectangle, calculate the average sample value for the specified channel.
- * If either the target or reference rectange contains a black sample or a samples
- * greater than rejectHigh, the SamplePair is not added to the array.
- * Using a super binned sample makes fitting the data to a line more robust because
- * it ensures that stars have the same size (less than a single pixel) in both
- * the target and reference images. SampleSize should be between 1 and 5 times
- * greater than the diameter of bright stars. 3 times works well.
- *
- * @param {Image} targetImage
- * @param {Image} referenceImage
- * @param {Number} channel This number Indicates L=0 or R=0, G=1, B=2
- * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @return {SamplePairs} Array of target and reference binned sample values
- */
-function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) {
-    // Divide the images into blocks specified by sampleSize.
-    let w = referenceImage.width;
-    let h = referenceImage.height;
-    let firstY = channel < 2 ? 0 : 1;
-    let firstX;
-    if (channel === 1 || channel === 3){
-        firstX = 0;
-    } else {
-        firstX = 1;
-    }
-
-    /**
-     * @param sample Pixel value to check
-     * @param rejectHigh Maximum allowed pixel value
-     * @return true if the sample is out of range and should therefore be excluded
-     */
-    let isBlackOrClipped = (sample, rejectHigh) => sample === 0 || sample > rejectHigh;
-
-    let samplePairArray = [];
-    for (let y = firstY; y < h; y+=2) {
-        for (let x = firstX; x < w; x+=2) {
-            let targetSample = targetImage.sample(x, y, 0);
-            if (isBlackOrClipped(targetSample, rejectHigh)) {
-                continue;
-            }
-            let referenceSample = referenceImage.sample(x, y, 0);
-            if (isBlackOrClipped(referenceSample, rejectHigh)) {
-                continue;
-            }
-            let pairedAverage = new SamplePair(targetSample, referenceSample, x, y);
-            samplePairArray.push(pairedAverage);
-        }
-    }
-
-    let selectedArea = new Rectangle(0, 0, w, h);
-    return new SamplePairs(samplePairArray, 1, selectedArea, false);
 }
