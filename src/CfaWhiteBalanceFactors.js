@@ -84,6 +84,7 @@ function cfaLinearFit(data)
             return;
         }
 
+        // TODO change this
         linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getLinearFitX, getLinearFitY);
         displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
                 channel, data.rejectHigh);
@@ -97,6 +98,62 @@ function cfaLinearFit(data)
     }
     data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+}
+
+/** TODO create and use CfaPair instead of SamplePair
+ * Create samplePairArray. Divide the target and reference images into Rectangles.
+ * The rectanles have dimension sampleSize x sampleSize.
+ * For each rectangle, calculate the average sample value for the specified channel.
+ * If either the target or reference rectange contains a black sample or a samples
+ * greater than rejectHigh, the SamplePair is not added to the array.
+ * Using a super binned sample makes fitting the data to a line more robust because
+ * it ensures that stars have the same size (less than a single pixel) in both
+ * the target and reference images. SampleSize should be between 1 and 5 times
+ * greater than the diameter of bright stars. 3 times works well.
+ *
+ * @param {Image} targetImage
+ * @param {Image} referenceImage
+ * @param {Number} channel This number Indicates L=0 or R=0, G=1, B=2
+ * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
+ * @return {SamplePairs} Array of target and reference binned sample values
+ */
+function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) {
+    // Divide the images into blocks specified by sampleSize.
+    let w = referenceImage.width;
+    let h = referenceImage.height;
+    let firstY = channel < 2 ? 0 : 1;
+    let firstX;
+    if (channel === 1 || channel === 3){
+        firstX = 0;
+    } else {
+        firstX = 1;
+    }
+
+    /**
+     * @param sample Pixel value to check
+     * @param rejectHigh Maximum allowed pixel value
+     * @return true if the sample is out of range and should therefore be excluded
+     */
+    let isBlackOrClipped = (sample, rejectHigh) => sample === 0 || sample > rejectHigh;
+
+    let samplePairArray = [];
+    for (let y = firstY; y < h; y+=2) {
+        for (let x = firstX; x < w; x+=2) {
+            let targetSample = targetImage.sample(x, y, 0);
+            if (isBlackOrClipped(targetSample, rejectHigh)) {
+                continue;
+            }
+            let referenceSample = referenceImage.sample(x, y, 0);
+            if (isBlackOrClipped(referenceSample, rejectHigh)) {
+                continue;
+            }
+            let pairedAverage = new SamplePair(targetSample, referenceSample, x, y);
+            samplePairArray.push(pairedAverage);
+        }
+    }
+
+    let selectedArea = new Rect(w, h);
+    return new SamplePairs(samplePairArray, 1, selectedArea, false);
 }
 
 /**
