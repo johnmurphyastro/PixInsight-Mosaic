@@ -69,17 +69,6 @@ function LeastSquareFitAlgorithm() {
     };
 
     /**
-     * Samples for Linear fit line
-     * @param {SamplePair[]} samplePairArray
-     * @param {Number function(SamplePair)} getX
-     * @param {Number function(SamplePair)} getY
-     * @returns {undefined}
-     */
-    this.addValues = function (samplePairArray, getX, getY) {
-        samplePairArray.forEach(samplePair => this.addValue(getX(samplePair), getY(samplePair)));
-    };
-
-    /**
      * Calculate line from data points
      * @return {LinearFitData} Fitted line (y = mx + b)
      */
@@ -98,19 +87,6 @@ function LeastSquareFitAlgorithm() {
             return new LinearFitData(1, 0);
         }
     };
-}
-
-/**
- * Calculate 'm' and 'b' for the best Fit line y = mx + b
- * @param {SamplePair[]} samplePairArray
- * @param {Number function(SamplePair)} getX
- * @param {Number function(SamplePair)} getY
- * @returns {LinearFitData} The linear fit details.
- */
-function calculateLinearFit(samplePairArray, getX, getY) {
-    let algorithm = new LeastSquareFitAlgorithm();
-    algorithm.addValues(samplePairArray, getX, getY);
-    return algorithm.getLinearFit();
 }
 
 /**
