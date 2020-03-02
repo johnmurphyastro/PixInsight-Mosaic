@@ -55,18 +55,14 @@ function gradientLinearFit(data)
 
     let detectStarTime = new Date().getTime();
     console.writeln("\n<b>Detecting stars</b>");
-    let starRegionMask = createStarRegionMask(referenceView.image, targetView.image, samplePreviewArea);
-    let colorStarPairs = getColorStarPairs(referenceView, targetView, starRegionMask,
-            data.logStarDetection, data.rejectHigh);
-    let combienStarPairArrays = new CombienStarPairArrays();
-    for (let c=0; c<nChannels; c++){
-        combienStarPairArrays.addStarPairArray(colorStarPairs[c].starPairArray);
-    }
-    let allStars = combienStarPairArrays.getSortedStars();
+    let detectedStars = new StarsDetected();
+    detectedStars.detectStars(referenceView, targetView, samplePreviewArea, data.logStarDetection);
+    let colorStarPairs = getColorStarPairs(detectedStars, referenceView.image, targetView.image, data.rejectHigh);
     console.writeln("Detecting stars time: ", getElapsedTime(detectStarTime));
     
     if (data.testMaskOnly){
-        displayMask(targetView, allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd);
+        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, true);
+        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, false);
         console.writeln("\n" + TITLE() + ":Mask Creation Total time ", getElapsedTime(startTime));
         return;
     }
@@ -86,7 +82,7 @@ function gradientLinearFit(data)
 
     let createSamplesTime = new Date().getTime();
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
-        data.sampleSize, allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
+        data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
     console.writeln("creating samples... (", getElapsedTime(createSamplesTime), ")");
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
@@ -149,7 +145,7 @@ function gradientLinearFit(data)
     if (data.displaySamplesFlag){
         let time = new Date().getTime();
         let title = "Samples_" + targetView.fullId;
-        displaySampleSquares(referenceView, colorSamplePairs[0], allStars, data.limitSampleStarsPercent, title);
+        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars.allStars, data.limitSampleStarsPercent, title);
         console.writeln("Displaying samples... (", getElapsedTime(time), ")");
     }
 
@@ -173,27 +169,34 @@ function gradientLinearFit(data)
     
     if (data.displayMaskFlag){
         let time = new Date().getTime();
-        displayMask(targetView, allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd);
+        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, true);
+        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, false);
         console.writeln("Creating mask for ", targetView.fullId, " (", getElapsedTime(time), ")");
     }
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
 }
 
 /**
- * @param {type} refView
- * @param {type} tgtView
- * @param {type} starRegionMask Limit star detection to region were pixels = 1)
- * @param {type} logStarDetectionSensitivity
- * @param {type} upperLimit Exclude stars with core brighter than this
+ * @param {StarDetector} detectedStars
+ * @param {Number} upperLimit Only use stars within camera's linear range
+ *  upperLimit Exclude stars with core brighter than this
  * @returns {StarPairs[]} Array of StarPairs for all color channels
  */
-function getColorStarPairs(refView, tgtView, starRegionMask,
-        logStarDetectionSensitivity, upperLimit){
+/**
+ * 
+ * @param {StarDetector} detectedStars
+ * @param {Image} refImg
+ * @param {Image} tgtImg
+ * @param {Number} upperLimit
+ * @returns {Array|getColorStarPairs.colorStarPairs}
+ */
+function getColorStarPairs(detectedStars, refImg, tgtImg, upperLimit){
     let colorStarPairs = [];
-    let nChannels = refView.image.isColor ? 3 : 1;
-    for (let i=0; i < nChannels; i++){
-        let starPairs = getStarPairs(refView, tgtView, starRegionMask,
-                logStarDetectionSensitivity, upperLimit, i);
+    let nChannels = refImg.isColor ? 3 : 1;
+    for (let channel=0; channel < nChannels; channel++){
+        let refStars = detectedStars.refColorStars[channel];
+        let tgtStars = detectedStars.tgtColorStars[channel];
+        let starPairs = findMatchingStars(refImg, refStars, tgtImg, tgtStars, channel, upperLimit);
         colorStarPairs.push(starPairs);
     }
     return colorStarPairs;
@@ -819,20 +822,20 @@ function GradientLeastSquareFitData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.logStarDetection = -1;
+        this.logStarDetection = -0.5;
         this.displayStarsFlag = false;
         this.photometryGraphFlag = true;
         this.orientation = AUTO();
         this.rejectHigh = 0.8;
-        this.sampleSize = 10;
+        this.sampleSize = 20;
         this.limitSampleStarsPercent = 100;
         this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
-        this.displaySamplesFlag = false;
+        this.displaySamplesFlag = true;
         this.displayMosiacFlag = true;
-        this.mosaicOverlayFlag = true;
-        this.mosaicRandomFlag = false;
+        this.mosaicOverlayFlag = false;
+        this.mosaicRandomFlag = true;
         this.displayMaskFlag = true;
         this.testMaskOnly = false;
         this.limitMaskStarsPercent = 20;
@@ -951,18 +954,19 @@ function gradientLinearFitDialog(data) {
     //----------------------------------------------------
     // Star detection group box
     //----------------------------------------------------
-    this.starDetectionControl = new NumericEdit();
-    this.starDetectionControl.setReal(false);
-    this.starDetectionControl.setRange(-10, 10);
-    this.starDetectionControl.setValue(data.logStarDetection);
+    this.starDetectionControl = new NumericControl(this);
+    this.starDetectionControl.real = true;
     this.starDetectionControl.label.text = "Star Detection:";
-    this.starDetectionControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    this.starDetectionControl.label.setFixedWidth(labelSize);
-//    this.starDetectionControl.edit.setFixedWidth(30);
-    this.starDetectionControl.toolTip = "Smaller values detect more stars.";
-    this.starDetectionControl.onValueUpdated = function (value){
+    this.starDetectionControl.label.minWidth = labelSize;
+    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>";
+    this.starDetectionControl.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
+    this.starDetectionControl.setRange(-3, 3);
+    this.starDetectionControl.slider.setRange(0, 600);
+    this.starDetectionControl.setPrecision(2);
+    this.starDetectionControl.slider.minWidth = 200;
+    this.starDetectionControl.setValue(data.logStarDetection);
     
     let starDetectionSizer = new HorizontalSizer;
     starDetectionSizer.spacing = 4;
@@ -985,7 +989,7 @@ function gradientLinearFitDialog(data) {
     this.rejectHigh_Control.setRange(0.3, 1.0);
     this.rejectHigh_Control.slider.setRange(0, 500);
     this.rejectHigh_Control.setPrecision(2);
-    this.rejectHigh_Control.slider.minWidth = 200;
+    this.rejectHigh_Control.slider.minWidth = 206;
     this.rejectHigh_Control.setValue(data.rejectHigh);
 
     this.photometryGraphControl = new CheckBox(this);

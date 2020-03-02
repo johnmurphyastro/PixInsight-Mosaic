@@ -67,169 +67,243 @@ function getFlux(star) {
 };
 
 /**
- * Finds the stars that exist in both images
- * If the supplied images are color, the specified channel is extracted from the 
- * reference and target images.
- * @param {View} refView Reference view.
- * @param {View} tgtView Target view.
- * @param {Image} starRegionMask Limit star detection to region were pixels = 1)
- * @param {Number} logStarDetectionSensitivity Smaller values detect more stars. -1, to 1 good values
- * @param {Number} upperLimit Ignore stars with a peak value greater than this.
- * @param {Number} channel Detect stars in this RGB channel. B&W = 0, R=0,G=1,B=2
- * @returns {StarPairs}
+ * 
+ * @returns {StarsDetected}
  */
-function getStarPairs(refView, tgtView, starRegionMask, 
-        logStarDetectionSensitivity, upperLimit, channel){
-            
-    const useColorManagement = false;
-            
-    let isColor = refView.image.isColor;
-    let imgRefWindow = null;
-    let imgTgtWindow = null;
-    let refImage = refView.image;
-    let tgtImage = tgtView.image;
-    let starRefImage;
-    let starTgtImage;
-    if (isColor){
-        if (useColorManagement){
-            // Extract the specified color channel from both target and reference images
-            // Slightly more accurate, but slow
-            // ChannelExtraction creates a new B&W image for the extracted channel
-            let P = new ChannelExtraction;
-            P.colorSpace = ChannelExtraction.prototype.RGB;
-            P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
-            P.channels = [// enabled, id
-                [channel % 3 === 0, "REF_CHANNEL"],
-                [channel % 3 === 1, "REF_CHANNEL"],
-                [channel % 3 === 2, "REF_CHANNEL"]
-            ];
-            P.executeOn(refView);
+function StarsDetected(){
+    this.nChannels = 1;
+    this.starRegionMask = null;
+    /** color array of Star[] */
+    this.refColorStars = [];
+    /** color array of Star[] */
+    this.tgtColorStars = [];
+    /** Star[] */
+    this.allStars = null;
+    
+    /**
+     * @param {View} refView
+     * @param {View} tgtView
+     * @param {Rect} regionOfInterest 
+     * @param {Number} logSensitivity
+     */
+    this.detectStars = function (refView, tgtView, regionOfInterest, logSensitivity) {
+        this.nChannels = refView.image.isColor ? 3 : 1;
+        this.starRegionMask = this.createStarRegionMask(refView.image, tgtView.image, regionOfInterest);
+        // Detect stars in both ref and tgt images in all channels
+        for (let c = 0; c < this.nChannels; c++) {
+            this.refColorStars.push(this.findStars(refView, logSensitivity, c));
+            this.tgtColorStars.push(this.findStars(tgtView, logSensitivity, c));
+        }
 
-            P.channels = [// enabled, id
-                [channel % 3 === 0, "TGT_CHANNEL"],
-                [channel % 3 === 1, "TGT_CHANNEL"],
-                [channel % 3 === 2, "TGT_CHANNEL"]
-            ];
-            P.executeOn(tgtView);
+        let combienStars = new CombienStarArrays();
+        combienStars.addFirstArray(this.refColorStars[0]);
+        for (let c = 1; c < this.nChannels; c++) {
+            combienStars.addStars(this.refColorStars[c]);
+        }
+        for (let c = 0; c < this.nChannels; c++) {
+            combienStars.addStars(this.tgtColorStars[c]);
+        }
+        this.allStars = combienStars.getSortedStars();
+    };
+    
+    /** Private
+     * Create bitmap image with overlapping region set to 1
+     * @param {Image} refImage
+     * @param {Image} tgtImage
+     * @param {Rect} regionOfInterest
+     * @param {Rect} regionOfInterest
+     * @returns {Image} A image mask for the overlapping region
+     */
+    this.createStarRegionMask = function (refImage, tgtImage, regionOfInterest) {
+        let mask = new Image(refImage.width, refImage.height, 1);
+        mask.fill(0);
 
-            imgRefWindow = ImageWindow.windowById( "REF_CHANNEL" );
-            imgTgtWindow = ImageWindow.windowById( "TGT_CHANNEL" );
-            starRefImage = imgRefWindow.mainView.image;
-            starRefImage = imgTgtWindow.mainView.image;
-        } else {
-            // Dont color manage to increase speed
-            // The extra error when the scale is calculated is small:
-            // Example: slow method gives 1.100000299505084, this method: 1.1003654077279212
-
-            // Create grey scale 32bit floating point images
-            let width = refImage.width;
-            let height = refImage.height;
-            starRefImage = new Image(width, height, 1);
-            starTgtImage = new Image(width, height, 1);
-            for (let x = width - 1; x !== 0; x-- ){
-                for (let y = height - 1; y !== 0; y--){
-                    starTgtImage.setSample(tgtImage.sample(x, y, channel), x, y);
-                    starRefImage.setSample(refImage.sample(x, y, channel), x, y);
+        // Create a mask to restrict the star detection to the overlapping area and previewArea
+        let xMin = regionOfInterest.x0;
+        let xMax = regionOfInterest.x1;
+        let yMin = regionOfInterest.y0;
+        let yMax = regionOfInterest.y1;
+        for (let x = xMin; x < xMax; x++) {
+            for (let y = yMin; y < yMax; y++) {
+                let isOverlap = true;
+                for (let c = this.nChannels - 1; c >= 0; c--) {
+                    if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0) {
+                        isOverlap = false;
+                        break;
+                    }
+                }
+                if (isOverlap) {
+                    mask.setSample(1, x, y);
                 }
             }
         }
-    } else {
-        // Input images are B&W so we can use them directly
-        starRefImage = refImage;
-        starTgtImage = tgtImage;
-    }
+        return mask;
+    };
     
-    // Detect stars in target and reference images
-    let tgtStars = detectStars(starTgtImage, starRegionMask, logStarDetectionSensitivity, upperLimit);
-    let refStars = detectStars(starRefImage, starRegionMask, logStarDetectionSensitivity, upperLimit);
-    let starPairs = findMatchingStars(refStars, tgtStars);
-
-    if (useColorManagement){
+    /**
+     * Private
+     * @param {View} view
+     * @param {Number} logSensitivity
+     * @param {Number} channel
+     * @returns {unresolved}
+     */
+    this.findStars = function(view, logSensitivity, channel){
+        const title = "TMP_ChannelExtraction";
+        const useColorManagement = false;
+        const isColor = view.image.isColor;
+        let imgWindow = null;
+        let starImage;
         if (isColor){
-            // We must close the temporary windows we created
-            imgRefWindow.forceClose();
-            imgTgtWindow.forceClose();
+            if (useColorManagement){
+                // Extract the specified color channel from both target and reference images
+                // Slightly more accurate, but slow
+                // ChannelExtraction creates a new B&W image for the extracted channel
+                let P = new ChannelExtraction;
+                P.colorSpace = ChannelExtraction.prototype.RGB;
+                P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
+                P.channels = [// enabled, id
+                    [channel % 3 === 0, title],
+                    [channel % 3 === 1, title],
+                    [channel % 3 === 2, title]
+                ];
+                P.executeOn(view);
+                imgWindow = ImageWindow.windowById( title );
+                starImage = imgWindow.mainView.image;
+            } else {
+                // Dont color manage to increase speed
+                // The extra error when the scale is calculated is small:
+                // Example: slow method gives 1.100000299505084, this method: 1.1003654077279212
+                // Create grey scale 32bit floating point images
+                let width = view.image.width;
+                let height = view.image.height;
+                starImage = new Image(width, height, 1);
+                for (let x = width - 1; x !== 0; x-- ){
+                    for (let y = height - 1; y !== 0; y--){
+                        starImage.setSample(view.image.sample(x, y, channel), x, y);
+                    }
+                }
+            }
+        } else {
+            // Input images are B&W so we can use them directly
+            starImage = view.image;
         }
-    }
-    
-    return starPairs;
+
+        // Detect stars in target and reference images
+        let starDetector = new StarDetector();
+        starDetector.mask = this.starRegionMask;
+        starDetector.sensitivity = Math.pow(10.0, logSensitivity);
+        starDetector.upperLimit = 1;
+        starDetector.applyHotPixelFilterToDetectionImage = true;
+        let stars = starDetector.stars(starImage);
+
+        if (useColorManagement && isColor){
+            // We must close the temporary windows we created
+            imgWindow.forceClose();
+        }
+        return stars;
+    };  
 }
 
 /**
- * Finds the stars that exist in both images using a search window of 1x1 pixels.
- * @param {Star[]} refStars Stars detected in reference image.
- * @param {Star[]} tgtStars Stars detected in target image.
- * @returns {StarPairs}
+ * Combien star arrays removing duplicate stars (keep star with maximum flux)
+ * @param {Number} stars
  */
-function findMatchingStars(refStars, tgtStars){
+function CombienStarArrays(stars){
+    this.starMap = new Map();
+    
+    /**
+     * @param {Star[]} stars
+     */
+    this.addFirstArray = function (stars) {
+        for (let star of stars) {
+            this.starMap.set(this.starToKey(star), star);
+        }
+    };
+    
+    /**
+     * @param {Star[]} stars
+     */
+    this.addStars = function(stars){
+        for (let star of stars){
+            // keep star with maximum flux
+            let key = this.starToKey(star);
+            let mapStar = this.starMap.get(key);
+            if (mapStar === undefined || mapStar.flux < star.flux){
+                this.starMap.set(key, star);
+            }
+        }
+    };
+    
+    /**
+     * @returns {Star[]} All stars, sorted by brightness (brightest first)
+     */
+    this.getSortedStars = function(){
+        let stars = [];
+        for (let star of this.starMap.values()){
+            stars.push(star);
+        }
+        return stars.sort((a, b) => b.flux - a.flux);
+    };
+    
+    /** Private function
+     * @param {Star} star
+     * @returns {String}
+     */
+    this.starToKey = function(star){
+        return "" + star.pos.x + "," + star.pos.y;
+    };
+    
+    /** Private functin
+     * @param {Star} star1
+     * @param {Star} star2
+     * @returns {Star} The brightest of the two stars
+     */
+    this.brightestStar = function(star1, star2){
+        return star1.flux > star2.flux ? star1 : star2;
+    };
+}
+
+/**
+ * Finds the stars that exist in both images that have no pixel above upperLimit
+ * @param {Image} refImg
+ * @param {Star[]} refStars Stars detected in reference image.
+ * @param {Image} tgtImg 
+ * @param {Star[]} tgtStars Stars detected in target image.
+ * @param {Number} channel
+ * @param {Number} upperLimit Reject stars with one or more pixels greater than this.
+ * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
+ */
+function findMatchingStars(refImg, refStars, tgtImg, tgtStars, channel, upperLimit){
     let createKey = function(star){
         return "" + Math.round(star.pos.x) + "," + Math.round(star.pos.y);
     };
     
+    let withinLimit = function(image, star, upperLimit){
+        let r = Math.sqrt(star.size)/2;
+        let sx = star.pos.x;
+        let sy = star.pos.y;
+        let rect = new Rect(sx - r, sy - r, sx + r, sy + r);
+        return image.maximum(rect, channel, channel) < upperLimit;
+    };
+    
     let starMap = new Map();
     for (let star of refStars){
-        starMap.set(createKey(star), star);
+        if (withinLimit(refImg, star, upperLimit)){
+            starMap.set(createKey(star), star);
+        }
     }
     
     // Find stars that are in both images, using a search radius of 1 pixel
     let starPairArray = [];
     for (let tgtStar of tgtStars){
-        const key = createKey(tgtStar);
-        if (starMap.has(key)){
-            starPairArray.push(new StarPair(starMap.get(key), tgtStar));
+        if (withinLimit(tgtImg, tgtStar, upperLimit)){
+            const key = createKey(tgtStar);
+            if (starMap.has(key)){
+                starPairArray.push(new StarPair(starMap.get(key), tgtStar));
+            }
         }
     }
     return new StarPairs(starPairArray);
-}
-
-/**
- * Create bitmap image with overlapping region set to 1
- * @param {Image} refImage
- * @param {Image} tgtImage
- * @param {Rect} previewArea Mask is also limitted by this area
- * @returns {Image} A image mask for the overlapping region
- */
-function createStarRegionMask(refImage, tgtImage, previewArea){
-    let nChannels = refImage.isColor ? 3 : 1;
-    
-    let mask = new Image(refImage.width, refImage.height, 1);
-    mask.fill(0);
-  
-    // Create a mask to restrict the star detection to the overlapping area and previewArea
-    let xMin = previewArea.x0;
-    let xMax = previewArea.x1;
-    let yMin = previewArea.y0;
-    let yMax = previewArea.y1;
-    for (let x = xMin; x < xMax; x++){
-        for (let y = yMin; y < yMax; y++){
-            let isOverlap = true;
-            for (let c = nChannels-1; c >= 0; c--){
-                if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0){
-                    isOverlap = false;
-                    break;
-                }
-            }
-            if (isOverlap){
-                mask.setSample(1, x, y);
-            }
-        }
-    }
-    return mask;
-}
-
-/**
- * @param {Image} image Find stars in this image
- * @param {Image} starRegionMask Bitmask used to limit star search region
- * @param {type} logStarDetectionSensitivity
- * @param {type} upperLimit Dont include stars with a peak above this value
- * @returns {Star[]} Detected stars
- */
-function detectStars(image, starRegionMask, logStarDetectionSensitivity, upperLimit){
-    let starDetector = new StarDetector();
-    starDetector.mask = starRegionMask;
-    starDetector.sensitivity = Math.pow(10.0, logStarDetectionSensitivity);
-    starDetector.upperLimit = upperLimit;
-    return starDetector.stars(image);
 }
 
 /**
@@ -354,8 +428,17 @@ function displayDetectedStars(view, starPairArray, channel, isColor) {
     //w.zoomToFit();
 }
 
-function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAdd){
-    let title = view.fullId + "_MOSAIC_mask";
+/**
+ * @param {View} view
+ * @param {Star[]} allStars
+ * @param {Number} limitMaskStarsPercent
+ * @param {Number} radiusMult
+ * @param {Number} radiusAdd
+ * @param {Boolean} fill
+ */
+function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAdd, fill){
+    let postfix = fill ? "_MOSAIC_mask" : "_MOSAIC_stars_mask";
+    let title = view.fullId + postfix;
     let bmp = new Bitmap(view.image.width, view.image.height);
     bmp.fill(0xffffffff);
     
@@ -368,14 +451,25 @@ function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAd
     
     let G = new VectorGraphics(bmp);
     G.antialiasing = true;
-    G.brush = new Brush();
+    if (fill){
+        G.brush = new Brush();
+    } else {
+        G.pen = new Pen(0xff000000);
+    }
     for (let i = 0; i < firstNstars; ++i){
         let star = allStars[i];
-        let radius = Math.sqrt(star.size)/2;
-        G.fillCircle(star.pos, radius * radiusMult + radiusAdd);
+        let radius = (Math.sqrt(star.size)/2) * radiusMult + radiusAdd;
+        if (fill){
+            G.fillCircle(star.pos, radius);
+        } else {
+            G.strokeCircle(star.pos, radius);
+        }
     }
     G.end();
-    bmp.invert();
+    
+    if (fill){
+        bmp.invert();
+    }
 
     let w = new ImageWindow(bmp.width, bmp.height,
             1, // numberOfChannels
@@ -385,6 +479,16 @@ function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAd
             title);
     w.mainView.beginProcess(UndoFlag_NoSwapFile);
     w.mainView.image.blend(bmp);
+    if (fill){
+        let P = new MultiscaleLinearTransform;
+        P.layers = [// enabled, biasEnabled, bias, noiseReductionEnabled, noiseReductionThreshold, noiseReductionAmount, noiseReductionIterations
+            [false, true, 0.000, false, 3.000, 1.00, 1],
+            [false, true, 0.000, false, 3.000, 1.00, 1],
+            [true, true, 0.000, false, 3.000, 1.00, 1]
+        ];
+        P.transform = MultiscaleLinearTransform.prototype.StarletTransform;
+        P.executeOn(w.mainView, true);
+    }
     w.mainView.endProcess();
     w.show();
 }
@@ -403,54 +507,4 @@ function drawStarLineAndPoints(graph, lineColor, starPairs, pointColor){
     for (let starPair of starPairs.starPairArray){
         graph.drawPoint(getFlux(starPair.tgtStar), getFlux(starPair.refStar), pointColor);
     }
-}
-
-/**
- * Use star with maximum flux
- */
-function CombienStarPairArrays(){
-    this.starMap = new Map();
-    
-    /**
-     * @param {StarPair[]} starPairArray
-     */
-    this.addStarPairArray = function(starPairArray){
-        for (let starPair of starPairArray){
-            // keep star with maximum flux
-            let star = this.brightestStar(starPair.tgtStar, starPair.refStar);
-            let key = this.starToKey(star);
-            let mapStar = this.starMap.get(key);
-            if (mapStar === undefined || mapStar.flux < star.flux){
-                this.starMap.set(key, star);
-            }
-        }
-    };
-    
-    /**
-     * @returns {Star[]} All stars, sorted by brightness (brightest first)
-     */
-    this.getSortedStars = function(){
-        let stars = [];
-        for (let star of this.starMap.values()){
-            stars.push(star);
-        }
-        return stars.sort((a, b) => b.flux - a.flux);
-    };
-    
-    /** Private function
-     * @param {Star} star
-     * @returns {String}
-     */
-    this.starToKey = function(star){
-        return "" + star.pos.x + "," + star.pos.y;
-    };
-    
-    /** Private functin
-     * @param {Star} star1
-     * @param {Star} star2
-     * @returns {Star} The brightest of the two stars
-     */
-    this.brightestStar = function(star1, star2){
-        return star1.flux > star2.flux ? star1 : star2;
-    };
 }
