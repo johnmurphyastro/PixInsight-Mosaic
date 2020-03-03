@@ -135,6 +135,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         g.transparentBackground = true;
         g.textAntialiasing = true;
         g.pen = new Pen(this.axisColor);
+        g.clipRect = new Rect(0, 0, imageWidth, imageHeight);
         this.drawXAxis(g, tickLength, minDistBetweenTicks);
         this.drawYAxis(g, tickLength, minDistBetweenTicks);
         
@@ -305,18 +306,20 @@ function Graph(xMin, yMin, xMax, yMax) {
         // draw into a small bitmap
         // rotate the bit map by 90 degrees
         // copy bitmap into graph right hand margin
-        let w = g.font.width(text);
+        let w = Math.min(imageHeight, g.font.width(text));
         let h = g.font.ascent + g.font.descent;
         let textBitmap = new Bitmap(w, h);
         textBitmap.fill(0x00000000);    // AARRGGBB
         let graphics = new Graphics(textBitmap);
+        graphics.clipRect = new Rect(0, 0, w, h);
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
         graphics.pen = new Pen(this.axisColor);
         graphics.drawText(0, h - g.font.descent, text);
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
-        this.bitmap.copy(new Point(0, imageHeight/2 - w/2), rotatedBitmap);
+        let y = Math.max(0, imageHeight/2 - w/2);
+        this.bitmap.copy(new Point(0, y), rotatedBitmap);
     };
     
     // Default the size and scale of the graph
