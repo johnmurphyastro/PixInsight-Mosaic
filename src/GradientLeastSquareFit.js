@@ -54,11 +54,10 @@ function gradientLinearFit(data)
     }
 
     let detectStarTime = new Date().getTime();
-    console.writeln("\n<b>Detecting stars</b>");
     let detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, samplePreviewArea, data.logStarDetection);
     let colorStarPairs = getColorStarPairs(detectedStars, referenceView.image, targetView.image, data.rejectHigh);
-    console.writeln("Detecting stars time: ", getElapsedTime(detectStarTime));
+    console.writeln("Detected stars (", getElapsedTime(detectStarTime), ")");
     
     if (data.testMaskOnly){
         displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, true);
@@ -68,7 +67,7 @@ function gradientLinearFit(data)
     }
 
     let scaleTime = new Date().getTime();
-    console.writeln("\n<b>Applying scale factors to '" + targetView.fullId + "':</b>");
+    console.writeln("\nApplying scale factors to '" + targetView.fullId + "':");
     // Apply scale to target image. Must be done before calculating the gradient
     targetView.beginProcess();
     let scaleFactor = [];
@@ -78,12 +77,15 @@ function gradientLinearFit(data)
         scaleFactor.push(starPairs.linearFitData);
     }
     applyLinearFit(targetView, scaleFactor, false);
-    console.writeln("Apply scale time: ", getElapsedTime(scaleTime));
+    for (let c = 0; c < nChannels; c++) {
+        console.writeln("\nScaling channel[", c, "] x ", scaleFactor[c].m.toPrecision(5) );
+    }
+    console.writeln("Applied scale factor (", getElapsedTime(scaleTime), ")");
 
     let createSamplesTime = new Date().getTime();
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
         data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
-    console.writeln("creating samples... (", getElapsedTime(createSamplesTime), ")");
+    console.writeln("Created samples (", getElapsedTime(createSamplesTime), ")");
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
         new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -92,7 +94,7 @@ function gradientLinearFit(data)
 
     let sampleAreaTime = new Date().getTime();
     let sampleArea = samplePairs.getSampleArea();
-    console.writeln("Calculating sample area... (", getElapsedTime(sampleAreaTime), ")");
+    console.writeln("Calculated sample area (", getElapsedTime(sampleAreaTime), ")");
     let isHorizontal = isJoinHorizontal(data, sampleArea);
 
     let calculateGradientTime = new Date().getTime();
@@ -108,18 +110,21 @@ function gradientLinearFit(data)
         sampleSections = joinSectionLines(sampleSections);
         gradientArray[channel] = createGradient(sampleSections, samplePreviewArea, targetView.image, isHorizontal);
 
-        console.writeln("Gradients (channel " + channel + "):");
-        for (let n = 0; n < sampleSections.length; n++) {
-            let line = sampleSections[n];
-            console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
-                    + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
-        }
+        let average = Math.mean(gradientArray[channel].difArray);
+        console.writeln("Channel[", channel, "] offset is ", average.toPrecision(5));
+
+//        console.writeln("Gradients (channel " + channel + "):");
+//        for (let n = 0; n < sampleSections.length; n++) {
+//            let line = sampleSections[n];
+//            console.writeln("    [" + n + "] coord: " + line.minCoord + " to " + line.maxCoord
+//                    + ", m: " + line.linearFitData.m.toPrecision(5) + ", b: " + line.linearFitData.b.toPrecision(5));
+//        }
     }
-    console.writeln("Calculating gradients time... (", getElapsedTime(calculateGradientTime), ")");
+    console.writeln("Calculated gradients (", getElapsedTime(calculateGradientTime), ")");
 
     let applyGradientTime = new Date().getTime();
     applyGradient(targetView, isHorizontal, gradientArray);
-    console.writeln("Apply gradients time... (", getElapsedTime(applyGradientTime), ")");
+    console.writeln("Applied gradients (", getElapsedTime(applyGradientTime), ")\n");
 
     // Save parameters to PixInsight history
     data.saveParameters();
@@ -494,14 +499,21 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
         xLabel = "Mosaic tile join Y-coordinate";
         maxCoordinate = targetView.image.height;
     }
-    let yLabel = "(" + targetView.fullId + " sample median) - (" + referenceView.fullId + " sample median)";
+    let yLabel = "(" + targetView.fullId + ") - (" + referenceView.fullId + ")";
     axisWidth = Math.min(width, maxCoordinate);
     // Graph scale
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
+    const minScaleDif = 1e-4;
     let minMax = new SamplePairDifMinMax(colorSamplePairs, gradientArray);
-    let graphWithAxis = new Graph(0, minMax.minDif, maxCoordinate, minMax.maxDif);
-    graphWithAxis.setAxisLength(axisWidth + 2, 500);
+    let maxY = minMax.maxDif;
+    let minY = minMax.minDif;
+    if (maxY - minY < minScaleDif){
+        maxY += minScaleDif;
+        minY -= minScaleDif;
+    }
+    let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
+    graphWithAxis.setAxisLength(axisWidth + 2, 720);
     graphWithAxis.createGraph(xLabel, yLabel);
 
     if (colorSamplePairs.length === 1){ // B&W
@@ -828,7 +840,7 @@ function GradientLeastSquareFitData() {
         this.orientation = AUTO();
         this.rejectHigh = 0.8;
         this.sampleSize = 20;
-        this.limitSampleStarsPercent = 100;
+        this.limitSampleStarsPercent = 20;
         this.nLineSegments = 15;
         this.displayGradientFlag = false;
         this.displayGraphFlag = true;
