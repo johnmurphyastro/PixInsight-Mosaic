@@ -26,6 +26,7 @@ function SamplePair(targetMedian, referenceMedian, rect) {
     this.targetMedian = targetMedian;
     this.referenceMedian = referenceMedian;
     this.rect = rect;
+//    this.refRelativeToBg = 0;
 }
 
 /**
@@ -101,9 +102,10 @@ function createColorSamplePairs(targetImage, referenceImage,
         }
     }
     bins.removeBinRectWithStars(stars, firstNstars);
+    
     // Use the radius of the brightest detected star * 2
-    let radius = Math.sqrt(stars[0].size);
-    bins.removeBinRectWithSaturatedStars(radius);
+    //let radius = Math.sqrt(stars[0].size);
+    //bins.removeBinRectWithSaturatedStars(radius);
     let colorSamplePairs = [];
     for (let c=0; c<nChannels; c++){
         let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, c);
@@ -131,7 +133,8 @@ function SampleBinMap(selectedArea, binSize, nChannels){
     this.x1 = selectedArea.x1;
     this.y1 = selectedArea.y1;
     // For stars too bright to have been detected by StarDetector
-    this.tooBrightMap = new Map();
+//    this.tooBrightMap = new Map();
+
     // binRect maps for all colors
     this.binRectMapArray = [];
     for (let c=0; c<nChannels; c++){
@@ -195,6 +198,11 @@ function SampleBinMap(selectedArea, binSize, nChannels){
     this.createKey = function(xKey, yKey){
         return "" + xKey + "," + yKey;
     };
+//    /**
+//     * @param {type} x Sample's top left x coordinate
+//     * @param {type} y Sample's top left y coordinate
+//     * @returns {String} Key value
+//     */
 //    this.getKey = function(x, y){
 //        let xKey = Math.floor((x - this.x0) / this.binSize);
 //        let yKey = Math.floor((y - this.y0) / this.binSize);
@@ -223,11 +231,11 @@ function SampleBinMap(selectedArea, binSize, nChannels){
                 // exclude this sample from this channel.
                 continue;
             }
-            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
-                // Star will not be in star array, so deal with it seperately
-                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
-                return;
-            }
+//            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
+//                // Star will not be in star array, so deal with it seperately
+//                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
+//                return;
+//            }
             this.binRectMapArray[c].set(this.createKey(xKey, yKey), binRect);
         }
     };
@@ -247,18 +255,18 @@ function SampleBinMap(selectedArea, binSize, nChannels){
         }
     };
     
-    /**
-     * Remove all bin entries that are fully or partially covered by a saturated star
-     * addBinRect() records these to the 'tooBrightMap', along with the
-     * position of the brightest pixel. We treat this brightest pixel as the 
-     * center of a bright star.
-     * @param {Number} starRadius
-     */
-    this.removeBinRectWithSaturatedStars = function(starRadius){
-        for (let point of this.tooBrightMap.values()){
-            this.removeBinsInCircle(point, starRadius);
-        }
-    };
+//    /**
+//     * Remove all bin entries that are fully or partially covered by a saturated star
+//     * addBinRect() records these to the 'tooBrightMap', along with the
+//     * position of the brightest pixel. We treat this brightest pixel as the 
+//     * center of a bright star.
+//     * @param {Number} starRadius
+//     */
+//    this.removeBinRectWithSaturatedStars = function(starRadius){
+//        for (let point of this.tooBrightMap.values()){
+//            this.removeBinsInCircle(point, starRadius);
+//        }
+//    };
     
     /**
      * Reject bin entries from the map if:
@@ -318,6 +326,59 @@ function SampleBinMap(selectedArea, binSize, nChannels){
             samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
         }
         return samplePairArray;
+//        let samplePairMap = new Map();
+//        for (let [key, binRect] of this.binRectMapArray[channel].entries()) {
+//            let tgtMedian = tgtImage.median(binRect, channel, channel);
+//            let refMedian = refImage.median(binRect, channel, channel);
+//            samplePairMap.set(key, new SamplePair(tgtMedian, refMedian, binRect));
+//        }
+//        
+//        let refRelativeToBgArray = [];
+//        // Calculate background value: take median of neighbouring samples
+//        for (let samplePair of samplePairMap.values()){
+//            let xKey = this.getXKey(samplePair.rect.x0);
+//            let yKey = this.getYKey(samplePair.rect.y0);
+//            
+//            let medianValues = [];
+//            for (let x = xKey - 1; x <= xKey + 1; x++){
+//                for (let y = yKey - 1; y <= yKey + 1; y++){
+//                    if (x !== xKey && y !== yKey){
+//                        let neighbour = samplePairMap.get(this.createKey(x, y));
+//                        if (neighbour !== undefined){
+//                            medianValues.push(neighbour.referenceMedian);
+//                        }
+//                    }
+//                }
+//            }
+//            if (medianValues.length > 0){
+//                let refRelativeToBg = samplePair.referenceMedian - Math.median(medianValues);
+//                samplePair.refRelativeToBg = refRelativeToBg;
+//                refRelativeToBgArray.push(refRelativeToBg);
+//            }
+//        }
+//        
+//        // Remove all samples that exceed 5 x standard deviation
+//        let standardDeviation = Math.stdDev(refRelativeToBgArray);
+//        for (let samplePair of samplePairMap.values()){
+//            if (samplePair.refRelativeToBg > 3 * standardDeviation){
+//                // Remove entry and the samples around it
+//                let xKey = this.getXKey(samplePair.rect.x0);
+//                let yKey = this.getYKey(samplePair.rect.y0);
+//                for (let x = xKey - 1; x <= xKey + 1; x++){
+//                    for (let y = yKey - 1; y <= yKey + 1; y++){
+////                        console.writeln("key = ", this.createKey(x, y));
+//                        samplePairMap.delete(this.createKey(x, y));
+//                    }
+//                }
+//            }
+//        }
+//
+////      return Array.from(samplePairMap.values()); TODO Next version!
+//        let samplePairArray = [];
+//        for (let samplePair of samplePairMap.values()){
+//            samplePairArray.push(samplePair);
+//        }
+//        return samplePairArray;
     };
 }
 
