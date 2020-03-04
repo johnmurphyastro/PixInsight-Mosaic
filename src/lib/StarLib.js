@@ -311,10 +311,10 @@ function findMatchingStars(refImg, refStars, tgtImg, tgtStars, channel, upperLim
  * @returns {StarMinMax}
  */
 function StarMinMax() {
-    this.maxRefFlux = Number.MIN_VALUE;
-    this.maxTgtFlux = Number.MIN_VALUE;
-    this.minRefFlux = Number.MAX_VALUE; 
-    this.minTgtFlux = Number.MAX_VALUE;
+    this.maxRefFlux = Number.NEGATIVE_INFINITY;
+    this.maxTgtFlux = Number.NEGATIVE_INFINITY;
+    this.minRefFlux = Number.POSITIVE_INFINITY; 
+    this.minTgtFlux = Number.POSITIVE_INFINITY;
 
     /**
      * Find max and min for the (corrected) star flux 
