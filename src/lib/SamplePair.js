@@ -26,7 +26,6 @@ function SamplePair(targetMedian, referenceMedian, rect) {
     this.targetMedian = targetMedian;
     this.referenceMedian = referenceMedian;
     this.rect = rect;
-//    this.refRelativeToBg = 0;
 }
 
 /**
@@ -51,8 +50,8 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
      */
     this.getSampleArea = function(){
         if (this.sampleArea === null) {
-            let minX = Number.MAX_VALUE;
-            let minY = Number.MAX_VALUE;
+            let minX = Number.POSITIVE_INFINITY;
+            let minY = Number.POSITIVE_INFINITY;
             let maxX = 0;
             let maxY = 0;
             for (let samplePair of samplePairArray) {
@@ -198,16 +197,6 @@ function SampleBinMap(selectedArea, binSize, nChannels){
     this.createKey = function(xKey, yKey){
         return "" + xKey + "," + yKey;
     };
-//    /**
-//     * @param {type} x Sample's top left x coordinate
-//     * @param {type} y Sample's top left y coordinate
-//     * @returns {String} Key value
-//     */
-//    this.getKey = function(x, y){
-//        let xKey = Math.floor((x - this.x0) / this.binSize);
-//        let yKey = Math.floor((y - this.y0) / this.binSize);
-//        return this.createKey(xKey, yKey);
-//    };
     
     /**
      * If the specified bin does not contain pixels that are zero or > rejectHigh
@@ -326,59 +315,6 @@ function SampleBinMap(selectedArea, binSize, nChannels){
             samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
         }
         return samplePairArray;
-//        let samplePairMap = new Map();
-//        for (let [key, binRect] of this.binRectMapArray[channel].entries()) {
-//            let tgtMedian = tgtImage.median(binRect, channel, channel);
-//            let refMedian = refImage.median(binRect, channel, channel);
-//            samplePairMap.set(key, new SamplePair(tgtMedian, refMedian, binRect));
-//        }
-//        
-//        let refRelativeToBgArray = [];
-//        // Calculate background value: take median of neighbouring samples
-//        for (let samplePair of samplePairMap.values()){
-//            let xKey = this.getXKey(samplePair.rect.x0);
-//            let yKey = this.getYKey(samplePair.rect.y0);
-//            
-//            let medianValues = [];
-//            for (let x = xKey - 1; x <= xKey + 1; x++){
-//                for (let y = yKey - 1; y <= yKey + 1; y++){
-//                    if (x !== xKey && y !== yKey){
-//                        let neighbour = samplePairMap.get(this.createKey(x, y));
-//                        if (neighbour !== undefined){
-//                            medianValues.push(neighbour.referenceMedian);
-//                        }
-//                    }
-//                }
-//            }
-//            if (medianValues.length > 0){
-//                let refRelativeToBg = samplePair.referenceMedian - Math.median(medianValues);
-//                samplePair.refRelativeToBg = refRelativeToBg;
-//                refRelativeToBgArray.push(refRelativeToBg);
-//            }
-//        }
-//        
-//        // Remove all samples that exceed 5 x standard deviation
-//        let standardDeviation = Math.stdDev(refRelativeToBgArray);
-//        for (let samplePair of samplePairMap.values()){
-//            if (samplePair.refRelativeToBg > 3 * standardDeviation){
-//                // Remove entry and the samples around it
-//                let xKey = this.getXKey(samplePair.rect.x0);
-//                let yKey = this.getYKey(samplePair.rect.y0);
-//                for (let x = xKey - 1; x <= xKey + 1; x++){
-//                    for (let y = yKey - 1; y <= yKey + 1; y++){
-////                        console.writeln("key = ", this.createKey(x, y));
-//                        samplePairMap.delete(this.createKey(x, y));
-//                    }
-//                }
-//            }
-//        }
-//
-////      return Array.from(samplePairMap.values()); TODO Next version!
-//        let samplePairArray = [];
-//        for (let samplePair of samplePairMap.values()){
-//            samplePairArray.push(samplePair);
-//        }
-//        return samplePairArray;
     };
 }
 
