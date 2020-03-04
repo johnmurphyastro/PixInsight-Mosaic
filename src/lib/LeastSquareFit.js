@@ -121,16 +121,18 @@ function LeastSquareFitAlgorithm() {
 function applyLinearFit(view, line, allowUndo) {
     let P = new PixelMath;
     P.setDescription("Apply Least Squares Fit to " + view.fullId);
-    P.expression = "iif($T == 0, 0, $T * " + line[0].m + " + " + line[0].b +")";
+    P.symbols = "m0 = " + line[0].m + ", b0 = " + line[0].b;
+    P.expression0 = "iif($T == 0, 0, $T * m0 + b0)";
     if (3 === line.length) { // RGB
-        P.expression1 = "iif($T == 0, 0, $T * " + line[1].m + " + " + line[1].b +")";
-        P.expression2 = "iif($T == 0, 0, $T * " + line[2].m + " + " + line[2].b +")";
+        P.symbols += ", m1 = " + line[1].m + ", b1 = " + line[1].b;
+        P.expression1 = "iif($T == 0, 0, $T * m1 + b1)";
+        P.symbols += ", m2 = " + line[2].m + ", b2 = " + line[2].b;
+        P.expression2 = "iif($T == 0, 0, $T * m2 + b2)";
         P.expression3 = "";
         P.useSingleExpression = false;
     } else { // L
         P.useSingleExpression = true;
     }
-    P.symbols = "";
     P.singleThreaded = false;
     P.use64BitWorkingImage = true;
     P.rescale = false;
