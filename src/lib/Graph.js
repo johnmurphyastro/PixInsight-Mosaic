@@ -183,14 +183,19 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @returns {undefined}
      */
     this.drawLine = function(m, b, color){
+        this.drawLineSegment(m, b, color, false, this.xMin, this.xMax);
+    };
+    
+    this.drawLineSegment = function(m, b, color, antiAlias, x0, x1){
         let g = new Graphics(this.bitmap);
         g.clipRect = new Rect(this.xOrigin, this.yOrigin - this.yAxisLength, this.xOrigin + this.xAxisLength, this.yOrigin);
         g.transparentBackground = true;
+        g.antialiasing = antiAlias;
         g.pen = new Pen(color);
-        let y0 = m * this.xMin + b;
-        let y1 = m * this.xMax + b;
-        g.drawLine(this.xToScreenX(this.xMin), this.yToScreenY(y0),
-            this.xToScreenX(this.xMax), this.yToScreenY(y1));
+        let y0 = eqnOfLineCalcY(x0, m, b);
+        let y1 = eqnOfLineCalcY(x1, m, b);
+        g.drawLine(this.xToScreenX(x0), this.yToScreenY(y0),
+            this.xToScreenX(x1), this.yToScreenY(y1));
         g.end();
     };
     
@@ -243,7 +248,8 @@ function Graph(xMin, yMin, xMax, yMax) {
             let y1 = this.yOrigin;
             g.drawLine(x1, y1, x1, y1 + tickLength);
             if (xTickInterval < 1){
-                let text = x.toExponential(2);
+                let n = Math.abs(x) > 1e-15 ? x : 0;
+                let text = n.toExponential(2);
                 let width = g.font.width(text);
                 g.drawText(x1 - width/2, y1 + tickLength + g.font.ascent + 2, text);
             } else {
@@ -270,7 +276,8 @@ function Graph(xMin, yMin, xMax, yMax) {
             let y1 = this.yToScreenY(y);
             g.drawLine(x1, y1, x1 - tickLength, y1);
             if (yTickInterval < 1){
-                let text = y.toExponential(2);
+                let n = Math.abs(y) > 1e-15 ? y : 0;
+                let text = n.toExponential(2);
                 let width = g.font.width(text);
                 g.drawText(x1 - (tickLength + width + 3), y1 + g.font.ascent/2 - 1, text);
             } else {
@@ -364,4 +371,45 @@ function calculateTickIncrement(range, nTargetSteps) {
  */
 function calculateFirstTick(minValue, tickIncrement){
     return tickIncrement * Math.ceil(minValue / tickIncrement);
+}
+
+/**
+ * @param {Number} m gradient
+ * @param {Number} b y axis intercept
+ * @param {Number} x0 Line valid from this x coordinate
+ * @param {Number} x1 Line valid upto this x coordinate
+ * @returns {EquationOfLine}
+ */
+function EquationOfLine(m, b, x0, x1){
+    this.m = m;
+    this.b = b;
+    this.x0 = x0;
+    this.x1 = x1;
+    this.y0 = eqnOfLineCalcY(x0, m, b);
+    this.y1 = eqnOfLineCalcY(x1, m, b);
+    
+    /**
+     * y = mx + c
+     * @param {Number} x coordinate
+     * @returns {Number} y coordinate
+     */
+    this.calcYFromX = function (x){
+        return this.m * x + this.b;
+    };
+}
+/**
+ * y = mx + c
+ * @param {Number} x coordinate
+ * @param {Number} m gradient
+ * @param {Number} b y-axis intercept
+ * @returns {Number} y coordinate
+ */
+function eqnOfLineCalcY(x, m, b) {
+    return m * x + b;
+}
+function eqnOfLineCalcGradient(x0, y0, x1, y1) {
+    return (y1 - y0) / (x1 - x0);
+}   
+function eqnOfLineCalcYIntercept(x0, y0, m) {
+    return y0 - m * x0;
 }
