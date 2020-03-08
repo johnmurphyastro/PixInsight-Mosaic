@@ -16,6 +16,8 @@
 //"use strict";
 
 /**
+ * Construct the Graph object with the X and Y data range.
+ * Calling function must ensure that (xMax - xMin) > 0 and (yMax - yMin) > 0
  * @param {Number} xMin
  * @param {Number} yMin
  * @param {Number} xMax
@@ -95,21 +97,27 @@ function Graph(xMin, yMin, xMax, yMax) {
     };
     
     /** Private function
-     * @param {Number} x
-     * @returns {Number}
+     * @param {Number} x X data value
+     * @returns {Number} Screen X-Coordinate
      */
     this.xToScreenX = function (x){
         return Math.round(this.xOrigin + (x - xMin) * this.xScale);
     };
     
     /** Private function
-     * @param {Number} y
-     * @returns {Number}
+     * @param {Number} y Y data value
+     * @returns {Number} Screen Y-Coordinate
      */
     this.yToScreenY = function(y){
         return Math.round(this.yOrigin - (y - yMin) * this.yScale);
     };
     
+    /**
+     * Create the graph with fully drawn X-axis and Y-axis.
+     * At this stage the graph contains no data.
+     * @param {String} xLabel Text to display beneath the X-axis
+     * @param {String} yLabel Text to rotate and display on the Y-axis
+     */
     this.createGraph = function (xLabel, yLabel) {
         let g = new Graphics();
         let font = g.font;
@@ -131,21 +139,20 @@ function Graph(xMin, yMin, xMax, yMax) {
         this.bitmap = new Bitmap(imageWidth, imageHeight);
         this.bitmap.fill(0xFF000000);    // AARRGGBB
         
-        let g = new Graphics(this.bitmap);
-        g.transparentBackground = true;
-        g.textAntialiasing = true;
-        g.pen = new Pen(this.axisColor);
-        g.clipRect = new Rect(0, 0, imageWidth, imageHeight);
-        this.drawXAxis(g, tickLength, minDistBetweenTicks);
-        this.drawYAxis(g, tickLength, minDistBetweenTicks);
-        
-        this.drawXAxisLabel(g, imageWidth, imageHeight, xLabel);
-        g.end(); // necessary before the yLabel bitmap can copied to this.bitmap
-        this.drawYAxisLabel(g, imageHeight, yLabel);
+        let graphics = new Graphics(this.bitmap);
+        graphics.transparentBackground = true;
+        graphics.textAntialiasing = true;
+        graphics.pen = new Pen(this.axisColor);
+        graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
+        this.drawXAxis(graphics, tickLength, minDistBetweenTicks);
+        this.drawYAxis(graphics, tickLength, minDistBetweenTicks);
+        this.drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel);
+        graphics.end();
+        this.drawYAxisLabel(font, imageHeight, yLabel);
     };
     
     /**
-     * Create a graph with no axis and margins.
+     * Create a graph with no axis or margins. It only contains the data area.
      * This is used to create seperate red, green and blue graphs that can be
      * bitwise ORed together to blend the colors
      * @returns {Graph}
@@ -176,16 +183,24 @@ function Graph(xMin, yMin, xMax, yMax) {
         this.bitmap.or(p, graphAreaOnly.bitmap);
     };
     
-    /**
+    /** Draw a line that traverses the whole data area
      * @param {Number} m gradient
      * @param {Number} b Y-Axis intercept
      * @param {type} color Line color (0xAARRGGBB)
-     * @returns {undefined}
      */
     this.drawLine = function(m, b, color){
         this.drawLineSegment(m, b, color, false, this.xMin, this.xMax);
     };
     
+    /**
+     * Draw a line segment which starts from x0 and ends at x1
+     * @param {Number} m Line gradient
+     * @param {Number} b Y-axis intercept
+     * @param {Number} color Hex color value
+     * @param {Boolean} antiAlias If true draw an antialiased line
+     * @param {Number} x0 Specifies line's left limit
+     * @param {Number} x1 Specifies line's right limit
+     */
     this.drawLineSegment = function(m, b, color, antiAlias, x0, x1){
         let g = new Graphics(this.bitmap);
         g.clipRect = new Rect(this.xOrigin, this.yOrigin - this.yAxisLength, this.xOrigin + this.xAxisLength, this.yOrigin);
@@ -199,18 +214,26 @@ function Graph(xMin, yMin, xMax, yMax) {
         g.end();
     };
     
+    /**
+     * Draw a point on the graph. If the point is outside the graph's data range,
+     * a error is reported on the Console.
+     * @param {Number} xWorld
+     * @param {Number} yWorld
+     * @param {Number} color
+     */
     this.drawPoint = function(xWorld, yWorld, color){
         let x = this.xToScreenX(xWorld);
         let y = this.yToScreenY(yWorld);
         if (x >= 0 && y >= 0 && x < this.bitmap.width && y < this.bitmap.height){
             this.bitmap.setPixel(x, y, color);
         } else {
-            Console.criticalln("Out of range: (" + x + "," + y + ") bitmap width: "
+            console.criticalln("Out of range: (" + x + "," + y + ") bitmap width: "
                     + this.bitmap.width + " heigth: " + this.bitmap.height);
         }
     };
     
     /**
+     * Create a PixInsight View window that contains the graph, but don't display it yet.
      * @param {String} title
      * @param {Boolean} isColor
      * @returns {ImageWindow|Graph.createWindow.imageWindow}
@@ -304,17 +327,17 @@ function Graph(xMin, yMin, xMax, yMax) {
     
     /**
      * Private function
-     * @param {Graphics} g
+     * @param {Font} font
      * @param {Number} imageHeight
      * @param {String} text
      * @returns {undefined}
      */
-    this.drawYAxisLabel = function (g, imageHeight, text){
+    this.drawYAxisLabel = function (font, imageHeight, text){
         // draw into a small bitmap
         // rotate the bit map by 90 degrees
         // copy bitmap into graph right hand margin
-        let w = Math.min(imageHeight, g.font.width(text));
-        let h = g.font.ascent + g.font.descent;
+        let w = Math.min(imageHeight, font.width(text));
+        let h = font.ascent + font.descent;
         let textBitmap = new Bitmap(w, h);
         textBitmap.fill(0x00000000);    // AARRGGBB
         let graphics = new Graphics(textBitmap);
@@ -322,7 +345,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
         graphics.pen = new Pen(this.axisColor);
-        graphics.drawText(0, h - g.font.descent, text);
+        graphics.drawText(0, h - font.descent, text);
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
         let y = Math.max(0, imageHeight/2 - w/2);
@@ -389,7 +412,7 @@ function EquationOfLine(m, b, x0, x1){
     this.y1 = eqnOfLineCalcY(x1, m, b);
     
     /**
-     * y = mx + c
+     * y = mx + b
      * @param {Number} x coordinate
      * @returns {Number} y coordinate
      */
@@ -398,7 +421,7 @@ function EquationOfLine(m, b, x0, x1){
     };
 }
 /**
- * y = mx + c
+ * y = mx + b
  * @param {Number} x coordinate
  * @param {Number} m gradient
  * @param {Number} b y-axis intercept
@@ -407,9 +430,26 @@ function EquationOfLine(m, b, x0, x1){
 function eqnOfLineCalcY(x, m, b) {
     return m * x + b;
 }
+/**
+ * m = (y1 - y0) / (x1 - x0)
+ * @param {Number} x0 point0 x-coordinate
+ * @param {Number} y0 point0 y-coordinate
+ * @param {Number} x1 point1 x-coordinate
+ * @param {Number} y1 point1 y-coordinate
+ * @returns {Number} Gradient
+ */
 function eqnOfLineCalcGradient(x0, y0, x1, y1) {
     return (y1 - y0) / (x1 - x0);
 }   
+/**
+ * y = mx + b
+ * Hence
+ * b = y - mx
+ * @param {Number} x0 x-coordinate
+ * @param {Number} y0 y-coordinate
+ * @param {Number} m Gradient
+ * @returns {Number} Y Intercept (b)
+ */
 function eqnOfLineCalcYIntercept(x0, y0, m) {
     return y0 - m * x0;
 }
