@@ -182,16 +182,14 @@ function applyLinearFitScale(view, linearFitColorArray, allowUndo) {
  * @param {View} referenceView In overlay mode, displayed on top
  * @param {View} targetView In overlay mode, displayed beneath
  * @param {String} mosaicImageName
+ * @param {Boolean} createMosaicView If true create image, else replace reference view
  * @param {Boolean} overlayRefFlag Set overlapping pixels to the reference image
  * @param {Boolean} overlayTgtFlag Set overlapping pixels to the target image
  * @param {Boolean} randomFlag Set overlapping pixels randomly to reference or target pixels
  * @returns {undefined}
  */
-function createMosaic(referenceView, targetView, mosaicImageName,
+function createMosaic(referenceView, targetView, mosaicImageName, createMosaicView,
         overlayRefFlag, overlayTgtFlag, randomFlag) {
-    let mosaicView = View.viewById(mosaicImageName);
-    let createMosaicView = mosaicView.isNull;
-
     let P = new PixelMath;
     P.setDescription("Create Mosaic from " + referenceView.fullId + ", " + targetView.fullId);
     let expression;
@@ -231,7 +229,7 @@ function createMosaic(referenceView, targetView, mosaicImageName,
         P.executeOn(targetView, true); // used to get sample format and color space
     } else {
         P.createNewImage = false;
-        P.executeOn(mosaicView, true);
+        P.executeOn(referenceView, true);
     }
 
 }

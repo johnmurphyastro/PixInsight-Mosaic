@@ -166,8 +166,19 @@ function PhotometricMosaic(data)
     }
 
     if (data.createMosaicFlag){
-        console.writeln("Creating ", MOSAIC_NAME());
-        createMosaic(referenceView, targetView, MOSAIC_NAME(),
+        let mosaicName = MOSAIC_NAME();
+        let createMosaicView = (referenceView.fullId !== mosaicName || 
+                View.viewById(mosaicName).isNull);
+        
+        if (createMosaicView){
+            // Create a new view
+            console.writeln("Creating ", MOSAIC_NAME());
+        } else {
+            // The reference view has been set to a previously created mosaic.
+            // We will update this view
+            console.writeln("Updating ", MOSAIC_NAME());
+        }
+        createMosaic(referenceView, targetView, MOSAIC_NAME(), createMosaicView,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
     }
     
