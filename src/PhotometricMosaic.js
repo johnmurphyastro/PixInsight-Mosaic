@@ -32,6 +32,7 @@ function HORIZONTAL(){return 0;}
 function VERTICAL(){return 1;}
 function AUTO(){return 2;}
 function MOSAIC_NAME(){return "Mosaic";}
+function WINDOW_ID_PREFIX(){return "PM__";}
 
 /**
  * Controller. Processing starts here!
@@ -74,17 +75,30 @@ function PhotometricMosaic(data)
     }
 
     // Apply scale to target image. Must be done before calculating the gradient
-    targetView.beginProcess();
     let scaleFactor = [];
     for (let c = 0; c < nChannels; c++){
         // For each color
         let starPairs = colorStarPairs[c];
+        if (starPairs.starPairArray.length === 0){
+            let warning = "Warning: channel [" + c + "] has no matching stars. Defaulting scale to 1.0";
+            let messageBox = new MessageBox(warning, "Warning - no matching stars", StdIcon_Warning, StdButton_Ok, StdButton_Abort);
+            if (StdButton_Abort === messageBox.execute()){
+                console.warningln("No matching stars. Aborting...");
+                return;
+            }
+        }
         starPairs.linearFitData = calculateScale(starPairs);
         scaleFactor.push(starPairs.linearFitData);
-        console.writeln("Scaling ", targetView.fullId, " channel[", c, "] x ", 
-                starPairs.linearFitData.m.toPrecision(5) );
+        let text = "Scaling " + targetView.fullId + " channel[" + c + "] x " + 
+                starPairs.linearFitData.m.toPrecision(5);
+        if (starPairs.starPairArray.length < 4){
+            console.warningln(text + " (Warning: calculated from only " + starPairs.starPairArray.length + " stars)");
+        } else {
+            console.writeln(text);
+        }
     }
-    applyLinearFit(targetView, scaleFactor, false);
+    targetView.beginProcess();
+    applyLinearFitScale(targetView, scaleFactor, false);
 
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
         data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
@@ -132,16 +146,9 @@ function PhotometricMosaic(data)
         console.writeln("Displaying photometric stars... (", getElapsedTime(time), ")");
     }
 
-    if (data.displayGradientFlag){
-        let time = new Date().getTime();
-        let title = "Gradient_" + targetView.fullId;
-        displayGradient(targetView, title, isHorizontal, gradientArray);
-        console.writeln("Created gradient image... (", getElapsedTime(time), ")");
-    }
-
     if (data.displaySamplesFlag){
         let time = new Date().getTime();
-        let title = "Samples_" + targetView.fullId;
+        let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
         displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars.allStars, data.limitSampleStarsPercent, title);
         console.writeln("Displaying samples... (", getElapsedTime(time), ")");
     }
@@ -158,9 +165,10 @@ function PhotometricMosaic(data)
         console.writeln("Displaying gradient graph... (", getElapsedTime(time), ")");
     }
 
-    if (data.displayMosiacFlag){
+    if (data.createMosaicFlag){
         console.writeln("Creating ", MOSAIC_NAME());
-        createMosaic(referenceView, targetView, data.mosaicOverlayFlag, MOSAIC_NAME()); 
+        createMosaic(referenceView, targetView, MOSAIC_NAME(),
+                data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
     }
     
     if (data.displayMaskFlag){
@@ -200,11 +208,7 @@ function calculateScale(starPairs) {
     for (let starPair of starPairs.starPairArray) {
         leastSquareFit.addValue(starPair.getTgtFlux(), starPair.getRefFlux());
     }
-    // We are only interested in the scale, not the intercept.
-    // Any intercept would be an artifact of the photometry
-    let linearFit = leastSquareFit.getLinearFit();
-    linearFit.b = 0;
-    return linearFit;
+    return leastSquareFit.getOriginFit();
 }
 
 /**
@@ -470,7 +474,7 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
     let axisWidth;
     let maxCoordinate;
     let imageWindow = null;
-    let windowTitle = "GradientBetween_" + targetView.fullId + "_and_" + referenceView.fullId + "_LeastSquaresFit";
+    let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
     let xLabel;
     if (isHorizontal){
         xLabel = "Mosaic tile join X-coordinate";
@@ -568,56 +572,6 @@ function SamplePairDifMinMax(colorSamplePairs, gradientData) {
 }
 
 /**
- * Display the detected gradient to the user
- * @param {View} targetView Create a new image with the same dimensions as the target image
- * @param {String} title Title for the displayed gradient window
- * @param {Boolean} isHorizontal True if displaying a horizontal gradient
- * @param {GradientArray[]} gradientArray One GradientData structure for each channel.
- * @returns {undefined}
- */
-function displayGradient(targetView, title, isHorizontal, gradientArray) {
-    // Create ImageWindow and View
-    let nChannels = gradientArray.length;
-    let targetImage = targetView.image;
-    let window = new ImageWindow(targetImage.width, targetImage.height,
-            nChannels, targetImage.bitsPerSample, targetImage.isReal, targetImage.isColor, title);
-    let view = window.mainView;
-
-    let minValue = Number.POSITIVE_INFINITY;
-    for (let channel = 0; channel < nChannels; channel++){
-        minValue = Math.min(minValue, gradientArray[channel].minValue);
-    }
-
-    view.beginProcess(UndoFlag_NoSwapFile);
-
-    for (let channel = 0; channel < nChannels; channel++) {
-        let difArray = gradientArray[channel].difArray;
-        for (let y = 0; y < targetImage.height; y++) {
-            for (let x = 0; x < targetImage.width; x++) {
-                if (targetImage.sample(x, y, channel) !== 0) {
-                    let value;
-                    if (isHorizontal) {
-                        value = difArray[x];
-                    } else {
-                        value = difArray[y];
-                    }
-                    if (minValue < 0) {
-                        value -= minValue;
-                    }
-                    view.image.setSample(value, x, y, channel);
-                }
-            }
-        }
-    }
-
-
-
-    view.endProcess();
-    window.show();
-}
-
-
-/**
  * Subtract the detected gradient from the target view
  * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
@@ -680,7 +634,8 @@ function isJoinHorizontal(data, sampleArea){
 /**
  * Default the Reference view to the open view named "Mosaic".
  * If this view does not exist, default to any view that is NOT the current view
- * (the Target view will be set to the current view)
+ * (the Target view will be set to the current view).
+ * Avoid all graph / sample windows that start with "PM__"
  * @param {ImageWindow} activeWindow
  * @return {View} default reference view
  */
@@ -689,6 +644,9 @@ function getDefaultReferenceView(activeWindow) {
     let allWindows = ImageWindow.openWindows;
     let referenceView = null;
     for (let win of allWindows) {
+        if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())){
+            continue;
+        }
         if (win.currentView.fullId.toLowerCase().contains("mosaic")) {
             referenceView = win.currentView;
             break;
@@ -696,6 +654,9 @@ function getDefaultReferenceView(activeWindow) {
     }
     if (null === referenceView) {
         for (let win of allWindows) {
+            if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())) {
+                continue;
+            }
             if (activeWindow.currentView.fullId !== win.currentView.fullId) {
                 referenceView = win.currentView;
                 break;
@@ -703,6 +664,32 @@ function getDefaultReferenceView(activeWindow) {
         }
     }
     return referenceView;
+}
+
+/**
+ * Default the target view to the current view provided it is not a graph/sample
+ * window (starting with "PM__").
+ * @param {ImageWindow} activeWindow
+ * @param {View} referenceView
+ * @returns {win.currentView}
+ */
+function getDefaultTargetView(activeWindow, referenceView){
+    let targetView = null;
+    if (!activeWindow.currentView.fullId.startsWith(WINDOW_ID_PREFIX())){
+        targetView = activeWindow.currentView;
+    } else {
+        let allWindows = ImageWindow.openWindows;
+        for (let win of allWindows) {
+            if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())) {
+                continue;
+            }
+            if (referenceView !== win.currentView.fullId) {
+                targetView = win.currentView;
+                break;
+            }
+        }
+    }
+    return targetView;
 }
 
 // -----------------------------------------------------------------------------
@@ -727,11 +714,13 @@ function PhotometricMosaicData() {
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("nLineSegments", this.nLineSegments);
-        Parameters.set("displayGradientFlag", this.displayGradientFlag);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
-        Parameters.set("displayMosiacFlag", this.displayMosiacFlag);
-        Parameters.set("mosiacOverlayFlag", this.mosaicOverlayFlag);
+        Parameters.set("createMosaicFlag", this.createMosaicFlag);
+        Parameters.set("mosaicOverlayRefFlag", this.mosaicOverlayRefFlag);
+        Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
+        Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
+        Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag);
         Parameters.set("displayMaskFlag", this.displayMaskFlag);
         Parameters.set("testMaskOnly", this.testMaskOnly);
         Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
@@ -763,18 +752,20 @@ function PhotometricMosaicData() {
             this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
         if (Parameters.has("nLineSegments"))
             this.nLineSegments = Parameters.getInteger("nLineSegments");
-        if (Parameters.has("displayGradientFlag"))
-            this.displayGradientFlag = Parameters.getBoolean("displayGradientFlag");
         if (Parameters.has("displayGraphFlag"))
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
         if (Parameters.has("displaySamplesFlag"))
             this.displaySamplesFlag = Parameters.getBoolean("displaySamplesFlag");
-        if (Parameters.has("displayMosiacFlag"))
-            this.displayMosiacFlag = Parameters.getBoolean("displayMosiacFlag");
-        if (Parameters.has("mosiacOverlayFlag")) {
-            this.mosaicOverlayFlag = Parameters.getBoolean("mosiacOverlayFlag");
-            this.mosaicRandomFlag = !(this.mosaicOverlayFlag);
-        }
+        if (Parameters.has("createMosaicFlag"))
+            this.createMosaicFlag = Parameters.getBoolean("createMosaicFlag");
+        if (Parameters.has("mosaicOverlayRefFlag"))
+            this.mosaicOverlayRefFlag = Parameters.getBoolean("mosaicOverlayRefFlag");
+        if (Parameters.has("mosaicOverlayTgtFlag"))
+            this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
+        if (Parameters.has("mosaicRandomFlag"))
+            this.mosaicRandomFlag = Parameters.getBoolean("mosaicRandomFlag");
+        if (Parameters.has("mosaicAverageFlag"))
+            this.mosaicAverageFlag = Parameters.getBoolean("mosaicAverageFlag");
         if (Parameters.has("displayMaskFlag"))
             this.displayMaskFlag = Parameters.getBoolean("displayMaskFlag");
         if (Parameters.has("testMaskOnly"))
@@ -812,23 +803,24 @@ function PhotometricMosaicData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.logStarDetection = -0.5;
+        this.logStarDetection = 0;
         this.displayStarsFlag = false;
         this.photometryGraphFlag = true;
         this.orientation = AUTO();
         this.rejectHigh = 0.8;
         this.sampleSize = 20;
-        this.limitSampleStarsPercent = 20;
-        this.nLineSegments = 35;
-        this.displayGradientFlag = false;
+        this.limitSampleStarsPercent = 25;
+        this.nLineSegments = 1;
         this.displayGraphFlag = true;
         this.displaySamplesFlag = true;
-        this.displayMosiacFlag = true;
-        this.mosaicOverlayFlag = false;
+        this.createMosaicFlag = true;
+        this.mosaicOverlayRefFlag = false;
+        this.mosaicOverlayTgtFlag = false;
         this.mosaicRandomFlag = true;
+        this.mosaicAverageFlag = false;
         this.displayMaskFlag = true;
         this.testMaskOnly = false;
-        this.limitMaskStarsPercent = 20;
+        this.limitMaskStarsPercent = 25;
         this.radiusMult = 2.5;
         this.radiusAdd = -1;
 
@@ -847,15 +839,15 @@ function PhotometricMosaicData() {
         linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
         linearFitDialog.displayStarsControl.checked = this.displayStarsFlag;
         linearFitDialog.photometryGraphControl.checked = this.photometryGraphFlag;
-        linearFitDialog.displayGradientControl.checked = this.displayGradientFlag;
         linearFitDialog.displayGraphControl.checked = this.displayGraphFlag;
         linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
-        linearFitDialog.displayMosaicControl.checked = this.displayMosiacFlag;
-        linearFitDialog.mosaicOverlayControl.checked = this.mosaicOverlayFlag;
+        linearFitDialog.displayMosaicControl.checked = this.createMosaicFlag;
+        linearFitDialog.mosaicOverlayRefControl.checked = this.mosaicOverlayRefFlag;
+        linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
         linearFitDialog.starMaskFlagControl.checked = this.displayMaskFlag;
         linearFitDialog.testMaskFlagControl.checked = this.testMaskOnly;
         linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
@@ -871,9 +863,7 @@ function PhotometricMosaicData() {
 
     let activeWindow = ImageWindow.activeWindow;
     this.referenceView = getDefaultReferenceView(activeWindow);
-    if (!activeWindow.isNull) {
-        this.targetView = activeWindow.currentView;
-    }
+    this.targetView = getDefaultTargetView(activeWindow, this.referenceView);
     // Initialise the script's data
     this.setParameters();
 }
@@ -893,7 +883,10 @@ function PhotometricMosaicDialog(data) {
 
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
-            "</b> &mdash; Calculates the scale and offset gradient between two images over their overlapping area.");
+            " &mdash; Corrects the scale and gradient between two images.</b><br />" +
+            "(1) Each join must be approximately vertical or horizontal.<br />" +
+            "(2) Join frames into either columns or rows.<br />" +
+            "(3) Join these strips to create the final mosaic.");
 
     //-------------------------------------------------------
     // Create the reference image field
@@ -903,12 +896,14 @@ function PhotometricMosaicDialog(data) {
     referenceImage_Label.text = "Reference View:";
     referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     referenceImage_Label.minWidth = labelWidth1;
+    referenceImage_Label.toolTip = "<p>This image will not have the scale or gradient applied.</p>";
 
     this.referenceImage_ViewList = new ViewList(this);
     this.referenceImage_ViewList.getMainViews();
     this.referenceImage_ViewList.minWidth = 300;
     this.referenceImage_ViewList.currentView = data.referenceView;
-    this.referenceImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
+    this.referenceImage_ViewList.toolTip = 
+            "<p>This image will not have scale or gradient applied.</p>";
     this.referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
     };
@@ -925,12 +920,17 @@ function PhotometricMosaicDialog(data) {
     targetImage_Label.text = "Target View:";
     targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     targetImage_Label.minWidth = labelWidth1;
+    targetImage_Label.toolTip = "<p>This image is first multiplied by " +
+            "the photometrically determined scale factor and then the gradient " +
+            "is calculated and subtracted.</p>";
 
     this.targetImage_ViewList = new ViewList(this);
     this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 300;
     this.targetImage_ViewList.currentView = data.targetView;
-    this.targetImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
+    this.targetImage_ViewList.toolTip = "<p>This image is first multiplied by " +
+            "the photometrically determined scale factor and then the gradient " +
+            "is calculated and subtracted.</p>";
     this.targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
     };
@@ -948,13 +948,15 @@ function PhotometricMosaicDialog(data) {
     this.starDetectionControl.real = true;
     this.starDetectionControl.label.text = "Star Detection:";
     this.starDetectionControl.label.minWidth = labelSize;
-    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>";
+    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>" +
+            "<p>To test use the 'Star Mask' section; " +
+            "select 'Test Mask' and set 'Limit Stars %' to 100%</p>";
     this.starDetectionControl.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
     this.starDetectionControl.setRange(-3, 3);
     this.starDetectionControl.slider.setRange(0, 600);
-    this.starDetectionControl.setPrecision(2);
+    this.starDetectionControl.setPrecision(1);
     this.starDetectionControl.slider.minWidth = 200;
     this.starDetectionControl.setValue(data.logStarDetection);
     
@@ -972,7 +974,9 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.real = true;
     this.rejectHigh_Control.label.text = "Linear Range:";
     this.rejectHigh_Control.label.minWidth = labelSize;
-    this.rejectHigh_Control.toolTip = "<p>Only use pixels within CCD's linear range.</p>";
+    this.rejectHigh_Control.toolTip = "<p>Only use pixels within the camera's " +
+            "linear range.</p><p>Check that the points plotted within the " +
+            "'Photometry Graph' show a linear response.</p>";
     this.rejectHigh_Control.onValueUpdated = function (value) {
         data.rejectHigh = value;
     };
@@ -984,7 +988,11 @@ function PhotometricMosaicDialog(data) {
 
     this.photometryGraphControl = new CheckBox(this);
     this.photometryGraphControl.text = "Photometry Graph";
-    this.photometryGraphControl.toolTip = "Graph comparing star flux and their least squares fit line";
+    this.photometryGraphControl.toolTip = 
+            "<p>Compares reference and target star flux and displays their " +
+            "least squares fit line.</p>" +
+            "<p>The gradient indicates the required scale factor.</p>" +
+            "<p>If the plotted points show a non linear response, reduce the 'linear Range'";
     this.photometryGraphControl.checked = data.photometryGraphFlag;
     this.photometryGraphControl.onClick = function (checked) {
         data.photometryGraphFlag = checked;
@@ -992,7 +1000,10 @@ function PhotometricMosaicDialog(data) {
 
     this.displayStarsControl = new CheckBox(this);
     this.displayStarsControl.text = "Photometry Stars";
-    this.displayStarsControl.toolTip = "Creates mask which indicates stars used for photometry.";
+    this.displayStarsControl.toolTip = "<p>Indicates the stars that were within " +
+            "the 'Linear Range' and that were found in both target and reference images.</p>" +
+            "<p>A mask is created that uses circles to indicate the stars used. " +
+            "Apply this mask to the reference image to visualise.</p>";
     this.displayStarsControl.checked = data.displayStarsFlag;
     this.displayStarsControl.onClick = function (checked) {
         data.displayStarsFlag = checked;
@@ -1020,7 +1031,14 @@ function PhotometricMosaicDialog(data) {
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
-    this.orientationCombo.toolTip = "<p>Set to the orientation of the line of intersection between the reference and target frames</p>";
+    this.orientationCombo.toolTip = "<p>The orientation of the line of intersection. " +
+            "'Auto' usually works well.</p>" +
+            "<p>This script is designed to apply the horizontal and vertical components " +
+            "of the gradient separately so it works best for joins that are " +
+            "approximately horizontal or vertial.</p>" +
+            "<p>To avoid adding a 'corner' with both a horizontal and vertical join, " +
+            "build up the mosaic as rows or columns. Then join these strips to " +
+            "create the final mosaic.</p>";
     this.orientationCombo.minWidth = this.font.width("Horizontal");
     this.orientationCombo.addItem("Horizontal");
     this.orientationCombo.addItem("Vertical");
@@ -1030,23 +1048,38 @@ function PhotometricMosaicDialog(data) {
         data.orientation = this.currentItem;
     };
 
-    this.displayGradientControl = new CheckBox(this);
-    this.displayGradientControl.text = "Create Gradient";
-    this.displayGradientControl.toolTip = "Display the background model";
-    this.displayGradientControl.checked = data.displayGradientFlag;
-    this.displayGradientControl.onClick = function (checked) {
-        data.displayGradientFlag = checked;
-    };
     this.displayGraphControl = new CheckBox(this);
     this.displayGraphControl.text = "Gradient Graph";
-    this.displayGraphControl.toolTip = "Graph displays difference between the two images along the join";
+    this.displayGraphControl.toolTip = 
+            "<p>The vertical axis represents the difference between the two images." +
+            "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
+            "or Y-Coordinate (vertical join).</p>" +
+            "<p>If a small proportion of the plotted points have excessive scatter, " +
+            "this indicates that some samples contain bright stars that occupy more " +
+            "than half the sample area. Either increase the 'Sample Size' to increase " +
+            "the sample area, or increase the 'Limit Stars %' so that samples that " +
+            "contain bright stars are rejected.</p>" +
+            "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
+            "or reduce the 'Sample Size'.</p>";
     this.displayGraphControl.checked = data.displayGraphFlag;
     this.displayGraphControl.onClick = function (checked) {
         data.displayGraphFlag = checked;
     };
     this.displaySampleControl = new CheckBox(this);
     this.displaySampleControl.text = "Display Samples";
-    this.displaySampleControl.toolTip = "Display the sample squares";
+    this.displaySampleControl.toolTip = 
+            "<p>Display the samples that will be used to calculate the background gradient.</p>" +
+            "<p>Samples are rejected if they contain one or more zero pixels in " +
+            "either image or if they contain a bright star.</p>" +
+            "<p>A mask is created and the surviving samples are drawn as squares. " +
+            "The stars used to reject samples are drawn as circles. " +
+            "Apply this mask to the reference image to visualise.</p>" +
+            "<p>If too many samples are rejected, decrease 'Limit Stars %'. " +
+            "This script uses the median value from each sample, so any star that " +
+            "takes up less than half the sample area will have little effect. " +
+            "These samples do not need to be rejected.</p>" +
+            "<p>Using samples to determine the background gradient ensures that " +
+            "the calculation is unaffected by bright stars with differing FWHM sizes.</p>";
     this.displaySampleControl.checked = data.displaySamplesFlag;
     this.displaySampleControl.onClick = function (checked) {
         data.displaySamplesFlag = checked;
@@ -1060,15 +1093,28 @@ function PhotometricMosaicDialog(data) {
     orientationSizer.add(this.displayGraphControl);
     orientationSizer.addSpacing(10);
     orientationSizer.add(this.displaySampleControl);
-    orientationSizer.addSpacing(10);
-    orientationSizer.add(this.displayGradientControl);
     orientationSizer.addStretch();
 
     this.sampleSize_Control = new NumericControl(this);
     this.sampleSize_Control.real = true;
     this.sampleSize_Control.label.text = "Sample Size:";
     this.sampleSize_Control.label.minWidth = labelSize;
-    this.sampleSize_Control.toolTip = "<p>Sample binning size. Set between 1 and 3 times bright star diameter. Example: if star diameter = 10 then 30 would work well.</p>";
+    this.sampleSize_Control.toolTip = 
+            "<p>Sets the size of the sample squares. " + 
+            "Using samples to determine the background gradient ensures that " +
+            "the calculation is unaffected by bright stars with differing FWHM sizes.</p>" +
+            "<p>Samples will be rejected if they contain one or more zero pixels in " +
+            "either image or if they contain a star bright enough to be included " +
+            "in the 'Limit Stars %' list.</p>" +
+            "<p>Larger samples are more tolerant to bright stars. " +
+            "Smaller samples might be necessary for small overlaps. " +
+            "Ideally set to about 1.5x the size of the largest " +
+            "star in the ovalapping region. Rejecting samples that contain stars " +
+            "reduces this requirement</p>" +
+            "<p>If too many samples are rejected, decrease 'Limit Stars %'. " +
+            "This script uses the median value from each sample, so any star that " +
+            "takes up less than half the sample area will have little effect. " +
+            "These samples do not need to be rejected.</p>";
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
     };
@@ -1082,7 +1128,15 @@ function PhotometricMosaicDialog(data) {
     this.limitSampleStarsPercent_Control.real = true;
     this.limitSampleStarsPercent_Control.label.text = "Limit Stars %:";
     this.limitSampleStarsPercent_Control.label.minWidth = labelSize;
-    this.limitSampleStarsPercent_Control.toolTip = "<p>Reduce to increase number of sample points.</p>";
+    this.limitSampleStarsPercent_Control.toolTip = 
+            "<p>Specifies the percentage of detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples. " +
+            "This can dramatically reduce the number of surviving samples and is " +
+            "usually unnecessary. This script uses the median pixel value within a " +
+            "sample, so any star that takes up less then half the sample's area " +
+            "will have little affect.</p>";
     this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
     };
@@ -1096,7 +1150,8 @@ function PhotometricMosaicDialog(data) {
     this.lineSegments_Control.real = true;
     this.lineSegments_Control.label.text = "Line Segments:";
     this.lineSegments_Control.label.minWidth = labelSize;
-    this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data.</p>";
+    this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data. " +
+            "Too many lines may fit noise or artifacts.</p>";
     this.lineSegments_Control.onValueUpdated = function (value) {
         data.nLineSegments = value;
     };
@@ -1122,37 +1177,89 @@ function PhotometricMosaicDialog(data) {
 
     this.displayMosaicControl = new CheckBox(this);
     this.displayMosaicControl.text = "Create Mosaic";
-    this.displayMosaicControl.toolTip = "Adds reference & target frames and displays in a 'MosaicTest' window";
-    this.displayMosaicControl.checked = data.displayMosiacFlag;
+    this.displayMosaicControl.toolTip = 
+            "<p>Combiens the reference and target frames together and " +
+            "displays the result in the '" + MOSAIC_NAME() + "' window<\p>" +
+            "<p>If the '" + MOSAIC_NAME() + "' window exists, its content is replaced. " +
+            "If it does not, it is created.</p>" +
+            "<p>After the first mosaic join, it is usually convenient to set " +
+            "the reference view to '" + MOSAIC_NAME() + "'<\p>";
+    this.displayMosaicControl.checked = data.createMosaicFlag;
     this.displayMosaicControl.onClick = function (checked) {
-        data.displayMosiacFlag = checked;
+        data.createMosaicFlag = checked;
     };
 
-    this.mosaicOverlayControl = new RadioButton(this);
-    this.mosaicOverlayControl.text = "Overlay";
-    this.mosaicOverlayControl.toolTip = "Overlays reference image on top of the target image";
-    this.mosaicOverlayControl.checked = data.mosaicOverlayFlag;
-    this.mosaicOverlayControl.onClick = function (checked) {
-        data.mosaicOverlayFlag = checked;
+    let overlay_Label = new Label(this);
+    overlay_Label.text = "Overlay:";
+    overlay_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    overlay_Label.minWidth = this.font.width("Overlay:");
+
+    this.mosaicOverlayRefControl = new RadioButton(this);
+    this.mosaicOverlayRefControl.text = "Reference";
+    this.mosaicOverlayRefControl.toolTip = 
+            "<p>The reference image pixels are drawn on top of the target image.<\p>";
+    this.mosaicOverlayRefControl.checked = data.mosaicOverlayRefFlag;
+    this.mosaicOverlayRefControl.onClick = function (checked) {
+        data.mosaicOverlayRefFlag = checked;
+        data.mosaicOverlayTgtFlag = !checked;
         data.mosaicRandomFlag = !checked;
+        data.mosaicAverageFlag = !checked;
+    };
+    
+    this.mosaicOverlayTgtControl = new RadioButton(this);
+    this.mosaicOverlayTgtControl.text = "Target";
+    this.mosaicOverlayTgtControl.toolTip = 
+            "<p>The target image pixels are drawn on top of the reference image.<\p>";
+    this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
+    this.mosaicOverlayTgtControl.onClick = function (checked) {
+        data.mosaicOverlayTgtFlag = checked;
+        data.mosaicOverlayRefFlag = !checked;
+        data.mosaicRandomFlag = !checked;
+        data.mosaicAverageFlag = !checked;
     };
 
     this.mosaicRandomControl = new RadioButton(this);
     this.mosaicRandomControl.text = "Random";
-    this.mosaicRandomControl.toolTip = "Randomly choose pixels from the reference and target image";
+    this.mosaicRandomControl.toolTip = "<p>Over the overlapping region " +
+            "pixels are randomly choosen from the reference and target images.<\p>" +
+            "<p>This mode is particularly effective at hiding the join, but if " +
+            "the star profiles in the reference and target images don't match, " +
+            "this can lead to speckled pixels around the stars.<\p>" +
+            "<p>The speckled star artifacts can be fixed by using a mask that " +
+            "only reveals the bright stars. Then use pixelMath to set the stars " +
+            "to either the reference or target image. " +
+            "The 'Star Mask' section has been provided for this purpose.<\p>";
     this.mosaicRandomControl.checked = data.mosaicRandomFlag;
     this.mosaicRandomControl.onClick = function (checked) {
         data.mosaicRandomFlag = checked;
-        data.mosaicOverlayFlag = !checked;
+        data.mosaicOverlayRefFlag = !checked;
+        data.mosaicOverlayTgtFlag = !checked;
+        data.mosaicAverageFlag = !checked;
+    };
+    this.mosaicAverageControl = new RadioButton(this);
+    this.mosaicAverageControl.text = "Average";
+    this.mosaicAverageControl.toolTip = "<p>Over the overlapping region " +
+            "pixels are set to the average of the reference and target images.<\p>" +
+            "<p>This mode has the advantage of increasing the signal to noise ratio " +
+            "over the join, but this can also make the join more visible.<\p>";
+    this.mosaicAverageControl.checked = data.mosaicAverageFlag;
+    this.mosaicAverageControl.onClick = function (checked) {
+        data.mosaicAverageFlag = checked;
+        data.mosaicRandomFlag = !checked;
+        data.mosaicOverlayRefFlag = !checked;
+        data.mosaicOverlayTgtFlag = !checked;
     };
 
     let mosaic_Sizer = new HorizontalSizer;
-    mosaic_Sizer.spacing = 4;
+    mosaic_Sizer.spacing = 10;
     mosaic_Sizer.add(mosaic_Label);
     mosaic_Sizer.add(this.displayMosaicControl);
-    mosaic_Sizer.addSpacing(20);
-    mosaic_Sizer.add(this.mosaicOverlayControl);
+    mosaic_Sizer.addSpacing(50);
+    mosaic_Sizer.add(overlay_Label);
+    mosaic_Sizer.add(this.mosaicOverlayRefControl);
+    mosaic_Sizer.add(this.mosaicOverlayTgtControl);
     mosaic_Sizer.add(this.mosaicRandomControl);
+    mosaic_Sizer.add(this.mosaicAverageControl);
     mosaic_Sizer.addStretch();
 
     let mosaicGroupBox = createGroupBox(this, "Mosaic");
@@ -1163,7 +1270,11 @@ function PhotometricMosaicDialog(data) {
     //-------------------------------------------------------
     this.starMaskFlagControl = new CheckBox(this);
     this.starMaskFlagControl.text = "Create Star Mask";
-    this.starMaskFlagControl.toolTip = "Create a star mask to help fix ragged star edges after 'Random' join";
+    this.starMaskFlagControl.toolTip = 
+            "<p>Creates a star mask that reveals bright stars.<\p>" +
+            "<p>A mosaic join using the 'Random' mode is highly effective, but " +
+            "often produces speckled star edges around bright stars. This " +
+            "mask option is provided to help fix this.<\p>";
     this.starMaskFlagControl.checked = data.displayMaskFlag;
     this.starMaskFlagControl.onClick = function (checked) {
         data.displayMaskFlag = checked;
@@ -1171,7 +1282,13 @@ function PhotometricMosaicDialog(data) {
     
     this.testMaskFlagControl = new CheckBox(this);
     this.testMaskFlagControl.text = "Test Mask";
-    this.testMaskFlagControl.toolTip = "Only create a star mask";
+    this.testMaskFlagControl.toolTip = 
+            "<p>Use this option while experimenting with the mask settings.<\p>" +
+            "<p>When selected the processing is reduced to just creating this mask " +
+            "plus a mask that just contains circles. " +
+            "These circles indicate which stars will be revealed by the mask.<\p>" +
+            "<p>Use the 'Area of Interest' to limit the test stars to a small " +
+            "but representative area.<\p>";
     this.testMaskFlagControl.checked = data.testMaskOnly;
     this.testMaskFlagControl.onClick = function (checked) {
         data.testMaskOnly = checked;
@@ -1186,9 +1303,15 @@ function PhotometricMosaicDialog(data) {
     
     let starMaskLabelSize = this.font.width("Multiply Star Radius:");
     this.LimitMaskStars_Control = new NumericControl(this);
-//    this.LimitMaskStars_Control.real = true;
+    this.LimitMaskStars_Control.real = false;
     this.LimitMaskStars_Control.label.text = "Limit Stars %:";
-    this.LimitMaskStars_Control.toolTip = "<p>Increase to include more faint stars.</p>";
+    this.LimitMaskStars_Control.toolTip =
+            "<p>Specifies the percentage of detected stars that will be used to " +
+            "create the star mask.</p>" +
+            "<p>0% will produce a solid mask with no stars.<br />" +
+            "100% will produce a mask that includes all detected stars.</p>" +
+            "<p>Small faint stars are usually free of artifacts, so normally " +
+            "only a small percentage of the detected stars need to be used.</p>";
     this.LimitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
     this.LimitMaskStars_Control.setRange(0, 100);
     this.LimitMaskStars_Control.slider.setRange(0, 100);
@@ -1202,7 +1325,9 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusMultiply_Control = new NumericControl(this);
     this.StarRadiusMultiply_Control.real = true;
     this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
-    this.StarRadiusMultiply_Control.toolTip = "<p>Multiply star's radius.</p>";
+    this.StarRadiusMultiply_Control.toolTip = 
+            "<p>Sets the mask star radius to a multiple of the star's radius.</p>" +
+            "<p>This increases the size for large stars more than for the small ones.<\p>";
     this.StarRadiusMultiply_Control.setRange(1, 5);
     this.StarRadiusMultiply_Control.slider.setRange(1, 150);
     this.StarRadiusMultiply_Control.setPrecision(1);
@@ -1215,7 +1340,9 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusAdd_Control = new NumericControl(this);
     this.StarRadiusAdd_Control.real = true;
     this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
-    this.StarRadiusAdd_Control.toolTip = "<p>Add to star's radius.</p>";
+    this.StarRadiusAdd_Control.toolTip = 
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply Star Radius'.<\p>";
     this.StarRadiusAdd_Control.setRange(-5, 10);
     this.StarRadiusAdd_Control.slider.setRange(0, 150);
     this.StarRadiusAdd_Control.setPrecision(1);
@@ -1329,13 +1456,7 @@ function PhotometricMosaicDialog(data) {
 
     const helpWindowTitle = TITLE() + " v" + VERSION();
     const HELP_MSG =
-            "<p>Apply a gradient to the target image so that it matches the reference image. The default parameters should work well. " +
-            "Adjust the 'Sample Size' if your images are over or under sampled.</p>" +
-            "<p>The 'CCD Linear Range' rejects all sample squares that contain a sample above this level. " +
-            "This ensures that only the linear part of the CCD's range is used.</p>" +
-            "<p>The images are divided into 'Sample Size' squares; a sample is the average of a square. " +
-            "The 'Sample Size' should be bigger than the diameter of bright stars. " +
-            "If set too small, differing FWHM between the two images will affect the linear fit.</p>";
+            "<p>See tooltips</p>";
 
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 
