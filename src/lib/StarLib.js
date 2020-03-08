@@ -349,7 +349,6 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
     // Create the graph axis and annotation.
     let minMax = new StarMinMax();
     colorStarPairs.forEach(function (starPairs) {
-        //minMax.calculateMinMax(starPairs.samplePairArray);
         minMax.calculateMinMax(starPairs.starPairArray);
     });
     if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
@@ -358,6 +357,13 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
     }
     let startOffsetX = (minMax.maxTgtFlux - minMax.minTgtFlux) / 100;
     let startOffsetY = (minMax.maxRefFlux - minMax.minRefFlux) / 100;
+    // If there is only one point, min & max will be equal. Prevent zero length axis.
+    if (startOffsetX === 0){
+        startOffsetX = minMax.minTgtFlux !== 0 ? minMax.minTgtFlux : 0.0001;
+    }
+    if (startOffsetY === 0){
+        startOffsetY = minMax.minRefFlux !== 0 ? minMax.minRefFlux : 0.0001;
+    }
     let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
                                   minMax.maxTgtFlux, minMax.maxRefFlux);
     graphWithAxis.setYAxisLength(height);
