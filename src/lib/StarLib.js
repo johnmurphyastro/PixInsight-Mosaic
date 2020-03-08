@@ -149,7 +149,7 @@ function StarsDetected(){
      */
     this.findStars = function(view, logSensitivity, channel){
         const title = "TMP_ChannelExtraction";
-        const useColorManagement = false;
+        const useColorManagement = true;
         const isColor = view.image.isColor;
         let imgWindow = null;
         let starImage;
@@ -342,7 +342,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
     let targetName = tgtView.fullId;
     let referenceName = refView.fullId;
     let imageWindow = null;
-    let windowTitle = "Photometry__" + targetName + "__and__" + referenceName;
+    let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
     let targetLabel = "Target (" + targetName + ")";
     let referenceLabel = "Reference (" + referenceName + ")";
     
@@ -352,7 +352,14 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
         //minMax.calculateMinMax(starPairs.samplePairArray);
         minMax.calculateMinMax(starPairs.starPairArray);
     });
-    let graphWithAxis = new Graph(minMax.minTgtFlux, minMax.minRefFlux, minMax.maxTgtFlux, minMax.maxRefFlux);
+    if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
+        console.warningln("Unable to display graph. No points to display.");
+        return;
+    }
+    let startOffsetX = (minMax.maxTgtFlux - minMax.minTgtFlux) / 100;
+    let startOffsetY = (minMax.maxRefFlux - minMax.minRefFlux) / 100;
+    let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
+                                  minMax.maxTgtFlux, minMax.maxRefFlux);
     graphWithAxis.setYAxisLength(height);
     graphWithAxis.createGraph(targetLabel, referenceLabel);
 
@@ -384,20 +391,20 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
  * @param {Boolean} isColor
  */
 function displayDetectedStars(view, starPairArray, channel, isColor) {
-    let title = view.fullId;
+    let title = WINDOW_ID_PREFIX() + view.fullId;
     switch (channel) {
         case 0:
             if (isColor){
-                title += "_red_photometry";
+                title += "__RedPhotometry";
             } else {
-                title += "_photometry";
+                title += "__PhotometryStars";
             }
             break;
         case 1:
-            title += "_green_photometry";
+            title += "__GreenPhotometry";
             break;
         case 2:
-            title += "_blue_photometry";
+            title += "__BluePhotometry";
     }
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
@@ -437,8 +444,8 @@ function displayDetectedStars(view, starPairArray, channel, isColor) {
  * @param {Boolean} fill
  */
 function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAdd, fill){
-    let postfix = fill ? "_MOSAIC_mask" : "_MOSAIC_stars_mask";
-    let title = view.fullId + postfix;
+    let postfix = fill ? "__MosaicMask" : "__MosaicStarsMask";
+    let title = WINDOW_ID_PREFIX() + view.fullId + postfix;
     let bmp = new Bitmap(view.image.width, view.image.height);
     bmp.fill(0xffffffff);
     
@@ -487,7 +494,7 @@ function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAd
             [true, true, 0.000, false, 3.000, 1.00, 1]
         ];
         P.transform = MultiscaleLinearTransform.prototype.StarletTransform;
-        P.executeOn(w.mainView, true);
+        P.executeOn(w.mainView, false);
     }
     w.mainView.endProcess();
     w.show();
