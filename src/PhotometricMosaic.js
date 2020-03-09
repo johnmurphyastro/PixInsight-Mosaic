@@ -131,13 +131,11 @@ function PhotometricMosaic(data)
         sampleSections = joinSectionLines(sampleSections);
         eqnLineArray[channel] = createGradientLines(sampleSections, samplePreviewArea, targetView.image, isHorizontal); 
         gradientArray[channel] = createGradient(eqnLineArray[channel]);
-
-        let average = Math.mean(gradientArray[channel].difArray);
-        console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
     }
 
     let applyGradientTime = new Date().getTime();
-    applyGradient(targetView, isHorizontal, gradientArray);
+    applyGradient(targetView, isHorizontal, gradientArray, detectedStars.overlapBox, 
+        data.taperFlag, data.taperLength);
     console.writeln("Applied gradients (", getElapsedTime(applyGradientTime), ")\n");
 
     // Save parameters to PixInsight history
@@ -595,25 +593,38 @@ function SamplePairDifMinMax(colorSamplePairs, gradientData) {
  * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
  * @param {Number[].GradientData} gradientArray ColourChannel.GradientData diff data
+ * @param {Rect} overlapBox Bounding box of overlap region
+ * @param {Boolean} taperFlag If true, apply taper to average offset in direction perpendicular to join
+ * @param {Number} taperLength Length of taper to apply in pixels
  * @returns {undefined}
  */
-function applyGradient(view, isHorizontal, gradientArray) {
+function applyGradient(view, isHorizontal, gradientArray, overlapBox, taperFlag, taperLength) {
     let nChannels = gradientArray.length;
     let targetImage = view.image;
-
     for (let channel = 0; channel < nChannels; channel++) {
         let difArray = gradientArray[channel].difArray;
+        let average = Math.mean(difArray);
+        console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
+        let gradientOffset = new GradientOffset(targetImage.width, targetImage.height, 
+                average, overlapBox, taperLength, isHorizontal);     
+                
         for (let y = 0; y < targetImage.height; y++) {
             for (let x = 0; x < targetImage.width; x++) {
                 let sample = targetImage.sample(x, y, channel);
                 if (sample !== 0) {
-                    let value;
-                    if (isHorizontal) {
-                        value = sample - difArray[x];
+                    let offset;
+                    if (isHorizontal){
+                        offset = difArray[x];
+                        if (taperFlag){
+                            offset = gradientOffset.getOffset(y, offset);
+                        }
                     } else {
-                        value = sample - difArray[y];
+                        offset = difArray[y];
+                        if (taperFlag){
+                            offset = gradientOffset.getOffset(x, offset);
+                        }
                     }
-                    view.image.setSample(value, x, y, channel);
+                    view.image.setSample(sample - offset, x, y, channel);
                 }
             }
         }
@@ -624,6 +635,63 @@ function applyGradient(view, isHorizontal, gradientArray) {
         console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
         view.image.truncate(0, 1);
     }
+}
+
+/**
+ * Calculates the offset in the direction perpendicular to the join.
+ * Over the overlap area this is constant.
+ * Before and after the overlap area, it tapers towards the average offset.
+ * Beyond the taper length, it returns the average offset.
+ * @param {Number} imageWidth
+ * @param {Number} imageHeight
+ * @param {Number} average Average offset (average value in difArray)
+ * @param {Rect} overlapBox Bounding box of the overlap between target and reference images
+ * @param {Number} taperLength Taper (or feather) length
+ * @param {Boolean} isHorizontal Tile join direction
+ * @returns {GradientOffset}
+ */
+function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLength, isHorizontal) {
+    this.average = average;
+    this.taperLength = taperLength;
+    if (isHorizontal){
+        this.limit1 = Math.max(0, overlapBox.y0 - taperLength);
+        this.limit2 = overlapBox.y0;
+        this.limit3 = overlapBox.y1;
+        this.limit4 = Math.min(imageHeight, overlapBox.y1 + taperLength);
+    } else {
+        this.limit1 = Math.max(0, overlapBox.x0 - taperLength);
+        this.limit2 = overlapBox.x0;
+        this.limit3 = overlapBox.x1;
+        this.limit4 = Math.min(imageWidth, overlapBox.x1 + taperLength);
+    }
+    
+    /**
+     * Get the tapered offset value between the reference and target image.
+     * Outside the overlap region, it tapers down towards the average offset.
+     * @param {Number} coord x-coord (vertical join) or y-coord (horizontal join)
+     * @param {Number} dif Value from the difArray
+     * @returns {Number} Offset to subtract from target image
+     */
+    this.getOffset = function(coord, dif){
+        if (coord < this.limit1 || coord > this.limit4){
+            // First or last region; Only apply average offset
+            return this.average;
+        }
+        if (coord < this.limit2){
+            // Progressively apply more of the correction as we approach the overlap 
+            let delta = dif - this.average;
+            let fraction = 1 - (this.limit2 - coord) / this.taperLength;
+            return this.average + delta * fraction;
+        }
+        if (coord < this.limit3){
+            // Overlap region: apply the full correction
+            return dif;
+        }
+        // Progressively apply less of the correction as we move away from the overlap
+        let delta = dif - this.average;
+        let fraction = 1 - (coord - this.limit3) / this.taperLength;
+        return this.average + delta * fraction;
+    };
 }
 
 /**
@@ -733,6 +801,8 @@ function PhotometricMosaicData() {
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("nLineSegments", this.nLineSegments);
+        Parameters.set("taperFlag", this.taperFlag);
+        Parameters.set("taperLength", this.taperLength);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
         Parameters.set("displaySamplesFlag", this.displaySamplesFlag);
         Parameters.set("createMosaicFlag", this.createMosaicFlag);
@@ -771,6 +841,10 @@ function PhotometricMosaicData() {
             this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
         if (Parameters.has("nLineSegments"))
             this.nLineSegments = Parameters.getInteger("nLineSegments");
+        if (Parameters.has("taperFlag"))
+            this.taperFlag = Parameters.getBoolean("taperFlag");
+        if (Parameters.has("taperLength"))
+            this.taperLength = Parameters.getInteger("taperLength");
         if (Parameters.has("displayGraphFlag"))
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
         if (Parameters.has("displaySamplesFlag"))
@@ -830,6 +904,8 @@ function PhotometricMosaicData() {
         this.sampleSize = 20;
         this.limitSampleStarsPercent = 25;
         this.nLineSegments = 1;
+        this.taperFlag = false;
+        this.taperLength = 1500;
         this.displayGraphFlag = true;
         this.displaySamplesFlag = true;
         this.createMosaicFlag = true;
@@ -864,6 +940,8 @@ function PhotometricMosaicData() {
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
+        linearFitDialog.taperFlag_Control.checked = this.taperFlag;
+        linearFitDialog.taperLength_Control.setValue(this.taperLength);
         linearFitDialog.displayMosaicControl.checked = this.createMosaicFlag;
         linearFitDialog.mosaicOverlayRefControl.checked = this.mosaicOverlayRefFlag;
         linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
@@ -959,7 +1037,7 @@ function PhotometricMosaicDialog(data) {
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
-    let labelSize = this.font.width("Line Segments:");
+    let labelSize = this.font.width("Line Segments:") + 9;
     //----------------------------------------------------
     // Star detection group box
     //----------------------------------------------------
@@ -1166,7 +1244,7 @@ function PhotometricMosaicDialog(data) {
     this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
 
     this.lineSegments_Control = new NumericControl(this);
-    this.lineSegments_Control.real = true;
+    this.lineSegments_Control.real = false;
     this.lineSegments_Control.label.text = "Line Segments:";
     this.lineSegments_Control.label.minWidth = labelSize;
     this.lineSegments_Control.toolTip = "<p>The number of lines used to fit the data. " +
@@ -1176,15 +1254,55 @@ function PhotometricMosaicDialog(data) {
     };
     this.lineSegments_Control.setRange(1, 49);
     this.lineSegments_Control.slider.setRange(1, 25);
-    this.lineSegments_Control.setPrecision(0);
     this.lineSegments_Control.slider.minWidth = 200;
     this.lineSegments_Control.setValue(data.nLineSegments);
+    
+    let taperTooltip = "<p>The gradient offset is applied to the target image " +
+            "along a line perpendicular to the horizontal or vertical join.<\p>" +
+            "<p>When taper is selected, the correction applied is gradually " +
+            "tapered down over the taper length to the average background level. " +
+            "This prevents the local offset corrections requied at the join from " +
+            "propogating to the opposite edge of the target frame.<\p>" +
+            "<p>If the 'Line Segments' is set to one, and the first reference " +
+            "frame has little or no gradient, it can be helpful for the gradient to " +
+            "be propogated. It can help reduce the overall gradient in the final " +
+            "mosaic.</p>" +
+            "<p>However, a propogated complex gradient curve is unlikely to " +
+            "be helpful. In these cases, using a taper is recommended.<\p>" +
+            "<p>In difficult cases it can be helpful to first use a single " +
+            "'Line Segment' and propogate the linear gradient. Then " +
+            "correct the complex gradient with a taper to create the mosaic.<\p>";
+    this.taperFlag_Control = new CheckBox(this);
+    this.taperFlag_Control.text = "Taper";
+    this.taperFlag_Control.toolTip = taperTooltip;
+    this.taperFlag_Control.checked = data.taperFlag;
+    this.taperFlag_Control.onClick = function (checked) {
+        data.taperFlag = checked;
+    };
+    
+    this.taperLength_Control = new NumericControl(this);
+    this.taperLength_Control.real = false;
+    this.taperLength_Control.label.text = "Length:";
+    this.taperLength_Control.toolTip = taperTooltip;
+    this.taperLength_Control.onValueUpdated = function (value) {
+        data.taperLength = value;
+    };
+    this.taperLength_Control.setRange(50, 10000);
+    this.taperLength_Control.slider.setRange(1, 200);
+    this.taperLength_Control.slider.minWidth = 200;
+    this.taperLength_Control.setValue(data.taperLength);
+    
+    let taperSizer = new HorizontalSizer;
+    taperSizer.spacing = 4;
+    taperSizer.add(this.taperFlag_Control);
+    taperSizer.add(this.taperLength_Control);
 
     let gradientGroupBox = createGroupBox(this, "Gradient Offset");
     gradientGroupBox.sizer.add(orientationSizer);
     gradientGroupBox.sizer.add(this.sampleSize_Control);
     gradientGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
     gradientGroupBox.sizer.add(this.lineSegments_Control);
+    gradientGroupBox.sizer.add(taperSizer);
 
     //-------------------------------------------------------
     // Mosaic Group Box
@@ -1511,6 +1629,7 @@ PhotometricMosaicDialog.prototype = new Dialog;
 // Photometric Mosaic main process
 function main() {
 //    testLeastSquareFitAlgorithm();
+    GradientTest();
     
     if (ImageWindow.openWindows.length < 2) {
         (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
@@ -1565,6 +1684,48 @@ function main() {
     }
 
     return;
+}
+
+function GradientTest(){
+    let x0 = 300;
+    let x1 = 500;
+    let y0 = 600;
+    let y1 = 700;
+    let average = 50;
+    let feather = 100;
+    let isHorizontal = true;
+    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
+    console.writeln("y = 0, offset = 50? ", gradOffset.getOffset(0, 250));
+    console.writeln("y = 499, offset = 50? ", gradOffset.getOffset(499, 250));
+    console.writeln("y = 525, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(525, 250));
+    console.writeln("y = 550, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(550, 250));
+    console.writeln("y = 575, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(575, 250));
+    console.writeln("y = 600, offset = 250? ", gradOffset.getOffset(600, 250));
+    console.writeln("y = 650, offset = 250? ", gradOffset.getOffset(650, 250));
+    console.writeln("y = 699, offset = 250? ", gradOffset.getOffset(699, 250));
+    console.writeln("y = 725, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(725, 250));
+    console.writeln("y = 750, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(750, 250));
+    console.writeln("y = 775, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(775, 250));
+    console.writeln("y = 800, offset = 50? ", gradOffset.getOffset(800, 250));
+    console.writeln("y = 999, offset = 50? ", gradOffset.getOffset(999, 250));
+    
+    let average = -50;
+    let feather = 200;
+    let isHorizontal = false;
+    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
+    console.writeln("x = 0, offset = -50? ", gradOffset.getOffset(0, 350));
+    console.writeln("x = 99, offset = -50? ", gradOffset.getOffset(99, 350));
+    console.writeln("x = 150, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(150, 350));
+    console.writeln("x = 200, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(200, 350));
+    console.writeln("x = 250, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(250, 350));
+    console.writeln("x = 300, offset = 350? ", gradOffset.getOffset(300, 350));
+    console.writeln("x = 400, offset = 350? ", gradOffset.getOffset(400, 350));
+    console.writeln("x = 499, offset = 350? ", gradOffset.getOffset(499, 350));
+    console.writeln("x = 550, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(550, 350));
+    console.writeln("x = 600, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(600, 350));
+    console.writeln("x = 650, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(650, 350));
+    console.writeln("x = 700, offset = -50? ", gradOffset.getOffset(700, 350));
+    console.writeln("x = 999, offset = -50? ", gradOffset.getOffset(999, 350));
 }
 
 main();
