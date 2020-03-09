@@ -47,16 +47,23 @@ function PhotometricMosaic(data)
 
     console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
 
-    let samplePreviewArea;
+    let samplePreviewArea = null;
     if (data.hasAreaOfInterest) {
-        samplePreviewArea = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, data.areaOfInterest_X1, data.areaOfInterest_Y1);
-    } else {
-        samplePreviewArea = targetView.image.bounds;
+        samplePreviewArea = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, 
+                data.areaOfInterest_X1, data.areaOfInterest_Y1);
     }
-
     let detectStarTime = new Date().getTime();
     let detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, samplePreviewArea, data.logStarDetection);
+    if (detectedStars.overlapBox === null){
+        let msgEnd = (samplePreviewArea === null) ? "." : " within preview area.";
+        let errorMsg = "Error: '" + referenceView.fullId + "' and '" + targetView.fullId + "' do not overlap" + msgEnd;
+        new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
+    }
+    if (samplePreviewArea === null){
+        samplePreviewArea = detectedStars.overlapBox;
+    }
     let colorStarPairs = getColorStarPairs(detectedStars, referenceView.image, targetView.image, data.rejectHigh);
     console.writeln("Detected " + detectedStars.allStars.length + " stars (", getElapsedTime(detectStarTime), ")");
     if (targetView.image.isColor){
@@ -404,8 +411,9 @@ function createGradient(eqnLines) {
  * How the difference lines are calculated:
  * (1) The SampleArea is the bounding rectangle of all the SamplePairs.
  * (2) The previewArea is the area selected by the user (e.g. by a preview). If
- * the user made no selection, the previewArea is the area as the image. The
- * SampleArea is a subset of the previewArea (it can be the same size, but not bigger.)
+ * the user made no selection, the previewArea is the bounding box of the 
+ * overlap region. The SampleArea is a subset of the previewArea (it can be the 
+ * same size, but not bigger.)
  * (3) The SampleArea is divided into SampleSection. Each of these sections
  * defines a gradient line. The dif value within the sample area is calculated
  * from the equation of this line: dif = mx + b

@@ -72,6 +72,7 @@ function getFlux(star) {
  */
 function StarsDetected(){
     this.nChannels = 1;
+    this.overlapBox = null;
     this.starRegionMask = null;
     /** color array of Star[] */
     this.refColorStars = [];
@@ -86,8 +87,9 @@ function StarsDetected(){
      * @param {Rect} regionOfInterest 
      * @param {Number} logSensitivity
      */
-    this.detectStars = function (refView, tgtView, regionOfInterest, logSensitivity) {
+    this.detectStars = function (refView, tgtView, previewArea, logSensitivity) {
         this.nChannels = refView.image.isColor ? 3 : 1;
+        let regionOfInterest = previewArea === null ? refView.image.bounds : previewArea;
         this.starRegionMask = this.createStarRegionMask(refView.image, tgtView.image, regionOfInterest);
         // Detect stars in both ref and tgt images in all channels
         for (let c = 0; c < this.nChannels; c++) {
@@ -117,7 +119,11 @@ function StarsDetected(){
     this.createStarRegionMask = function (refImage, tgtImage, regionOfInterest) {
         let mask = new Image(refImage.width, refImage.height, 1);
         mask.fill(0);
-
+        // Overlap bounding box coordinates
+        let x0 = Number.POSITIVE_INFINITY;
+        let x1 = Number.NEGATIVE_INFINITY;
+        let y0 = Number.POSITIVE_INFINITY;
+        let y1 = Number.NEGATIVE_INFINITY;
         // Create a mask to restrict the star detection to the overlapping area and previewArea
         let xMin = regionOfInterest.x0;
         let xMax = regionOfInterest.x1;
@@ -134,9 +140,20 @@ function StarsDetected(){
                 }
                 if (isOverlap) {
                     mask.setSample(1, x, y);
+                    // Determine bounding box
+                    x0 = Math.min(x0, x);
+                    x1 = Math.max(x1, x);
+                    y0 = Math.min(y0, y);
+                    y1 = Math.max(y1, y);
                 }
             }
         }
+        if (x0 != Number.POSITIVE_INFINITY){
+            this.overlapBox = new Rect(x0, y0, x1+1, y1+1);
+        } else {
+            this.overlapBox = null;
+        }
+        
         return mask;
     };
     
