@@ -19,18 +19,20 @@
 #feature-info Linear fits target and reference images over the overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
-#include <pjsr/UndoFlag.jsh>
+//#include <pjsr/UndoFlag.jsh>
+//#include <pjsr/DataType.jsh>
 #include "lib/DialogLib.js"
+#include "lib/FitsHeader.js"
 
-#define VERSION "1.0"
-#define TITLE "Trim Image"
-#define DEFAULT_TRIM 3;
+function VERSION(){return "1.0";}
+function TITLE(){return "Trim Image";}
+function DEFAULT_TRIM(){return 3;}
 
 /**
  * @param {Image} image
- * @param {number} x x-coordinate
- * @param {number} y y-coordinate
- * @return true if the specified pixel has a non zero value in one or more channels
+ * @param {Number} x x-coordinate
+ * @param {Number} y y-coordinate
+ * @return {Boolean} true if the specified pixel has a non zero value in one or more channels
  */
 function isNotBlack(image, x, y) {
     if (image.isColor) {
@@ -42,8 +44,8 @@ function isNotBlack(image, x, y) {
 /**
  * Set the specified pixel to zero
  * @param {Image} image
- * @param {number} x x-coordinate
- * @param {number} y y-coordinate
+ * @param {Number} x x-coordinate
+ * @param {Number} y y-coordinate
  */
 function setBlack(image, x, y) {
     image.setSample(0, x, y, 0);
@@ -55,9 +57,9 @@ function setBlack(image, x, y) {
 
 /** Private function
  * @param {Image} image
- * @param {number} row Y coordinate
- * @param {number} nPixels Number of pixels to trim
- * @return {boolean} true if the row has image content
+ * @param {Number} row Y coordinate
+ * @param {Number} nPixels Number of pixels to trim
+ * @return {Boolean} true if the row has image content
  */
 function trimRowLeft(image, row, nPixels) {
     let w = image.width;
@@ -79,9 +81,9 @@ function trimRowLeft(image, row, nPixels) {
 
 /** Private function
  * @param {Image} image
- * @param {number} row Y coordinate
- * @param {number} nPixels Number of pixels to trim
- * @return {boolean} true if the row has image content
+ * @param {Number} row Y coordinate
+ * @param {Number} nPixels Number of pixels to trim
+ * @return {Boolean} true if the row has image content
  */
 function trimRowRight(image, row, nPixels) {
     let w = image.width;
@@ -103,9 +105,9 @@ function trimRowRight(image, row, nPixels) {
 
 /** Private function
  * @param {Image} image
- * @param {number} col X coordinate
- * @param {number} nPixels Number of pixels to trim
- * @return {boolean} true if the col has image content
+ * @param {Number} col X coordinate
+ * @param {Number} nPixels Number of pixels to trim
+ * @return {Boolean} true if the col has image content
  */
 function trimColumnTop(image, col, nPixels) {
     let h = image.height;
@@ -127,9 +129,9 @@ function trimColumnTop(image, col, nPixels) {
 
 /** Private function
  * @param {Image} image
- * @param {number} col X coordinate
- * @param {number} nPixels Number of pixels to trim
- * @return {boolean} true if the column has image content
+ * @param {Number} col X coordinate
+ * @param {Number} nPixels Number of pixels to trim
+ * @return {Boolean} true if the column has image content
  */
 function trimColumnBottom(image, col, nPixels) {
     let h = image.height;
@@ -151,8 +153,8 @@ function trimColumnBottom(image, col, nPixels) {
 
 /**
  * @param {Image} image
- * @param {number} nLeft Number of pixels to remove from left of non zero part of image
- * @param {number} nRight Number of pixels to remove from right of non zero part of image
+ * @param {Number} nLeft Number of pixels to remove from left of non zero part of image
+ * @param {Number} nRight Number of pixels to remove from right of non zero part of image
  */
 function trimRows(image, nLeft, nRight) {
     if (nLeft === 0 && nRight === 0) {
@@ -172,8 +174,8 @@ function trimRows(image, nLeft, nRight) {
 
 /**
  * @param {Image} image
- * @param {number} nTop Number of pixels to remove from top of non zero part of image
- * @param {number} nBottom Number of pixels to remove from bottom of non zero part of image
+ * @param {Number} nTop Number of pixels to remove from top of non zero part of image
+ * @param {Number} nBottom Number of pixels to remove from bottom of non zero part of image
  */
 function trimColumns(image, nTop, nBottom) {
     if (nTop === 0 && nBottom === 0) {
@@ -193,7 +195,7 @@ function trimColumns(image, nTop, nBottom) {
 
 /**
  * Controller. Processing starts here!
- * @param {trimImageData} data Values from user interface
+ * @param {TrimImageData} data Values from user interface
  */
 function trimImage(data)
 {
@@ -219,7 +221,11 @@ function trimImage(data)
     data.saveParameters();
     targetView.endProcess();
 
-    console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+    let fitsHeaderComment = "TrimImage top:" + data.top + " bottom:" + data.bottom +
+                   " left:" + data.left + " right:" + data.right;
+    addFitsHistory(targetView, [fitsHeaderComment], true);
+    
+    console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
 }
 
 // -----------------------------------------------------------------------------
@@ -256,19 +262,19 @@ function TrimImageData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.left = DEFAULT_TRIM;
-        this.right = DEFAULT_TRIM;
-        this.top = DEFAULT_TRIM;
-        this.bottom = DEFAULT_TRIM;
+        this.left = DEFAULT_TRIM();
+        this.right = DEFAULT_TRIM();
+        this.top = DEFAULT_TRIM();
+        this.bottom = DEFAULT_TRIM();
     };
 
     // Used when the user presses the reset button
-    this.resetParameters = function (linearFitDialog) {
+    this.resetParameters = function (dialog) {
         this.setParameters();
-        linearFitDialog.left_Control.setValue(this.left);
-        linearFitDialog.right_Control.setValue(this.right);
-        linearFitDialog.top_Control.setValue(this.top);
-        linearFitDialog.bottom_Control.setValue(this.bottom);
+        dialog.left_Control.setValue(this.left);
+        dialog.right_Control.setValue(this.right);
+        dialog.top_Control.setValue(this.top);
+        dialog.bottom_Control.setValue(this.bottom);
     };
 
     // Initialise the script's data
@@ -309,7 +315,7 @@ function trimImageDialog(data) {
     let labelWidth1 = this.font.width("Bottom:_");
 
     // Create the Program Discription at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + "</b> &mdash; Trim the edge of the none zero area.");
+    let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() + "</b> &mdash; Trim the edge of the none zero area.");
 
     // Create the target image field
     let targetImage_Label = new Label(this);
@@ -355,7 +361,7 @@ function trimImageDialog(data) {
         data.bottom = value;
     };
 
-    const helpWindowTitle = TITLE + " v" + VERSION;
+    const helpWindowTitle = TITLE() + " v" + VERSION();
     const helpMsg = "<p>Trim the pixels at the edge of the non zero part of an image. " +
             "Black pixels are ignored. Modified pixels are set to black.</p>";
 
@@ -375,7 +381,7 @@ function trimImageDialog(data) {
     this.sizer.add(buttons_Sizer);
 
     // Set all the window data
-    this.windowTitle = TITLE;
+    this.windowTitle = TITLE();
     this.adjustToContents();
     this.setFixedSize();
 }
@@ -388,7 +394,7 @@ function main() {
     //console.hide();
 
     if (ImageWindow.openWindows.length < 1) {
-        (new MessageBox("ERROR: there must be at least one image open for this script to function", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        (new MessageBox("ERROR: there must be at least one image open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;
     }
 
@@ -404,15 +410,15 @@ function main() {
         if (!trimDialog.execute())
             break;
 
-        console.writeln("\n<b>Trim Image ", VERSION, "</b>:");
+        console.writeln("\n<b>", TITLE()," ", VERSION(), "</b>:");
 
         // User must select a target view
         if (data.targetView.isNull) {
-            (new MessageBox("WARNING: Target view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("WARNING: Target view must be selected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
 
-        // Call the layer extraction routine.
+        // Trim the image.
         trimImage(data);
 
         // Quit after successful execution.

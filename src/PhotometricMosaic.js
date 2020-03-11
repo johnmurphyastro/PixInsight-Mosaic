@@ -25,6 +25,7 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/StarLib.js"
+#include "lib/FitsHeader.js"
 
 function VERSION(){return  "1.0";}
 function TITLE(){return "Photometric Mosaic";}
@@ -172,19 +173,34 @@ function PhotometricMosaic(data)
 
     if (data.createMosaicFlag){
         let mosaicName = MOSAIC_NAME();
-        let createMosaicView = (referenceView.fullId !== mosaicName || 
-                View.viewById(mosaicName).isNull);
+        let createMosaicView = (referenceView.fullId !== mosaicName);
         
         if (createMosaicView){
-            // Create a new view
-            console.writeln("Creating ", MOSAIC_NAME());
+            if (!View.viewById(mosaicName).isNull){
+                // find a unique name for the new mosaic view
+                let mosaicNameBase = mosaicName;
+                for (let i=1; ; i++){
+                    if (View.viewById(mosaicNameBase + i).isNull){
+                        mosaicName = mosaicNameBase + i;
+                        break;
+                    }
+                }
+            }
+            console.writeln("Creating ", mosaicName);
         } else {
             // The reference view has been set to a previously created mosaic.
             // We will update this view
-            console.writeln("Updating ", MOSAIC_NAME());
+            console.writeln("Updating ", mosaicName);
         }
-        createMosaic(referenceView, targetView, MOSAIC_NAME(), createMosaicView,
+        createMosaic(referenceView, targetView, mosaicName, createMosaicView,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
+                
+        // Update Fits Header
+        let mosaicView = View.viewById(mosaicName);
+        if (createMosaicView){
+            copyFitsAstrometricSolution(referenceView, mosaicView);
+            addFitsComment(mosaicView, "PhotometricMosaic " + VERSION());
+        }
     }
     
     if (data.displayMaskFlag){
@@ -1261,12 +1277,12 @@ function PhotometricMosaicDialog(data) {
             "along a line perpendicular to the horizontal or vertical join.<\p>" +
             "<p>When taper is selected, the correction applied is gradually " +
             "tapered down over the taper length to the average background level. " +
-            "This prevents the local offset corrections requied at the join from " +
+            "This prevents the local gradient corrections requied at the join from " +
             "propogating to the opposite edge of the target frame.<\p>" +
-            "<p>If the 'Line Segments' is set to one, and the first reference " +
-            "frame has little or no gradient, it can be helpful for the gradient to " +
-            "be propogated. It can help reduce the overall gradient in the final " +
-            "mosaic.</p>" +
+            "<p>If the 'Line Segments' is set to one, and the reference " +
+            "image has little or no gradient, it can be helpful for the target " +
+            "image's gradient correction to be propogated. This can help reduce " + 
+            "the overall gradient in the final mosaic.</p>" +
             "<p>However, a propogated complex gradient curve is unlikely to " +
             "be helpful. In these cases, using a taper is recommended.<\p>" +
             "<p>In difficult cases it can be helpful to first use a single " +
@@ -1628,8 +1644,7 @@ PhotometricMosaicDialog.prototype = new Dialog;
 
 // Photometric Mosaic main process
 function main() {
-//    testLeastSquareFitAlgorithm();
-    GradientTest();
+//    GradientTest();
     
     if (ImageWindow.openWindows.length < 2) {
         (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
@@ -1686,46 +1701,46 @@ function main() {
     return;
 }
 
-function GradientTest(){
-    let x0 = 300;
-    let x1 = 500;
-    let y0 = 600;
-    let y1 = 700;
-    let average = 50;
-    let feather = 100;
-    let isHorizontal = true;
-    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
-    console.writeln("y = 0, offset = 50? ", gradOffset.getOffset(0, 250));
-    console.writeln("y = 499, offset = 50? ", gradOffset.getOffset(499, 250));
-    console.writeln("y = 525, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(525, 250));
-    console.writeln("y = 550, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(550, 250));
-    console.writeln("y = 575, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(575, 250));
-    console.writeln("y = 600, offset = 250? ", gradOffset.getOffset(600, 250));
-    console.writeln("y = 650, offset = 250? ", gradOffset.getOffset(650, 250));
-    console.writeln("y = 699, offset = 250? ", gradOffset.getOffset(699, 250));
-    console.writeln("y = 725, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(725, 250));
-    console.writeln("y = 750, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(750, 250));
-    console.writeln("y = 775, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(775, 250));
-    console.writeln("y = 800, offset = 50? ", gradOffset.getOffset(800, 250));
-    console.writeln("y = 999, offset = 50? ", gradOffset.getOffset(999, 250));
-    
-    let average = -50;
-    let feather = 200;
-    let isHorizontal = false;
-    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
-    console.writeln("x = 0, offset = -50? ", gradOffset.getOffset(0, 350));
-    console.writeln("x = 99, offset = -50? ", gradOffset.getOffset(99, 350));
-    console.writeln("x = 150, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(150, 350));
-    console.writeln("x = 200, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(200, 350));
-    console.writeln("x = 250, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(250, 350));
-    console.writeln("x = 300, offset = 350? ", gradOffset.getOffset(300, 350));
-    console.writeln("x = 400, offset = 350? ", gradOffset.getOffset(400, 350));
-    console.writeln("x = 499, offset = 350? ", gradOffset.getOffset(499, 350));
-    console.writeln("x = 550, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(550, 350));
-    console.writeln("x = 600, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(600, 350));
-    console.writeln("x = 650, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(650, 350));
-    console.writeln("x = 700, offset = -50? ", gradOffset.getOffset(700, 350));
-    console.writeln("x = 999, offset = -50? ", gradOffset.getOffset(999, 350));
-}
+//function GradientTest(){
+//    let x0 = 300;
+//    let x1 = 500;
+//    let y0 = 600;
+//    let y1 = 700;
+//    let average = 50;
+//    let feather = 100;
+//    let isHorizontal = true;
+//    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
+//    console.writeln("y = 0, offset = 50? ", gradOffset.getOffset(0, 250));
+//    console.writeln("y = 499, offset = 50? ", gradOffset.getOffset(499, 250));
+//    console.writeln("y = 525, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(525, 250));
+//    console.writeln("y = 550, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(550, 250));
+//    console.writeln("y = 575, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(575, 250));
+//    console.writeln("y = 600, offset = 250? ", gradOffset.getOffset(600, 250));
+//    console.writeln("y = 650, offset = 250? ", gradOffset.getOffset(650, 250));
+//    console.writeln("y = 699, offset = 250? ", gradOffset.getOffset(699, 250));
+//    console.writeln("y = 725, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(725, 250));
+//    console.writeln("y = 750, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(750, 250));
+//    console.writeln("y = 775, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(775, 250));
+//    console.writeln("y = 800, offset = 50? ", gradOffset.getOffset(800, 250));
+//    console.writeln("y = 999, offset = 50? ", gradOffset.getOffset(999, 250));
+//    
+//    let average = -50;
+//    let feather = 200;
+//    let isHorizontal = false;
+//    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
+//    console.writeln("x = 0, offset = -50? ", gradOffset.getOffset(0, 350));
+//    console.writeln("x = 99, offset = -50? ", gradOffset.getOffset(99, 350));
+//    console.writeln("x = 150, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(150, 350));
+//    console.writeln("x = 200, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(200, 350));
+//    console.writeln("x = 250, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(250, 350));
+//    console.writeln("x = 300, offset = 350? ", gradOffset.getOffset(300, 350));
+//    console.writeln("x = 400, offset = 350? ", gradOffset.getOffset(400, 350));
+//    console.writeln("x = 499, offset = 350? ", gradOffset.getOffset(499, 350));
+//    console.writeln("x = 550, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(550, 350));
+//    console.writeln("x = 600, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(600, 350));
+//    console.writeln("x = 650, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(650, 350));
+//    console.writeln("x = 700, offset = -50? ", gradOffset.getOffset(700, 350));
+//    console.writeln("x = 999, offset = -50? ", gradOffset.getOffset(999, 350));
+//}
 
 main();
