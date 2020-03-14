@@ -18,29 +18,12 @@
 /**
  * 
  * @param {View} view
- * @param {String[]} comments
- * @param {Boolean} allowUndo
+ * @param {String} comment
  */
-function addFitsHistory(view, comments, allowUndo) {
-    let entries = [];
+function addFitsHistory(view, comment) {
     let keywords = view.window.keywords;
-    for (let keyword of keywords){
-        let nameValueComment = [3];
-        nameValueComment[0] = keyword.name;
-        nameValueComment[1] = keyword.value;
-        nameValueComment[2] = keyword.comment;
-        entries.push(nameValueComment);
-    }
-    for (let comment of comments){
-        let nameValueComment = [3];
-        nameValueComment[0] = "HISTORY";
-        nameValueComment[1] = "";
-        nameValueComment[2] = comment;
-        entries.push(nameValueComment);
-    }
-    let P = new FITSHeader;
-    P.keywords = entries;
-    P.executeOn(view, allowUndo);
+    keywords.push(new FITSKeyword("HISTORY", "", comment));
+    view.window.keywords = keywords;
 }
 
 /**
@@ -54,19 +37,41 @@ function addFitsComment(view, comment) {
     view.window.keywords = keywords;
 }
 
+/**
+ * Copy Astrometric solution from source view to target view
+ * @param {View} sourceView Copy astrometric solution from this header
+ * @param {View} targetView Append astrometric solution to this header
+ */
 function copyFitsAstrometricSolution(sourceView, targetView) {
     let found = false;
     let keywords = targetView.window.keywords;
     for (let fitsKeyword of sourceView.window.keywords) {
         if (fitsKeyword.name === "COMMENT" &&
-                fitsKeyword.comment.toLowerCase().contains("astrometric solution")) {
-            found = true;            
-        } else if (found && fitsKeyword.name === "HISTORY" && fitsKeyword.name === "COMMENT") {
-            // At end of astrometric solution
-            break;
-        }
-        if (found){
+                fitsKeyword.comment.toLowerCase().contains("astrometric")) {
+            found = true;
             keywords.push(fitsKeyword);
+        } 
+        if (fitsKeyword.name === "OBJCTRA" ||
+                fitsKeyword.name === "OBJCTDEC" ||
+                fitsKeyword.name === "EQUINOX" ||
+                fitsKeyword.name === "CTYPE1" ||
+                fitsKeyword.name === "CTYPE2" ||
+                fitsKeyword.name === "CRPIX1" ||
+                fitsKeyword.name === "CRPIX2" ||
+                fitsKeyword.name === "CRVAL1" ||
+                fitsKeyword.name === "CRVAL2" ||
+                fitsKeyword.name === "PV1_1" ||
+                fitsKeyword.name === "PV1_2" ||
+                fitsKeyword.name === "CD1_1" ||
+                fitsKeyword.name === "CD1_2" ||
+                fitsKeyword.name === "CD2_1" ||
+                fitsKeyword.name === "CD2_2" ||
+                fitsKeyword.name === "CDELT1" ||
+                fitsKeyword.name === "CDELT2" ||
+                fitsKeyword.name === "CROTA1" ||
+                fitsKeyword.name === "CROTA2"){
+            keywords.push(fitsKeyword);
+            found = true;
         }
     }
     if (found){
@@ -75,26 +80,16 @@ function copyFitsAstrometricSolution(sourceView, targetView) {
     return;
 }
 
-function copyFitsHistory(sourceView, targetView) {
+/**
+ * Copy known observaton keywords from source to target fits headers.
+ * The RA and DEC are not copied since these will probably be invalid.
+ * @param {View} sourceView Copy observation data from this view
+ * @param {View} targetView Append observation data to this view
+ */
+function copyFitsObservation(sourceView, targetView){
     let found = false;
     let keywords = targetView.window.keywords;
     for (let fitsKeyword of sourceView.window.keywords) {
-        if (fitsKeyword.name === "HISTORY" &&
-                !fitsKeyword.comment.startsWith("ImageIntegration.") &&
-                !fitsKeyword.comment.startsWith("Integration with ")) {
-            found = true;  
-            keywords.push(fitsKeyword);
-        }
-    }
-    if (found){
-        targetView.window.keywords = keywords;
-    }
-    return;
-}
-
-function getFitsObservation(view){
-    let keywords = [];
-    for (let fitsKeyword of view.window.keywords) {
         if (fitsKeyword.name === "OBSERVER" ||
                 fitsKeyword.name === "INSTRUME" ||
                 fitsKeyword.name === "IMAGETYP" ||
@@ -106,30 +101,18 @@ function getFitsObservation(view){
                 fitsKeyword.name === "TELESCOP" ||
                 fitsKeyword.name === "FOCALLEN" ||
                 fitsKeyword.name === "OBJECT" ||
-                fitsKeyword.name === "RA" ||
-                fitsKeyword.name === "DEC" ||
                 fitsKeyword.name === "DATE-OBS" ||
                 fitsKeyword.name === "DATE-END" ||
                 fitsKeyword.name === "OBSGEO-H" ||
                 fitsKeyword.name === "ALT-OBS"){
             keywords.push(fitsKeyword);
+            found = true;
         }
     }
-    return keywords;
-}
-
-/**
- * @param {View} view
- * @param {FITSKeyword[]} fitsKeywords
- * @returns {undefined}
- */
-function fitsAppendAsComments(view, fitsKeywords){
-    let keywords = view.window.keywords;
-    for (let fitsKeyword of fitsKeywords){
-        let comment = fitsKeyword.name + " : " + fitsKeyword.value + " : " + fitsKeyword.comment;
-        keywords.push(new FITSKeyword("COMMENT", "", "__" + comment));
+    if (found){
+        targetView.window.keywords = keywords;
     }
-    view.window.keywords = keywords;
+    return;
 }
 
 //let history = [];

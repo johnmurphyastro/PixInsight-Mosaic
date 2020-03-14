@@ -195,11 +195,14 @@ function PhotometricMosaic(data)
         createMosaic(referenceView, targetView, mosaicName, createMosaicView,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
                 
-        // Update Fits Header
-        let mosaicView = View.viewById(mosaicName);
         if (createMosaicView){
+            // Update Fits Header
+            let mosaicView = View.viewById(mosaicName);
+            mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
+            addFitsHistory(mosaicView, "PhotometricMosaic " + VERSION());
+            copyFitsObservation(referenceView, mosaicView);
             copyFitsAstrometricSolution(referenceView, mosaicView);
-            addFitsComment(mosaicView, "PhotometricMosaic " + VERSION());
+            mosaicView.endProcess();
         }
     }
     
@@ -916,7 +919,7 @@ function PhotometricMosaicData() {
         this.displayStarsFlag = false;
         this.photometryGraphFlag = true;
         this.orientation = AUTO();
-        this.rejectHigh = 0.8;
+        this.rejectHigh = 0.5;
         this.sampleSize = 20;
         this.limitSampleStarsPercent = 25;
         this.nLineSegments = 1;

@@ -19,7 +19,7 @@
 #feature-info Linear fits target and reference images over the overlaping area.<br/>\
 Copyright & copy; 2019 John Murphy.GNU General Public License.<br/>
 
-//#include <pjsr/UndoFlag.jsh>
+#include <pjsr/UndoFlag.jsh>
 //#include <pjsr/DataType.jsh>
 #include "lib/DialogLib.js"
 #include "lib/FitsHeader.js"
@@ -214,16 +214,17 @@ function trimImage(data)
 
     // Begin process to let PixInsight know the script is about to modify image data.
     // It will then allow us write access
-    targetView.beginProcess();
+    targetView.beginProcess(UndoFlag_All);
     trimRows(image, data.left, data.right);
     trimColumns(image, data.top, data.bottom);
+    
+    let fitsHeaderComment = "TrimImage top:" + data.top + " bottom:" + data.bottom +
+                   " left:" + data.left + " right:" + data.right;
+    addFitsHistory(targetView, fitsHeaderComment);
+    
     // Send our parameters to PixInsight core so that it can be added to the history event
     data.saveParameters();
     targetView.endProcess();
-
-    let fitsHeaderComment = "TrimImage top:" + data.top + " bottom:" + data.bottom +
-                   " left:" + data.left + " right:" + data.right;
-    addFitsHistory(targetView, [fitsHeaderComment], true);
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
 }
