@@ -21,23 +21,22 @@ Copyright &copy; 2019 John Murphy. GNU General Public License.<br/>
 
 #include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
-#include "lib/SamplePair.js"
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 
-#define VERSION  "1.0"
-#define TITLE "CFA White Balance Factors"
+function VERSION(){return "1.0";}
+function TITLE(){return "CFA White Balance Factors";}
 
 /**
  * @param {LinearFitData} linearFit
- * @param {Number} nSamples
- * @param {Number} channel
+ * @param {Number} nPixels
+ * @param {Number} bayerPixel
  * @param {Number} rejectHigh
  * @returns {undefined}
  */
-function displayConsoleInfo(linearFit, nSamples, channel, rejectHigh) {
-    console.writeln("Pixel = ", channel);
-    console.writeln("  Samples: ", nSamples, ", Reject high: ", rejectHigh);
+function displayConsoleInfo(linearFit, nPixels, bayerPixel, rejectHigh) {
+    console.writeln("Pixel = ", bayerPixel);
+    console.writeln("  Pixels: ", nPixels, ", Reject high: ", rejectHigh);
     console.writeln("  Linear Fit:  m = ", linearFit.m.toPrecision(5), ", b = ", linearFit.b.toPrecision(5));
 }
 
@@ -61,69 +60,64 @@ function displayWhiteBalance(linearFit){
 function cfaLinearFit(data)
 {
     let startTime = new Date().getTime();
-    let targetView = data.targetView;
-    let referenceView = data.referenceView;
-    let linearFit = []; // linear fit details (m and b) for all channels
-    let colorSamplePairs = []; // SamplePairs[channel]
-    let nChannels = 4;      // 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
-    if (targetView.image.isColor || referenceView.image.isColor) {
-        new MessageBox("Error: both images must be CFA", TITLE, StdIcon_Error, StdButton_Ok).execute();
+    let rawView = data.rawView;
+    let wbView = data.wbView;
+    let linearFit = []; // linear fit details (m and b) for all bayer pixels
+    let bayerCfaPairs = []; // Array of CfaPair[], one for each of the 4 bayer pixels
+//    let nChannels = 4;      // 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
+    if (rawView.image.isColor || wbView.image.isColor) {
+        new MessageBox("Error: both images must be CFA", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
 
-    console.writeln("CFA Reference: ", referenceView.fullId, ", CFA Raw: ", targetView.fullId);
+    console.writeln("CFA White Balanced Raw: ", wbView.fullId, ", CFA Pure Raw: ", rawView.fullId);
 
-    // For each channel (L or RGB)
+    // For each pixel in the bayer block of 4
     // Calculate the linear fit line y = mx + b
     // Display graph of fitted line and sample points
-    for (let channel = 0; channel < nChannels; channel++) {
-        let samplePairs = createCfaSamplePairs(targetView.image, referenceView.image,
-                channel, data.rejectHigh);
-        if (samplePairs.samplePairArray.length < 2) {
-            new MessageBox("Error: Too few samples to determine a linear fit.", TITLE, StdIcon_Error, StdButton_Ok).execute();
-            return;
+    for (let bayerPixel = 0; bayerPixel < 4; bayerPixel++) {
+        let leastSquaresFit = new LeastSquareFitAlgorithm();
+        let cfaPairs = createCfaPairs(rawView.image, wbView.image, bayerPixel, data.rejectHigh);
+        for (let cfaPair of cfaPairs){
+            leastSquaresFit.addValue(cfaPair.rawValue, cfaPair.wbValue);
         }
-
-        // TODO change this
-        linearFit[channel] = calculateLinearFit(samplePairs.samplePairArray, getLinearFitX, getLinearFitY);
-        displayConsoleInfo(linearFit[channel], samplePairs.samplePairArray.length,
-                channel, data.rejectHigh);
-        colorSamplePairs[channel] = samplePairs;
+        linearFit[bayerPixel] = leastSquaresFit.getLinearFit();
+        bayerCfaPairs[bayerPixel] = cfaPairs;
+        displayConsoleInfo(linearFit[bayerPixel], cfaPairs.length, bayerPixel, data.rejectHigh);
     }
     displayWhiteBalance(linearFit);
 
     if (data.displayGraphFlag) {
         console.writeln("\nCreating least squares fit graph");
-        displayGraph(targetView.fullId, referenceView.fullId, 730, colorSamplePairs, linearFit);
+        displayGraph(rawView, wbView, 730, bayerCfaPairs, linearFit);
     }
     data.saveParameters();
-    console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
+    console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
 }
 
-/** TODO create and use CfaPair instead of SamplePair
- * Create samplePairArray. Divide the target and reference images into Rectangles.
- * The rectanles have dimension sampleSize x sampleSize.
- * For each rectangle, calculate the average sample value for the specified channel.
- * If either the target or reference rectange contains a black sample or a samples
- * greater than rejectHigh, the SamplePair is not added to the array.
- * Using a super binned sample makes fitting the data to a line more robust because
- * it ensures that stars have the same size (less than a single pixel) in both
- * the target and reference images. SampleSize should be between 1 and 5 times
- * greater than the diameter of bright stars. 3 times works well.
+function CfaPair(rawValue, wbValue){
+    this.rawValue = rawValue;
+    this.wbValue = wbValue;
+}
+
+/**
+ * Create CfaPair array.
+ * If either the 'pure raw' or 'white balance raw' value is black sample or
+ * greater than rejectHigh, the CfaPair is not added to the array.
  *
- * @param {Image} targetImage
- * @param {Image} referenceImage
- * @param {Number} channel This number Indicates L=0 or R=0, G=1, B=2
+ * @param {Image} rawImage
+ * @param {Image} wbImage
+ * @param {Number} bayerPixel This number Indicates the bayer array position (0, 1, 2, 3)
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @return {SamplePairs} Array of target and reference binned sample values
+ * @return {cfaPair[]} Array of target and reference binned sample values
  */
-function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) {
+function createCfaPairs(rawImage, wbImage, bayerPixel, rejectHigh) {
     // Divide the images into blocks specified by sampleSize.
-    let w = referenceImage.width;
-    let h = referenceImage.height;
-    let firstY = channel < 2 ? 0 : 1;
+    let w = wbImage.width;
+    let h = wbImage.height;
+    let firstY = bayerPixel < 2 ? 0 : 1;
     let firstX;
-    if (channel === 1 || channel === 3){
+    if (bayerPixel === 1 || bayerPixel === 3){
         firstX = 0;
     } else {
         firstX = 1;
@@ -136,58 +130,57 @@ function createCfaSamplePairs(targetImage, referenceImage, channel, rejectHigh) 
      */
     let isBlackOrClipped = (sample, rejectHigh) => sample === 0 || sample > rejectHigh;
 
-    let samplePairArray = [];
+    let cfaPairArray = [];
     for (let y = firstY; y < h; y+=2) {
         for (let x = firstX; x < w; x+=2) {
-            let targetSample = targetImage.sample(x, y, 0);
-            if (isBlackOrClipped(targetSample, rejectHigh)) {
+            let rawValue = rawImage.sample(x, y, 0);
+            if (isBlackOrClipped(rawValue, rejectHigh)) {
                 continue;
             }
-            let referenceSample = referenceImage.sample(x, y, 0);
-            if (isBlackOrClipped(referenceSample, rejectHigh)) {
+            let wbValue = wbImage.sample(x, y, 0);
+            if (isBlackOrClipped(wbValue, rejectHigh)) {
                 continue;
             }
-            let pairedAverage = new SamplePair(targetSample, referenceSample, x, y);
-            samplePairArray.push(pairedAverage);
+            let pair = new CfaPair(rawValue, wbValue);
+            cfaPairArray.push(pair);
         }
     }
 
-    let selectedArea = new Rect(w, h);
-    return new SamplePairs(samplePairArray, 1, selectedArea, false);
+    return cfaPairArray;
 }
 
 /**
- * @param {String} targetName
- * @param {String} referenceName
+ * @param {View} rawView
+ * @param {View} wbView
  * @param {Number} height
- * @param {SamplePairs[]} colorSamplePairs SamplePairs for L or R,G,B
- * @param {LinearFitData[]} linearFit Least Squares Fit for L or R,G,B
+ * @param {CfaPair[][]} bayerCfaPairs Array of CfaPair[], one for each bayer pixel
+ * @param {LinearFitData[]} linearFit Least Squares Fit each bayer pixel
  * @returns {undefined}
  */
-function displayGraph(targetName, referenceName, height, colorSamplePairs, linearFit){
+function displayGraph(rawView, wbView, height, bayerCfaPairs, linearFit){
     let imageWindow = null;
-    let windowTitle = targetName + "_to_" + referenceName + "_LeastSquaresFit";
-    let targetLabel = "Pure RAW (" + targetName + ") sample value";
-    let referenceLabel = "White Balance RAW (" + referenceName + ") sample value";
+    let windowTitle = rawView.fullId + "_to_" + wbView.fullId + "_LeastSquaresFit";
+    let rawLabel = "Pure RAW (" + rawView.fullId + ") pixel value";
+    let wbLabel = "White Balanced RAW (" + wbView.fullId + ") pixel value";
     
     // Create the graph axis and annotation.
-    let minMax = new SamplePairMinMax();
-    colorSamplePairs.forEach(function (samplePairs) {
-        minMax.calculateMinMax(samplePairs.samplePairArray);
-    });
-    let graphWithAxis = new Graph(minMax.minTargetMean, minMax.minReferenceMean, minMax.maxTargetMean, minMax.maxReferenceMean);
+    let rawMin = rawView.image.minimum();
+    let rawMax = rawView.image.maximum();
+    let wbMin = wbView.image.minimum();
+    let wbMax = wbView.image.maximum();
+    let graphWithAxis = new Graph(rawMin, wbMin, rawMax, wbMax);
     //let graphWithAxis = new Graph(0, 0, minMax.maxTargetMean, minMax.maxReferenceMean);
     graphWithAxis.setYAxisLength(height);
-    graphWithAxis.createGraph(targetLabel, referenceLabel);
+    graphWithAxis.createGraph(rawLabel, wbLabel);
 
     // Now add the data to the graph...
     // Color. Need to create 4 graphs for r, g, g, b and then merge them (binary OR) so that
     // if three samples are on the same pixel we get white and not the last color drawn
     let lineColors = [0xFF770000, 0xFF007700, 0xFF007700, 0xFF000077]; // r, g, b
     let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-    for (let c = 0; c < colorSamplePairs.length; c++) {
+    for (let c = 0; c < bayerCfaPairs.length; c++) {
         let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-        drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], colorSamplePairs[c], pointColors[c]);
+        drawLineAndPoints(graphAreaOnly, linearFit[c], lineColors[c], bayerCfaPairs[c], pointColors[c]);
         graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
     }
     imageWindow = graphWithAxis.createWindow(windowTitle, true);
@@ -199,14 +192,14 @@ function displayGraph(targetName, referenceName, height, colorSamplePairs, linea
  * @param {Graph} graph
  * @param {LinearFitData} linearFit
  * @param {Number} lineColor e.g. 0xAARRGGBB
- * @param {SamplePairs} samplePairs Contains the array of SamplePair
+ * @param {CfaPair[]} cfaPairs The array of CfaPair
  * @param {Number} pointColor e.g. 0xAARRGGBB
  * @returns {undefined}
  */
-function drawLineAndPoints(graph, linearFit, lineColor, samplePairs, pointColor){
+function drawLineAndPoints(graph, linearFit, lineColor, cfaPairs, pointColor){
     graph.drawLine(linearFit.m, linearFit.b, lineColor);
-    for (let samplePair of samplePairs.samplePairArray){
-        graph.drawPoint(samplePair.targetMean, samplePair.referenceMean, pointColor);
+    for (let cfaPair of cfaPairs){
+        graph.drawPoint(cfaPair.rawValue, cfaPair.wbValue, pointColor);
     }
 }
 
@@ -246,11 +239,11 @@ function cfaLinearFitData() {
     // It would normally also be called at the end of our script to populate the history entry,
     // but because we use PixelMath to modify the image, the history entry is automatically populated.
     this.saveParameters = function () {
-        if (this.targetView.isMainView) {
-            Parameters.set("targetView", this.targetView.fullId);
+        if (this.rawView.isMainView) {
+            Parameters.set("rawView", this.rawView.fullId);
         }
-        if (this.referenceView.isMainView) {
-            Parameters.set("referenceView", this.referenceView.fullId);
+        if (this.wbView.isMainView) {
+            Parameters.set("wbView", this.wbView.fullId);
         }
         Parameters.set("rejectHigh", this.rejectHigh);
         Parameters.set("displayGraphFlag", this.displayGraphFlag);
@@ -262,13 +255,13 @@ function cfaLinearFitData() {
             this.rejectHigh = Parameters.getReal("rejectHigh");
         if (Parameters.has("displayGraphFlag"))
             this.displayGraphFlag = Parameters.getBoolean("displayGraphFlag");
-        if (Parameters.has("targetView")) {
-            let viewId = Parameters.getString("targetView");
-            this.targetView = View.viewById(viewId)
+        if (Parameters.has("rawView")) {
+            let viewId = Parameters.getString("rawView");
+            this.rawView = View.viewById(viewId)
         }
-        if (Parameters.has("referenceView")) {
-            let viewId = Parameters.getString("referenceView");
-            this.referenceView = View.viewById(viewId)
+        if (Parameters.has("wbView")) {
+            let viewId = Parameters.getString("wbView");
+            this.wbView = View.viewById(viewId)
         }
     };
 
@@ -286,8 +279,8 @@ function cfaLinearFitData() {
     };
 
     let activeWindow = ImageWindow.activeWindow;
-    this.referenceView = getDefaultView(activeWindow, "wb");
-    this.targetView = getDefaultView(activeWindow, "raw");
+    this.wbView = getDefaultView(activeWindow, "wb");
+    this.rawView = getDefaultView(activeWindow, "raw");
     
     // Initialise the script's data
     this.setParameters();
@@ -299,55 +292,55 @@ function cfaLinearFitDialog(data) {
     this.__base__();
 
     // Set some basic widths from dialog text
-    let labelWidth1 = this.font.width("RAW (White Balance):_");
+    let labelWidth1 = this.font.width("White Balanced RAW:_");
 
     // Create the Program Discription at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION +
+    let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
             "</b> &mdash; Determines CFA white balance factors.");
 
     //-------------------------------------------------------
     // Create the reference image field
     //-------------------------------------------------------
-    let referenceImage_Label = new Label(this);
-    referenceImage_Label.text = "RAW (White Balance):";
-    referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    referenceImage_Label.minWidth = labelWidth1;
+    let wbImage_Label = new Label(this);
+    wbImage_Label.text = "White Balanced RAW:";
+    wbImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    wbImage_Label.minWidth = labelWidth1;
 
-    this.referenceImage_ViewList = new ViewList(this);
-    this.referenceImage_ViewList.getMainViews();
-    this.referenceImage_ViewList.minWidth = 300;
-    this.referenceImage_ViewList.currentView = data.referenceView;
-    this.referenceImage_ViewList.toolTip = "<p>Select the colour balanced CFA image</p>";
-    this.referenceImage_ViewList.onViewSelected = function (view) {
-        data.referenceView = view;
+    this.wbImage_ViewList = new ViewList(this);
+    this.wbImage_ViewList.getMainViews();
+    this.wbImage_ViewList.minWidth = 300;
+    this.wbImage_ViewList.currentView = data.wbView;
+    this.wbImage_ViewList.toolTip = "<p>Select the colour balanced CFA image</p>";
+    this.wbImage_ViewList.onViewSelected = function (view) {
+        data.wbView = view;
     };
 
-    let referenceImage_Sizer = new HorizontalSizer;
-    referenceImage_Sizer.spacing = 4;
-    referenceImage_Sizer.add(referenceImage_Label);
-    referenceImage_Sizer.add(this.referenceImage_ViewList, 100);
+    let wbImage_Sizer = new HorizontalSizer;
+    wbImage_Sizer.spacing = 4;
+    wbImage_Sizer.add(wbImage_Label);
+    wbImage_Sizer.add(this.wbImage_ViewList, 100);
 
     //-------------------------------------------------------
     // Create the target image field
     //-------------------------------------------------------
-    let targetImage_Label = new Label(this);
-    targetImage_Label.text = "Pure RAW:";
-    targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    targetImage_Label.minWidth = labelWidth1;
+    let rawImage_Label = new Label(this);
+    rawImage_Label.text = "Pure RAW:";
+    rawImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+    rawImage_Label.minWidth = labelWidth1;
 
-    this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getMainViews();
-    this.targetImage_ViewList.minWidth = 300;
-    this.targetImage_ViewList.currentView = data.targetView;
-    this.targetImage_ViewList.toolTip = "<p>Select the RAW CFA image</p>";
-    this.targetImage_ViewList.onViewSelected = function (view) {
-        data.targetView = view;
+    this.rawImage_ViewList = new ViewList(this);
+    this.rawImage_ViewList.getMainViews();
+    this.rawImage_ViewList.minWidth = 300;
+    this.rawImage_ViewList.currentView = data.rawView;
+    this.rawImage_ViewList.toolTip = "<p>Select the RAW CFA image</p>";
+    this.rawImage_ViewList.onViewSelected = function (view) {
+        data.rawView = view;
     };
 
-    let targetImage_Sizer = new HorizontalSizer;
-    targetImage_Sizer.spacing = 4;
-    targetImage_Sizer.add(targetImage_Label);
-    targetImage_Sizer.add(this.targetImage_ViewList, 100);
+    let rawImage_Sizer = new HorizontalSizer;
+    rawImage_Sizer.spacing = 4;
+    rawImage_Sizer.add(rawImage_Label);
+    rawImage_Sizer.add(this.rawImage_ViewList, 100);
 
 
     //-------------------------------------------------------
@@ -386,13 +379,13 @@ function cfaLinearFitDialog(data) {
     rejectHigh_Control.onValueUpdated = function (value) {
         data.rejectHigh = value;
     };
-    rejectHigh_Control.setRange(0.001, 1.0);
-    rejectHigh_Control.slider.setRange(0, 5000);
-    rejectHigh_Control.setPrecision(4);
-    rejectHigh_Control.slider.minWidth = 500;
+    rejectHigh_Control.setRange(0.1, 1.0);
+    rejectHigh_Control.slider.setRange(1, 1000);
+    rejectHigh_Control.setPrecision(2);
+    rejectHigh_Control.slider.minWidth = 300;
     rejectHigh_Control.setValue(data.rejectHigh);
 
-    const helpWindowTitle = TITLE + " v" + VERSION;
+    const helpWindowTitle = TITLE() + " v" + VERSION();
 
     // Help button
     const HELP_MSG =
@@ -408,8 +401,8 @@ function cfaLinearFitDialog(data) {
     this.sizer.spacing = 6;
     this.sizer.add(titleLabel);
     this.sizer.addSpacing(4);
-    this.sizer.add(referenceImage_Sizer);
-    this.sizer.add(targetImage_Sizer);
+    this.sizer.add(wbImage_Sizer);
+    this.sizer.add(rawImage_Sizer);
     this.sizer.add(algorithm_Sizer);
     this.sizer.add(rejectHigh_Control);
     this.sizer.add(buttons_Sizer);
@@ -417,7 +410,7 @@ function cfaLinearFitDialog(data) {
     //-------------------------------------------------------
     // Set all the window data
     //-------------------------------------------------------
-    this.windowTitle = TITLE;
+    this.windowTitle = TITLE();
     this.adjustToContents();
     this.setFixedSize();
 }
@@ -430,7 +423,7 @@ function main() {
 //    testLeastSquareFitAlgorithm();
 
     if (ImageWindow.openWindows.length < 2) {
-        (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;
     }
 
@@ -447,24 +440,24 @@ function main() {
             break;
         console.show();
         console.writeln("=================================================");
-        console.writeln("<b>CFA White Balance Factors ", VERSION, "</b>:");
+        console.writeln("<b>CFA White Balance Factors ", VERSION(), "</b>:");
 
         // User must select a reference and target view with the same dimensions and color depth
-        if (data.targetView.isNull) {
-            (new MessageBox("WARNING: Target view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        if (data.rawView.isNull) {
+            (new MessageBox("WARNING: Target view must be selected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.referenceView.isNull) {
-            (new MessageBox("WARNING: Reference view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        if (data.wbView.isNull) {
+            (new MessageBox("WARNING: Reference view must be selected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.targetView.image.isColor !== data.referenceView.image.isColor) {
-            (new MessageBox("ERROR: Cannot linear fit a B&W image with a colour image", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        if (data.rawView.image.isColor !== data.wbView.image.isColor) {
+            (new MessageBox("ERROR: Cannot linear fit a B&W image with a colour image", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.targetView.image.width !== data.referenceView.image.width ||
-                data.targetView.image.height !== data.referenceView.image.height) {
-            (new MessageBox("ERROR: Both images must have the same dimensions", TITLE, StdIcon_Error, StdButton_Ok)).execute();
+        if (data.rawView.image.width !== data.wbView.image.width ||
+                data.rawView.image.height !== data.wbView.image.height) {
+            (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
 
