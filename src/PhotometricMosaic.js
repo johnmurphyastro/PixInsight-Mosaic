@@ -96,6 +96,10 @@ function PhotometricMosaic(data)
             }
         }
         starPairs.linearFitData = calculateScale(starPairs);
+        for (let i=0; i<data.outlierRemoval; i++){
+            starPairs = removeStarPairOutlier(starPairs, starPairs.linearFitData);
+            starPairs.linearFitData = calculateScale(starPairs);
+        }
         scaleFactor.push(starPairs.linearFitData);
         let text = "Scaling " + targetView.fullId + " channel[" + c + "] x " + 
                 starPairs.linearFitData.m.toPrecision(5);
@@ -244,6 +248,31 @@ function calculateScale(starPairs) {
         leastSquareFit.addValue(starPair.getTgtFlux(), starPair.getRefFlux());
     }
     return leastSquareFit.getOriginFit();
+}
+
+/**
+ * Removes the worst outlier from the photometry least squares fit line
+ * @param {StarPairs} starPairs A star pair will be removed
+ * @param {LinearFitData} linearFit
+ * @returns {StarPairs}
+ */
+function removeStarPairOutlier(starPairs, linearFit){
+    let maxErr = Number.NEGATIVE_INFINITY;
+    let removeStarPairIdx = -1;
+    for (let i=0; i<starPairs.starPairArray.length; i++){
+        let starPair = starPairs.starPairArray[i];
+        // y = ref; x = tgt
+        let y = eqnOfLineCalcY(starPair.getTgtFlux(), linearFit.m, linearFit.b);
+        let dif = Math.abs(y - starPair.getRefFlux());
+        if (dif > maxErr){
+            maxErr = dif;
+            removeStarPairIdx = i;
+        }
+    }
+    if (removeStarPairIdx !== -1){
+        starPairs.starPairArray.splice(removeStarPairIdx, 1);
+    }
+    return starPairs;
 }
 
 /**
@@ -553,6 +582,7 @@ function displayGraph(targetView, referenceView, width, isHorizontal, gradientAr
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
+    gradientGraphFitsHeader(referenceView, targetView, imageWindow, eqnLineArray);
     imageWindow.show();
 }
 
@@ -581,6 +611,38 @@ function drawLineAndPoints(graph, isHorizontal, eqnLines, lineColor, samplePairs
         }
         graph.drawPoint(coord, dif, pointColor);
     }
+}
+
+/**
+ * @param {View} refView
+ * @param {View} tgtView
+ * @param {ImageWindow} graphWindow Graph window
+ * @param {EquationOfLine[]} eqnLinesArray Best fit lines for each channel
+ * @return {undefined}
+ */
+function gradientGraphFitsHeader(refView, tgtView, graphWindow, eqnLinesArray){
+    let view = graphWindow.mainView;
+    let nColors = eqnLinesArray.length;
+    view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
+    let keywords = graphWindow.keywords;
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+    for (let c = 0; c < nColors; c++){
+        let eqnLines = eqnLinesArray[c];
+        for (let i=0; i<eqnLines.length; i++){
+            let eqnLine = eqnLines[i];
+            let offset = eqnOfLineCalcY(eqnLine.x0, eqnLine.m, eqnLine.b);
+            let comment = "Offset[" + c + "] at " + eqnLine.x0 + " = " + offset.toPrecision(5);
+            keywords.push(new FITSKeyword("COMMENT", "", comment));
+            if (i === eqnLines.length - 1){
+                let offset1 = eqnOfLineCalcY(eqnLine.x1, eqnLine.m, eqnLine.b);
+                let comment2 = "Offset[" + c + "] at " + eqnLine.x1 + " = " + offset1.toPrecision(5);
+                keywords.push(new FITSKeyword("COMMENT", "", comment2));
+            }
+        }
+    }
+    graphWindow.keywords = keywords;
+    view.endProcess();
 }
 
 /**
@@ -817,6 +879,7 @@ function PhotometricMosaicData() {
         Parameters.set("photometryGraph", this.photometryGraphFlag);
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
+        Parameters.set("outlierRemoval", this.outlierRemoval);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("nLineSegments", this.nLineSegments);
@@ -854,6 +917,8 @@ function PhotometricMosaicData() {
             this.orientation = Parameters.getInteger("orientation");
         if (Parameters.has("rejectHigh"))
             this.rejectHigh = Parameters.getReal("rejectHigh");
+        if (Parameters.has("outlierRemoval"))
+            this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         if (Parameters.has("sampleSize"))
             this.sampleSize = Parameters.getInteger("sampleSize");
         if (Parameters.has("limitSampleStarsPercent"))
@@ -919,7 +984,8 @@ function PhotometricMosaicData() {
         this.displayStarsFlag = false;
         this.photometryGraphFlag = true;
         this.orientation = AUTO();
-        this.rejectHigh = 0.5;
+        this.rejectHigh = 0.8;
+        this.outlierRemoval = 0;
         this.sampleSize = 20;
         this.limitSampleStarsPercent = 25;
         this.nLineSegments = 1;
@@ -956,6 +1022,7 @@ function PhotometricMosaicData() {
         linearFitDialog.displayGraphControl.checked = this.displayGraphFlag;
         linearFitDialog.displaySampleControl.checked = this.displaySamplesFlag;
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
+        linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
@@ -1133,9 +1200,29 @@ function PhotometricMosaicDialog(data) {
     photometrySizer.addSpacing(10);
     photometrySizer.add(this.displayStarsControl);
     photometrySizer.addStretch();
+    
+    this.OutlierRemoval = new NumericControl(this);
+    this.OutlierRemoval.real = false;
+    this.OutlierRemoval.label.text = "Outlier Removal:";
+    this.OutlierRemoval.label.minWidth = labelSize;
+    this.OutlierRemoval.toolTip = "<p>Number of outlier stars to remove</p>" +
+            "<p>Check that the points plotted within the 'Photometry Graph'" +
+            " and use this control to reject the worst outliers.</p>";
+    this.OutlierRemoval.onValueUpdated = function (value) {
+        data.outlierRemoval = value;
+    };
+    this.OutlierRemoval.setRange(0, 10);
+    this.OutlierRemoval.slider.setRange(0, 10);
+    this.OutlierRemoval.slider.minWidth = 220;
+    this.OutlierRemoval.setValue(data.outlierRemoval);
+    let outlierSizer = new HorizontalSizer;
+    outlierSizer.spacing = 4;
+    outlierSizer.add(this.OutlierRemoval);
+    outlierSizer.addStretch();
 
     let photometryGroupBox = createGroupBox(this, "Photometric Scale");
     photometryGroupBox.sizer.add(photometrySizer);
+    photometryGroupBox.sizer.add(outlierSizer);
 
     //-------------------------------------------------------
     // Gradient detection group box
