@@ -579,8 +579,11 @@ function StarDetector()
                               if ( wrk.sample( ix, iy ) > 0.85*p.peak )
                               {
                                  let m = Matrix.fromImage( wrk, r );
-                                 if ( m.median() < this.peakResponse*p.peak )
-                                    S.push( new Star( p.pos, p.flux, p.size, p.bkg ) );
+                                 if ( m.median() < this.peakResponse*p.peak ){
+                                    // John Murphy: return star flux instead of total flux
+                                    let flux = p.flux - p.bkg * p.size;
+                                    S.push( new Star( p.pos, flux, p.size, p.bkg ) );
+                                 }
                               }
                      }
                   }

@@ -63,7 +63,8 @@ function StarPairs(starPairArray){
  * @returns {Number} Star flux corrected for background level
  */
 function getFlux(star) {
-    return star.flux - star.bkg * star.size;
+    //return star.flux - star.bkg * star.size;
+    return star.flux;
 };
 
 /**
@@ -402,7 +403,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    
+    starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs);
     imageWindow.show();
 }
 
@@ -537,4 +538,47 @@ function drawStarLineAndPoints(graph, lineColor, starPairs, pointColor){
     for (let starPair of starPairs.starPairArray){
         graph.drawPoint(getFlux(starPair.tgtStar), getFlux(starPair.refStar), pointColor);
     }
+}
+
+/**
+ * @param {View} refView
+ * @param {View} tgtView
+ * @param {ImageWindow} graphWindow Graph window
+ * @param {StarPairs[]} colorStarPairs StarPairs for each color channel
+ * @return {undefined}
+ */
+function starGraphFitsHeader(refView, tgtView, graphWindow, colorStarPairs){
+    let view = graphWindow.mainView;
+    let nColors = colorStarPairs.length;
+    view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
+    let keywords = graphWindow.keywords;
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+    let maxErr = Number.NEGATIVE_INFINITY;
+    let errStar = null;
+    for (let c = 0; c < nColors; c++){
+        let starPairs = colorStarPairs[c];
+        let linearFit = starPairs.linearFitData;
+        let comment = "Scale[" + c + "]: " + linearFit.m.toPrecision(5) + 
+                " (" + starPairs.starPairArray.length + " stars)";
+        keywords.push(new FITSKeyword("COMMENT", "", comment));
+        
+        for (let starPair of starPairs.starPairArray){
+            // y = ref; x = tgt
+            let y = eqnOfLineCalcY(starPair.getTgtFlux(), linearFit.m, linearFit.b);
+            let dif = Math.abs(y - starPair.getRefFlux());
+            if (dif > maxErr){
+                maxErr = dif;
+                errStar = starPair.tgtStar;
+            }
+        }
+    }
+    if (maxErr > Number.NEGATIVE_INFINITY){
+        let text = "" + maxErr.toPrecision(5) + 
+                " at (" + errStar.pos.x + ", " + errStar.pos.y + ")";
+        keywords.push(new FITSKeyword("COMMENT", "", "Max error: " + text));
+        console.writeln("Photomertry maximum error: " + text);
+    }
+    graphWindow.keywords = keywords;
+    view.endProcess();
 }
