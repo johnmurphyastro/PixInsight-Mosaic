@@ -239,10 +239,10 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @returns {ImageWindow|Graph.createWindow.imageWindow}
      */
     this.createWindow = function (title, isColor) {
-        let bitsPerSample = 32;
+        let bitsPerSample = 8;
         let nChannels = isColor ? 3 : 1;
         let imageWindow = new ImageWindow(this.bitmap.width, this.bitmap.height,
-                nChannels, bitsPerSample, true, isColor, title);
+                nChannels, bitsPerSample, false, isColor, title);
 
         let view = imageWindow.mainView;
         let image = view.image;
