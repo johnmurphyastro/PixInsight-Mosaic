@@ -32,7 +32,7 @@ function SamplePair(targetMedian, referenceMedian, rect) {
  * Contains SamplePair[]
  * @param {SamplePair[]} samplePairArray
  * @param {Number} sampleSize
- * @param {Rect} selectedArea Area selected by user (e.g. via preview)
+ * @param {Rect} selectedArea Area selected by user (e.g. via preview) or overlap bounding box
  * @returns {SamplePairs}
  */
 function SamplePairs(samplePairArray, sampleSize, selectedArea){
@@ -69,7 +69,7 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
 }
 
 // ============ Algorithms ============
-/**
+/** TODO rejectHigh is not currently used. If not needed for RGB images, remove.
  * Create SamplePairs for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
@@ -77,7 +77,7 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
  * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars
- * @param {Rect} selectedArea Reject samples outside this area
+ * @param {Rect} selectedArea Reject samples outside this area (preview or overlap bounding box)
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
 function createColorSamplePairs(targetImage, referenceImage,
@@ -93,13 +93,7 @@ function createColorSamplePairs(targetImage, referenceImage,
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
     let bins = new SampleBinMap(selectedArea, sampleSize, nChannels);
-    let xMax = bins.getNumberOfColumns();
-    let yMax = bins.getNumberOfRows();
-    for (let xKey = 0; xKey < xMax; xKey++){
-        for (let yKey = 0; yKey < yMax; yKey++){
-            bins.addBinRect(targetImage, referenceImage, xKey, yKey, rejectHigh);
-        }
-    }
+    bins.addSampleBins(targetImage, referenceImage, rejectHigh);
     bins.removeBinRectWithStars(stars, firstNstars);
     
     // Use the radius of the brightest detected star * 2
@@ -117,12 +111,13 @@ function createColorSamplePairs(targetImage, referenceImage,
  * Used to create the SamplePair array.
  * SamplePair[] are used to model the background level and gradient
  * Samples are discarded if they include black pixels or stars
- * @param {Rect} selectedArea Whole image area or selected preview area
+ * @param {Rect} selectedArea preview area or overlap bounding box
  * @param {Number} binSize bin size (SamplePair size)
  * @param {Number} nChannels 1 for B&W, 3 for color
  * @returns {SampleBinMap} 
  */
 function SampleBinMap(selectedArea, binSize, nChannels){
+    const self = this;
     //Sample size
     this.binSize = binSize;
     // Coordinate of top left bin
@@ -145,60 +140,78 @@ function SampleBinMap(selectedArea, binSize, nChannels){
      * @param {Number} yKey Nth bin in y direction (starting at zero)
      * @returns {Point} The (x,y) coordinate of the bin's center
      */
-    this.getBinCenter = function(xKey, yKey){
-        return new Point(this.getX(xKey) + this.binSize/2, this.getY(yKey) + this.binSize/2);
+    let getBinCenter = function(xKey, yKey){
+        return new Point(getX(xKey) + self.binSize/2, getY(yKey) + self.binSize/2);
     };
     /**
      * @returns {Number}
      */
-    this.getNumberOfColumns = function(){
-        return Math.floor((this.x1 - this.x0) / this.binSize);
+    let getNumberOfColumns = function(){
+        return Math.floor((self.x1 - self.x0) / self.binSize);
     };
     /**
      * 
      * @returns {Number}
      */
-    this.getNumberOfRows = function(){
-        return Math.floor((this.y1 - this.y0) / this.binSize);
+    let getNumberOfRows = function(){
+        return Math.floor((self.y1 - self.y0) / self.binSize);
     };
     /**
      * @param {Number} x Any X-Coordinate within a bin, including left edge
      * @returns {Number} Nth sample in x direction (starting at zero)
      */
-    this.getXKey = function(x){
-        return Math.floor((x - this.x0) / this.binSize);
+    let getXKey = function(x){
+        return Math.floor((x - self.x0) / self.binSize);
     };
     /**
      * @param {Number} y Any Y-Coordinate within a bin, including top edge
      * @returns {Number} Nth sample in y direction (starting at zero)
      */
-    this.getYKey = function(y){
-        return Math.floor((y - this.y0) / this.binSize);
+    let getYKey = function(y){
+        return Math.floor((y - self.y0) / self.binSize);
     };
     /**
      * @param {Number} xKey Nth bin in x direction (starting at zero)
      * @returns {Number} X-Coordinate of bin's left edge
      */
-    this.getX = function (xKey){
-        return this.x0 + xKey * this.binSize;
+    let getX = function (xKey){
+        return self.x0 + xKey * self.binSize;
     };
     /**
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      * @returns {Number} Y-Coordinate of bin's top edge
      */
-    this.getY = function (yKey){
-        return this.y0 + yKey * this.binSize;
+    let getY = function (yKey){
+        return self.y0 + yKey * self.binSize;
     };
     /**
      * @param {Number} xKey Nth bin in x direction (starting at zero)
      * @param {Number} yKey Nth bin in y direction (starting at zero)
      * @returns {String} Key has format "xKey,yKey" e.g. "3,28"
      */
-    this.createKey = function(xKey, yKey){
+    let createKey = function(xKey, yKey){
         return "" + xKey + "," + yKey;
     };
     
     /**
+     * Add all bins within the selected area.
+     * Reject bins with one or more zero pixels.
+     * @param {Image} targetImage
+     * @param {Image} referenceImage
+     * @param {Number} rejectHigh TODO Not currently used
+     * @returns {undefined}
+     */
+    this.addSampleBins = function(targetImage, referenceImage, rejectHigh){
+        let xMax = getNumberOfColumns();
+        let yMax = getNumberOfRows();
+        for (let xKey = 0; xKey < xMax; xKey++){
+            for (let yKey = 0; yKey < yMax; yKey++){
+                addBinRect(targetImage, referenceImage, xKey, yKey, rejectHigh);
+            }
+        }
+    };
+    
+    /** TODO rejectHigh not currently used
      * If the specified bin does not contain pixels that are zero or > rejectHigh
      * add an entry to our binRect map. If the sample contains a 
      * pixel > rejectHigh save it to a 'too bright' map, with the coordinate of 
@@ -208,12 +221,12 @@ function SampleBinMap(selectedArea, binSize, nChannels){
      * @param {Image} refImage
      * @param {Number} xKey Nth sample in x direction (starting at zero)
      * @param {Number} yKey Nth sample in y direction (starting at zero)
-     * @param {Number} rejectHigh Reject samples with pixels greater than this
+     * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
      */
-    this.addBinRect = function(tgtImage, refImage, xKey, yKey, rejectHigh){
-        let nChannels = this.binRectMapArray.length;
-        let binRect = new Rect(this.binSize, this.binSize);
-        binRect.moveTo(this.getX(xKey), this.getY(yKey));
+    let addBinRect = function(tgtImage, refImage, xKey, yKey, rejectHigh){
+        let nChannels = self.binRectMapArray.length;
+        let binRect = new Rect(self.binSize, self.binSize);
+        binRect.moveTo(getX(xKey), getY(yKey));
         for (let c=0; c < nChannels; c++){
             // Dont add sample if it contains 1 or more pixels that are black
             if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
@@ -225,7 +238,7 @@ function SampleBinMap(selectedArea, binSize, nChannels){
 //                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
 //                return;
 //            }
-            this.binRectMapArray[c].set(this.createKey(xKey, yKey), binRect);
+            self.binRectMapArray[c].set(createKey(xKey, yKey), binRect);
         }
     };
     
@@ -240,7 +253,7 @@ function SampleBinMap(selectedArea, binSize, nChannels){
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
             let starRadius = Math.sqrt(star.size)/2;
-            this.removeBinsInCircle(star.pos, starRadius);
+            removeBinsInCircle(star.pos, starRadius);
         }
     };
     
@@ -264,22 +277,22 @@ function SampleBinMap(selectedArea, binSize, nChannels){
      * @param {Point} p
      * @param {Number} starRadius
      */
-    this.removeBinsInCircle = function (p, starRadius) {
+    let removeBinsInCircle = function (p, starRadius) {
         let starToCenter = starRadius + binSize/2;
-        let starXKey = this.getXKey(p.x);
-        let starYKey = this.getYKey(p.y);
-        let minXKey = this.getXKey(p.x - starRadius);
-        let maxXKey = this.getXKey(p.x + starRadius);
-        let minYKey = this.getYKey(p.y - starRadius);
-        let maxYKey = this.getYKey(p.y + starRadius);
+        let starXKey = getXKey(p.x);
+        let starYKey = getYKey(p.y);
+        let minXKey = getXKey(p.x - starRadius);
+        let maxXKey = getXKey(p.x + starRadius);
+        let minYKey = getYKey(p.y - starRadius);
+        let maxYKey = getYKey(p.y + starRadius);
         for (let xKey = minXKey; xKey <= maxXKey; xKey++) {
             for (let yKey = minYKey; yKey <= maxYKey; yKey++) {
                 if (xKey === starXKey || yKey === starYKey) {
-                    this.removeBinRect(xKey, yKey);
+                    removeBinRect(xKey, yKey);
                 } else {
-                    let binCenter = this.getBinCenter(xKey, yKey);
+                    let binCenter = getBinCenter(xKey, yKey);
                     if (p.distanceTo(binCenter) < starToCenter) {
-                        this.removeBinRect(xKey, yKey);
+                        removeBinRect(xKey, yKey);
                     }
                 }
             }
@@ -291,10 +304,10 @@ function SampleBinMap(selectedArea, binSize, nChannels){
      * @param {Number} xKey Nth sample in x direction (starting at zero)
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      */
-    this.removeBinRect = function(xKey, yKey){
-        let key = this.createKey(xKey, yKey);
-        for (let c=0; c < this.binRectMapArray.length; c++){
-            this.binRectMapArray[c].delete(key);
+    let removeBinRect = function(xKey, yKey){
+        let key = createKey(xKey, yKey);
+        for (let c=0; c < self.binRectMapArray.length; c++){
+            self.binRectMapArray[c].delete(key);
         }
     };
     

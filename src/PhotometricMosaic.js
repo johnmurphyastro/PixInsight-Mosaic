@@ -25,6 +25,7 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/StarLib.js"
+#include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
 
 function VERSION(){return  "1.0";}
@@ -65,7 +66,7 @@ function PhotometricMosaic(data)
     if (samplePreviewArea === null){
         samplePreviewArea = detectedStars.overlapBox;
     }
-    let colorStarPairs = getColorStarPairs(detectedStars, referenceView.image, targetView.image, data.rejectHigh);
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView.image, targetView.image, data.rejectHigh);
     console.writeln("Detected " + detectedStars.allStars.length + " stars (", getElapsedTime(detectStarTime), ")");
     if (targetView.image.isColor){
         console.writeln("Stars used for photometry: red " + colorStarPairs[0].starPairArray.length + 
@@ -123,23 +124,16 @@ function PhotometricMosaic(data)
     let sampleArea = samplePairs.getSampleArea();
     let isHorizontal = isJoinHorizontal(data, sampleArea);
 
-    let gradientArray = [];
-    let eqnLineArray = [];
-    // For each channel (L or RGB)
-    // Calculate the linear fit line y = mx + b
-    // Display graph of fitted line and sample points
-    for (let channel = 0; channel < nChannels; channel++) {
-        samplePairs = colorSamplePairs[channel];
-        // Divide into sections and calculate linearFit
-        let nLineSegments = (data.nLineSegments + 1) / 2;
-        let sampleSections = getSampleSections(samplePairs, nLineSegments, isHorizontal);
-        sampleSections = joinSectionLines(sampleSections);
-        eqnLineArray[channel] = createGradientLines(sampleSections, samplePreviewArea, targetView.image, isHorizontal); 
-        gradientArray[channel] = createGradient(eqnLineArray[channel]);
+    // Calculate the gradient for each channel
+    let gradients = [];
+    let nLineSegments = (data.nLineSegments + 1) / 2;
+    for (let c = 0; c < nChannels; c++) {
+        samplePairs = colorSamplePairs[c];
+        gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, samplePreviewArea, isHorizontal);
     }
 
     let applyGradientTime = new Date().getTime();
-    applyGradient(targetView, isHorizontal, gradientArray, detectedStars.overlapBox, 
+    applyGradient(targetView, isHorizontal, gradients, detectedStars.overlapBox, 
         data.taperFlag, data.taperLength);
     console.writeln("Applied gradients (", getElapsedTime(applyGradientTime), ")\n");
 
@@ -171,7 +165,7 @@ function PhotometricMosaic(data)
 
     if (data.displayGraphFlag) {
         let time = new Date().getTime();
-        displayGraph(targetView, referenceView, 1000, isHorizontal, gradientArray, colorSamplePairs, eqnLineArray);
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs);
         console.writeln("Displaying gradient graph... (", getElapsedTime(time), ")");
     }
 
@@ -219,471 +213,67 @@ function PhotometricMosaic(data)
 }
 
 /**
- * 
- * @param {StarDetector} detectedStars
- * @param {Image} refImg
- * @param {Image} tgtImg
- * @param {Number} upperLimit Only use stars within camera's linear range
- * @returns {StarPairs[]} Array of StarPairs for all color channels
- */
-function getColorStarPairs(detectedStars, refImg, tgtImg, upperLimit){
-    let colorStarPairs = [];
-    let nChannels = refImg.isColor ? 3 : 1;
-    for (let channel=0; channel < nChannels; channel++){
-        let refStars = detectedStars.refColorStars[channel];
-        let tgtStars = detectedStars.tgtColorStars[channel];
-        let starPairs = findMatchingStars(refImg, refStars, tgtImg, tgtStars, channel, upperLimit);
-        colorStarPairs.push(starPairs);
-    }
-    return colorStarPairs;
-}
-
-/**
  * @param {StarPairs} starPairs
  * @returns {LinearFitData} Least Square Fit between reference & target star flux
  */
 function calculateScale(starPairs) {
     let leastSquareFit = new LeastSquareFitAlgorithm();
     for (let starPair of starPairs.starPairArray) {
-        leastSquareFit.addValue(starPair.getTgtFlux(), starPair.getRefFlux());
+        leastSquareFit.addValue(starPair.tgtStar.flux, starPair.refStar.flux);
     }
     return leastSquareFit.getOriginFit();
 }
 
 /**
- * Removes the worst outlier from the photometry least squares fit line
- * @param {StarPairs} starPairs A star pair will be removed
- * @param {LinearFitData} linearFit
- * @returns {StarPairs}
- */
-function removeStarPairOutlier(starPairs, linearFit){
-    let maxErr = Number.NEGATIVE_INFINITY;
-    let removeStarPairIdx = -1;
-    for (let i=0; i<starPairs.starPairArray.length; i++){
-        let starPair = starPairs.starPairArray[i];
-        // y = ref; x = tgt
-        let y = eqnOfLineCalcY(starPair.getTgtFlux(), linearFit.m, linearFit.b);
-        let dif = Math.abs(y - starPair.getRefFlux());
-        if (dif > maxErr){
-            maxErr = dif;
-            removeStarPairIdx = i;
-        }
-    }
-    if (removeStarPairIdx !== -1){
-        starPairs.starPairArray.splice(removeStarPairIdx, 1);
-    }
-    return starPairs;
-}
-
-/**
- * Split the sample coverage area into sections and calculate the gradient linear fit
- * for each section.
- * Returns an array of all the sections.
- * @param {SamplePairs} samplePairs Contains the SamplePairArray and selection areas )
- * @param {Number} nSections The number of sections to create
- * @param {Boolean} isHorizontal True if the mosaic join is a horizontal strip
- * @returns {SampleSection[]}
- */
-function getSampleSections(samplePairs, nSections, isHorizontal){
-    // Start the first section at the start of the SamplePair area
-    let sampleAreaStart;
-    let sampleAreaEnd;
-    let sampleCoverageArea = samplePairs.getSampleArea();
-    if (isHorizontal){
-        sampleAreaStart = sampleCoverageArea.x0;
-        sampleAreaEnd = sampleCoverageArea.x1;
-    } else {
-        sampleAreaStart = sampleCoverageArea.y0;
-        sampleAreaEnd = sampleCoverageArea.y1;
-    }
-    let interval = (sampleAreaEnd - sampleAreaStart) / nSections;
-
-    // Split the SamplePair area into sections of equal size.
-    let sections = [];
-    for (let i=0; i<nSections; i++){
-        // ...Coord is x if horizontal join, y if vertical join
-        let minCoord = Math.floor(sampleAreaStart + interval * i);
-        let maxCoord = Math.floor(sampleAreaStart + interval * (i+1));
-        let newSampleSection = new SampleSection(minCoord, maxCoord, isHorizontal);
-        newSampleSection.calcLinearFit(samplePairs);
-        sections[i] = newSampleSection;
-    }
-    return sections;
-}
-
-/**
- * Represents a single section of the mosaic join
- * @param {type} minCoord Minimum coordinate of section boundary
- * @param {type} maxCoord Maximum coordinate of section boundary
- * @param {type} isHorizontal
- * @returns {SampleSection}
- */
-function SampleSection(minCoord, maxCoord, isHorizontal){
-    this.linearFitData = null;
-    this.minCoord = minCoord;
-    this.maxCoord = maxCoord;
-    this.isHorizontal = isHorizontal;
-
-    /**
-     * Determine which SamplePair are within this section's area, store them
-     * and calculate their linear fit
-     * @param {SamplePairs} samplePairs Contains samplePairArray
-     * @returns {undefined}
-     */
-    this.calcLinearFit = function (samplePairs) {
-        let samplePairArray = [];
-        for (let samplePair of samplePairs.samplePairArray) {
-            // Discover which SamplePair are within this section's area and store them
-            if (this.isHorizontal) {
-                const x = samplePair.rect.center.x;
-                if (x >= this.minCoord && x < this.maxCoord) {
-                    samplePairArray.push(samplePair);
-                }
-            } else {
-                const y = samplePair.rect.center.y;
-                if (y >= this.minCoord && y < this.maxCoord) {
-                    samplePairArray.push(samplePair);
-                }
-            }
-        }
-        // Calculate the linear fit
-        let algorithm = new LeastSquareFitAlgorithm();
-        if (isHorizontal) {
-            samplePairArray.forEach((samplePair) => {
-                algorithm.addValue(samplePair.rect.center.x, samplePair.targetMedian - samplePair.referenceMedian);
-            });
-        } else {
-            samplePairArray.forEach((samplePair) => {
-                algorithm.addValue(samplePair.rect.center.y, samplePair.targetMedian - samplePair.referenceMedian);
-            });
-        }
-        this.linearFitData = algorithm.getLinearFit();
-    };
-
-    /**
-     * Calculate this section's linear fit line from where two lines intersect this section's boundary.
-     * We first calculate the two intersection points:
-     * The first point is where the line linearFit0 intersects with this section's minimum boundary.
-     * The second point is where the line linearFit1 intersects with this section's maximum boundary.
-     * We can then calculate the equation of the line that joins these two points.
-     * This method is used when we insert a new section between two others inorder
-     * to round off the gradient curve corners.
-     * @param {LinearFitData} linearFit0 Line that intersects this sections minimum boundary
-     * @param {LinearFitData} linearFit1 Line that intersects this sections maximum boundary
-     * @returns {undefined}
-     */
-    this.calcLineBetween = function(linearFit0, linearFit1){
-        // y = mx + b
-        // m = (y1 - y0)/(x1 - x0)
-        // b = y0 - m * x0
-        let x0 = this.minCoord;
-        let x1 = this.maxCoord;
-        let y0 = eqnOfLineCalcY(x0, linearFit0.m, linearFit0.b);
-        let y1 = eqnOfLineCalcY(x1, linearFit1.m, linearFit1.b);
-        let m = eqnOfLineCalcGradient(x0, y0, x1, y1);
-        let b = eqnOfLineCalcYIntercept(x0, y0, m);
-        this.linearFitData = new LinearFitData(m, b);
-    };
-}
-
-/**
- * Join section lines together by adding dummy SampleSection between each genuine one.
- * The boundaries of the existing SampleSection's are adjusted to make room.
- * The new SampleSection contains a line that 'cuts the corner' between
- * where the original lines ended
- * @param {SampleSection[]} sampleSections
- * @returns {SampleSection[]}
- */
-function joinSectionLines(sampleSections){
-    if (sampleSections.length > 1) {
-        // Calculate how far to move the existing SampleSection boundaries.
-        // The newly inserted SampleSection will be (dist * 2) wide.
-        let s = sampleSections[1];
-        let dist = Math.round((s.maxCoord - s.minCoord) / 6);
-        if (dist < 6) {
-            return sampleSections;
-        }
-        let roundedSampleSections = [];
-        let s0 = sampleSections[0];
-        for (let i = 1; i < sampleSections.length; i++) {
-            let s1 = sampleSections[i];
-            s0.maxCoord -= dist;
-            s1.minCoord += dist;
-            // Create a new dummy SampleSection. It will not contain any samples,
-            // but we do calcuate and set its 'linear fit' line which joins it to
-            // the previous and next SampleSection's
-            let ss = new SampleSection(s0.maxCoord, s1.minCoord, s0.isHorizontal);
-            ss.calcLineBetween(s0.linearFitData, s1.linearFitData);
-            roundedSampleSections.push(s0);
-            roundedSampleSections.push(ss);
-            s0 = s1;
-        }
-        roundedSampleSections.push(s0);
-        sampleSections = roundedSampleSections;
-    }
-
-    return sampleSections;
-}
-/**
- * Create the gradient as an array of pixel differences, stored in the GradientData structure.
- *
- * @param {EquationOfLine[]} eqnLines EquationOfLine array
- * @returns {GradientData}
- */
-function createGradient(eqnLines) {
-    let minValue = Number.POSITIVE_INFINITY;
-    let maxValue = Number.NEGATIVE_INFINITY;
-    
-    let difArray = [];
-    for (let eqnLine of eqnLines){
-        minValue = Math.min(minValue, eqnLine.y0);
-        maxValue = Math.max(maxValue, eqnLine.y0);
-        for (let x = eqnLine.x0; x < eqnLine.x1; x++){
-            difArray.push(eqnLine.calcYFromX(x));
-        }
-    }
-    
-    let eqnLine = eqnLines[eqnLines.length - 1];
-    minValue = Math.min(minValue, eqnLine.y1);
-    maxValue = Math.max(maxValue, eqnLine.y1);
-    
-    if (difArray.length !== eqnLines[eqnLines.length-1].x1) {
-        console.criticalln("Error: DifArray length = " + difArray.length + "image size = " + eqnLines[eqnLines.length-1].x1);
-    }
-    return new GradientData(difArray, minValue, maxValue);
-}
-
-/**
- * How the difference lines are calculated:
- * (1) The SampleArea is the bounding rectangle of all the SamplePairs.
- * (2) The previewArea is the area selected by the user (e.g. by a preview). If
- * the user made no selection, the previewArea is the bounding box of the 
- * overlap region. The SampleArea is a subset of the previewArea (it can be the 
- * same size, but not bigger.)
- * (3) The SampleArea is divided into SampleSection. Each of these sections
- * defines a gradient line. The dif value within the sample area is calculated
- * from the equation of this line: dif = mx + b
- * (4) From the start of the image to the start of the previewArea, the dif value
- * is held constant.
- * (5) From the start of the previewArea (or the start of the image if the
- * preview area does not exist) to the first SampleSection, the line from that first
- * SampleSection is extended.
- * (6) From the last SampleSection to the end of the previewArea (or the end of
- * the image if the preview area does not exist) the line from that last
- * SampleSection is extended.
- * (7) From the end of the previewArea to the end of the image, the dif value
- * is held constant.
- * @param {SampleSection[]} sections
- * @param {Rect} previewArea
- * @param {Image} targetImage
- * @param {Boolean} isHorizontal
- * @returns {EquationOfLine[]}
- */
-function createGradientLines(sections, previewArea, targetImage, isHorizontal){
-    let previewMin;
-    let previewMax;
-    let imageMax;
-    if (isHorizontal) {
-        previewMin = previewArea.x0;
-        previewMax = previewArea.x1;
-        imageMax = targetImage.width;
-    } else {
-        previewMin = previewArea.y0;
-        previewMax = previewArea.y1;
-        imageMax = targetImage.height;
-    }
-    
-    let eqnOfLines = [];
-    if (previewMin > 0){
-        // First horizontal line to start of preview
-        // The first line is horizontal (gradient = 0)
-        // and intersects the first section line at previewMin
-        let linearFitData = sections[0].linearFitData;
-        let b = eqnOfLineCalcY(previewMin, linearFitData.m, linearFitData.b);
-        eqnOfLines.push(new EquationOfLine(0, b, 0, previewMin));
-    }
-    
-    // Each section
-    for (let i = 0; i < sections.length; i++){
-        let x0 = (i===0 ? previewMin : sections[i].minCoord);
-        let x1 = (i===sections.length - 1 ? previewMax : sections[i].maxCoord);
-        let m = sections[i].linearFitData.m;
-        let b = sections[i].linearFitData.b;
-        eqnOfLines.push(new EquationOfLine(m, b, x0, x1));
-    }
-    
-    // From end of sections to end of preview (or end of image)
-    if (previewMax < imageMax){
-        // The last line is horizontal (gradient = 0)
-        // and intersects the last section line at previewMax
-        let linearFitData = sections[sections.length-1].linearFitData;
-        let b = eqnOfLineCalcY(previewMax, linearFitData.m, linearFitData.b);
-        eqnOfLines.push(new EquationOfLine(0, b, previewMax, imageMax));
-    }
-    
-    return eqnOfLines;    
-}
-
-/**
- * Display graph of (difference between images) / (pixel distance across image)
- * @param {View} targetView Used for view name and image size (max graph size is limited to image size)
- * @param {View} referenceView Used for view name
- * @param {Number} width Width or Height. Limited to target image size.
- * @param {Boolean} isHorizontal
- * @param {GradientData[]} gradientArray Only used for stored min/max difference values
- * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
- * @param {EquationOfLine[]} eqnLineArray The best fit lines of difference against coordinate
+ * Apply the linear fit scale factor (gradient) to all non zero samples within 
+ * the target image. The output image is not truncated to be within the 0 to 1
+ * range because the offset/gradient will be applied later on.
+ * The scale should always be corrected (via photometry) before the offset or 
+ * gradient is calculated.
+ * @param {View} view Target view
+ * @param {LinearFitData[]} linearFitColorArray LinearFitData for each channel
+ * @param {Boolean} allowUndo
  * @returns {undefined}
  */
-function displayGraph(targetView, referenceView, width, isHorizontal, gradientArray, colorSamplePairs, eqnLineArray){
-    let axisWidth;
-    let maxCoordinate;
-    let imageWindow = null;
-    let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
-    let xLabel;
-    if (isHorizontal){
-        xLabel = "Mosaic tile join X-coordinate";
-        maxCoordinate = targetView.image.width;
-    } else {
-        xLabel = "Mosaic tile join Y-coordinate";
-        maxCoordinate = targetView.image.height;
+function applyLinearFitScale(view, linearFitColorArray, allowUndo) {
+    let P = new PixelMath;
+    P.setDescription("Apply gradient to " + view.fullId);
+    P.symbols = "m0 = " + linearFitColorArray[0].m;
+    P.expression0 = "iif($T == 0, 0, $T * m0)";
+    if (3 === linearFitColorArray.length) { // RGB
+        P.symbols += ", m1 = " + linearFitColorArray[1].m;
+        P.expression1 = "iif($T == 0, 0, $T * m1)";
+        P.symbols += ", m2 = " + linearFitColorArray[2].m;
+        P.expression2 = "iif($T == 0, 0, $T * m2)";
+        P.expression3 = "";
+        P.useSingleExpression = false;
+    } else { // L
+        P.useSingleExpression = true;
     }
-    let yLabel = "(" + targetView.fullId + ") - (" + referenceView.fullId + ")";
-    axisWidth = Math.min(width, maxCoordinate);
-    // Graph scale
-    // gradientArray stores min / max of fitted lines.
-    // also need min / max of sample points.
-    const minScaleDif = 1e-4;
-    let minMax = new SamplePairDifMinMax(colorSamplePairs, gradientArray);
-    let maxY = minMax.maxDif;
-    let minY = minMax.minDif;
-    if (maxY - minY < minScaleDif){
-        maxY += minScaleDif;
-        minY -= minScaleDif;
-    }
-    let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
-    graphWithAxis.setAxisLength(axisWidth + 2, 720);
-    graphWithAxis.createGraph(xLabel, yLabel);
-
-    if (colorSamplePairs.length === 1){ // B&W
-        drawLineAndPoints(graphWithAxis, isHorizontal, eqnLineArray[0], 0xFFFFFFFF,
-            colorSamplePairs[0], 0xFFFFFFFF);
-        imageWindow = graphWithAxis.createWindow(windowTitle, false);
-    } else {
-        // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
-        // if three samples are on the same pixel we get white and not the last color drawn
-        let lineColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        for (let c = 0; c < colorSamplePairs.length; c++){
-            let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawLineAndPoints(graphWithAxis, isHorizontal, eqnLineArray[c], lineColors[c],
-                colorSamplePairs[c], pointColors[c]);
-            graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
-        }
-        imageWindow = graphWithAxis.createWindow(windowTitle, true);
-    }
-    gradientGraphFitsHeader(referenceView, targetView, imageWindow, eqnLineArray);
-    imageWindow.show();
-}
-
-/**
- * Draw gradient line and sample points for a single color channel.
- * @param {Graph} graph
- * @param {Boolean} isHorizontal
- * @param {EquationOfLine[]} eqnLines
- * @param {Number} lineColor
- * @param {SamplePairs} samplePairs
- * @param {Number} pointColor
- * @returns {undefined}
- */
-function drawLineAndPoints(graph, isHorizontal, eqnLines, lineColor, samplePairs, pointColor) {
-    for (let eqnLine of eqnLines){
-        graph.drawLineSegment(eqnLine.m, eqnLine.b, lineColor, true, eqnLine.x0, eqnLine.x1);
-    }
-    for (let samplePair of samplePairs.samplePairArray) {
-        // Draw the sample points
-        let dif = samplePair.targetMedian - samplePair.referenceMedian;
-        let coord;
-        if (isHorizontal) {
-            coord = samplePair.rect.center.x;
-        } else {
-            coord = samplePair.rect.center.y;
-        }
-        graph.drawPoint(coord, dif, pointColor);
-    }
-}
-
-/**
- * @param {View} refView
- * @param {View} tgtView
- * @param {ImageWindow} graphWindow Graph window
- * @param {EquationOfLine[]} eqnLinesArray Best fit lines for each channel
- * @return {undefined}
- */
-function gradientGraphFitsHeader(refView, tgtView, graphWindow, eqnLinesArray){
-    let view = graphWindow.mainView;
-    let nColors = eqnLinesArray.length;
-    view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-    let keywords = graphWindow.keywords;
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-    for (let c = 0; c < nColors; c++){
-        let eqnLines = eqnLinesArray[c];
-        for (let i=0; i<eqnLines.length; i++){
-            let eqnLine = eqnLines[i];
-            let offset = eqnOfLineCalcY(eqnLine.x0, eqnLine.m, eqnLine.b);
-            let comment = "Offset[" + c + "] at " + eqnLine.x0 + " = " + offset.toPrecision(5);
-            keywords.push(new FITSKeyword("COMMENT", "", comment));
-            if (i === eqnLines.length - 1){
-                let offset1 = eqnOfLineCalcY(eqnLine.x1, eqnLine.m, eqnLine.b);
-                let comment2 = "Offset[" + c + "] at " + eqnLine.x1 + " = " + offset1.toPrecision(5);
-                keywords.push(new FITSKeyword("COMMENT", "", comment2));
-            }
-        }
-    }
-    graphWindow.keywords = keywords;
-    view.endProcess();
-}
-
-/**
- * Calculates maximum and minimum values for the samples and the best fit line(s)
- * @param {type} colorSamplePairs
- * @param {GradientData} gradientData
- * @returns {SamplePairDifMinMax}
- */
-function SamplePairDifMinMax(colorSamplePairs, gradientData) {
-    if (gradientData.length === 3){
-        this.minDif = Math.min(gradientData[0].minValue, gradientData[1].minValue, gradientData[2].minValue);
-        this.maxDif = Math.max(gradientData[0].maxValue, gradientData[1].maxValue, gradientData[2].maxValue);
-    } else {
-        this.minDif = gradientData[0].minValue;
-        this.maxDif = gradientData[0].maxValue;
-    }
-
-    for (let samplePairs of colorSamplePairs) {
-        for (let samplePair of samplePairs.samplePairArray) {
-            // works for both horizontal and vertical
-            this.minDif = Math.min(this.minDif, samplePair.targetMedian - samplePair.referenceMedian);
-            this.maxDif = Math.max(this.maxDif, samplePair.targetMedian - samplePair.referenceMedian);
-        }
-    }
+    P.singleThreaded = false;
+    P.use64BitWorkingImage = true;
+    P.rescale = false;
+    P.truncate = false;
+    P.createNewImage = false;
+    P.executeOn(view, allowUndo);
 }
 
 /**
  * Subtract the detected gradient from the target view
  * @param {View} view Apply the gradient correction to this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
- * @param {Number[].GradientData} gradientArray ColourChannel.GradientData diff data
+ * @param {Gradient[]} gradients Gradient for each color channel
  * @param {Rect} overlapBox Bounding box of overlap region
  * @param {Boolean} taperFlag If true, apply taper to average offset in direction perpendicular to join
  * @param {Number} taperLength Length of taper to apply in pixels
  * @returns {undefined}
  */
-function applyGradient(view, isHorizontal, gradientArray, overlapBox, taperFlag, taperLength) {
-    let nChannels = gradientArray.length;
+function applyGradient(view, isHorizontal, gradients, overlapBox, taperFlag, taperLength) {
+    let nChannels = gradients.length;
     let targetImage = view.image;
     for (let channel = 0; channel < nChannels; channel++) {
-        let difArray = gradientArray[channel].difArray;
+        let gradientData = gradients[channel].getGradientData();
+        let difArray = gradientData.difArray;
         let average = Math.mean(difArray);
         console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
         let gradientOffset = new GradientOffset(targetImage.width, targetImage.height, 
@@ -719,60 +309,62 @@ function applyGradient(view, isHorizontal, gradientArray, overlapBox, taperFlag,
 }
 
 /**
- * Calculates the offset in the direction perpendicular to the join.
- * Over the overlap area this is constant.
- * Before and after the overlap area, it tapers towards the average offset.
- * Beyond the taper length, it returns the average offset.
- * @param {Number} imageWidth
- * @param {Number} imageHeight
- * @param {Number} average Average offset (average value in difArray)
- * @param {Rect} overlapBox Bounding box of the overlap between target and reference images
- * @param {Number} taperLength Taper (or feather) length
- * @param {Boolean} isHorizontal Tile join direction
- * @returns {GradientOffset}
+ * Create or append to a mosaic by adding two images together
+ * If the MosaicTest image does not exist it is created.
+ * Zero pixels are ignored
+ * 
+ * @param {View} referenceView In overlay mode, displayed on top
+ * @param {View} targetView In overlay mode, displayed beneath
+ * @param {String} mosaicImageName
+ * @param {Boolean} createMosaicView If true create image, else replace reference view
+ * @param {Boolean} overlayRefFlag Set overlapping pixels to the reference image
+ * @param {Boolean} overlayTgtFlag Set overlapping pixels to the target image
+ * @param {Boolean} randomFlag Set overlapping pixels randomly to reference or target pixels
+ * @returns {undefined}
  */
-function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLength, isHorizontal) {
-    this.average = average;
-    this.taperLength = taperLength;
-    if (isHorizontal){
-        this.limit1 = Math.max(0, overlapBox.y0 - taperLength);
-        this.limit2 = overlapBox.y0;
-        this.limit3 = overlapBox.y1;
-        this.limit4 = Math.min(imageHeight, overlapBox.y1 + taperLength);
+function createMosaic(referenceView, targetView, mosaicImageName, createMosaicView,
+        overlayRefFlag, overlayTgtFlag, randomFlag) {
+    let P = new PixelMath;
+    P.setDescription("Create Mosaic from " + referenceView.fullId + ", " + targetView.fullId);
+    let expression;
+    if (overlayRefFlag) {
+        expression = format("iif(%s != 0, %s, %s)", referenceView.fullId, referenceView.fullId, targetView.fullId);
+    } else if (overlayTgtFlag){
+        expression = format("iif(%s != 0, %s, %s)", targetView.fullId, targetView.fullId, referenceView.fullId);
+    } else if (randomFlag){
+        // iif( A && B, rndselect( A, B ), A + B )
+        let A = referenceView.fullId;
+        let B = targetView.fullId;
+        expression = "iif(" + A + " && " + B + ", rndselect(" + A + ", " + B + "), " + A + " + " + B + ")";
     } else {
-        this.limit1 = Math.max(0, overlapBox.x0 - taperLength);
-        this.limit2 = overlapBox.x0;
-        this.limit3 = overlapBox.x1;
-        this.limit4 = Math.min(imageWidth, overlapBox.x1 + taperLength);
+        // Average: iif( A && B, mean( A, B ), A + B )
+        let A = referenceView.fullId;
+        let B = targetView.fullId;
+        expression = "iif(" + A + " && " + B + ", (" + A + " + " + B + ")/2, " + A + " + " + B + ")";
     }
-    
-    /**
-     * Get the tapered offset value between the reference and target image.
-     * Outside the overlap region, it tapers down towards the average offset.
-     * @param {Number} coord x-coord (vertical join) or y-coord (horizontal join)
-     * @param {Number} dif Value from the difArray
-     * @returns {Number} Offset to subtract from target image
-     */
-    this.getOffset = function(coord, dif){
-        if (coord < this.limit1 || coord > this.limit4){
-            // First or last region; Only apply average offset
-            return this.average;
-        }
-        if (coord < this.limit2){
-            // Progressively apply more of the correction as we approach the overlap 
-            let delta = dif - this.average;
-            let fraction = 1 - (this.limit2 - coord) / this.taperLength;
-            return this.average + delta * fraction;
-        }
-        if (coord < this.limit3){
-            // Overlap region: apply the full correction
-            return dif;
-        }
-        // Progressively apply less of the correction as we move away from the overlap
-        let delta = dif - this.average;
-        let fraction = 1 - (coord - this.limit3) / this.taperLength;
-        return this.average + delta * fraction;
-    };
+
+    P.expression = expression;
+    P.symbols = "";
+    P.useSingleExpression = true;
+    P.generateOutput = true;
+    P.singleThreaded = false;
+    P.use64BitWorkingImage = true;
+    P.rescale = false;
+    P.truncate = false; // Both input images should be within range
+    if (createMosaicView) {
+        P.createNewImage = true;
+        P.showNewImage = true;
+        P.newImageId = mosaicImageName;
+        P.newImageWidth = 0;
+        P.newImageHeight = 0;
+        P.newImageAlpha = false;
+        P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
+        P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
+        P.executeOn(targetView, true); // used to get sample format and color space
+    } else {
+        P.createNewImage = false;
+        P.executeOn(referenceView, true);
+    }
 }
 
 /**

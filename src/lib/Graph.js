@@ -37,6 +37,7 @@ function Graph(xMin, yMin, xMax, yMax) {
     this.xOrigin = 0;
     this.yOrigin = 0;
     
+    const self = this;
     /**
      * Sets the x & y axis lengths and calculates the scales for both axis
      * @param {Number} xAxisLength
@@ -46,8 +47,8 @@ function Graph(xMin, yMin, xMax, yMax) {
     this.setAxisLength = function(xAxisLength, yAxisLength){
         this.xAxisLength = xAxisLength;
         this.yAxisLength = yAxisLength;
-        this.xScale = this.calculateScale(this.xAxisLength, this.xMax - this.xMin);
-        this.yScale = this.calculateScale(this.yAxisLength, this.yMax - this.yMin);
+        this.xScale = calculateScale(this.xAxisLength, this.xMax - this.xMin);
+        this.yScale = calculateScale(this.yAxisLength, this.yMax - this.yMin);
     };
     
     /**
@@ -58,9 +59,9 @@ function Graph(xMin, yMin, xMax, yMax) {
      */
     this.setXAxisLength = function(xAxisLength){
         this.xAxisLength = xAxisLength;
-        this.xScale = this.calculateScale(this.xAxisLength, this.xMax - this.xMin);
+        this.xScale = calculateScale(this.xAxisLength, this.xMax - this.xMin);
         this.yScale = this.xScale;
-        this.yAxisLength = this.calculateAxisLength(this.yScale, this.yMax - this.yMin);
+        this.yAxisLength = calculateAxisLength(this.yScale, this.yMax - this.yMin);
     };
     
     /**
@@ -71,9 +72,9 @@ function Graph(xMin, yMin, xMax, yMax) {
      */
     this.setYAxisLength = function(yAxisLength){
         this.yAxisLength = yAxisLength;
-        this.yScale = this.calculateScale(this.yAxisLength, this.yMax - this.yMin);
+        this.yScale = calculateScale(this.yAxisLength, this.yMax - this.yMin);
         this.xScale = this.yScale;
-        this.xAxisLength = this.calculateAxisLength(this.xScale, this.xMax - this.xMin);
+        this.xAxisLength = calculateAxisLength(this.xScale, this.xMax - this.xMin);
     };
     
     /**
@@ -82,7 +83,7 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} range
      * @returns {Number}
      */
-    this.calculateScale = function(axisLength, range){
+    let calculateScale = function(axisLength, range){
         return (axisLength - 2) / range;
     };
     
@@ -92,7 +93,7 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} range
      * @returns {Number}
      */
-    this.calculateAxisLength = function(scale, range){
+    let calculateAxisLength = function(scale, range){
         return scale * range + 2;
     };
     
@@ -100,16 +101,16 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} x X data value
      * @returns {Number} Screen X-Coordinate
      */
-    this.xToScreenX = function (x){
-        return Math.round(this.xOrigin + (x - xMin) * this.xScale);
+    let xToScreenX = function (x){
+        return Math.round(self.xOrigin + (x - xMin) * self.xScale);
     };
     
     /** Private function
      * @param {Number} y Y data value
      * @returns {Number} Screen Y-Coordinate
      */
-    this.yToScreenY = function(y){
-        return Math.round(this.yOrigin - (y - yMin) * this.yScale);
+    let yToScreenY = function(y){
+        return Math.round(self.yOrigin - (y - yMin) * self.yScale);
     };
     
     /**
@@ -144,11 +145,11 @@ function Graph(xMin, yMin, xMax, yMax) {
         graphics.textAntialiasing = true;
         graphics.pen = new Pen(this.axisColor);
         graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
-        this.drawXAxis(graphics, tickLength, minDistBetweenTicks);
-        this.drawYAxis(graphics, tickLength, minDistBetweenTicks);
-        this.drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel);
+        drawXAxis(graphics, tickLength, minDistBetweenTicks);
+        drawYAxis(graphics, tickLength, minDistBetweenTicks);
+        drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel);
         graphics.end();
-        this.drawYAxisLabel(font, imageHeight, yLabel);
+        drawYAxisLabel(font, imageHeight, yLabel);
     };
     
     /**
@@ -209,8 +210,7 @@ function Graph(xMin, yMin, xMax, yMax) {
         g.pen = new Pen(color);
         let y0 = eqnOfLineCalcY(x0, m, b);
         let y1 = eqnOfLineCalcY(x1, m, b);
-        g.drawLine(this.xToScreenX(x0), this.yToScreenY(y0),
-            this.xToScreenX(x1), this.yToScreenY(y1));
+        g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
         g.end();
     };
     
@@ -222,8 +222,8 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} color
      */
     this.drawPoint = function(xWorld, yWorld, color){
-        let x = this.xToScreenX(xWorld);
-        let y = this.yToScreenY(yWorld);
+        let x = xToScreenX(xWorld);
+        let y = yToScreenY(yWorld);
         if (x >= 0 && y >= 0 && x < this.bitmap.width && y < this.bitmap.height){
             this.bitmap.setPixel(x, y, color);
         } else {
@@ -261,14 +261,14 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} minDistBetweenTicks
      * @returns {undefined}
      */
-    this.drawXAxis = function (g, tickLength, minDistBetweenTicks){
-        g.drawLine(this.xOrigin, this.yOrigin, this.xOrigin + this.xAxisLength, this.yOrigin);
+    let drawXAxis = function (g, tickLength, minDistBetweenTicks){
+        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin + self.xAxisLength, self.yOrigin);
         let fontHeight = g.font.ascent + g.font.descent;
-        let xTickInterval = calculateTickIncrement(this.xMax - this.xMin, this.xAxisLength / minDistBetweenTicks);
-        let firstTickX = calculateFirstTick(this.xMin, xTickInterval);
-        for (let x = firstTickX; x <= this.xMax; x += xTickInterval){
-            let x1 = this.xToScreenX(x);
-            let y1 = this.yOrigin;
+        let xTickInterval = calculateTickIncrement(self.xMax - self.xMin, self.xAxisLength / minDistBetweenTicks);
+        let firstTickX = calculateFirstTick(self.xMin, xTickInterval);
+        for (let x = firstTickX; x <= self.xMax; x += xTickInterval){
+            let x1 = xToScreenX(x);
+            let y1 = self.yOrigin;
             g.drawLine(x1, y1, x1, y1 + tickLength);
             if (xTickInterval < 1){
                 let n = Math.abs(x) > 1e-15 ? x : 0;
@@ -290,13 +290,13 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} minDistBetweenTicks
      * @returns {undefined}
      */
-    this.drawYAxis = function (g, tickLength, minDistBetweenTicks){
-        g.drawLine(this.xOrigin, this.yOrigin, this.xOrigin, this.yOrigin - this.yAxisLength);
-        let yTickInterval = calculateTickIncrement(this.yMax - this.yMin, this.yAxisLength / minDistBetweenTicks);
-        let firstTickY = calculateFirstTick(this.yMin, yTickInterval);
-        for (let y = firstTickY; y <= this.yMax; y += yTickInterval){
-            let x1 = this.xOrigin;
-            let y1 = this.yToScreenY(y);
+    let drawYAxis = function (g, tickLength, minDistBetweenTicks){
+        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin, self.yOrigin - self.yAxisLength);
+        let yTickInterval = calculateTickIncrement(self.yMax - self.yMin, self.yAxisLength / minDistBetweenTicks);
+        let firstTickY = calculateFirstTick(self.yMin, yTickInterval);
+        for (let y = firstTickY; y <= self.yMax; y += yTickInterval){
+            let x1 = self.xOrigin;
+            let y1 = yToScreenY(y);
             g.drawLine(x1, y1, x1 - tickLength, y1);
             if (yTickInterval < 1){
                 let n = Math.abs(y) > 1e-15 ? y : 0;
@@ -319,7 +319,7 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {String} text
      * @returns {undefined}
      */
-    this.drawXAxisLabel = function (g, imageWidth, imageHeight, text){
+    let drawXAxisLabel = function (g, imageWidth, imageHeight, text){
         let x = imageWidth/2 - g.font.width(text)/2;
         let y = imageHeight - 5;
         g.drawText(x, y, text);
@@ -332,7 +332,7 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {String} text
      * @returns {undefined}
      */
-    this.drawYAxisLabel = function (font, imageHeight, text){
+    let drawYAxisLabel = function (font, imageHeight, text){
         // draw into a small bitmap
         // rotate the bit map by 90 degrees
         // copy bitmap into graph right hand margin
@@ -344,56 +344,56 @@ function Graph(xMin, yMin, xMax, yMax) {
         graphics.clipRect = new Rect(0, 0, w, h);
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
-        graphics.pen = new Pen(this.axisColor);
+        graphics.pen = new Pen(self.axisColor);
         graphics.drawText(0, h - font.descent, text);
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
         let y = Math.max(0, imageHeight/2 - w/2);
-        this.bitmap.copy(new Point(0, y), rotatedBitmap);
+        self.bitmap.copy(new Point(0, y), rotatedBitmap);
+    };
+    
+    /**
+     * Private function
+     * @param {Number} range xMax - xMin
+     * @param {Number} nTargetSteps Maximum number of ticks on axis
+     * @returns {Number} tick increment
+     */
+    let calculateTickIncrement = function(range, nTargetSteps) {
+        // calculate the exact floating point step size
+        let floatStep = range / nTargetSteps;
+
+        // get the magnitude of the step size (e.g. 999 -> 100, 100 -> 100)
+        let nDigits = Math.floor(Math.log10(floatStep)); // e.g. 999 -> 2, 100 -> 2
+        let roundDownStep = Math.pow(10, nDigits); // e.g. 2 -> 100
+
+        // calculate how much bigger the floating point step was
+        let correctionFactor = Math.round(floatStep / roundDownStep);
+
+        // Adjust our roundDownStep to be closer to the roundDownStep
+        if (correctionFactor > 5)
+            correctionFactor = 10;
+        else if (correctionFactor > 2)
+            correctionFactor = 5;
+        else if (correctionFactor > 1)
+            correctionFactor = 2;
+
+        return correctionFactor * roundDownStep;
+    };
+
+    /**
+     * Private function
+     * @param {type} minValue xMin
+     * @param {type} tickIncrement
+     * @returns {Number}
+     */
+    let calculateFirstTick = function(minValue, tickIncrement){
+        return tickIncrement * Math.ceil(minValue / tickIncrement);
     };
     
     // Default the size and scale of the graph
     this.xAxisLength = 700;
     this.yAxisLength = 700;
     this.setAxisLength(this.xAxisLength, this.yAxisLength);
-}
-
-/**
- * Private function
- * @param {Number} range xMax - xMin
- * @param {Number} nTargetSteps Maximum number of ticks on axis
- * @returns {Number} tick increment
- */
-function calculateTickIncrement(range, nTargetSteps) {
-    // calculate the exact floating point step size
-    let floatStep = range / nTargetSteps;
-
-    // get the magnitude of the step size (e.g. 999 -> 100, 100 -> 100)
-    let nDigits = Math.floor(Math.log10(floatStep)); // e.g. 999 -> 2, 100 -> 2
-    let roundDownStep = Math.pow(10, nDigits); // e.g. 2 -> 100
-
-    // calculate how much bigger the floating point step was
-    let correctionFactor = Math.round(floatStep / roundDownStep);
-
-    // Adjust our roundDownStep to be closer to the roundDownStep
-    if (correctionFactor > 5)
-        correctionFactor = 10;
-    else if (correctionFactor > 2)
-        correctionFactor = 5;
-    else if (correctionFactor > 1)
-        correctionFactor = 2;
-
-    return correctionFactor * roundDownStep;
-}
-
-/**
- * Private function
- * @param {type} minValue xMin
- * @param {type} tickIncrement
- * @returns {Number}
- */
-function calculateFirstTick(minValue, tickIncrement){
-    return tickIncrement * Math.ceil(minValue / tickIncrement);
 }
 
 /**
