@@ -73,6 +73,7 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
  * Create SamplePairs for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
+ * @param {LinearFitData[]} scaleFactors
  * @param {Number} sampleSize
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
@@ -80,7 +81,7 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
  * @param {Rect} selectedArea Reject samples outside this area (preview or overlap bounding box)
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
-function createColorSamplePairs(targetImage, referenceImage,
+function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
         sampleSize, stars, rejectHigh, limitSampleStarsPercent, selectedArea) {
 
     let firstNstars;
@@ -101,7 +102,8 @@ function createColorSamplePairs(targetImage, referenceImage,
     //bins.removeBinRectWithSaturatedStars(radius);
     let colorSamplePairs = [];
     for (let c=0; c<nChannels; c++){
-        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, c);
+        let scale = scaleFactors[c].m;
+        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, scale, c);
         colorSamplePairs.push(new SamplePairs(samplePairArray, sampleSize, selectedArea));
     }
     return colorSamplePairs;
@@ -312,18 +314,19 @@ function SampleBinMap(selectedArea, binSize, nChannels){
     };
     
     /**
-     * Calculates SamplePair[] for specified channel
+     * Calculates SamplePair[] for specified channel.
      * Calculates median of each bin for both target and reference images,
      * creates a SamplePair and adds it to the SamplePair[] array
      * @param {Image} tgtImage
      * @param {Image} refImage
+     * @param {Number} scale Scale factor for target image samples
      * @param {Number} channel 0 for B&W, 0,1,2 for RGB
      * @returns {Array|SampleBinMap.createSamplePairArray.samplePairArray}
      */
-    this.createSamplePairArray = function(tgtImage, refImage, channel){
+    this.createSamplePairArray = function(tgtImage, refImage, scale, channel){
         let samplePairArray = [];
         for (let binRect of this.binRectMapArray[channel].values()) {
-            let tgtMedian = tgtImage.median(binRect, channel, channel);
+            let tgtMedian = tgtImage.median(binRect, channel, channel) * scale;
             let refMedian = refImage.median(binRect, channel, channel);
             samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
         }
@@ -374,5 +377,5 @@ function displaySampleSquares(view, samplePairs,
     w.mainView.image.blend(bmp);
     w.mainView.endProcess();
     w.show();
-    //w.zoomToFit();
+    w.zoomToFit();
 }

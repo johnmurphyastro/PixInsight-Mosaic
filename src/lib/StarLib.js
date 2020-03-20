@@ -37,6 +37,87 @@ function StarPairs(starPairArray){
     this.linearFitData = null;
 }
 
+function StarCache() {
+    // Is cache valid parameters
+    this.refId = null;
+    this.tgtId = null;
+    this.regionOfInterest = null;
+    this.logSensitivity = Number.NaN;
+
+    // Stored data
+    this.overlapBox = null;
+    this.starRegionMask = null;
+    /** color array of Star[] */
+    this.refColorStars = null;
+    /** color array of Star[] */
+    this.tgtColorStars = null;
+    /** Star[] */
+    this.allStars = null;
+
+    /**
+     * @param {String} refId
+     * @param {String} tgtId
+     * @param {Rect} regionOfInterest
+     * @param {Number} logSensitivity
+     */
+    this.setIsValidParameters = function (refId, tgtId, regionOfInterest, logSensitivity) {
+        this.refId = refId;
+        this.tgtId = tgtId;
+        this.regionOfInterest = regionOfInterest;
+        this.logSensitivity = logSensitivity;
+    };
+    
+    /**
+     * @param {String} refId
+     * @param {String} tgtId
+     * @param {Rect} regionOfInterest
+     * @param {Number} logSensitivity
+     * @returns {Boolean}
+     */
+    this.isValid = function (refId, tgtId, regionOfInterest, logSensitivity) {
+        return refId === this.refId &&
+                tgtId === this.tgtId &&
+                logSensitivity === this.logSensitivity &&
+                regionOfInterest.x0 === this.regionOfInterest.x0 && 
+                regionOfInterest.x1 === this.regionOfInterest.x1 &&
+                regionOfInterest.y0 === this.regionOfInterest.y0 && 
+                regionOfInterest.y1 === this.regionOfInterest.y1;
+    };
+    
+    /**
+     * @param {Rect} overlapBox
+     * @param {Image} starRegionMask
+     * @param {Star[][]} refColorStars Color array of Star[]
+     * @param {Star[][]} tgtColorStars Color array of Star[]
+     * @param {Star[]} allStars
+     * @returns {undefined}
+     */
+    this.setData = function (overlapBox, starRegionMask, refColorStars, tgtColorStars, allStars){
+        this.overlapBox = overlapBox;
+        this.starRegionMask = starRegionMask;
+        this.refColorStars = refColorStars;
+        this.tgtColorStars = tgtColorStars;
+        this.allStars = allStars;
+    };
+    
+    /**
+     * @returns {String} Cache content details
+     */
+    this.getStatus = function(){
+        let allStarsN = this.allStars.length;
+        let nChannels = this.refColorStars.length;
+        let nRefStars = 0;
+        let nTgtStars = 0;
+        for (let c=0; c<nChannels; c++){
+            nRefStars += this.refColorStars[c].length;
+            nTgtStars += this.tgtColorStars[c].length;
+        }
+        return "    Detected stars: " + allStarsN +
+                "\n    Reference stars: " + nRefStars +
+                "\n    Target stars: " + nTgtStars;
+    }
+}
+
 /**
  * 
  * @returns {StarsDetected}
@@ -59,17 +140,38 @@ function StarsDetected(){
      * @param {View} tgtView
      * @param {Rect} previewArea 
      * @param {Number} logSensitivity
+     * @param {StarCache} starCache
+     * @return {StarCache} new star cache
      */
-    this.detectStars = function (refView, tgtView, previewArea, logSensitivity) {
+    this.detectStars = function (refView, tgtView, previewArea, logSensitivity, starCache) {
         this.nChannels = refView.image.isColor ? 3 : 1;
         let regionOfInterest = previewArea === null ? refView.image.bounds : previewArea;
-        this.starRegionMask = createStarRegionMask(refView.image, tgtView.image, regionOfInterest);
-        // Detect stars in both ref and tgt images in all channels
-        for (let c = 0; c < this.nChannels; c++) {
-            this.refColorStars.push(findStars(refView, logSensitivity, c));
-            this.tgtColorStars.push(findStars(tgtView, logSensitivity, c));
+        if (starCache !== null && starCache.isValid(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity)){
+            this.starRegionMask = starCache.starRegionMask;
+            this.overlapBox = starCache.overlapBox;
+            this.refColorStars = starCache.refColorStars;
+            this.tgtColorStars = starCache.tgtColorStars;
+            this.allStars = starCache.allStars;
+            console.writeln("Using star cache:\n" + starCache.getStatus() + "\n");
+            return starCache;
+        } else {
+            let detectStarTime = new Date().getTime();
+            this.starRegionMask = createStarRegionMask(refView.image, tgtView.image, regionOfInterest);
+            // Detect stars in both ref and tgt images in all channels
+            for (let c = 0; c < this.nChannels; c++) {
+                this.refColorStars.push(findStars(refView, logSensitivity, c));
+                this.tgtColorStars.push(findStars(tgtView, logSensitivity, c));
+            }
+            this.allStars = combienStarArrays();
+            
+            let newStarCache = new StarCache();
+            newStarCache.setIsValidParameters(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity);
+            newStarCache.setData(this.overlapBox, this.starRegionMask, 
+                    this.refColorStars, this.tgtColorStars, this.allStars);
+            console.writeln("Caching stars:\n" + newStarCache.getStatus() + 
+                    "\n    (" + getElapsedTime(detectStarTime) + ")\n");
+            return newStarCache;
         }
-        this.allStars = combienStarArrays();
     };
     
     /**
@@ -468,6 +570,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
     }
     starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs);
     imageWindow.show();
+    imageWindow.zoomToFit();
 }
 
 /**
@@ -477,7 +580,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
  * @param {Number} channel
  * @param {Boolean} isColor
  */
-function displayDetectedStars(view, starPairArray, channel, isColor) {
+function displayPhotometryStars(view, starPairArray, channel, isColor) {
     let title = WINDOW_ID_PREFIX() + view.fullId;
     switch (channel) {
         case 0:
@@ -506,6 +609,38 @@ function displayDetectedStars(view, starPairArray, channel, isColor) {
         let maxSize = Math.max(tgtStar.size,refStar.size);
         let radius = Math.sqrt(maxSize)/2;
         G.strokeCircle(refStar.pos, radius);
+    }
+    G.end();
+
+    let w = new ImageWindow(bmp.width, bmp.height,
+            1, // numberOfChannels
+            8, // bitsPerSample
+            false, // floatSample
+            false, // color
+            title);
+    w.mainView.beginProcess(UndoFlag_NoSwapFile);
+    w.mainView.image.blend(bmp);
+    w.mainView.endProcess();
+    w.show();
+    //w.zoomToFit();
+}
+
+/**
+ * Display the detected stars as circles within a mask image
+ * @param {View} view Get the dimensions from this image
+ * @param {Star[]} stars
+ */
+function displayDetectedStars(view, stars) {
+    let title = WINDOW_ID_PREFIX() + view.fullId + "__DetectedStars";
+    let image = view.image;
+    let bmp = new Bitmap(image.width, image.height);
+    bmp.fill(0xffffffff);
+    let G = new VectorGraphics(bmp);
+    G.antialiasing = true;
+    G.pen = new Pen(0xff000000);
+    for (let star of stars){
+        let radius = Math.sqrt(star.size)/2;
+        G.strokeCircle(star.pos, radius);
     }
     G.end();
 
