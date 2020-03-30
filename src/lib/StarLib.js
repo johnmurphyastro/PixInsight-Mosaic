@@ -1,3 +1,5 @@
+/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform */
+
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -115,7 +117,7 @@ function StarCache() {
         return "    Detected stars: " + allStarsN +
                 "\n    Reference stars: " + nRefStars +
                 "\n    Target stars: " + nTgtStars;
-    }
+    };
 }
 
 /**

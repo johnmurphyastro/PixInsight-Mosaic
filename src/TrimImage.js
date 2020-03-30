@@ -1,3 +1,5 @@
+/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok */
+
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -257,7 +259,7 @@ function TrimImageData() {
             this.bottom = Parameters.getInteger("bottom");
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
-            this.targetView = View.viewById(viewId)
+            this.targetView = View.viewById(viewId);
         }
     };
 

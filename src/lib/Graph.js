@@ -1,3 +1,5 @@
+/* global UndoFlag_NoSwapFile */
+
 // Version 1.0 (c) John Murphy 16th-Feb-2020
 //
 // ======== #license ===============================================================

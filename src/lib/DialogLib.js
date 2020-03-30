@@ -1,3 +1,5 @@
+/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter */
+
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================

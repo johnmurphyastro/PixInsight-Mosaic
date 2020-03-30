@@ -1,3 +1,5 @@
+/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, View, UndoFlag_NoSwapFile, PixelMath, ImageWindow, Parameters, Dialog, TextAlign_Right, TextAlign_VertCenter */
+
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -509,11 +511,11 @@ function PhotometricMosaicData() {
             this.radiusAdd = Parameters.getReal("addStarRadius");
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
-            this.targetView = View.viewById(viewId)
+            this.targetView = View.viewById(viewId);
         }
         if (Parameters.has("referenceView")) {
             let viewId = Parameters.getString("referenceView");
-            this.referenceView = View.viewById(viewId)
+            this.referenceView = View.viewById(viewId);
         }
 
         if (Parameters.has("hasAreaOfInterest"))
