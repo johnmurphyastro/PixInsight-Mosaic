@@ -576,26 +576,28 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
 /**
  * Display the detected stars as circles within a mask image
  * @param {View} view Get the dimensions from this image
+ * @param {Rect} overlapBox
  * @param {StarPair[]} starPairArray Detected stars
  * @param {Number} channel
  * @param {Boolean} isColor
  */
-function displayPhotometryStars(view, starPairArray, channel, isColor) {
-    let title = WINDOW_ID_PREFIX() + view.fullId;
+function displayPhotometryStars(view, overlapBox, starPairArray, channel, isColor) {
+    let postfix = "";
     switch (channel) {
         case 0:
             if (isColor){
-                title += "__RedPhotometry";
+                postfix = "RedPhotometry";
             } else {
-                title += "__PhotometryStars";
+                postfix = "PhotometryStars";
             }
             break;
         case 1:
-            title += "__GreenPhotometry";
+            postfix = "GreenPhotometry";
             break;
         case 2:
-            title += "__BluePhotometry";
+            postfix = "BluePhotometry";
     }
+    let title = WINDOW_ID_PREFIX() + view.fullId + "__" + postfix;
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
     bmp.fill(0xffffffff);
@@ -622,15 +624,18 @@ function displayPhotometryStars(view, starPairArray, channel, isColor) {
     w.mainView.image.blend(bmp);
     w.mainView.endProcess();
     w.show();
-    //w.zoomToFit();
+    let preview = w.createPreview(overlapBox, postfix);
+    w.currentView = preview;
+    w.zoomToFit();
 }
 
 /**
  * Display the detected stars as circles within a mask image
  * @param {View} view Get the dimensions from this image
+ * @param {Rect} overlapBox
  * @param {Star[]} stars
  */
-function displayDetectedStars(view, stars) {
+function displayDetectedStars(view, overlapBox, stars) {
     let title = WINDOW_ID_PREFIX() + view.fullId + "__DetectedStars";
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
@@ -654,20 +659,23 @@ function displayDetectedStars(view, stars) {
     w.mainView.image.blend(bmp);
     w.mainView.endProcess();
     w.show();
-    //w.zoomToFit();
+    let preview = w.createPreview(overlapBox, "DetectedStars");
+    w.currentView = preview;
+    w.zoomToFit();
 }
 
 /**
  * @param {View} view
+ * @param {Rect} overlapBox
  * @param {Star[]} allStars
  * @param {Number} limitMaskStarsPercent
  * @param {Number} radiusMult
  * @param {Number} radiusAdd
  * @param {Boolean} fill
  */
-function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAdd, fill){
-    let postfix = fill ? "__MosaicMask" : "__MosaicStarsMask";
-    let title = WINDOW_ID_PREFIX() + view.fullId + postfix;
+function displayMask(view, overlapBox, allStars, limitMaskStarsPercent, radiusMult, radiusAdd, fill){
+    let postfix = fill ? "MosaicMask" : "MosaicStarsMask";
+    let title = WINDOW_ID_PREFIX() + view.fullId + "__" + postfix;
     let bmp = new Bitmap(view.image.width, view.image.height);
     bmp.fill(0xffffffff);
     
@@ -720,4 +728,7 @@ function displayMask(view, allStars, limitMaskStarsPercent, radiusMult, radiusAd
     }
     w.mainView.endProcess();
     w.show();
+    let preview = w.createPreview(overlapBox, postfix);
+    w.currentView = preview;
+    w.zoomToFit();
 }

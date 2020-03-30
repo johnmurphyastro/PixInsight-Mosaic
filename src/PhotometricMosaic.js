@@ -71,7 +71,7 @@ function PhotometricMosaic(data)
         return;
     }
     if (data.viewFlag === DETECTED_STARS_FLAG()){
-        displayDetectedStars(targetView, detectedStars.allStars);
+        displayDetectedStars(targetView, detectedStars.overlapBox, detectedStars.allStars);
         return;
     }
     
@@ -105,20 +105,23 @@ function PhotometricMosaic(data)
     if (data.viewFlag === PHOTOMETRY_STARS_FLAG()) {
         for (let i = 0; i < colorStarPairs.length; i++) {
             let starPairs = colorStarPairs[i];
-            displayPhotometryStars(targetView, starPairs.starPairArray, i, referenceView.image.isColor);
+            displayPhotometryStars(targetView, detectedStars.overlapBox, 
+                    starPairs.starPairArray, i, referenceView.image.isColor);
         }
         return;
     }
     if (data.viewFlag === PHOTOMETRY_GRAPH_FLAG()){
-        displayStarGraph(referenceView, targetView, 1000, colorStarPairs);
+        displayStarGraph(referenceView, targetView, 800, colorStarPairs);
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_FLAG()){
-        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, true);
+        displayMask(targetView, detectedStars.overlapBox, detectedStars.allStars, 
+                data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, true);
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_STARS_FLAG()){
-        displayMask(targetView, detectedStars.allStars, data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, false);
+        displayMask(targetView, detectedStars.overlapBox, detectedStars.allStars, 
+                data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, false);
         return;
     }
 
@@ -156,7 +159,7 @@ function PhotometricMosaic(data)
     let isHorizontal = isJoinHorizontal(data, sampleArea);
     if (data.viewFlag === DISPLAY_SAMPLES_FLAG()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
-        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars.allStars, data.limitSampleStarsPercent, title);
+        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, data.limitSampleStarsPercent, title);
         return;
     }
 

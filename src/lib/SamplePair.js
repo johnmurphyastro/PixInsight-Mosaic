@@ -337,12 +337,12 @@ function SampleBinMap(selectedArea, binSize, nChannels){
 /** Display the SamplePair by drawing them into a mask image
  * @param {Image} view Determine bitmap size from this view's image.
  * @param {SamplePairs} samplePairs The samplePairs to be displayed.
- * @param {Star[]} stars 
+ * @param {StarsDetected} detectedStars 
  * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars 
  * @param {String} title Window title
  */
 function displaySampleSquares(view, samplePairs, 
-        stars, limitSampleStarsPercent, title) {
+        detectedStars, limitSampleStarsPercent, title) {
     let image = view.image;
     let bmp = new Bitmap(image.width, image.height);
     bmp.fill(0xffffffff);
@@ -353,6 +353,7 @@ function displaySampleSquares(view, samplePairs,
         G.drawRect(samplePair.rect);
     });
 
+    let stars = detectedStars.allStars;
     let firstNstars;
     if (limitSampleStarsPercent < 100){
         firstNstars = Math.floor(stars.length * limitSampleStarsPercent / 100);
@@ -377,5 +378,7 @@ function displaySampleSquares(view, samplePairs,
     w.mainView.image.blend(bmp);
     w.mainView.endProcess();
     w.show();
+    let preview = w.createPreview(detectedStars.overlapBox, "SampleGrid");
+    w.currentView = preview;
     w.zoomToFit();
 }
