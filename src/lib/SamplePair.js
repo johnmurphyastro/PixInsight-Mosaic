@@ -336,23 +336,27 @@ function SampleBinMap(selectedArea, binSize, nChannels){
     };
 }
 
-/** Display the SamplePair by drawing them into a mask image
- * @param {Image} view Determine bitmap size from this view's image.
+/** Display the SamplePair squares
+ * @param {Image} refView Copy image and STF from this view.
  * @param {SamplePairs} samplePairs The samplePairs to be displayed.
  * @param {StarsDetected} detectedStars 
  * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars 
  * @param {String} title Window title
  */
-function displaySampleSquares(view, samplePairs, 
+function displaySampleSquares(refView, samplePairs, 
         detectedStars, limitSampleStarsPercent, title) {
-    let image = view.image;
-    let bmp = new Bitmap(image.width, image.height);
-    bmp.fill(0xffffffff);
+    let overlapBox = detectedStars.overlapBox;
+    let offsetX = -overlapBox.x0;
+    let offsetY = -overlapBox.y0;
+    let bmp = new Bitmap(overlapBox.width, overlapBox.height);
+    bmp.fill(0x00000000);
     let G = new VectorGraphics(bmp);
     //let G = new Graphics(bmp);  // good for debug
-    G.pen = new Pen(0xff000000);
+    G.pen = new Pen(0xffff0000);
     samplePairs.samplePairArray.forEach(function (samplePair) {
-        G.drawRect(samplePair.rect);
+        let rect = new Rect(samplePair.rect);
+        rect.translateBy(offsetX, offsetY);
+        G.drawRect(rect);
     });
 
     let stars = detectedStars.allStars;
@@ -366,21 +370,11 @@ function displaySampleSquares(view, samplePairs,
     for (let i = 0; i < firstNstars; ++i){
         let star = stars[i];
         let radius = Math.sqrt(star.size)/2;
-        G.strokeCircle(star.pos, radius);
+        let x = star.pos.x + offsetX;
+        let y = star.pos.y + offsetY;
+        G.strokeCircle(x, y, radius);
     }
     G.end();
-
-    let w = new ImageWindow(bmp.width, bmp.height,
-            1, // numberOfChannels
-            8, // bitsPerSample
-            false, // floatSample
-            false, // color
-            title);
-    w.mainView.beginProcess(UndoFlag_NoSwapFile);
-    w.mainView.image.blend(bmp);
-    w.mainView.endProcess();
-    w.show();
-    let preview = w.createPreview(detectedStars.overlapBox, "SampleGrid");
-    w.currentView = preview;
-    w.zoomToFit();
+    
+    createDiagnosticImage(refView, bmp, detectedStars, title, -2);
 }
