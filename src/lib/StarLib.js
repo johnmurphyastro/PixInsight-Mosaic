@@ -45,13 +45,16 @@ function StarPairs(starPairArray){
  */
 function StarsDetected(){
     this.nChannels = 1;
-    this.overlapBox = null;
+    
+    /** {Image} bitmap indicates were ref & tgt images overlap */
     this.starRegionMask = null;
-    /** color array of Star[] */
-    this.refColorStars = [];
-    /** color array of Star[] */
-    this.tgtColorStars = [];
-    /** Star[] */
+    /** {Rect} starRegionMask bounding box */
+    this.overlapBox = null;
+    /** {star[][]} color array of reference stars */
+    this.refColorStars = null;
+    /** {star[][]} color array of target stars */
+    this.tgtColorStars = null;
+    /** {Star[]} refColorStars and tgtColorStars, sorted by star flux */
     this.allStars = null;
     /** Gets set to background rectangle inflation around star */
     this.bkgDelta = 3;
@@ -67,34 +70,51 @@ function StarsDetected(){
      * @return {StarCache} new star cache
      */
     this.detectStars = function (refView, tgtView, previewArea, logSensitivity, starCache) {
+        let detectStarTime = new Date().getTime();
         this.nChannels = refView.image.isColor ? 3 : 1;
+        
+        // let the StarCache know about any relevant input parameter changes
         let regionOfInterest = previewArea === null ? refView.image.bounds : previewArea;
-        if (starCache !== null && starCache.isValid(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity)){
-            this.starRegionMask = starCache.starRegionMask;
-            this.overlapBox = starCache.overlapBox;
-            this.refColorStars = starCache.refColorStars;
-            this.tgtColorStars = starCache.tgtColorStars;
-            this.allStars = starCache.allStars;
-            console.writeln("Using star cache:\n" + starCache.getStatus() + "\n");
-            return starCache;
-        } else {
-            let detectStarTime = new Date().getTime();
-            this.starRegionMask = createStarRegionMask(refView.image, tgtView.image, regionOfInterest);
-            // Detect stars in both ref and tgt images in all channels
-            for (let c = 0; c < this.nChannels; c++) {
-                this.refColorStars.push(findStars(refView, logSensitivity, c));
-                this.tgtColorStars.push(findStars(tgtView, logSensitivity, c));
-            }
-            this.allStars = combienStarArrays();
-            
-            let newStarCache = new StarCache();
-            newStarCache.setIsValidParameters(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity);
-            newStarCache.setData(this.overlapBox, this.starRegionMask, 
-                    this.refColorStars, this.tgtColorStars, this.allStars);
-            console.writeln("Caching stars:\n" + newStarCache.getStatus() + 
-                    "\n    (" + getElapsedTime(detectStarTime) + ")\n");
-            return newStarCache;
+        starCache.setUserInputData(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity);
+        
+        // StarRegionMask
+        if (starCache.starRegionMask === null || starCache.overlapBox === null){
+            // Create ref/tgt overlap bitmap (starRegionMask) and its bounding box (ovelapBox)
+            cacheStarRegionMask(refView.image, tgtView.image, regionOfInterest, starCache);
         }
+        this.starRegionMask = starCache.starRegionMask;
+        this.overlapBox = starCache.overlapBox;
+        
+        // Reference image stars
+        if (starCache.refColorStars === null){
+            starCache.allStars = null;
+            starCache.refColorStars = [];
+            for (let c = 0; c < this.nChannels; c++) {
+                starCache.refColorStars.push(
+                        findStars(refView, this.starRegionMask, logSensitivity, c));
+            }
+        }
+        this.refColorStars = starCache.refColorStars;
+        
+        // Target image stars
+        if (starCache.tgtColorStars === null){
+            starCache.allStars = null;
+            starCache.tgtColorStars = [];
+            for (let c = 0; c < this.nChannels; c++) {
+                starCache.tgtColorStars.push(
+                        findStars(tgtView, this.starRegionMask, logSensitivity, c));
+            }
+        }
+        this.tgtColorStars = starCache.tgtColorStars;
+        
+        // Reference and target stars, sorted by star flux
+        if (starCache.allStars === null){
+            starCache.allStars = combienStarArrays(starCache.refColorStars, starCache.tgtColorStars);
+        }
+        this.allStars = starCache.allStars;
+
+        console.writeln("Star cache:\n" + starCache.getStatus() + 
+                "\n    (" + getElapsedTime(detectStarTime) + ")\n");
     };
     
     /**
@@ -120,9 +140,9 @@ function StarsDetected(){
      * @param {Image} tgtImage
      * @param {Rect} regionOfInterest
      * @param {Rect} regionOfInterest
-     * @returns {Image} A image mask for the overlapping region
+     * @param {StarCache} starCache
      */
-    let createStarRegionMask = function (refImage, tgtImage, regionOfInterest) {
+    let cacheStarRegionMask = function (refImage, tgtImage, regionOfInterest, starCache) {
         let mask = new Image(refImage.width, refImage.height, 1);
         mask.fill(0);
         // Overlap bounding box coordinates
@@ -155,22 +175,23 @@ function StarsDetected(){
             }
         }
         if (x0 !== Number.POSITIVE_INFINITY){
-            self.overlapBox = new Rect(x0, y0, x1+1, y1+1);
+            starCache.overlapBox = new Rect(x0, y0, x1+1, y1+1);
         } else {
-            self.overlapBox = null;
+            starCache.overlapBox = null;
         }
         
-        return mask;
+        starCache.starRegionMask = mask;
     };
     
     /**
      * Private
      * @param {View} view
+     * @param {Image} starRegionMask Bitmap represents overlapping region
      * @param {Number} logSensitivity
      * @param {Number} channel
      * @returns {unresolved}
      */
-    let findStars = function(view, logSensitivity, channel){
+    let findStars = function(view, starRegionMask, logSensitivity, channel){
         const title = "TMP_ChannelExtraction";
         const useColorManagement = true;
         const isColor = view.image.isColor;
@@ -213,7 +234,7 @@ function StarsDetected(){
 
         // Detect stars in target and reference images
         let starDetector = new StarDetector();
-        starDetector.mask = self.starRegionMask;
+        starDetector.mask = starRegionMask;
         starDetector.sensitivity = Math.pow(10.0, logSensitivity);
         starDetector.upperLimit = 1;
         starDetector.applyHotPixelFilterToDetectionImage = true;
@@ -272,9 +293,11 @@ function StarsDetected(){
     
     /**
      * Combien star arrays removing duplicate stars (keep star with maximum flux)
+     * @param {star[][]} refColorStars color array of reference stars
+     * @param {star[][]} tgtColorStars color array of target stars
      * @returns {Star[]} All stars, sorted by brightness (brightest first)
      */
-    let combienStarArrays = function (){
+    let combienStarArrays = function (refColorStars, tgtColorStars){
         /**
          * @param {Star} star
          * @returns {String}
@@ -319,12 +342,13 @@ function StarsDetected(){
         
         // Add all the stars to a map to reject duplicates at the same coordinates
         let starMap = new Map();
-        addFirstArray(starMap, self.refColorStars[0]);
-        for (let c = 1; c < self.nChannels; c++) {
-            addStars(starMap, self.refColorStars[c]);
+        addFirstArray(starMap, refColorStars[0]);
+        const nChannels = refColorStars.length;
+        for (let c = 1; c < nChannels; c++) {
+            addStars(starMap, refColorStars[c]);
         }
-        for (let c = 0; c < self.nChannels; c++) {
-            addStars(starMap, self.tgtColorStars[c]);
+        for (let c = 0; c < nChannels; c++) {
+            addStars(starMap, tgtColorStars[c]);
         }
         return getSortedStars(starMap);
     };
@@ -385,23 +409,28 @@ function StarMinMax() {
  * @param {String} tgtView
  * @param {Number} height
  * @param {StarPairs[]} colorStarPairs StarPairs for L or R,G,B
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {undefined}
  */
-function displayStarGraph(refView, tgtView, height, colorStarPairs){
+function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     /**
      * @param {View} refView
      * @param {View} tgtView
      * @param {ImageWindow} graphWindow Graph window
      * @param {StarPairs[]} colorStarPairs StarPairs for each color channel
+     * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let starGraphFitsHeader = function (refView, tgtView, graphWindow, colorStarPairs){
+    let starGraphFitsHeader = function (refView, tgtView, graphWindow, colorStarPairs, data){
         let view = graphWindow.mainView;
         let nColors = colorStarPairs.length;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
         keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+        keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "LinearRange: " + data.rejectHigh));
+        keywords.push(new FITSKeyword("COMMENT", "", "OutlierRemoval: " + data.outlierRemoval));
         let maxErr = Number.NEGATIVE_INFINITY;
         let errStar = null;
         for (let c = 0; c < nColors; c++){
@@ -492,7 +521,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs);
+    starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs, data);
     imageWindow.show();
     imageWindow.zoomToFit();
 }
@@ -504,8 +533,9 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs){
  * @param {StarsDetected} detectedStars
  * @param {StarPairs[]} colorStarPairs Detected star pairs for each color
  * @param {String} targetId Used to create ImageWindow title
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId) {
+function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId, data) {
     
     /** Creates a bitmap
      * @param {Rect} overlapBox Bitmap area
@@ -563,8 +593,15 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
         bmp.or(bitmaps[c]);
     }
 
+    let keywords = [];
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
+    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "LinearRange: " + data.rejectHigh));
+    keywords.push(new FITSKeyword("COMMENT", "", "OutlierRemoval: " + data.outlierRemoval));
+
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
-    createDiagnosticImage(refView, bmp, detectedStars, title, 1);
+    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
 }
 
 /**
@@ -576,9 +613,10 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
  * @param {String} targetId Used to create ImageWindow title
  * @param {Number} limitMaskStarsPercent
  * @param {String} postfix Used to create ImageWindow title
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
 function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPercent, 
-        postfix) {
+        postfix, data) {
     let overlapBox = detectedStars.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
@@ -605,8 +643,13 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
     }
     G.end();
 
+    let keywords = [];
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
+    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createDiagnosticImage(refView, bmp, detectedStars, title, -2);
+    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, -2);
 }
 
 /**
@@ -620,9 +663,10 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
  * @param {Number} radiusAdd
  * @param {Boolean} antialias
  * @param {String} postfix Used to create ImageWindow title
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
 function displayMaskStars(refView, detectedStars, targetId, limitMaskStarsPercent, 
-        radiusMult, radiusAdd, antialias, postfix) {
+        radiusMult, radiusAdd, antialias, postfix, data) {
     let overlapBox = detectedStars.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
@@ -651,7 +695,16 @@ function displayMaskStars(refView, detectedStars, targetId, limitMaskStarsPercen
     G.end();
 
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createDiagnosticImage(refView, bmp, detectedStars, title, 1);
+    
+    let keywords = [];
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
+    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "RadiusMultiply: " + radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "RadiusAdd: " + radiusAdd));
+    
+    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
 }
 
 /**
@@ -660,8 +713,9 @@ function displayMaskStars(refView, detectedStars, targetId, limitMaskStarsPercen
  * @param {Number} limitMaskStarsPercent
  * @param {Number} radiusMult
  * @param {Number} radiusAdd
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, radiusAdd){
+function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, radiusAdd, data){
     let postfix = "MosaicMask";
     let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + postfix;
     let bmp = new Bitmap(tgtView.image.width, tgtView.image.height);
@@ -722,6 +776,15 @@ function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, 
         }
     }
 
+    let keywords = [];
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + data.referenceView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "RadiusMultiply: " + radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "RadiusAdd: " + radiusAdd));
+    
+    w.keywords = keywords;
     view.endProcess();
     w.show();
 }
@@ -735,9 +798,10 @@ function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, 
  * @param {Bitmap} bmp The bitmap image to lay on top of the background image
  * @param {StarsDetected} detectedStars For overlayBox and starRegionMask
  * @param {String} title Window title
+ * @param {FITSKeyword[]} fitsKeyWords
  * @param {Number} minZoom -2 is half size, 1 is 1:1
  */
-function createDiagnosticImage(refView, bmp, detectedStars, title, minZoom) {
+function createDiagnosticImage(refView, bmp, detectedStars, title, fitsKeyWords, minZoom) {
     /**
      * Get all the samples from the image that are within the overlapBox rectangle.
      * @param {Image} image Return subset of samples from this image
@@ -785,6 +849,9 @@ function createDiagnosticImage(refView, bmp, detectedStars, title, minZoom) {
     
     // Copy the bitmap image onto the top of the image
     view.image.blend(bmp);
+    if (fitsKeyWords.length > 0){
+        w.keywords = fitsKeyWords;
+    }
     view.endProcess();
     
     // Ensure the user can see it!

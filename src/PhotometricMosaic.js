@@ -1,4 +1,4 @@
-/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, View, UndoFlag_NoSwapFile, PixelMath, ImageWindow, Parameters, Dialog, TextAlign_Right, TextAlign_VertCenter */
+/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, View, UndoFlag_NoSwapFile, PixelMath, ImageWindow, Parameters, Dialog, TextAlign_Right, TextAlign_VertCenter, UndoFlag_Keywords, UndoFlag_PixelData */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -65,7 +65,7 @@ function PhotometricMosaic(data)
                 data.areaOfInterest_X1, data.areaOfInterest_Y1);
     }
     let detectedStars = new StarsDetected();
-    data.starCache = detectedStars.detectStars(referenceView, targetView, samplePreviewArea, 
+    detectedStars.detectStars(referenceView, targetView, samplePreviewArea, 
             data.logStarDetection, data.starCache);
     if (detectedStars.overlapBox === null){
         let msgEnd = (samplePreviewArea === null) ? "." : " within preview area.";
@@ -75,7 +75,7 @@ function PhotometricMosaic(data)
     }
     if (data.viewFlag === DETECTED_STARS_FLAG()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
-                100, "__DetectedStars");
+                100, "__DetectedStars", data);
         return;
     }
     
@@ -107,22 +107,22 @@ function PhotometricMosaic(data)
     }
     
     if (data.viewFlag === PHOTOMETRY_STARS_FLAG()) {
-        displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId);
+        displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId, data);
         return;
     }
     if (data.viewFlag === PHOTOMETRY_GRAPH_FLAG()){
-        displayStarGraph(referenceView, targetView, 800, colorStarPairs);
+        displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_FLAG()){
         displayMask(targetView, detectedStars, 
-                data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd);
+                data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, data);
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_STARS_FLAG()){
         displayMaskStars(referenceView, detectedStars, targetView.fullId, 
                 data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, 
-                false, "__MosaicStarsMask");
+                false, "__MosaicMaskStars", data);
         return;
     }
 
@@ -160,7 +160,7 @@ function PhotometricMosaic(data)
     let isHorizontal = isJoinHorizontal(data, sampleArea);
     if (data.viewFlag === DISPLAY_SAMPLES_FLAG()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
-        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, data.limitSampleStarsPercent, title);
+        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, data.limitSampleStarsPercent, title, data);
         return;
     }
 
@@ -172,15 +172,15 @@ function PhotometricMosaic(data)
         gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, samplePreviewArea, isHorizontal);
     }
     if (data.viewFlag === GRADIENT_GRAPH_FLAG()) {
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs);
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs, data);
         return;
     }
 
-    targetView.beginProcess();
+    targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
     let applyScaleAndGradientTime = new Date().getTime();
     applyScaleAndGradient(targetView, isHorizontal, scaleFactors, gradients, detectedStars.overlapBox, 
-        data.taperFlag, data.taperLength);
-        data.starCache = null;
+        data.taperFlag, data.taperLength, data);
+    data.starCache.invalidateTargetStars();
     console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
 
     // Save parameters to PixInsight history
@@ -207,6 +207,7 @@ function PhotometricMosaic(data)
             // The reference view has been set to a previously created mosaic.
             // We will update this view
             console.writeln("Updating ", mosaicName);
+            data.starCache.invalidate(); // reference image has changed
         }
         createMosaic(referenceView, targetView, mosaicName, createMosaicView,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
@@ -215,9 +216,9 @@ function PhotometricMosaic(data)
         if (createMosaicView){
             // Update Fits Header
             mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-            addFitsHistory(mosaicView, "PhotometricMosaic " + VERSION());
             copyFitsObservation(referenceView, mosaicView);
             copyFitsAstrometricSolution(referenceView, mosaicView);
+            addFitsHistory(mosaicView, "PhotometricMosaic " + VERSION());
             mosaicView.endProcess();
         }
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
@@ -230,7 +231,7 @@ function PhotometricMosaic(data)
         w.createPreview(previewRect, targetView.fullId);
         // But show the main mosaic view.
         w.currentView = mosaicView;
-        w.zoomToFit();
+        w.zoomToFit();  
     }
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
@@ -257,9 +258,11 @@ function calculateScale(starPairs) {
  * @param {Rect} overlapBox Bounding box of overlap region
  * @param {Boolean} taperFlag If true, apply taper to average offset in direction perpendicular to join
  * @param {Number} taperLength Length of taper to apply in pixels
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {undefined}
  */
-function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, overlapBox, taperFlag, taperLength) {
+function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, overlapBox, 
+        taperFlag, taperLength, data) {
     let nChannels = gradients.length;
     let targetImage = view.image;
     for (let channel = 0; channel < nChannels; channel++) {
@@ -292,12 +295,45 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
             }
         }
     }
+    
+    // FITS Header
+    let keywords = view.window.keywords;
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic " + VERSION()));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.ref: " + data.referenceView.fullId));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.tgt: " + view.fullId));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.starDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.linearRange: " + data.rejectHigh));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.outlierRemoval: " + data.outlierRemoval));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.sampleSize: " + data.sampleSize));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.limitStarsPercent: " + data.limitSampleStarsPercent));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        "PhotometricMosaic.lineSegments: " + data.nLineSegments));
+    if (taperFlag) {
+        keywords.push(new FITSKeyword("HISTORY", "",
+                "PhotometricMosaic.taperLength: " + taperLength));
+    }
+    for (let c=0; c<nChannels; c++){
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            "PhotometricMosaic.scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
+    }
     let minValue = view.image.minimum();
     let maxValue = view.image.maximum();
     if (minValue < 0 || maxValue > 1){
+        let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
+        keywords.push(new FITSKeyword("HISTORY", "",
+                "PhotometricMosaic.truncated" + minMaxValues));
         console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
         view.image.truncate(0, 1);
     }
+    view.window.keywords = keywords;
 }
 
 /**
@@ -548,7 +584,7 @@ function PhotometricMosaicData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.logStarDetection = 0;
+        this.logStarDetection = -1;
         this.orientation = AUTO();
         this.rejectHigh = 0.8;
         this.outlierRemoval = 0;
@@ -572,7 +608,7 @@ function PhotometricMosaicData() {
         this.areaOfInterest_X1 = 0;
         this.areaOfInterest_Y1 = 0;
         
-        this.starCache = null;
+        this.starCache = new StarCache();
         this.testFlag = 0;
     };
 
@@ -1175,93 +1211,93 @@ function PhotometricMosaicDialog(data) {
     //-------------------------------------------------------
     // Area of interest
     //-------------------------------------------------------
-    let labelWidth2 = this.font.width("Height:_");
-
-    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
-    this.rectangleX0_Control.onValueUpdated = function (value){
-        data.areaOfInterest_X0 = value;
-    };
-    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
-    this.rectangleY0_Control.onValueUpdated = function (value){
-        data.areaOfInterest_Y0 = value;
-    };
-    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
-    this.rectangleX1_Control.onValueUpdated = function (value){
-        data.areaOfInterest_X1 = value;
-    };
-    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
-    this.rectangleY1_Control.onValueUpdated = function (value){
-        data.areaOfInterest_Y1 = value;
-    };
-
-    this.areaOfInterestCheckBox = new CheckBox(this);
-    this.areaOfInterestCheckBox.text = "Area of Interest";
-    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
-    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-    this.areaOfInterestCheckBox.onClick = function (checked) {
-        data.hasAreaOfInterest = checked;
-    };
-
-    let coordHorizontalSizer = new HorizontalSizer;
-    coordHorizontalSizer.spacing = 10;
-    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
-    coordHorizontalSizer.addSpacing(20);
-    coordHorizontalSizer.add(this.rectangleX0_Control);
-    coordHorizontalSizer.add(this.rectangleY0_Control);
-    coordHorizontalSizer.add(this.rectangleX1_Control);
-    coordHorizontalSizer.add(this.rectangleY1_Control);
-    coordHorizontalSizer.addStretch();
-
-    // Area of interest Target->preview
-    let previewImage_Label = new Label(this);
-    previewImage_Label.text = "Get area from preview:";
-    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-
-    this.previewImage_ViewList = new ViewList(this);
-    this.previewImage_ViewList.getPreviews();
-    this.previewImage_ViewList.minWidth = 300;
-    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
-    this.previewImage_ViewList.onViewSelected = function (view) {
-        data.preview = view;
-    };
-    setTargetPreview(this.previewImage_ViewList, data, data.targetView);
-
-    let previewUpdateButton = new PushButton();
-    previewUpdateButton.hasFocus = false;
-    previewUpdateButton.text = "Update";
-    previewUpdateButton.onClick = function () {
-        if (!this.isUnderMouse){
-            // Ensure pressing return in a different field does not trigger this callback!
-            return;
-        }
-        let view = data.preview;
-        if (view.isPreview) {
-            data.hasAreaOfInterest = true;
-            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-            ///let imageWindow = view.window;
-            let rect = view.window.previewRect(view);
-            data.areaOfInterest_X0 = rect.x0;
-            data.areaOfInterest_Y0 = rect.y0;
-            data.areaOfInterest_X1 = rect.x1;
-            data.areaOfInterest_Y1 = rect.y1;
-
-            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
-            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
-            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
-            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
-        }
-    };
-
-    let previewImage_Sizer = new HorizontalSizer;
-    previewImage_Sizer.spacing = 4;
-    previewImage_Sizer.add(previewImage_Label);
-    previewImage_Sizer.add(this.previewImage_ViewList, 100);
-    previewImage_Sizer.addSpacing(10);
-    previewImage_Sizer.add(previewUpdateButton);
-
-    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
-    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
-    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
+//    let labelWidth2 = this.font.width("Height:_");
+//
+//    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
+//    this.rectangleX0_Control.onValueUpdated = function (value){
+//        data.areaOfInterest_X0 = value;
+//    };
+//    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
+//    this.rectangleY0_Control.onValueUpdated = function (value){
+//        data.areaOfInterest_Y0 = value;
+//    };
+//    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
+//    this.rectangleX1_Control.onValueUpdated = function (value){
+//        data.areaOfInterest_X1 = value;
+//    };
+//    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
+//    this.rectangleY1_Control.onValueUpdated = function (value){
+//        data.areaOfInterest_Y1 = value;
+//    };
+//
+//    this.areaOfInterestCheckBox = new CheckBox(this);
+//    this.areaOfInterestCheckBox.text = "Area of Interest";
+//    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
+//    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+//    this.areaOfInterestCheckBox.onClick = function (checked) {
+//        data.hasAreaOfInterest = checked;
+//    };
+//
+//    let coordHorizontalSizer = new HorizontalSizer;
+//    coordHorizontalSizer.spacing = 10;
+//    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
+//    coordHorizontalSizer.addSpacing(20);
+//    coordHorizontalSizer.add(this.rectangleX0_Control);
+//    coordHorizontalSizer.add(this.rectangleY0_Control);
+//    coordHorizontalSizer.add(this.rectangleX1_Control);
+//    coordHorizontalSizer.add(this.rectangleY1_Control);
+//    coordHorizontalSizer.addStretch();
+//
+//    // Area of interest Target->preview
+//    let previewImage_Label = new Label(this);
+//    previewImage_Label.text = "Get area from preview:";
+//    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+//
+//    this.previewImage_ViewList = new ViewList(this);
+//    this.previewImage_ViewList.getPreviews();
+//    this.previewImage_ViewList.minWidth = 300;
+//    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
+//    this.previewImage_ViewList.onViewSelected = function (view) {
+//        data.preview = view;
+//    };
+//    setTargetPreview(this.previewImage_ViewList, data, data.targetView);
+//
+//    let previewUpdateButton = new PushButton();
+//    previewUpdateButton.hasFocus = false;
+//    previewUpdateButton.text = "Update";
+//    previewUpdateButton.onClick = function () {
+//        if (!this.isUnderMouse){
+//            // Ensure pressing return in a different field does not trigger this callback!
+//            return;
+//        }
+//        let view = data.preview;
+//        if (view.isPreview) {
+//            data.hasAreaOfInterest = true;
+//            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+//            ///let imageWindow = view.window;
+//            let rect = view.window.previewRect(view);
+//            data.areaOfInterest_X0 = rect.x0;
+//            data.areaOfInterest_Y0 = rect.y0;
+//            data.areaOfInterest_X1 = rect.x1;
+//            data.areaOfInterest_Y1 = rect.y1;
+//
+//            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
+//            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
+//            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
+//            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
+//        }
+//    };
+//
+//    let previewImage_Sizer = new HorizontalSizer;
+//    previewImage_Sizer.spacing = 4;
+//    previewImage_Sizer.add(previewImage_Label);
+//    previewImage_Sizer.add(this.previewImage_ViewList, 100);
+//    previewImage_Sizer.addSpacing(10);
+//    previewImage_Sizer.add(previewUpdateButton);
+//
+//    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
+//    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
+//    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
     const helpWindowTitle = TITLE() + " v" + VERSION();
     const HELP_MSG =
@@ -1281,7 +1317,7 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(starDetectionGroupBox);
     this.sizer.add(photometryGroupBox);
     this.sizer.add(gradientGroupBox);
-    this.sizer.add(areaOfInterest_GroupBox);
+//    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(starMaskGroupBox);
     this.sizer.add(mosaicGroupBox);
     this.sizer.addSpacing(5);

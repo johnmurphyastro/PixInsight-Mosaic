@@ -342,9 +342,10 @@ function SampleBinMap(selectedArea, binSize, nChannels){
  * @param {StarsDetected} detectedStars 
  * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars 
  * @param {String} title Window title
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
 function displaySampleSquares(refView, samplePairs, 
-        detectedStars, limitSampleStarsPercent, title) {
+        detectedStars, limitSampleStarsPercent, title, data) {
     let overlapBox = detectedStars.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
@@ -376,5 +377,12 @@ function displaySampleSquares(refView, samplePairs,
     }
     G.end();
     
-    createDiagnosticImage(refView, bmp, detectedStars, title, -2);
+    let keywords = [];
+    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + data.targetView.fullId));
+    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "SampleSize: " + data.sampleSize));
+    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitSampleStarsPercent));
+    
+    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, -2);
 }

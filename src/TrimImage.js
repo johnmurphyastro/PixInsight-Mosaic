@@ -1,4 +1,4 @@
-/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok */
+/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, UndoFlag_Keywords, UndoFlag_PixelData */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -216,7 +216,7 @@ function trimImage(data)
 
     // Begin process to let PixInsight know the script is about to modify image data.
     // It will then allow us write access
-    targetView.beginProcess(UndoFlag_All);
+    targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
     trimRows(image, data.left, data.right);
     trimColumns(image, data.top, data.bottom);
     

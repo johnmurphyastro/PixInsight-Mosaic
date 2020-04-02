@@ -406,23 +406,33 @@ function SamplePairDifMinMax(colorSamplePairs, gradients) {
  * @param {Boolean} isHorizontal
  * @param {Gradient[]} gradients Contains best fit gradient lines for each channel
  * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
+ * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {undefined}
  */
-function displayGradientGraph(targetView, referenceView, width, isHorizontal, gradients, colorSamplePairs){
+function displayGradientGraph(targetView, referenceView, width, isHorizontal, gradients, colorSamplePairs, data){
     /**
      * @param {View} refView
      * @param {View} tgtView
      * @param {ImageWindow} graphWindow Graph window
      * @param {Gradient[]} gradients Contains best fit lines for each channel
+     * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let gradientGraphFitsHeader = function(refView, tgtView, graphWindow, gradients){
+    let gradientGraphFitsHeader = function(refView, tgtView, graphWindow, gradients, data){
         let view = graphWindow.mainView;
         let nColors = gradients.length;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
         keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+        keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "SampleSize: " + data.sampleSize));
+        keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + data.limitSampleStarsPercent));
+        keywords.push(new FITSKeyword("COMMENT", "", "LineSegments: " + data.nLineSegments));
+        if (data.taperFlag){
+            keywords.push(new FITSKeyword("COMMENT", "", "TaperLength: " + data.taperLength));
+        }
+        
         for (let c = 0; c < nColors; c++){
             let eqnLines = gradients[c].getGradientLines();
             for (let i=0; i<eqnLines.length; i++){
@@ -515,6 +525,6 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    gradientGraphFitsHeader(referenceView, targetView, imageWindow, gradients);
+    gradientGraphFitsHeader(referenceView, targetView, imageWindow, gradients, data);
     imageWindow.show();
 }

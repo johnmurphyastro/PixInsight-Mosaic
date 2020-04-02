@@ -16,20 +16,55 @@
 //"use strict";
 
 function StarCache() {
-    // Is cache valid parameters
-    this.refId = null;
-    this.tgtId = null;
-    this.regionOfInterest = null;
-    this.logSensitivity = Number.NaN;
+    /**
+    * User input data used to calculate stored values
+    * @param {String} refId
+    * @param {String} tgtId
+    * @param {Rect} regionOfInterest
+    * @param {Number} logSensitivity
+    */
+    let UserInputData = function(refId, tgtId, regionOfInterest, logSensitivity){
+        this.refId = refId;
+        this.tgtId = tgtId;
+        this.regionOfInterest = regionOfInterest;       // previewArea or whole image
+        this.logSensitivity = logSensitivity;
 
-    // Stored data
-    this.overlapBox = null;
+        /**
+         * Set user input data and check if it has changed
+         * @param {String} refId
+         * @param {String} tgtId
+         * @param {Rect} regionOfInterest
+         * @param {Number} logSensitivity
+         * @return {Boolean} true if one or more of the values don't match stored values
+         */
+        this.setData = function (refId, tgtId, regionOfInterest, logSensitivity){
+            if (refId !== this.refId || tgtId !== this.tgtId ||
+                    logSensitivity !== this.logSensitivity ||
+                    regionOfInterest.x0 !== this.regionOfInterest.x0 || 
+                    regionOfInterest.x1 !== this.regionOfInterest.x1 ||
+                    regionOfInterest.y0 !== this.regionOfInterest.y0 || 
+                    regionOfInterest.y1 !== this.regionOfInterest.y1){
+                this.refId = refId;
+                this.tgtId = tgtId;
+                this.regionOfInterest = regionOfInterest;
+                this.logSensitivity = logSensitivity;
+                return true;
+            }
+            return false;
+        };
+    };
+    
+    this.userInputData = new UserInputData(null, null, null, Number.NaN);
+    
+    /** {Image} bitmap indicates were ref & tgt images overlap */
     this.starRegionMask = null;
-    /** color array of Star[] */
+    /** {Rect} starRegionMask bounding box */
+    this.overlapBox = null;
+    /** {star[][]} color array of reference stars */
     this.refColorStars = null;
-    /** color array of Star[] */
+    /** {star[][]} color array of target stars */
     this.tgtColorStars = null;
-    /** Star[] */
+    /** {Star[]} refColorStars and tgtColorStars, sorted by star flux */
     this.allStars = null;
 
     /**
@@ -38,44 +73,24 @@ function StarCache() {
      * @param {Rect} regionOfInterest
      * @param {Number} logSensitivity
      */
-    this.setIsValidParameters = function (refId, tgtId, regionOfInterest, logSensitivity) {
-        this.refId = refId;
-        this.tgtId = tgtId;
-        this.regionOfInterest = regionOfInterest;
-        this.logSensitivity = logSensitivity;
+    this.setUserInputData = function (refId, tgtId, regionOfInterest, logSensitivity) {
+        let hasChanged = this.userInputData.setData(refId, tgtId, regionOfInterest, logSensitivity);
+        if (hasChanged){
+            this.invalidate();
+        }
     };
     
-    /**
-     * @param {String} refId
-     * @param {String} tgtId
-     * @param {Rect} regionOfInterest
-     * @param {Number} logSensitivity
-     * @returns {Boolean}
-     */
-    this.isValid = function (refId, tgtId, regionOfInterest, logSensitivity) {
-        return refId === this.refId &&
-                tgtId === this.tgtId &&
-                logSensitivity === this.logSensitivity &&
-                regionOfInterest.x0 === this.regionOfInterest.x0 && 
-                regionOfInterest.x1 === this.regionOfInterest.x1 &&
-                regionOfInterest.y0 === this.regionOfInterest.y0 && 
-                regionOfInterest.y1 === this.regionOfInterest.y1;
+    this.invalidateTargetStars = function(){
+        this.tgtColorStars = null;
+        this.allStars = null;
     };
     
-    /**
-     * @param {Rect} overlapBox
-     * @param {Image} starRegionMask
-     * @param {Star[][]} refColorStars Color array of Star[]
-     * @param {Star[][]} tgtColorStars Color array of Star[]
-     * @param {Star[]} allStars
-     * @returns {undefined}
-     */
-    this.setData = function (overlapBox, starRegionMask, refColorStars, tgtColorStars, allStars){
-        this.overlapBox = overlapBox;
-        this.starRegionMask = starRegionMask;
-        this.refColorStars = refColorStars;
-        this.tgtColorStars = tgtColorStars;
-        this.allStars = allStars;
+    this.invalidate = function(){
+        this.starRegionMask = null;
+        this.overlapBox = null;
+        this.refColorStars = null;
+        this.tgtColorStars = null;
+        this.allStars = null;
     };
     
     /**
