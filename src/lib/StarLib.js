@@ -70,7 +70,6 @@ function StarsDetected(){
      * @return {StarCache} new star cache
      */
     this.detectStars = function (refView, tgtView, previewArea, logSensitivity, starCache) {
-        let detectStarTime = new Date().getTime();
         this.nChannels = refView.image.isColor ? 3 : 1;
         
         // let the StarCache know about any relevant input parameter changes
@@ -84,14 +83,25 @@ function StarsDetected(){
         }
         this.starRegionMask = starCache.starRegionMask;
         this.overlapBox = starCache.overlapBox;
+         
+        console.writeln("<b><u>Detecting stars</u></b>");
+        processEvents();
+        if ( console.abortRequested )
+            throw "Process aborted";
         
+        let detectStarTime = new Date().getTime();
         // Reference image stars
         if (starCache.refColorStars === null){
             starCache.allStars = null;
             starCache.refColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                starCache.refColorStars.push(
-                        findStars(refView, this.starRegionMask, logSensitivity, c));
+                let stars = findStars(refView, this.starRegionMask, logSensitivity, c);
+                starCache.refColorStars.push(stars);
+                
+                console.writeln("Reference[", c, "] detected ", stars.length, " stars");
+                processEvents();
+                if ( console.abortRequested )
+                    throw "Process aborted";
             }
         }
         this.refColorStars = starCache.refColorStars;
@@ -101,8 +111,13 @@ function StarsDetected(){
             starCache.allStars = null;
             starCache.tgtColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                starCache.tgtColorStars.push(
-                        findStars(tgtView, this.starRegionMask, logSensitivity, c));
+                let stars = findStars(tgtView, this.starRegionMask, logSensitivity, c);
+                starCache.tgtColorStars.push(stars);
+                
+                console.writeln("Target[", c, "] detected ", stars.length, " stars");
+                processEvents();
+                if ( console.abortRequested )
+                    throw "Process aborted";
             }
         }
         this.tgtColorStars = starCache.tgtColorStars;
@@ -113,8 +128,9 @@ function StarsDetected(){
         }
         this.allStars = starCache.allStars;
 
-        console.writeln("Star cache:\n" + starCache.getStatus() + 
+        console.writeln("\n<b>Star cache:</b>\n" + starCache.getStatus() + 
                 "\n    (" + getElapsedTime(detectStarTime) + ")\n");
+        processEvents();
     };
     
     /**
@@ -139,11 +155,34 @@ function StarsDetected(){
      * @param {Image} refImage
      * @param {Image} tgtImage
      * @param {Rect} regionOfInterest
-     * @param {Rect} regionOfInterest
      * @param {StarCache} starCache
      */
     let cacheStarRegionMask = function (refImage, tgtImage, regionOfInterest, starCache) {
-        let mask = new Image(refImage.width, refImage.height, 1);
+        const startTime = new Date().getTime();
+        console.writeln("<b><u>Calculating overlap</u></b>");
+        processEvents();
+        const width = refImage.width;
+        const height = refImage.height;
+        const updateInterval = width / 10;
+        let xOld = width - 1;
+        let oldTextLength = 0;
+        
+        let showProgress = function (x){
+            let text = "" + Math.trunc((width - x) / width * 100) + "%";
+            console.write(getDelStr() + text);
+            processEvents();
+            oldTextLength = text.length;
+            xOld = x;
+        };
+        let getDelStr = function (){
+            let bsp = "";
+            for (let i = 0; i < oldTextLength; i++) {
+                bsp += "<bsp>";
+            }
+            return bsp;
+        };
+        
+        let mask = new Image(width, height, 1);
         mask.fill(0);
         // Overlap bounding box coordinates
         let x0 = Number.POSITIVE_INFINITY;
@@ -151,14 +190,17 @@ function StarsDetected(){
         let y0 = Number.POSITIVE_INFINITY;
         let y1 = Number.NEGATIVE_INFINITY;
         // Create a mask to restrict the star detection to the overlapping area and previewArea
-        let xMin = regionOfInterest.x0;
-        let xMax = regionOfInterest.x1;
-        let yMin = regionOfInterest.y0;
-        let yMax = regionOfInterest.y1;
-        for (let x = xMin; x < xMax; x++) {
-            for (let y = yMin; y < yMax; y++) {
+// If using previews
+//        let xMin = regionOfInterest.x0;
+//        let xMax = regionOfInterest.x1;
+//        let yMin = regionOfInterest.y0;
+//        let yMax = regionOfInterest.y1;   
+//        for (let x = xMin; x < xMax; x++) {
+//            for (let y = yMin; y < yMax; y++) {
+        for (let x = width - 1; x > -1; --x) {
+            for (let y = height - 1; y > -1; --y) {
                 let isOverlap = true;
-                for (let c = self.nChannels - 1; c >= 0; c--) {
+                for (let c = self.nChannels - 1; c > -1; c--) {
                     if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0) {
                         isOverlap = false;
                         break;
@@ -173,6 +215,9 @@ function StarsDetected(){
                     y1 = Math.max(y1, y);
                 }
             }
+            if (x < xOld - updateInterval){
+                showProgress(x);
+            }
         }
         if (x0 !== Number.POSITIVE_INFINITY){
             starCache.overlapBox = new Rect(x0, y0, x1+1, y1+1);
@@ -181,6 +226,8 @@ function StarsDetected(){
         }
         
         starCache.starRegionMask = mask;
+        console.write(getDelStr());   // remove 100% from console
+        console.writeln(getElapsedTime(startTime) + "\n");
     };
     
     /**
@@ -189,7 +236,7 @@ function StarsDetected(){
      * @param {Image} starRegionMask Bitmap represents overlapping region
      * @param {Number} logSensitivity
      * @param {Number} channel
-     * @returns {unresolved}
+     * @returns {Star[]}
      */
     let findStars = function(view, starRegionMask, logSensitivity, channel){
         const title = "TMP_ChannelExtraction";
@@ -649,7 +696,7 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
     keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
 
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, -2);
+    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
 }
 
 /**

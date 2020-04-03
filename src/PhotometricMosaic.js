@@ -57,13 +57,15 @@ function PhotometricMosaic(data)
     let referenceView = data.referenceView;
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
-    console.writeln("Reference: ", referenceView.fullId, ", Target: ", targetView.fullId);
+    console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
+    processEvents();
 
     let samplePreviewArea = null;
     if (data.hasAreaOfInterest) {
         samplePreviewArea = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, 
                 data.areaOfInterest_X1, data.areaOfInterest_Y1);
     }
+    
     let detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, samplePreviewArea, 
             data.logStarDetection, data.starCache);
@@ -73,6 +75,10 @@ function PhotometricMosaic(data)
         new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
+    processEvents();
+    if ( console.abortRequested )
+        throw "Process aborted";
+    
     if (data.viewFlag === DETECTED_STARS_FLAG()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
                 100, "__DetectedStars", data);
@@ -85,6 +91,7 @@ function PhotometricMosaic(data)
     let colorStarPairs = detectedStars.getColorStarPairs(referenceView.image, targetView.image, data.rejectHigh);
     
     // Remove photometric star outliers and calculate the scale
+    console.writeln("<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
         let starPairs = colorStarPairs[c];
         starPairs.linearFitData = calculateScale(starPairs);
@@ -105,6 +112,9 @@ function PhotometricMosaic(data)
     } else {
         console.writeln("Stars used for photometry: " + colorStarPairs[0].starPairArray.length);
     }
+    processEvents();
+    if ( console.abortRequested )
+        throw "Process aborted";
     
     if (data.viewFlag === PHOTOMETRY_STARS_FLAG()) {
         displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId, data);
@@ -147,6 +157,9 @@ function PhotometricMosaic(data)
         } else {
             console.writeln(text);
         }
+        processEvents();
+        if ( console.abortRequested )
+            throw "Process aborted";
     }
     
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, scaleFactors,
@@ -176,16 +189,18 @@ function PhotometricMosaic(data)
         return;
     }
 
+    console.writeln("\n<b><u>Applying scale and gradients</u></b>");
     targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
-    let applyScaleAndGradientTime = new Date().getTime();
     applyScaleAndGradient(targetView, isHorizontal, scaleFactors, gradients, detectedStars.overlapBox, 
         data.taperFlag, data.taperLength, data);
     data.starCache.invalidateTargetStars();
-    console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
 
     // Save parameters to PixInsight history
     data.saveParameters();
     targetView.endProcess();
+    processEvents();
+    if ( console.abortRequested )
+        throw "Process aborted";
 
     if (data.createMosaicFlag){
         let mosaicName = MOSAIC_NAME();
@@ -202,13 +217,14 @@ function PhotometricMosaic(data)
                     }
                 }
             }
-            console.writeln("Creating ", mosaicName);
+            console.writeln("<b><u>Creating ", mosaicName, "</u></b>");
         } else {
             // The reference view has been set to a previously created mosaic.
             // We will update this view
             console.writeln("Updating ", mosaicName);
             data.starCache.invalidate(); // reference image has changed
         }
+        processEvents();
         createMosaic(referenceView, targetView, mosaicName, createMosaicView,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
                 
@@ -235,6 +251,7 @@ function PhotometricMosaic(data)
     }
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
+    processEvents();
 }
 
 /**
@@ -263,8 +280,30 @@ function calculateScale(starPairs) {
  */
 function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, overlapBox, 
         taperFlag, taperLength, data) {
+    const applyScaleAndGradientTime = new Date().getTime();
+    const targetImage = view.image;
+    const width = targetImage.width;
+    const height = targetImage.height;
+    const updateInterval = height / 10;
+    let yOld = 0;
+    let oldTextLength = 0;
+    
+    let showProgress = function (y){
+        let text = "" + Math.trunc((height - y) / height * 100) + "%";
+        console.write(getDelStr() + text);
+        processEvents();
+        oldTextLength = text.length;
+        yOld = y;
+    };
+    let getDelStr = function (){
+        let bsp = "";
+        for (let i = 0; i < oldTextLength; i++) {
+            bsp += "<bsp>";
+        }
+        return bsp;
+    };
+    
     let nChannels = gradients.length;
-    let targetImage = view.image;
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let gradientData = gradients[channel].getGradientData();
@@ -273,11 +312,16 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
         console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
         let gradientOffset = new GradientOffset(targetImage.width, targetImage.height, 
                 average, overlapBox, taperLength, isHorizontal);     
-                
-        for (let y = 0; y < targetImage.height; y++) {
-            for (let x = 0; x < targetImage.width; x++) {
-                let sample = targetImage.sample(x, y, channel);
-                if (sample !== 0) {
+            
+        oldTextLength = 0;
+        yOld = height - 1;
+        for (let y = height - 1; y > -1 ; --y) {
+            let row = new Rect(0, y, width, y + 1);
+            let samples = [];
+            targetImage.getSamples(samples, row, channel);
+            let rowUpdated = false;
+            for (let x = samples.length - 1; x > -1; --x) {
+                if (samples[x] !== 0) {
                     let offset;
                     if (isHorizontal){
                         offset = difArray[x];
@@ -290,10 +334,19 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
                             offset = gradientOffset.getOffset(x, offset);
                         }
                     }
-                    view.image.setSample(sample * scale - offset, x, y, channel);
+                    samples[x] = samples[x] * scale - offset;
+                    rowUpdated = true;
                 }
             }
+            if (rowUpdated){
+                view.image.setSamples(samples, row, channel);
+            }
+            
+            if (y < yOld - updateInterval){
+                showProgress(y);
+            }
         }
+        console.write(getDelStr());   // remove 100% from console
     }
     
     // FITS Header
@@ -324,13 +377,15 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
         keywords.push(new FITSKeyword("HISTORY", "", 
             "PhotometricMosaic.scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
     }
+    console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
+    
     let minValue = view.image.minimum();
     let maxValue = view.image.maximum();
     if (minValue < 0 || maxValue > 1){
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
         keywords.push(new FITSKeyword("HISTORY", "",
                 "PhotometricMosaic.truncated" + minMaxValues));
-        console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...");
+        console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...\n");
         view.image.truncate(0, 1);
     }
     view.window.keywords = keywords;
@@ -1356,8 +1411,8 @@ function main() {
         if (!linearFitDialog.execute())
             break;
         console.show();
-        console.writeln("=================================================");
-        console.writeln("<b>" + TITLE() + " ", VERSION(), "</b>:");
+        console.abortEnabled = true;
+        console.writeln("\n\n=== <b>" + TITLE() + " ", VERSION(), "</b> ===");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
