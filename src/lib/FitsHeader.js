@@ -16,28 +16,6 @@
 //"use strict";
 
 /**
- * 
- * @param {View} view
- * @param {String} comment
- */
-function addFitsHistory(view, comment) {
-    let keywords = view.window.keywords;
-    keywords.push(new FITSKeyword("HISTORY", "", comment));
-    view.window.keywords = keywords;
-}
-
-/**
- * 
- * @param {View} view
- * @param {String} comment
- */
-function addFitsComment(view, comment) {
-    let keywords = view.window.keywords;
-    keywords.push(new FITSKeyword("COMMENT", "", comment));
-    view.window.keywords = keywords;
-}
-
-/**
  * Copy Astrometric solution from source view to target view
  * @param {View} sourceView Copy astrometric solution from this header
  * @param {View} targetView Append astrometric solution to this header
@@ -115,46 +93,24 @@ function copyFitsObservation(sourceView, targetView){
     return;
 }
 
-//let history = [];
-//    let prefix = "PhotometricMosaic.";
-//    history.push(prefix + "Reference: " + referenceView.fullId);
-//    history.push(prefix + "SampleSize: " + data.sampleSize);
-//    history.push(prefix + "LineSegments: " + data.nLineSegments);
-//    if (data.taperFlag){
-//        history.push(prefix + "TaperLength: " + data.taperLength);
-//    }
-//    for (let c=0; c<nChannels; c++){
-//        let starPairs = colorStarPairs[c];
-//        history.push(prefix + "Scale[" + c + "]: " + 
-//                starPairs.linearFitData.m.toPrecision(5) + " (" + 
-//                starPairs.starPairArray.length + " stars)");
-//    }
-//    addFitsHistory(targetView, history);
-
-// Update Fits Header
-//        let mosaicView = View.viewById(mosaicName);
-//        if (createMosaicView){
-//            copyFitsAstrometricSolution(referenceView, mosaicView);
-//            addFitsComment(mosaicView, "PhotometricMosaic " + VERSION());
-//            addFitsComment(mosaicView, "MOSAIC TILE: " + referenceView.fullId);
-//            let fitsKeywords = getFitsObservation(referenceView);
-//            fitsAppendAsComments(mosaicView, fitsKeywords);
-//            copyFitsHistory(referenceView, mosaicView);     
-//        }
-//        
-//        addFitsComment(mosaicView, "PhotometricMosaic " + VERSION());
-//        addFitsComment(mosaicView, "MOSAIC TILE: " + targetView.fullId);
-//        let fitsKeywords = getFitsObservation(targetView);
-//        fitsAppendAsComments(mosaicView, fitsKeywords);
-//        copyFitsHistory(targetView, mosaicView);
-//        let overlayMode;
-//        if (data.mosaicOverlayRefFlag)
-//            overlayMode = "(" + referenceView.fullId + ") over (" + targetView.fullId + ")";
-//        if (data.mosaicOverlayTgtFlag)
-//            overlayMode = "(" + targetView.fullId + ") over (" + referenceView.fullId + ")";
-//        if (data.mosaicRandomFlag)
-//            overlayMode = "Random pixels (" + referenceView.fullId + "), (" + targetView.fullId + ")";
-//        if (data.mosaicAverageFlag)
-//            overlayMode = "Average (" + referenceView.fullId + "), (" + targetView.fullId + ")";
-//        addFitsHistory(mosaicView, [prefix + "Mosaic: " + overlayMode]);
-
+/**
+ * @param {View} view Read FITS header from this view.
+ * @param {View} mosaicView Append FITS header to this view.
+ * @param {String} startsWith Copy all FITS comments that start with this.
+ * @param {String} orStartsWith Copy all FITS comments that start with this.
+ */
+function copyFitsKeywords(view, mosaicView, startsWith, orStartsWith){
+    let modified = false;
+    let keywords = view.window.keywords;
+    let mosaicKeywords = mosaicView.window.keywords;
+    for (let keyword of keywords){
+        if (keyword.comment.startsWith(startsWith) || 
+                keyword.comment.startsWith(orStartsWith)){
+            mosaicKeywords.push(keyword);
+            modified = true;
+        }
+    }
+    if (modified){
+        mosaicView.window.keywords = mosaicKeywords;
+    }
+}
