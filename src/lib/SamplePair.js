@@ -34,16 +34,16 @@ function SamplePair(targetMedian, referenceMedian, rect) {
  * Contains SamplePair[]
  * @param {SamplePair[]} samplePairArray
  * @param {Number} sampleSize
- * @param {Rect} selectedArea Area selected by user (e.g. via preview) or overlap bounding box
+ * @param {Rect} overlapBox overlap bounding box
  * @returns {SamplePairs}
  */
-function SamplePairs(samplePairArray, sampleSize, selectedArea){
+function SamplePairs(samplePairArray, sampleSize, overlapBox){
     /** SamplePair[] */
     this.samplePairArray = samplePairArray;
     /** Number */
     this.sampleSize = sampleSize;
     /** Rect */
-    this.selectedArea = selectedArea;
+    this.overlapBox = overlapBox;
     /** Rect, Private */
     this.sampleArea = null;                             // Private
 
@@ -80,11 +80,11 @@ function SamplePairs(samplePairArray, sampleSize, selectedArea){
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
  * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars
- * @param {Rect} selectedArea Reject samples outside this area (preview or overlap bounding box)
+ * @param {Rect} overlapBox Reject samples outside this area (overlap bounding box)
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
 function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
-        sampleSize, stars, rejectHigh, limitSampleStarsPercent, selectedArea) {
+        sampleSize, stars, rejectHigh, limitSampleStarsPercent, overlapBox) {
 
     let firstNstars;
     if (limitSampleStarsPercent < 100){
@@ -95,7 +95,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
                 
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
-    let bins = new SampleBinMap(selectedArea, sampleSize, nChannels);
+    let bins = new SampleBinMap(overlapBox, sampleSize, nChannels);
     bins.addSampleBins(targetImage, referenceImage, rejectHigh);
     bins.removeBinRectWithStars(stars, firstNstars);
     
@@ -106,7 +106,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
     for (let c=0; c<nChannels; c++){
         let scale = scaleFactors[c].m;
         let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, scale, c);
-        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleSize, selectedArea));
+        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleSize, overlapBox));
     }
     return colorSamplePairs;
 }
@@ -115,21 +115,21 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
  * Used to create the SamplePair array.
  * SamplePair[] are used to model the background level and gradient
  * Samples are discarded if they include black pixels or stars
- * @param {Rect} selectedArea preview area or overlap bounding box
+ * @param {Rect} overlapBox overlap bounding box
  * @param {Number} binSize bin size (SamplePair size)
  * @param {Number} nChannels 1 for B&W, 3 for color
  * @returns {SampleBinMap} 
  */
-function SampleBinMap(selectedArea, binSize, nChannels){
+function SampleBinMap(overlapBox, binSize, nChannels){
     const self = this;
     //Sample size
     this.binSize = binSize;
     // Coordinate of top left bin
-    this.x0 = selectedArea.x0;
-    this.y0 = selectedArea.y0;
+    this.x0 = overlapBox.x0;
+    this.y0 = overlapBox.y0;
     // Coordinate of the first bin that is beyond the selected area
-    this.x1 = selectedArea.x1;
-    this.y1 = selectedArea.y1;
+    this.x1 = overlapBox.x1;
+    this.y1 = overlapBox.y1;
     // For stars too bright to have been detected by StarDetector
 //    this.tooBrightMap = new Map();
 

@@ -73,21 +73,18 @@ function StarsDetected(){
         this.nChannels = refView.image.isColor ? 3 : 1;
         
         // let the StarCache know about any relevant input parameter changes
-        let regionOfInterest = previewArea === null ? refView.image.bounds : previewArea;
-        starCache.setUserInputData(refView.fullId, tgtView.fullId, regionOfInterest, logSensitivity);
+        starCache.setUserInputData(refView.fullId, tgtView.fullId, previewArea, logSensitivity);
         
         // StarRegionMask
         if (starCache.starRegionMask === null || starCache.overlapBox === null){
             // Create ref/tgt overlap bitmap (starRegionMask) and its bounding box (ovelapBox)
-            cacheStarRegionMask(refView.image, tgtView.image, regionOfInterest, starCache);
+            cacheStarRegionMask(refView.image, tgtView.image, previewArea, starCache);
         }
         this.starRegionMask = starCache.starRegionMask;
         this.overlapBox = starCache.overlapBox;
          
         console.writeln("<b><u>Detecting stars</u></b>");
         processEvents();
-        if ( console.abortRequested )
-            throw "Process aborted";
         
         let detectStarTime = new Date().getTime();
         // Reference image stars
@@ -100,8 +97,6 @@ function StarsDetected(){
                 
                 console.writeln("Reference[", c, "] detected ", stars.length, " stars");
                 processEvents();
-                if ( console.abortRequested )
-                    throw "Process aborted";
             }
         }
         this.refColorStars = starCache.refColorStars;
@@ -116,8 +111,6 @@ function StarsDetected(){
                 
                 console.writeln("Target[", c, "] detected ", stars.length, " stars");
                 processEvents();
-                if ( console.abortRequested )
-                    throw "Process aborted";
             }
         }
         this.tgtColorStars = starCache.tgtColorStars;
@@ -154,21 +147,33 @@ function StarsDetected(){
      * Create bitmap image with overlapping region set to 1
      * @param {Image} refImage
      * @param {Image} tgtImage
-     * @param {Rect} regionOfInterest
+     * @param {Rect} previewArea
      * @param {StarCache} starCache
      */
-    let cacheStarRegionMask = function (refImage, tgtImage, regionOfInterest, starCache) {
+    let cacheStarRegionMask = function (refImage, tgtImage, previewArea, starCache) {
         const startTime = new Date().getTime();
         console.writeln("<b><u>Calculating overlap</u></b>");
         processEvents();
-        const width = refImage.width;
-        const height = refImage.height;
+        
+        let xMin = 0;
+        let xMax = refImage.width;
+        let yMin = 0;
+        let yMax = refImage.height;  
+        let width = refImage.width;
+        if (previewArea !== null){
+            xMin = previewArea.x0;
+            xMax = previewArea.x1;
+            yMin = previewArea.y0;
+            yMax = previewArea.y1;  
+            width = previewArea.width;
+        } 
+        
         const updateInterval = width / 10;
-        let xOld = width - 1;
+        let xOld = 0;
         let oldTextLength = 0;
         
         let showProgress = function (x){
-            let text = "" + Math.trunc((width - x) / width * 100) + "%";
+            let text = "" + Math.trunc(x / width * 100) + "%";
             console.write(getDelStr() + text);
             processEvents();
             oldTextLength = text.length;
@@ -182,7 +187,7 @@ function StarsDetected(){
             return bsp;
         };
         
-        let mask = new Image(width, height, 1);
+        let mask = new Image(refImage.width, refImage.height, 1);
         mask.fill(0);
         // Overlap bounding box coordinates
         let x0 = Number.POSITIVE_INFINITY;
@@ -190,15 +195,8 @@ function StarsDetected(){
         let y0 = Number.POSITIVE_INFINITY;
         let y1 = Number.NEGATIVE_INFINITY;
         // Create a mask to restrict the star detection to the overlapping area and previewArea
-// If using previews
-//        let xMin = regionOfInterest.x0;
-//        let xMax = regionOfInterest.x1;
-//        let yMin = regionOfInterest.y0;
-//        let yMax = regionOfInterest.y1;   
-//        for (let x = xMin; x < xMax; x++) {
-//            for (let y = yMin; y < yMax; y++) {
-        for (let x = width - 1; x > -1; --x) {
-            for (let y = height - 1; y > -1; --y) {
+        for (let x = xMin; x < xMax; x++) {
+            for (let y = yMin; y < yMax; y++) {
                 let isOverlap = true;
                 for (let c = self.nChannels - 1; c > -1; c--) {
                     if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0) {
@@ -215,14 +213,14 @@ function StarsDetected(){
                     y1 = Math.max(y1, y);
                 }
             }
-            if (x < xOld - updateInterval){
+            if (x > xOld + updateInterval){
                 showProgress(x);
             }
         }
         if (x0 !== Number.POSITIVE_INFINITY){
-            starCache.overlapBox = new Rect(x0, y0, x1+1, y1+1);
+            starCache.setOverlapBox(new Rect(x0, y0, x1+1, y1+1));
         } else {
-            starCache.overlapBox = null;
+            starCache.setOverlapBox(null);
         }
         
         starCache.starRegionMask = mask;
@@ -763,8 +761,8 @@ function displayMaskStars(refView, detectedStars, targetId, limitMaskStarsPercen
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
 function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, radiusAdd, data){
-    let postfix = "MosaicMask";
-    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + postfix;
+    let postfix = "Mask";
+    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + limitMaskStarsPercent + "_" + postfix;
     let bmp = new Bitmap(tgtView.image.width, tgtView.image.height);
     bmp.fill(0xffffffff);
     

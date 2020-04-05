@@ -36,11 +36,11 @@ function GradientData(difArray, minLineValue, maxLineValue){
  * @param {SamplePairs} samplePairs Contains SamplePairArray and their bounding box.
  * @param {Number} nSections The number of least square fit lines to calculate.
  * @param {Image} targetImage Used to get image width and height
- * @param {Rect} previewArea Preview area or image overlap area if no preview
+ * @param {Rect} overlapBox Overlap bounding box
  * @param {Boolean} isHorizontal True if the mosaic join is a horizontal strip
  * @returns {Gradient}
  */
-function Gradient(samplePairs, nSections, targetImage, previewArea, isHorizontal){
+function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal){
     /**
      * Split the sample coverage area into sections and calculate the gradient linear fit
      * for each section.
@@ -119,69 +119,65 @@ function Gradient(samplePairs, nSections, targetImage, previewArea, isHorizontal
     /**
      * How the difference lines are calculated:
      * (1) The SampleArea is the bounding rectangle of all the SamplePairs.
-     * (2) The previewArea is the area selected by the user (e.g. by a preview). If
-     * the user made no selection, the previewArea is the bounding box of the 
-     * overlap region. The SampleArea is a subset of the previewArea (it can be the 
-     * same size, but not bigger.)
+     * (2) The overlapBox is the bounding box of the overlap region. The SampleArea
+     * is a subset of the overlapBox (it can be the same size, but not bigger.)
      * (3) The SampleArea is divided into SampleSection. Each of these sections
      * defines a gradient line. The dif value within the sample area is calculated
      * from the equation of this line: dif = mx + b
-     * (4) From the start of the image to the start of the previewArea, the dif value
+     * (4) From the start of the image to the start of the overlapBox, the dif value
      * is held constant.
-     * (5) From the start of the previewArea (or the start of the overlap bounding
-     * box if no preview) to the first SampleSection, the line from that first
-     * SampleSection is extended.
-     * (6) From the last SampleSection to the end of the previewArea (or the end of
-     * the overlap bounding box if no preview) the line from that last
-     * SampleSection is extended.
-     * (7) From the end of the previewArea to the end of the image, the dif value
+     * (5) From the start of the overlapBox to the first SampleSection, 
+     * the line from that first SampleSection is extended.
+     * (6) From the last SampleSection to the end of the overlapBox 
+     * the line from that last SampleSection is extended.
+     * (7) From the end of the overlapBox to the end of the image, the dif value
      * is held constant.
      * @param {SampleSection[]} sections Calculate best fit line for each SampleSection
-     * @param {Rect} previewArea Preview or overlap bounding box
+     * @param {Rect} overlapBox overlap bounding box
      * @param {Image} targetImage Used to get image width / height
      * @param {Boolean} isHorizontal True if the overlap strip is horizontal
      * @returns {EquationOfLine[]}
      */
-    let createGradientLines = function(sections, previewArea, targetImage, isHorizontal){
-        let previewMin;
-        let previewMax;
+    let createGradientLines = function(sections, overlapBox, targetImage, isHorizontal){
+        let overlapMin;
+        let overlapMax;
         let imageMax;
         if (isHorizontal) {
-            previewMin = previewArea.x0;
-            previewMax = previewArea.x1;
+            overlapMin = overlapBox.x0;
+            overlapMax = overlapBox.x1;
             imageMax = targetImage.width;
         } else {
-            previewMin = previewArea.y0;
-            previewMax = previewArea.y1;
+            overlapMin = overlapBox.y0;
+            overlapMax = overlapBox.y1;
             imageMax = targetImage.height;
         }
 
         let eqnOfLines = [];
-        if (previewMin > 0){
-            // First horizontal line to start of preview
+        if (overlapMin > 0){
+            // First horizontal line to start of overlap
             // The first line is horizontal (gradient = 0)
-            // and intersects the first section line at previewMin
+            // and intersects the first section line at overlapMin
             let linearFitData = sections[0].linearFitData;
-            let b = eqnOfLineCalcY(previewMin, linearFitData.m, linearFitData.b);
-            eqnOfLines.push(new EquationOfLine(0, b, 0, previewMin));
+            let b = eqnOfLineCalcY(overlapMin, linearFitData.m, linearFitData.b);
+            eqnOfLines.push(new EquationOfLine(0, b, 0, overlapMin));
         }
 
         // Each section
         for (let i = 0; i < sections.length; i++){
-            let x0 = (i===0 ? previewMin : sections[i].minCoord);
-            let x1 = (i===sections.length - 1 ? previewMax : sections[i].maxCoord);
+            let x0 = (i===0 ? overlapMin : sections[i].minCoord);
+            let x1 = (i===sections.length - 1 ? overlapMax : sections[i].maxCoord);
             let m = sections[i].linearFitData.m;
             let b = sections[i].linearFitData.b;
             eqnOfLines.push(new EquationOfLine(m, b, x0, x1));
         }
 
-        // From end of sections to end of preview (or end of image)
-        if (previewMax < imageMax){
+        // From end of sections to end of image
+        if (overlapMax < imageMax){
             // The last line is horizontal (gradient = 0)
-            // and intersects the last section line at previewMax
+            // and intersects the last section line at overlapMax
             let linearFitData = sections[sections.length-1].linearFitData;
-            let b = eqnOfLineCalcY(previewMax, linearFitData.m, linearFitData.b);
-            eqnOfLines.push(new EquationOfLine(0, b, previewMax, imageMax));
+            let b = eqnOfLineCalcY(overlapMax, linearFitData.m, linearFitData.b);
+            eqnOfLines.push(new EquationOfLine(0, b, overlapMax, imageMax));
         }
 
         return eqnOfLines;    
@@ -232,7 +228,7 @@ function Gradient(samplePairs, nSections, targetImage, previewArea, isHorizontal
     
     let sampleSections = getSampleSections(samplePairs, isHorizontal);
     sampleSections = joinSectionLines(sampleSections);
-    this.eqnLineArray = createGradientLines(sampleSections, previewArea, targetImage, isHorizontal);
+    this.eqnLineArray = createGradientLines(sampleSections, overlapBox, targetImage, isHorizontal);
     this.gradientData = createGradient(this.eqnLineArray);
 }
 

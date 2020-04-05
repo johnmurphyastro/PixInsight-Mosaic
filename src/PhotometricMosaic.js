@@ -31,8 +31,10 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
 
-function VERSION(){return  "1.0";}
+function VERSION(){return  "1.1 beta";}
 function TITLE(){return "Photometric Mosaic";}
+function SCRIPT_NAME(){return "PhotometricMosaic";}
+function TRIM_NAME(){return "TrimImage";}
 function HORIZONTAL(){return 0;}
 function VERTICAL(){return 1;}
 function AUTO(){return 2;}
@@ -60,24 +62,52 @@ function PhotometricMosaic(data)
     console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
     processEvents();
 
-    let samplePreviewArea = null;
+    let areaOfInterest = null;
     if (data.hasAreaOfInterest) {
-        samplePreviewArea = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, 
+        areaOfInterest = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, 
                 data.areaOfInterest_X1, data.areaOfInterest_Y1);
     }
     
     let detectedStars = new StarsDetected();
-    detectedStars.detectStars(referenceView, targetView, samplePreviewArea, 
+    detectedStars.detectStars(referenceView, targetView, areaOfInterest, 
             data.logStarDetection, data.starCache);
     if (detectedStars.overlapBox === null){
-        let msgEnd = (samplePreviewArea === null) ? "." : " within preview area.";
+        let msgEnd = (areaOfInterest === null) ? "." : " within area of interest.";
         let errorMsg = "Error: '" + referenceView.fullId + "' and '" + targetView.fullId + "' do not overlap" + msgEnd;
         new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     processEvents();
-    if ( console.abortRequested )
-        throw "Process aborted";
+    
+    // create preview of detected overlap in target image
+    let w = targetView.window;
+    let previews = w.previews;
+    let overlap = detectedStars.overlapBox;
+    let found = false;
+    let overlapPreview = null;
+    for (let preview of previews){
+        let r = w.previewRect( preview );
+        if (r.x0 === overlap.x0 && r.x1 === overlap.x1 &&
+                r.y0 === overlap.y0 && r.y1 === overlap.y1){
+            found = true; // preview already exists
+            overlapPreview = preview;
+            break;
+        }
+    }
+    if (!found){
+        let preview = w.createPreview(overlap, "Overlap");
+        overlapPreview = preview;
+    }
+    
+    // Set the preview data to the overlap bounding box.
+    // The UI controls will be set when PhotmetricMosaic() returns to main
+    data.hasAreaOfInterest = true;
+    data.preview = overlapPreview;
+    let rect = targetView.window.previewRect(data.preview);
+    data.areaOfInterest_X0 = rect.x0;
+    data.areaOfInterest_Y0 = rect.y0;
+    data.areaOfInterest_X1 = rect.x1;
+    data.areaOfInterest_Y1 = rect.y1;
     
     if (data.viewFlag === DETECTED_STARS_FLAG()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
@@ -85,11 +115,7 @@ function PhotometricMosaic(data)
         return;
     }
     
-    if (samplePreviewArea === null){
-        samplePreviewArea = detectedStars.overlapBox;
-    }
     let colorStarPairs = detectedStars.getColorStarPairs(referenceView.image, targetView.image, data.rejectHigh);
-    
     // Remove photometric star outliers and calculate the scale
     console.writeln("<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
@@ -113,8 +139,6 @@ function PhotometricMosaic(data)
         console.writeln("Stars used for photometry: " + colorStarPairs[0].starPairArray.length);
     }
     processEvents();
-    if ( console.abortRequested )
-        throw "Process aborted";
     
     if (data.viewFlag === PHOTOMETRY_STARS_FLAG()) {
         displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId, data);
@@ -158,12 +182,11 @@ function PhotometricMosaic(data)
             console.writeln(text);
         }
         processEvents();
-        if ( console.abortRequested )
-            throw "Process aborted";
     }
     
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, scaleFactors,
-        data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, samplePreviewArea);
+        data.sampleSize, detectedStars.allStars, 
+        data.rejectHigh, data.limitSampleStarsPercent, detectedStars.overlapBox);
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
         new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -182,7 +205,8 @@ function PhotometricMosaic(data)
     let nLineSegments = (data.nLineSegments + 1) / 2;
     for (let c = 0; c < nChannels; c++) {
         samplePairs = colorSamplePairs[c];
-        gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, samplePreviewArea, isHorizontal);
+        gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, 
+            detectedStars.overlapBox, isHorizontal);
     }
     if (data.viewFlag === GRADIENT_GRAPH_FLAG()) {
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs, data);
@@ -199,44 +223,36 @@ function PhotometricMosaic(data)
     data.saveParameters();
     targetView.endProcess();
     processEvents();
-    if ( console.abortRequested )
-        throw "Process aborted";
 
     if (data.createMosaicFlag){
         let mosaicName = MOSAIC_NAME();
-        let createMosaicView = (referenceView.fullId !== mosaicName);
-        
-        if (createMosaicView){
-            if (!View.viewById(mosaicName).isNull){
-                // find a unique name for the new mosaic view
-                let mosaicNameBase = mosaicName;
-                for (let i=1; ; i++){
-                    if (View.viewById(mosaicNameBase + i).isNull){
-                        mosaicName = mosaicNameBase + i;
-                        break;
-                    }
+        if (!View.viewById(mosaicName).isNull) {
+            // The view name 'Mosaic' is aready in use.
+            // find a unique name for the new mosaic view
+            let mosaicNameBase = mosaicName;
+            for (let i = 1; ; i++) {
+                if (View.viewById(mosaicNameBase + i).isNull) {
+                    mosaicName = mosaicNameBase + i;
+                    break;
                 }
             }
-            console.writeln("<b><u>Creating ", mosaicName, "</u></b>");
-        } else {
-            // The reference view has been set to a previously created mosaic.
-            // We will update this view
-            console.writeln("Updating ", mosaicName);
-            data.starCache.invalidate(); // reference image has changed
         }
+        console.writeln("<b><u>Creating ", mosaicName, "</u></b>");
+
         processEvents();
-        createMosaic(referenceView, targetView, mosaicName, createMosaicView,
+        createMosaic(referenceView, targetView, mosaicName,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
                 
         let mosaicView = View.viewById(mosaicName);
-        if (createMosaicView){
-            // Update Fits Header
-            mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-            copyFitsObservation(referenceView, mosaicView);
-            copyFitsAstrometricSolution(referenceView, mosaicView);
-            addFitsHistory(mosaicView, "PhotometricMosaic " + VERSION());
-            mosaicView.endProcess();
-        }
+
+        // Update Fits Header
+        mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
+        copyFitsObservation(referenceView, mosaicView);
+        copyFitsAstrometricSolution(referenceView, mosaicView);
+        copyFitsKeywords(referenceView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
+        copyFitsKeywords(targetView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
+        mosaicView.endProcess();
+
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
         let x0 = Math.max(0, detectedStars.overlapBox.x0 - 50);
         let x1 = Math.min(mosaicView.image.width, detectedStars.overlapBox.x1 + 50);
@@ -352,30 +368,30 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
     // FITS Header
     let keywords = view.window.keywords;
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic " + VERSION()));
+        SCRIPT_NAME() + " " + VERSION()));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.ref: " + data.referenceView.fullId));
+        SCRIPT_NAME() + ".ref: " + data.referenceView.fullId));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.tgt: " + view.fullId));
+        SCRIPT_NAME() + ".tgt: " + data.targetView.fullId));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.starDetection: " + data.logStarDetection));
+        SCRIPT_NAME() + ".starDetection: " + data.logStarDetection));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.linearRange: " + data.rejectHigh));
+        SCRIPT_NAME() + ".linearRange: " + data.rejectHigh));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.outlierRemoval: " + data.outlierRemoval));
+        SCRIPT_NAME() + ".outlierRemoval: " + data.outlierRemoval));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.sampleSize: " + data.sampleSize));
+        SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.limitStarsPercent: " + data.limitSampleStarsPercent));
+        SCRIPT_NAME() + ".limitStarsPercent: " + data.limitSampleStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        "PhotometricMosaic.lineSegments: " + data.nLineSegments));
+        SCRIPT_NAME() + ".lineSegments: " + data.nLineSegments));
     if (taperFlag) {
         keywords.push(new FITSKeyword("HISTORY", "",
-                "PhotometricMosaic.taperLength: " + taperLength));
+                SCRIPT_NAME() + ".taperLength: " + data.taperLength));
     }
     for (let c=0; c<nChannels; c++){
         keywords.push(new FITSKeyword("HISTORY", "", 
-            "PhotometricMosaic.scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
+            SCRIPT_NAME() + ".scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
     }
     console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
     
@@ -384,7 +400,7 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
     if (minValue < 0 || maxValue > 1){
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
         keywords.push(new FITSKeyword("HISTORY", "",
-                "PhotometricMosaic.truncated" + minMaxValues));
+                SCRIPT_NAME() + ".truncated" + minMaxValues));
         console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...\n");
         view.image.truncate(0, 1);
     }
@@ -399,13 +415,12 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
  * @param {View} referenceView In overlay mode, displayed on top
  * @param {View} targetView In overlay mode, displayed beneath
  * @param {String} mosaicImageName
- * @param {Boolean} createMosaicView If true create image, else replace reference view
  * @param {Boolean} overlayRefFlag Set overlapping pixels to the reference image
  * @param {Boolean} overlayTgtFlag Set overlapping pixels to the target image
  * @param {Boolean} randomFlag Set overlapping pixels randomly to reference or target pixels
  * @returns {undefined}
  */
-function createMosaic(referenceView, targetView, mosaicImageName, createMosaicView,
+function createMosaic(referenceView, targetView, mosaicImageName,
         overlayRefFlag, overlayTgtFlag, randomFlag) {
     let P = new PixelMath;
     P.setDescription("Create Mosaic from " + referenceView.fullId + ", " + targetView.fullId);
@@ -434,22 +449,17 @@ function createMosaic(referenceView, targetView, mosaicImageName, createMosaicVi
     P.use64BitWorkingImage = true;
     P.rescale = false;
     P.truncate = false; // Both input images should be within range
-    if (createMosaicView) {
-        P.createNewImage = true;
-        P.showNewImage = true;
-        P.newImageId = mosaicImageName;
-        P.newImageWidth = 0;
-        P.newImageHeight = 0;
-        P.newImageAlpha = false;
-        P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
-        P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
-        P.executeOn(targetView, true); // used to get sample format and color space
-        let mosaicView = View.viewById(mosaicImageName);
-        mosaicView.stf = referenceView.stf;
-    } else {
-        P.createNewImage = false;
-        P.executeOn(referenceView, true);
-    }
+    P.createNewImage = true;
+    P.showNewImage = true;
+    P.newImageId = mosaicImageName;
+    P.newImageWidth = 0;
+    P.newImageHeight = 0;
+    P.newImageAlpha = false;
+    P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
+    P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
+    P.executeOn(targetView, true); // used to get sample format and color space
+    let mosaicView = View.viewById(mosaicImageName);
+    mosaicView.stf = referenceView.stf;
 }
 
 /**
@@ -488,22 +498,24 @@ function getDefaultReferenceView(activeWindow) {
     // Get access to the active image window
     let allWindows = ImageWindow.openWindows;
     let referenceView = null;
-    for (let win of allWindows) {
-        if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())){
+    // the most recent image is at the end of the array
+    for (let i = allWindows.length - 1; i > -1; --i) {
+        let win = allWindows[i];
+        if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX())){
             continue;
         }
-        if (win.currentView.fullId.toLowerCase().contains("mosaic")) {
-            referenceView = win.currentView;
+        if (win.mainView.fullId.toLowerCase().contains("mosaic")) {
+            referenceView = win.mainView;
             break;
         }
     }
     if (null === referenceView) {
         for (let win of allWindows) {
-            if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())) {
+            if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX())) {
                 continue;
             }
-            if (activeWindow.currentView.fullId !== win.currentView.fullId) {
-                referenceView = win.currentView;
+            if (activeWindow.mainView.fullId !== win.mainView.fullId) {
+                referenceView = win.mainView;
                 break;
             }
         }
@@ -516,20 +528,20 @@ function getDefaultReferenceView(activeWindow) {
  * window (starting with "PM__").
  * @param {ImageWindow} activeWindow
  * @param {View} referenceView
- * @returns {win.currentView}
+ * @returns {win.mainView}
  */
 function getDefaultTargetView(activeWindow, referenceView){
     let targetView = null;
-    if (!activeWindow.currentView.fullId.startsWith(WINDOW_ID_PREFIX())){
-        targetView = activeWindow.currentView;
+    if (!activeWindow.mainView.fullId.startsWith(WINDOW_ID_PREFIX())){
+        targetView = activeWindow.mainView;
     } else {
         let allWindows = ImageWindow.openWindows;
         for (let win of allWindows) {
-            if (win.currentView.fullId.startsWith(WINDOW_ID_PREFIX())) {
+            if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX())) {
                 continue;
             }
-            if (referenceView !== win.currentView.fullId) {
-                targetView = win.currentView;
+            if (referenceView !== win.mainView.fullId) {
+                targetView = win.mainView;
                 break;
             }
         }
@@ -700,11 +712,52 @@ function PhotometricMosaicData() {
     this.setParameters();
 }
 
+/**
+ * Initialise the preview ViewList selection.
+ * If there are no previews, do not set the preview.
+ * If the areaOfInterst is uninitialised (all coords are zero) and targetView
+ * only has one preview, use this preview.
+ * If the areaOfInterst is uninitialised (all coords are zero) and targetView
+ * has more than one preview, do not set the preview. Force the user to decide.
+ * If the areaOfInterst is initialised (at least one coord is not zero) and a
+ * targetView preview exactly matches the areaOfInterest, use this preview.
+ * If the areaOfInterst is initialised (at least one coord is not zero) but no
+ * targetView preview matches the areaOfInterest, do not set the preview.
+ * @param {ViewList} previewImage_ViewList
+ * @param {PhotometricMosaicData} data
+ * @param {View} targetView
+ */
 function setTargetPreview(previewImage_ViewList, data, targetView){
     let previews = targetView.window.previews;
     if (previews.length > 0) {
-        previewImage_ViewList.currentView = previews[0];
-        data.preview = previews[0];
+        if (data.areaOfInterest_X0 === 0 &&
+                data.areaOfInterest_Y0 === 0 &&
+                data.areaOfInterest_X1 === 0 &&
+                data.areaOfInterest_Y1 === 0){
+            // areaOfInterest is uninitialised
+            if (previews.length === 1){
+                // There is only one preview, so use this preview
+                data.preview = previews[0];
+                previewImage_ViewList.currentView = data.preview;
+                
+            }
+        } else {
+            // areaOfInterst is initialised
+            let w = targetView.window;
+            let previews = w.previews;
+            for (let preview of previews){
+                let r = w.previewRect( preview );
+                if (r.x0 === data.areaOfInterest_X0 &&
+                        r.x1 === data.areaOfInterest_X1 &&
+                        r.y0 === data.areaOfInterest_Y0 &&
+                        r.y1 === data.areaOfInterest_Y1){
+                    // areaOfInterst is initialised and preview matches it.
+                    data.preview = preview;
+                    previewImage_ViewList.currentView = data.preview;
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -827,7 +880,7 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.onValueUpdated = function (value) {
         data.rejectHigh = value;
     };
-    this.rejectHigh_Control.setRange(0.3, 1.0);
+    this.rejectHigh_Control.setRange(0.1, 1.0);
     this.rejectHigh_Control.slider.setRange(0, 500);
     this.rejectHigh_Control.setPrecision(2);
     this.rejectHigh_Control.slider.minWidth = 206;
@@ -1075,11 +1128,6 @@ function PhotometricMosaicDialog(data) {
     //-------------------------------------------------------
     // Mosaic Group Box
     //-------------------------------------------------------
-    let mosaic_Label = new Label(this);
-    mosaic_Label.text = "Mosaic:";
-    mosaic_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    mosaic_Label.minWidth = this.font.width(mosaic_Label.text);
-
     this.displayMosaicControl = new CheckBox(this);
     this.displayMosaicControl.text = "Create Mosaic";
     this.displayMosaicControl.toolTip = 
@@ -1157,7 +1205,6 @@ function PhotometricMosaicDialog(data) {
 
     let mosaic_Sizer = new HorizontalSizer;
     mosaic_Sizer.spacing = 10;
-    mosaic_Sizer.add(mosaic_Label);
     mosaic_Sizer.add(this.displayMosaicControl);
     mosaic_Sizer.addSpacing(50);
     mosaic_Sizer.add(overlay_Label);
@@ -1266,93 +1313,92 @@ function PhotometricMosaicDialog(data) {
     //-------------------------------------------------------
     // Area of interest
     //-------------------------------------------------------
-//    let labelWidth2 = this.font.width("Height:_");
-//
-//    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
-//    this.rectangleX0_Control.onValueUpdated = function (value){
-//        data.areaOfInterest_X0 = value;
-//    };
-//    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
-//    this.rectangleY0_Control.onValueUpdated = function (value){
-//        data.areaOfInterest_Y0 = value;
-//    };
-//    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
-//    this.rectangleX1_Control.onValueUpdated = function (value){
-//        data.areaOfInterest_X1 = value;
-//    };
-//    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
-//    this.rectangleY1_Control.onValueUpdated = function (value){
-//        data.areaOfInterest_Y1 = value;
-//    };
-//
-//    this.areaOfInterestCheckBox = new CheckBox(this);
-//    this.areaOfInterestCheckBox.text = "Area of Interest";
-//    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
-//    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-//    this.areaOfInterestCheckBox.onClick = function (checked) {
-//        data.hasAreaOfInterest = checked;
-//    };
-//
-//    let coordHorizontalSizer = new HorizontalSizer;
-//    coordHorizontalSizer.spacing = 10;
-//    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
-//    coordHorizontalSizer.addSpacing(20);
-//    coordHorizontalSizer.add(this.rectangleX0_Control);
-//    coordHorizontalSizer.add(this.rectangleY0_Control);
-//    coordHorizontalSizer.add(this.rectangleX1_Control);
-//    coordHorizontalSizer.add(this.rectangleY1_Control);
-//    coordHorizontalSizer.addStretch();
-//
-//    // Area of interest Target->preview
-//    let previewImage_Label = new Label(this);
-//    previewImage_Label.text = "Get area from preview:";
-//    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-//
-//    this.previewImage_ViewList = new ViewList(this);
-//    this.previewImage_ViewList.getPreviews();
-//    this.previewImage_ViewList.minWidth = 300;
-//    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
-//    this.previewImage_ViewList.onViewSelected = function (view) {
-//        data.preview = view;
-//    };
-//    setTargetPreview(this.previewImage_ViewList, data, data.targetView);
-//
-//    let previewUpdateButton = new PushButton();
-//    previewUpdateButton.hasFocus = false;
-//    previewUpdateButton.text = "Update";
-//    previewUpdateButton.onClick = function () {
-//        if (!this.isUnderMouse){
-//            // Ensure pressing return in a different field does not trigger this callback!
-//            return;
-//        }
-//        let view = data.preview;
-//        if (view.isPreview) {
-//            data.hasAreaOfInterest = true;
-//            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-//            ///let imageWindow = view.window;
-//            let rect = view.window.previewRect(view);
-//            data.areaOfInterest_X0 = rect.x0;
-//            data.areaOfInterest_Y0 = rect.y0;
-//            data.areaOfInterest_X1 = rect.x1;
-//            data.areaOfInterest_Y1 = rect.y1;
-//
-//            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
-//            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
-//            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
-//            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
-//        }
-//    };
-//
-//    let previewImage_Sizer = new HorizontalSizer;
-//    previewImage_Sizer.spacing = 4;
-//    previewImage_Sizer.add(previewImage_Label);
-//    previewImage_Sizer.add(this.previewImage_ViewList, 100);
-//    previewImage_Sizer.addSpacing(10);
-//    previewImage_Sizer.add(previewUpdateButton);
-//
-//    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
-//    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
-//    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
+    let labelWidth2 = this.font.width("Height:_");
+
+    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
+    this.rectangleX0_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X0 = value;
+    };
+    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
+    this.rectangleY0_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y0 = value;
+    };
+    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
+    this.rectangleX1_Control.onValueUpdated = function (value){
+        data.areaOfInterest_X1 = value;
+    };
+    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
+    this.rectangleY1_Control.onValueUpdated = function (value){
+        data.areaOfInterest_Y1 = value;
+    };
+
+    this.areaOfInterestCheckBox = new CheckBox(this);
+    this.areaOfInterestCheckBox.text = "Area of Interest";
+    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+    this.areaOfInterestCheckBox.onClick = function (checked) {
+        data.hasAreaOfInterest = checked;
+    };
+
+    let coordHorizontalSizer = new HorizontalSizer;
+    coordHorizontalSizer.spacing = 10;
+    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
+    coordHorizontalSizer.addSpacing(20);
+    coordHorizontalSizer.add(this.rectangleX0_Control);
+    coordHorizontalSizer.add(this.rectangleY0_Control);
+    coordHorizontalSizer.add(this.rectangleX1_Control);
+    coordHorizontalSizer.add(this.rectangleY1_Control);
+    coordHorizontalSizer.addStretch();
+
+    // Area of interest Target->preview
+    let previewImage_Label = new Label(this);
+    previewImage_Label.text = "Get area from preview:";
+    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+
+    this.previewImage_ViewList = new ViewList(this);
+    this.previewImage_ViewList.getPreviews();
+    this.previewImage_ViewList.minWidth = 300;
+    this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
+    this.previewImage_ViewList.onViewSelected = function (view) {
+        data.preview = view;
+    };
+
+    let previewUpdateButton = new PushButton();
+    previewUpdateButton.hasFocus = false;
+    previewUpdateButton.text = "Update";
+    previewUpdateButton.onClick = function () {
+        if (!this.isUnderMouse){
+            // Ensure pressing return in a different field does not trigger this callback!
+            return;
+        }
+        let view = data.preview;
+        if (view !== null && view.isPreview) {
+            data.hasAreaOfInterest = true;
+            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            ///let imageWindow = view.window;
+            let rect = view.window.previewRect(view);
+            data.areaOfInterest_X0 = rect.x0;
+            data.areaOfInterest_Y0 = rect.y0;
+            data.areaOfInterest_X1 = rect.x1;
+            data.areaOfInterest_Y1 = rect.y1;
+
+            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
+            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
+            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
+            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
+        }
+    };
+
+    let previewImage_Sizer = new HorizontalSizer;
+    previewImage_Sizer.spacing = 4;
+    previewImage_Sizer.add(previewImage_Label);
+    previewImage_Sizer.add(this.previewImage_ViewList, 100);
+    previewImage_Sizer.addSpacing(10);
+    previewImage_Sizer.add(previewUpdateButton);
+
+    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
+    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
+    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
     const helpWindowTitle = TITLE() + " v" + VERSION();
     const HELP_MSG =
@@ -1369,10 +1415,10 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(titleLabel);
     this.sizer.add(referenceImage_Sizer);
     this.sizer.add(targetImage_Sizer);
+    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(starDetectionGroupBox);
     this.sizer.add(photometryGroupBox);
     this.sizer.add(gradientGroupBox);
-//    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(starMaskGroupBox);
     this.sizer.add(mosaicGroupBox);
     this.sizer.addSpacing(5);
@@ -1406,12 +1452,13 @@ function main() {
     }
 
     let linearFitDialog = new PhotometricMosaicDialog(data);
+    setTargetPreview(linearFitDialog.previewImage_ViewList, data, data.targetView);
     for (; ; ) {
         data.viewFlag = 0;
         if (!linearFitDialog.execute())
             break;
         console.show();
-        console.abortEnabled = true;
+        console.abortEnabled = false; // Allowing abort would complicate cache strategy
         console.writeln("\n\n=== <b>" + TITLE() + " ", VERSION(), "</b> ===");
 
         // User must select a reference and target view with the same dimensions and color depth
@@ -1437,9 +1484,22 @@ function main() {
             (new MessageBox("ERROR: Target and  Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
+        if (data.targetView.window.maskEnabled && !data.targetView.window.mask.isNull) {
+            (new MessageBox("ERROR: Target view mask detected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+            continue;
+        }
 
         // Calculate and apply the linear fit
         PhotometricMosaic(data);
+        
+        if (data.hasAreaOfInterest){
+            linearFitDialog.areaOfInterestCheckBox.checked = true;
+            linearFitDialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
+            linearFitDialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
+            linearFitDialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
+            linearFitDialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
+            linearFitDialog.previewImage_ViewList.currentView = data.preview;
+        }
         console.hide();
 
         // Quit after successful execution.

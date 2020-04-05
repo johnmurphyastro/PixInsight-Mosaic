@@ -20,33 +20,34 @@ function StarCache() {
     * User input data used to calculate stored values
     * @param {String} refId
     * @param {String} tgtId
-    * @param {Rect} regionOfInterest
+    * @param {Rect} previewArea
     * @param {Number} logSensitivity
     */
-    let UserInputData = function(refId, tgtId, regionOfInterest, logSensitivity){
+    let UserInputData = function(refId, tgtId, previewArea, logSensitivity){
         this.refId = refId;
         this.tgtId = tgtId;
-        this.regionOfInterest = regionOfInterest;       // previewArea or whole image
+        this.previewArea = previewArea;       // previewArea or whole image
         this.logSensitivity = logSensitivity;
 
         /**
          * Set user input data and check if it has changed
          * @param {String} refId
          * @param {String} tgtId
-         * @param {Rect} regionOfInterest
+         * @param {Rect} previewArea
          * @param {Number} logSensitivity
          * @return {Boolean} true if one or more of the values don't match stored values
          */
-        this.setData = function (refId, tgtId, regionOfInterest, logSensitivity){
+        this.setData = function (refId, tgtId, previewArea, logSensitivity){
             if (refId !== this.refId || tgtId !== this.tgtId ||
                     logSensitivity !== this.logSensitivity ||
-                    regionOfInterest.x0 !== this.regionOfInterest.x0 || 
-                    regionOfInterest.x1 !== this.regionOfInterest.x1 ||
-                    regionOfInterest.y0 !== this.regionOfInterest.y0 || 
-                    regionOfInterest.y1 !== this.regionOfInterest.y1){
+                    previewArea === null ||
+                    previewArea.x0 !== this.previewArea.x0 || 
+                    previewArea.x1 !== this.previewArea.x1 ||
+                    previewArea.y0 !== this.previewArea.y0 || 
+                    previewArea.y1 !== this.previewArea.y1){
                 this.refId = refId;
                 this.tgtId = tgtId;
-                this.regionOfInterest = regionOfInterest;
+                this.previewArea = previewArea;
                 this.logSensitivity = logSensitivity;
                 return true;
             }
@@ -70,14 +71,19 @@ function StarCache() {
     /**
      * @param {String} refId
      * @param {String} tgtId
-     * @param {Rect} regionOfInterest
+     * @param {Rect} previewArea
      * @param {Number} logSensitivity
      */
-    this.setUserInputData = function (refId, tgtId, regionOfInterest, logSensitivity) {
-        let hasChanged = this.userInputData.setData(refId, tgtId, regionOfInterest, logSensitivity);
+    this.setUserInputData = function (refId, tgtId, previewArea, logSensitivity) {
+        let hasChanged = this.userInputData.setData(refId, tgtId, previewArea, logSensitivity);
         if (hasChanged){
             this.invalidate();
         }
+    };
+    
+    this.setOverlapBox = function(overlapBox){
+        this.overlapBox = overlapBox;
+        this.userInputData.previewArea = overlapBox;
     };
     
     this.invalidateTargetStars = function(){
