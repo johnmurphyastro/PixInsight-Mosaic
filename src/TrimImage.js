@@ -220,9 +220,13 @@ function trimImage(data)
     trimRows(image, data.left, data.right);
     trimColumns(image, data.top, data.bottom);
     
-    let fitsHeaderComment = "TrimImage top:" + data.top + " bottom:" + data.bottom +
-                   " left:" + data.left + " right:" + data.right;
-    addFitsHistory(targetView, fitsHeaderComment);
+    let keywords = targetView.window.keywords;
+    keywords.push(new FITSKeyword("HISTORY", "", "TrimImage.target: " + targetView.fullId));
+    keywords.push(new FITSKeyword("HISTORY", "", "TrimImage.top: " + data.top));
+    keywords.push(new FITSKeyword("HISTORY", "", "TrimImage.bottom: " + data.bottom));
+    keywords.push(new FITSKeyword("HISTORY", "", "TrimImage.left: " + data.left));
+    keywords.push(new FITSKeyword("HISTORY", "", "TrimImage.right: " + data.right));
+    targetView.window.keywords = keywords;
     
     // Send our parameters to PixInsight core so that it can be added to the history event
     data.saveParameters();
