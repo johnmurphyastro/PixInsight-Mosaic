@@ -1,5 +1,4 @@
-/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, View, UndoFlag_NoSwapFile, PixelMath, ImageWindow, Parameters, Dialog, TextAlign_Right, TextAlign_VertCenter, UndoFlag_Keywords, UndoFlag_PixelData */
-
+/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -16,7 +15,7 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 //"use strict";
-
+#include "DialogLib.js"
 /**
  * Default the Reference view to the open view named "Mosaic".
  * If this view does not exist, default to any view that is NOT the current view
@@ -80,6 +79,54 @@ function getDefaultTargetView(activeWindow, referenceView){
     return targetView;
 }
 
+/**
+ * Initialise the preview ViewList selection.
+ * If there are no previews, do not set the preview.
+ * If the areaOfInterst is uninitialised (all coords are zero) and targetView
+ * only has one preview, use this preview.
+ * If the areaOfInterst is uninitialised (all coords are zero) and targetView
+ * has more than one preview, do not set the preview. Force the user to decide.
+ * If the areaOfInterst is initialised (at least one coord is not zero) and a
+ * targetView preview exactly matches the areaOfInterest, use this preview.
+ * If the areaOfInterst is initialised (at least one coord is not zero) but no
+ * targetView preview matches the areaOfInterest, do not set the preview.
+ * @param {ViewList} previewImage_ViewList
+ * @param {PhotometricMosaicData} data
+ * @param {View} targetView
+ */
+function setTargetPreview(previewImage_ViewList, data, targetView){
+    let previews = targetView.window.previews;
+    if (previews.length > 0) {
+        if (data.areaOfInterest_X0 === 0 &&
+                data.areaOfInterest_Y0 === 0 &&
+                data.areaOfInterest_X1 === 0 &&
+                data.areaOfInterest_Y1 === 0){
+            // areaOfInterest is uninitialised
+            if (previews.length === 1){
+                // There is only one preview, so use this preview
+                data.preview = previews[0];
+                previewImage_ViewList.currentView = data.preview;
+                
+            }
+        } else {
+            // areaOfInterst is initialised
+            let w = targetView.window;
+            let previews = w.previews;
+            for (let preview of previews){
+                let r = w.previewRect( preview );
+                if (r.x0 === data.areaOfInterest_X0 &&
+                        r.x1 === data.areaOfInterest_X1 &&
+                        r.y0 === data.areaOfInterest_Y0 &&
+                        r.y1 === data.areaOfInterest_Y1){
+                    // areaOfInterst is initialised and preview matches it.
+                    data.preview = preview;
+                    previewImage_ViewList.currentView = data.preview;
+                    break;
+                }
+            }
+        }
+    }
+}
 
 // -----------------------------------------------------------------------------
 // Form/Dialog data
@@ -185,7 +232,7 @@ function PhotometricMosaicData() {
     this.setParameters = function () {
         this.logStarDetection = -1;
         this.orientation = AUTO();
-        this.rejectHigh = 0.8;
+        this.rejectHigh = 0.5;
         this.outlierRemoval = 0;
         this.sampleSize = 20;
         this.limitSampleStarsPercent = 100;
@@ -197,7 +244,7 @@ function PhotometricMosaicData() {
         this.mosaicOverlayTgtFlag = false;
         this.mosaicRandomFlag = true;
         this.mosaicAverageFlag = false;
-        this.limitMaskStarsPercent = 50;
+        this.limitMaskStarsPercent = 20;
         this.radiusMult = 2.5;
         this.radiusAdd = -1;
 
@@ -244,55 +291,6 @@ function PhotometricMosaicData() {
     this.setParameters();
 }
 
-/**
- * Initialise the preview ViewList selection.
- * If there are no previews, do not set the preview.
- * If the areaOfInterst is uninitialised (all coords are zero) and targetView
- * only has one preview, use this preview.
- * If the areaOfInterst is uninitialised (all coords are zero) and targetView
- * has more than one preview, do not set the preview. Force the user to decide.
- * If the areaOfInterst is initialised (at least one coord is not zero) and a
- * targetView preview exactly matches the areaOfInterest, use this preview.
- * If the areaOfInterst is initialised (at least one coord is not zero) but no
- * targetView preview matches the areaOfInterest, do not set the preview.
- * @param {ViewList} previewImage_ViewList
- * @param {PhotometricMosaicData} data
- * @param {View} targetView
- */
-function setTargetPreview(previewImage_ViewList, data, targetView){
-    let previews = targetView.window.previews;
-    if (previews.length > 0) {
-        if (data.areaOfInterest_X0 === 0 &&
-                data.areaOfInterest_Y0 === 0 &&
-                data.areaOfInterest_X1 === 0 &&
-                data.areaOfInterest_Y1 === 0){
-            // areaOfInterest is uninitialised
-            if (previews.length === 1){
-                // There is only one preview, so use this preview
-                data.preview = previews[0];
-                previewImage_ViewList.currentView = data.preview;
-                
-            }
-        } else {
-            // areaOfInterst is initialised
-            let w = targetView.window;
-            let previews = w.previews;
-            for (let preview of previews){
-                let r = w.previewRect( preview );
-                if (r.x0 === data.areaOfInterest_X0 &&
-                        r.x1 === data.areaOfInterest_X1 &&
-                        r.y0 === data.areaOfInterest_Y0 &&
-                        r.y1 === data.areaOfInterest_Y1){
-                    // areaOfInterst is initialised and preview matches it.
-                    data.preview = preview;
-                    previewImage_ViewList.currentView = data.preview;
-                    break;
-                }
-            }
-        }
-    }
-}
-
 // The main dialog function
 function PhotometricMosaicDialog(data) {
     this.__base__ = Dialog;
@@ -313,14 +311,14 @@ function PhotometricMosaicDialog(data) {
     referenceImage_Label.text = "Reference View:";
     referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     referenceImage_Label.minWidth = labelWidth1;
-    referenceImage_Label.toolTip = "<p>This image will not have the scale or gradient applied.</p>";
+    referenceImage_Label.toolTip = "<p>The reference image is not modified.</p>";
 
     this.referenceImage_ViewList = new ViewList(this);
     this.referenceImage_ViewList.getMainViews();
     this.referenceImage_ViewList.minWidth = 300;
     this.referenceImage_ViewList.currentView = data.referenceView;
     this.referenceImage_ViewList.toolTip = 
-            "<p>This image will not have scale or gradient applied.</p>";
+            "<p>The reference image is not modified.</p>";
     this.referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
     };
@@ -365,9 +363,7 @@ function PhotometricMosaicDialog(data) {
     this.starDetectionControl.real = true;
     this.starDetectionControl.label.text = "Star Detection:";
     this.starDetectionControl.label.minWidth = labelSize;
-    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>" +
-            "<p>To test use the 'Star Mask' section; " +
-            "select 'Test Mask' and set 'Limit Stars %' to 100%</p>";
+    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>";
     this.starDetectionControl.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
@@ -380,12 +376,11 @@ function PhotometricMosaicDialog(data) {
     let detectedStarsButton = new PushButton();
     detectedStarsButton.text = "Detected Stars";
     detectedStarsButton.toolTip = 
-            "<p>Displays the stars that were detected in the reference and target images.</p>" +
-            "<p>Subsets of these stars are used for the photometry, rejecting " +
-            "samples containing stars and the mosaic star mask.</p>" +
-            "<p>These stars are cached until either the target or reference image " +
-            "is changed, or the 'Star Detection' value is modified " +
-            "or the PhotometricMosaic dialog is closed.<\p>";
+            "<p>Displays the stars that were detected in both the reference and target images.</p>" +
+            "<p>Subsets of these stars are used for photometry, rejecting " +
+            "samples that contain stars and to create the mosaic star mask.</p>" +
+            "<p>These stars are cached until either the PhotometricMosaic dialog is closed " +
+            "or a modification invalidates the cache.</p>";
     detectedStarsButton.onClick = function () {
         data.viewFlag = DETECTED_STARS_FLAG();
         this.dialog.ok();
@@ -611,20 +606,20 @@ function PhotometricMosaicDialog(data) {
     this.lineSegments_Control.setValue(data.nLineSegments);
     
     let taperTooltip = "<p>The gradient offset is applied to the target image " +
-            "along a line perpendicular to the horizontal or vertical join.<\p>" +
+            "along a line perpendicular to the horizontal or vertical join.</p>" +
             "<p>When taper is selected, the correction applied is gradually " +
             "tapered down over the taper length to the average background level. " +
             "This prevents the local gradient corrections requied at the join from " +
-            "propogating to the opposite edge of the target frame.<\p>" +
+            "propogating to the opposite edge of the target frame.</p>" +
             "<p>If the 'Line Segments' is set to one, and the reference " +
             "image has little or no gradient, it can be helpful for the target " +
             "image's gradient correction to be propogated. This can help reduce " + 
             "the overall gradient in the final mosaic.</p>" +
             "<p>However, a propogated complex gradient curve is unlikely to " +
-            "be helpful. In these cases, using a taper is recommended.<\p>" +
+            "be helpful. In these cases, using a taper is recommended.</p>" +
             "<p>In difficult cases it can be helpful to first use a single " +
             "'Line Segment' and propogate the linear gradient. Then " +
-            "correct the complex gradient with a taper to create the mosaic.<\p>";
+            "correct the complex gradient with a taper to create the mosaic.</p>";
     this.taperFlag_Control = new CheckBox(this);
     this.taperFlag_Control.text = "Taper";
     this.taperFlag_Control.toolTip = taperTooltip;
@@ -664,11 +659,9 @@ function PhotometricMosaicDialog(data) {
     this.displayMosaicControl.text = "Create Mosaic";
     this.displayMosaicControl.toolTip = 
             "<p>Combiens the reference and target frames together and " +
-            "displays the result in the '" + MOSAIC_NAME() + "' window<\p>" +
-            "<p>If the '" + MOSAIC_NAME() + "' window exists, its content is replaced. " +
-            "If it does not, it is created.</p>" +
+            "displays the result in the '" + MOSAIC_NAME() + "' window</p>" +
             "<p>After the first mosaic join, it is usually convenient to set " +
-            "the reference view to '" + MOSAIC_NAME() + "'<\p>";
+            "the reference view to '" + MOSAIC_NAME() + "'</p>";
     this.displayMosaicControl.checked = data.createMosaicFlag;
     this.displayMosaicControl.onClick = function (checked) {
         data.createMosaicFlag = checked;
@@ -682,7 +675,7 @@ function PhotometricMosaicDialog(data) {
     this.mosaicOverlayRefControl = new RadioButton(this);
     this.mosaicOverlayRefControl.text = "Reference";
     this.mosaicOverlayRefControl.toolTip = 
-            "<p>The reference image pixels are drawn on top of the target image.<\p>";
+            "<p>The reference image pixels are drawn on top of the target image.</p>";
     this.mosaicOverlayRefControl.checked = data.mosaicOverlayRefFlag;
     this.mosaicOverlayRefControl.onClick = function (checked) {
         data.mosaicOverlayRefFlag = checked;
@@ -694,7 +687,7 @@ function PhotometricMosaicDialog(data) {
     this.mosaicOverlayTgtControl = new RadioButton(this);
     this.mosaicOverlayTgtControl.text = "Target";
     this.mosaicOverlayTgtControl.toolTip = 
-            "<p>The target image pixels are drawn on top of the reference image.<\p>";
+            "<p>The target image pixels are drawn on top of the reference image.</p>";
     this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
     this.mosaicOverlayTgtControl.onClick = function (checked) {
         data.mosaicOverlayTgtFlag = checked;
@@ -706,14 +699,14 @@ function PhotometricMosaicDialog(data) {
     this.mosaicRandomControl = new RadioButton(this);
     this.mosaicRandomControl.text = "Random";
     this.mosaicRandomControl.toolTip = "<p>Over the overlapping region " +
-            "pixels are randomly choosen from the reference and target images.<\p>" +
+            "pixels are randomly choosen from the reference and target images.</p>" +
             "<p>This mode is particularly effective at hiding the join, but if " +
             "the star profiles in the reference and target images don't match, " +
-            "this can lead to speckled pixels around the stars.<\p>" +
+            "this can lead to speckled pixels around the stars.</p>" +
             "<p>The speckled star artifacts can be fixed by using a mask that " +
             "only reveals the bright stars. Then use pixelMath to set the stars " +
             "to either the reference or target image. " +
-            "The 'Star Mask' section has been provided for this purpose.<\p>";
+            "The 'Star Mask' section has been provided for this purpose.</p>";
     this.mosaicRandomControl.checked = data.mosaicRandomFlag;
     this.mosaicRandomControl.onClick = function (checked) {
         data.mosaicRandomFlag = checked;
@@ -724,9 +717,9 @@ function PhotometricMosaicDialog(data) {
     this.mosaicAverageControl = new RadioButton(this);
     this.mosaicAverageControl.text = "Average";
     this.mosaicAverageControl.toolTip = "<p>Over the overlapping region " +
-            "pixels are set to the average of the reference and target images.<\p>" +
+            "pixels are set to the average of the reference and target images.</p>" +
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
-            "over the join, but this can also make the join more visible.<\p>";
+            "over the join, but this can also make the join more visible.</p>";
     this.mosaicAverageControl.checked = data.mosaicAverageFlag;
     this.mosaicAverageControl.onClick = function (checked) {
         data.mosaicAverageFlag = checked;
@@ -755,10 +748,10 @@ function PhotometricMosaicDialog(data) {
     let createMaskButton = new PushButton();
     createMaskButton.text = "Create Mask";
     createMaskButton.toolTip = 
-            "<p>Creates a star mask that reveals bright stars.<\p>" +
+            "<p>Creates a star mask that reveals bright stars.</p>" +
             "<p>A mosaic join using the 'Random' mode is highly effective, but " +
             "often produces speckled star edges around bright stars. This " +
-            "mask option is provided to help fix this.<\p>";
+            "mask option is provided to help fix this.</p>";
     createMaskButton.onClick = function () {
         data.viewFlag = MOSAIC_MASK_FLAG();
         this.dialog.ok();
@@ -806,7 +799,7 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
     this.StarRadiusMultiply_Control.toolTip = 
             "<p>Sets the mask star radius to a multiple of the star's radius.</p>" +
-            "<p>This increases the size for large stars more than for the small ones.<\p>";
+            "<p>This increases the size for large stars more than for the small ones.</p>";
     this.StarRadiusMultiply_Control.setRange(1, 5);
     this.StarRadiusMultiply_Control.slider.setRange(1, 150);
     this.StarRadiusMultiply_Control.setPrecision(1);
@@ -821,7 +814,7 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
     this.StarRadiusAdd_Control.toolTip = 
             "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply Star Radius'.<\p>";
+            "<p>This is applied after the 'Multiply Star Radius'.</p>";
     this.StarRadiusAdd_Control.setRange(-5, 10);
     this.StarRadiusAdd_Control.slider.setRange(0, 150);
     this.StarRadiusAdd_Control.setPrecision(1);
@@ -866,7 +859,18 @@ function PhotometricMosaicDialog(data) {
 
     this.areaOfInterestCheckBox = new CheckBox(this);
     this.areaOfInterestCheckBox.text = "Area of Interest";
-    this.areaOfInterestCheckBox.toolTip = "Limit samples to area of interest";
+    this.areaOfInterestCheckBox.toolTip = 
+            "<p>Limit the search for overlaping pixels to this bounding box.</p>" +
+            "<p>If all overlapping pixels are within this area, selecting this " +
+            "option reduces calculation time but does not effect the calculated overlap pixels.</p>" +
+            "<p>If this area intersects the overlapping pixels, the calculated overlap pixels " +
+            "are limitted to those within the area. This is useful for a corner tile so that " +
+            "the horizontal and vertical joins can be calculated seperately.</p>" +
+            "<p>If the mosaic is built by first creating the rows (or columns) and then joining " +
+            "the resulting strips, it is not necessary to set the Area Of Interest.</p>" +
+            "<p>The first time the overlap is calculated, the Area Of Interest will be updated " +
+            "to the bounding box of the overlapping pixels that will be used to calculate the " +
+            "target image scale and gradient.</p>";
     this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     this.areaOfInterestCheckBox.onClick = function (checked) {
         data.hasAreaOfInterest = checked;
@@ -882,6 +886,28 @@ function PhotometricMosaicDialog(data) {
     coordHorizontalSizer.add(this.rectangleY1_Control);
     coordHorizontalSizer.addStretch();
 
+    let previewUpdateActions = function(dialog){
+        let view = data.preview;
+        if (view !== null && view.isPreview) {
+            data.hasAreaOfInterest = true;
+            dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            ///let imageWindow = view.window;
+            let rect = view.window.previewRect(view);
+            data.areaOfInterest_X0 = rect.x0;
+            data.areaOfInterest_Y0 = rect.y0;
+            data.areaOfInterest_X1 = rect.x1;
+            data.areaOfInterest_Y1 = rect.y1;
+
+            dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
+            dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
+            dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
+            dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
+        } else {
+            data.hasAreaOfInterest = false;
+            dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+        }
+    };
+
     // Area of interest Target->preview
     let previewImage_Label = new Label(this);
     previewImage_Label.text = "Get area from preview:";
@@ -893,6 +919,7 @@ function PhotometricMosaicDialog(data) {
     this.previewImage_ViewList.toolTip = "<p>Get area of interest from preview image.</p>";
     this.previewImage_ViewList.onViewSelected = function (view) {
         data.preview = view;
+        previewUpdateActions(this.dialog);
     };
 
     let previewUpdateButton = new PushButton();
@@ -903,22 +930,7 @@ function PhotometricMosaicDialog(data) {
             // Ensure pressing return in a different field does not trigger this callback!
             return;
         }
-        let view = data.preview;
-        if (view !== null && view.isPreview) {
-            data.hasAreaOfInterest = true;
-            this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-            ///let imageWindow = view.window;
-            let rect = view.window.previewRect(view);
-            data.areaOfInterest_X0 = rect.x0;
-            data.areaOfInterest_Y0 = rect.y0;
-            data.areaOfInterest_X1 = rect.x1;
-            data.areaOfInterest_Y1 = rect.y1;
-
-            this.dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
-            this.dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
-            this.dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
-            this.dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
-        }
+        previewUpdateActions(this.dialog);
     };
 
     let previewImage_Sizer = new HorizontalSizer;
