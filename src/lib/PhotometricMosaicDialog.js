@@ -946,9 +946,14 @@ function PhotometricMosaicDialog(data) {
 
     const helpWindowTitle = TITLE() + " Help";
     const HELP_MSG =
-            "<p>Refer to tooltips, or view PhotometricMosaicHelp.html in a web browser.</p>";
+            "<p>To install this script, use 'SCRIPT \> Feature Scripts...' and then in the " +
+            "'Feature Scripts' dialog box, press the 'Add' button and select the folder where you have saved this script.</p>" +
+            "<p>To install the help files, copy the 'PhotometricMosaic' folder from the 'Help' folder to " +
+            "'[PixInsight]/doc/scripts/PhotometricMosaic</p>" +
+            "<p>For example, on Windows, the correct installation would be:</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/PhotometricMosaic.html</p>";
 
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG, "PhotometricMosaic");
 
     //-------------------------------------------------------
     // Vertically stack all the objects

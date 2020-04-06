@@ -1,4 +1,4 @@
-/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter */
+/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter, Dialog */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -62,9 +62,11 @@ function createTitleLabel(text){
  * @param {Object} data
  * @param {String} helpMsgTitle
  * @param {String} helpMsg
+ * @param {scriptName} scriptName If not null, display html file 
+ * (C:\Program Files\PixInsight\doc\scripts\scriptName\scriptName.html)
  * @returns {HorizontalSizer}
  */
-function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg){
+function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptName){
     let newInstanceIcon = dialog.scaledResource(":/process-interface/new-instance.png");
     
     let ok_Button = new PushButton();
@@ -101,6 +103,10 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg){
     browseDocumentationButton.toolTip =
             "<p>Opens a browser to view the script's documentation.</p>";
     browseDocumentationButton.onClick = function () {
+        if (scriptName !== undefined && scriptName !== null){
+            let ok = Dialog.browseScriptDocumentation(scriptName);
+            if (ok) return;
+        }
         (new MessageBox(
                 helpMsg,
                 helpMsgTitle,
