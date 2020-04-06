@@ -15,7 +15,7 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 "use strict";
-#feature-id Utilities > Photometric Mosaic
+#feature-id Utilities > PhotometricMosaic
 
 #feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
 Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
