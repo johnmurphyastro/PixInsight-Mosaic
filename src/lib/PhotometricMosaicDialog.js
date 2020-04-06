@@ -944,9 +944,9 @@ function PhotometricMosaicDialog(data) {
     areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
     areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
 
-    const helpWindowTitle = TITLE() + " v" + VERSION();
+    const helpWindowTitle = TITLE() + " Help";
     const HELP_MSG =
-            "<p>See tooltips</p>";
+            "<p>Refer to tooltips, or view PhotometricMosaicHelp.html in a web browser.</p>";
 
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
 

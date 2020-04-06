@@ -30,7 +30,7 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
 
-function VERSION(){return  "1.1 beta";}
+function VERSION(){return  "1.1";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimImage";}
