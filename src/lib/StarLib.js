@@ -282,7 +282,8 @@ function StarsDetected(){
         starDetector.mask = starRegionMask;
         starDetector.sensitivity = Math.pow(10.0, logSensitivity);
         starDetector.upperLimit = 1;
-        starDetector.applyHotPixelFilterToDetectionImage = true;
+        // Noise reduction affects the accuracy of the photometry
+        starDetector.applyHotPixelFilterToDetectionImage = false;
         self.bkgDelta = starDetector.bkgDelta;
         let stars = starDetector.stars(starImage);
 
