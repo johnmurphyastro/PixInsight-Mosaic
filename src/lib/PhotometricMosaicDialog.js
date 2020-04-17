@@ -235,7 +235,7 @@ function PhotometricMosaicData() {
         this.rejectHigh = 0.5;
         this.outlierRemoval = 0;
         this.sampleSize = 20;
-        this.limitSampleStarsPercent = 100;
+        this.limitSampleStarsPercent = 50;
         this.nLineSegments = 25;
         this.taperFlag = true;
         this.taperLength = 1000;
