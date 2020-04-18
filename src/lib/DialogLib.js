@@ -62,11 +62,12 @@ function createTitleLabel(text){
  * @param {Object} data
  * @param {String} helpMsgTitle
  * @param {String} helpMsg
- * @param {scriptName} scriptName If not null, display html file 
+ * @param {String} scriptName If not null, display html file 
+ * @param {String} okToolTip If not null, add this tooltip to ok_Button
  * (C:\Program Files\PixInsight\doc\scripts\scriptName\scriptName.html)
  * @returns {HorizontalSizer}
  */
-function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptName){
+function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptName, okToolTip){
     let newInstanceIcon = dialog.scaledResource(":/process-interface/new-instance.png");
     
     let ok_Button = new PushButton();
@@ -75,6 +76,9 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     ok_Button.onClick = function () {
         dialog.ok();
     };
+    if (okToolTip !== undefined && okToolTip !== null){
+        ok_Button.toolTip = okToolTip;
+    }
 
     let cancel_Button = new PushButton();
     cancel_Button.text = "Cancel";

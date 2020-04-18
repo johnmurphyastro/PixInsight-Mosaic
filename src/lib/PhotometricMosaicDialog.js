@@ -541,8 +541,8 @@ function PhotometricMosaicDialog(data) {
             "<p>The graphs produced for color images use red, green and blue dots " +
             "and lines for each channel. The colors add together. " +
             "For example: red, green and blue add up to white.</p>" +
-            "<p>If a small proportion of the plotted points have excessive scatter, " +
-            "this may indicate that some samples contain bright stars that " +
+            "<p>If the plotted points have excessive scatter this may indicate that " +
+            "the sample size is too small or that samples contain bright stars that " +
             "occupy more than half the sample area. Either increase the 'Sample Size' " +
             "to increase the area of each sample, or increase the 'Limit Stars %' " +
             "so that samples that contain bright stars are rejected.</p>" +
@@ -708,7 +708,7 @@ function PhotometricMosaicDialog(data) {
     this.displayMosaicControl.text = "Create Mosaic";
     this.displayMosaicControl.toolTip = 
             "<p>Combines the reference and target frames together and " +
-            "displays the result in the '" + MOSAIC_NAME() + "' window</p>" +
+            "displays the result in a '" + MOSAIC_NAME() + "' window</p>" +
             "<p>If this option is not selected, the corrections will still be " +
             "applied to the target image, but the mosaic is not created.</p>" +
             "<p>After the first mosaic join, it is usually convenient to set " +
@@ -1003,8 +1003,12 @@ function PhotometricMosaicDialog(data) {
             "'[PixInsight]/doc/scripts/PhotometricMosaic</p>" +
             "<p>For example, on Windows, the correct installation would be:</p>" +
             "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/PhotometricMosaic.html</p>";
+    
+    let okTooltip = "<p>Applies the calculated scale and gradient to the target image.</p>" +
+            "<p>If 'Create Mosaic' is selected, a mosaic image is created and displayed.</p>";
 
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG, "PhotometricMosaic");
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data, 
+            helpWindowTitle, HELP_MSG, "PhotometricMosaic", okTooltip);
 
     //-------------------------------------------------------
     // Vertically stack all the objects

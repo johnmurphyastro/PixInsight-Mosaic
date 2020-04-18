@@ -30,7 +30,7 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
 
-function VERSION(){return  "1.1";}
+function VERSION(){return  "1.1.01";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimImage";}
@@ -178,6 +178,12 @@ function PhotometricMosaic(data)
         samplePairs = colorSamplePairs[c];
         gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, 
             detectedStars.overlapBox, isHorizontal);
+        if (!gradients[c].isValid){
+            new MessageBox("Error: insufficient number of samples per line segment.\n" +
+                    "Decrease the number of line segments or increase the number of samples.",
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
+        }
     }
     if (data.viewFlag === GRADIENT_GRAPH_FLAG()) {
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs, data);

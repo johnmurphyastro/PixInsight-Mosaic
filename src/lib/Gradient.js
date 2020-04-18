@@ -41,6 +41,8 @@ function GradientData(difArray, minLineValue, maxLineValue){
  * @returns {Gradient}
  */
 function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal){
+    this.isValid = true;
+    let self = this;
     /**
      * Split the sample coverage area into sections and calculate the gradient linear fit
      * for each section.
@@ -70,7 +72,11 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
             let minCoord = Math.floor(sampleAreaStart + interval * i);
             let maxCoord = Math.floor(sampleAreaStart + interval * (i+1));
             let newSampleSection = new SampleSection(minCoord, maxCoord, isHorizontal);
-            newSampleSection.calcLinearFit(samplePairs);
+            self.isValid = newSampleSection.calcLinearFit(samplePairs);
+            if (!self.isValid){
+                // Not enough samples in a section to calculate the line
+                return [];
+            }
             sections[i] = newSampleSection;
         }
         return sections;
@@ -227,9 +233,11 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
     };
     
     let sampleSections = getSampleSections(samplePairs, isHorizontal);
-    sampleSections = joinSectionLines(sampleSections);
-    this.eqnLineArray = createGradientLines(sampleSections, overlapBox, targetImage, isHorizontal);
-    this.gradientData = createGradient(this.eqnLineArray);
+    if (this.isValid){
+        sampleSections = joinSectionLines(sampleSections);
+        this.eqnLineArray = createGradientLines(sampleSections, overlapBox, targetImage, isHorizontal);
+        this.gradientData = createGradient(this.eqnLineArray);
+    }
 }
 
 
@@ -253,7 +261,7 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
      * Determine which SamplePair are within this section's area, and uses
      * them to calculate their best linear fit
      * @param {SamplePairs} samplePairs Contains samplePairArray
-     * @returns {undefined}
+     * @returns {Boolean} True if a valid line could be fitted to the points
      */
     this.calcLinearFit = function (samplePairs) {
         let samplePairArray = [];
@@ -271,6 +279,10 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
                 }
             }
         }
+        if (samplePairArray.length < 2){
+            // Unable to fit a line because this section has less than two points
+            return false;
+        }
         // Calculate the linear fit
         let algorithm = new LeastSquareFitAlgorithm();
         if (isHorizontal) {
@@ -283,6 +295,10 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
             });
         }
         this.linearFitData = algorithm.getLinearFit();
+        
+        // If all points in this section were at the same coordinate the gradient will be infinite (invalid)
+        return (this.linearFitData.m !== Number.POSITIVE_INFINITY &&
+                this.linearFitData.m !== Number.NEGATIVE_INFINITY);
     };
 
     /**
