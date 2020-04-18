@@ -456,7 +456,7 @@ function StarMinMax() {
  * @param {Number} height
  * @param {StarPairs[]} colorStarPairs StarPairs for L or R,G,B
  * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @returns {undefined}
+ * @returns {Boolean} True if graph was displayed
  */
 function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     /**
@@ -534,8 +534,8 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         minMax.calculateMinMax(starPairs.starPairArray);
     });
     if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
-        console.warningln("Unable to display graph. No points to display.");
-        return;
+        // Unable to display graph. No points to display so graph axis min/max range cannot be calculated.
+        return false;
     }
     let startOffsetX = (minMax.maxTgtFlux - minMax.minTgtFlux) / 100;
     let startOffsetY = (minMax.maxRefFlux - minMax.minRefFlux) / 100;
@@ -570,6 +570,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs, data);
     imageWindow.show();
     imageWindow.zoomToFit();
+    return true;
 }
 
 /**

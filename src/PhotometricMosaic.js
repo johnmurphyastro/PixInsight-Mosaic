@@ -116,7 +116,13 @@ function PhotometricMosaic(data)
         return;
     }
     if (data.viewFlag === PHOTOMETRY_GRAPH_FLAG()){
-        displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
+        let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
+        if (!displayed){
+            new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
+                    "Decrease the 'Star Detection' setting to detect more stars " +
+                    "or increase 'Linear Range'.", 
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        }
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_FLAG()){
