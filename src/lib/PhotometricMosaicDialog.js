@@ -546,7 +546,7 @@ function PhotometricMosaicDialog(data) {
             "occupy more than half the sample area. Either increase the 'Sample Size' " +
             "to increase the area of each sample, or increase the 'Limit Stars %' " +
             "so that samples that contain bright stars are rejected.</p>" +
-            "<p>To increase the number sample points, decrease 'Limit Stars %' " +
+            "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
             "or reduce the 'Sample Size'.</p>";
     gradientGraphButton.onClick = function () {
         data.viewFlag = GRADIENT_GRAPH_FLAG();
