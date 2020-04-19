@@ -128,16 +128,16 @@ function StarsDetected(){
     
     /**
      * 
-     * @param {Image} refImg
-     * @param {Image} tgtImg
+     * @param {View} refView
+     * @param {View} tgtView
      * @param {Number} upperLimit Only use stars within camera's linear range
      * @returns {StarPairs[]} Array of StarPairs for all color channels
      */
-    this.getColorStarPairs = function(refImg, tgtImg, upperLimit){
+    this.getColorStarPairs = function(refView, tgtView, upperLimit){
         let colorStarPairs = [];
-        let nChannels = refImg.isColor ? 3 : 1;
+        let nChannels = refView.image.isColor ? 3 : 1;
         for (let channel=0; channel < nChannels; channel++){
-            let starPairs = findMatchingStars(refImg, tgtImg, channel, upperLimit);
+            let starPairs = findMatchingStars(refView, tgtView, channel, upperLimit);
             colorStarPairs.push(starPairs);
         }
         return colorStarPairs;
@@ -296,19 +296,22 @@ function StarsDetected(){
     
     /**
      * Finds the stars that exist in both images that have no pixel above upperLimit
-     * @param {Image} refImg
-     * @param {Image} tgtImg 
+     * @param {View} refView
+     * @param {View} tgtView 
      * @param {Number} channel
      * @param {Number} upperLimit Reject stars with one or more pixels greater than this.
      * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
      */
-    let findMatchingStars = function (refImg, tgtImg, channel, upperLimit) {
-        let refStars = self.refColorStars[channel];
-        let tgtStars = self.tgtColorStars[channel];
-        let createKey = function (star) {
-            return "" + Math.round(star.pos.x) + "," + Math.round(star.pos.y);
-        };
+    let findMatchingStars = function (refView, tgtView, channel, upperLimit) {
+        let searchRadius = 5;
+        let rSqr = searchRadius * searchRadius;
 
+        /**
+         * @param {Image} image
+         * @param {Star} star
+         * @param {Number} upperLimit
+         * @returns {Boolean} true if all pixels within the star's bounding box are less then upperLimit
+         */
         let withinLimit = function (image, star, upperLimit) {
             let r = Math.sqrt(star.size) / 2;
             let sx = star.pos.x;
@@ -317,20 +320,57 @@ function StarsDetected(){
             return image.maximum(rect, channel, channel) < upperLimit;
         };
 
-        let starMap = new Map();
-        for (let star of refStars) {
-            if (withinLimit(refImg, star, upperLimit)) {
-                starMap.set(createKey(star), star);
+        /**
+         * Sort on flux, brightest stars at the end of the array
+         * @param {Star} a
+         * @param {Star} b
+         * @returns {Number}
+         */
+        let sortOnFlux = function (a, b) {
+            return a.flux - b.flux;
+        };
+
+        // create shallow copy of cached stars that are within upperLimit, and sort them
+        let refImage = refView.image;
+        let rcStars = self.refColorStars[channel];
+        let refStars = [];
+        for (let star of rcStars) {
+            if (withinLimit(refImage, star, upperLimit)) {
+                refStars.push(star);
             }
         }
+        let tgtImage = tgtView.image;
+        let tcStars = self.tgtColorStars[channel];
+        let tgtStars = [];
+        for (let star of tcStars) {
+            if (withinLimit(tgtImage, star, upperLimit)) {
+                tgtStars.push(star);
+            }
+        }
+        refStars.sort(sortOnFlux);
+        tgtStars.sort(sortOnFlux);
 
-        // Find stars that are in both images, using a search radius of 1 pixel
+        // Use flux and search radius to match stars
+        // Start with the brightest ref star and look for the brightest
+        // tgt star within the searchRadius. If a tgt star is found it is removed
+        // from the tgtStar array.
         let starPairArray = [];
-        for (let tgtStar of tgtStars) {
-            if (withinLimit(tgtImg, tgtStar, upperLimit)) {
-                const key = createKey(tgtStar);
-                if (starMap.has(key)) {
-                    starPairArray.push(new StarPair(starMap.get(key), tgtStar));
+        let r = refStars.length;
+        while (r--) {
+            let rStar = refStars[r];
+            let t = tgtStars.length;
+            while (t--) {
+                let tStar = tgtStars[t];
+                let deltaX = Math.abs(tStar.pos.x - rStar.pos.x);
+                let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
+                if (deltaX < searchRadius && deltaY < searchRadius &&
+                        rSqr > deltaX * deltaX + deltaY * deltaY) {
+                    starPairArray.push(new StarPair(rStar, tStar));
+//                        console.writeln("Length=" + tgtStars.length + " [" + t + "] flux=" + rStar.flux + ", " + tStar.flux);
+                    // Remove star so it is not matched multiple times
+                    // This should be efficient because the brightest stars are near the end of the array
+                    tgtStars.splice(t, 1);
+                    break;
                 }
             }
         }

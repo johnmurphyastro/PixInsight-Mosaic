@@ -86,7 +86,7 @@ function PhotometricMosaic(data)
         return;
     }
     
-    let colorStarPairs = detectedStars.getColorStarPairs(referenceView.image, targetView.image, data.rejectHigh);
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, targetView, data.rejectHigh);
     // Remove photometric star outliers and calculate the scale
     console.writeln("<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
