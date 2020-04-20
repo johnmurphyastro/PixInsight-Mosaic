@@ -104,7 +104,7 @@
  */
 #ifndef __PJSR_STAR_OBJECT_DEFINED
 #define __PJSR_STAR_OBJECT_DEFINED  1
-function Star( pos, flux, size, bkg )
+function Star( pos, flux, size, bkg, peak )
 {
    // Centroid position in pixels, image coordinates.
    this.pos = new Point( pos.x, pos.y );
@@ -114,6 +114,8 @@ function Star( pos, flux, size, bkg )
    this.size = size;
    // Local background estimate.
    this.bkg = bkg;
+   // Value at peak
+   this.peak = peak;
 }
 #endif
 
@@ -582,7 +584,7 @@ function StarDetector()
                                  if ( m.median() < this.peakResponse*p.peak ){
                                     // John Murphy: return star flux instead of total flux
                                     let flux = p.flux - p.bkg * p.size;
-                                    S.push( new Star( p.pos, flux, p.size, p.bkg ) );
+                                    S.push( new Star( p.pos, flux, p.size, p.bkg, p.peak) );
                                  }
                               }
                      }
