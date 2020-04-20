@@ -380,9 +380,9 @@ function displaySampleSquares(refView, samplePairs,
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + data.targetView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "SampleSize: " + data.sampleSize));
-    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitSampleStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitSampleStarsPercent));
     
     createDiagnosticImage(refView, bmp, detectedStars, title, keywords, -2);
 }
