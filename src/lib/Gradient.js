@@ -363,7 +363,7 @@ function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLengt
      * @returns {Number} Offset to subtract from target image
      */
     this.getOffset = function(coord, dif){
-        if (coord <= this.limit1 || coord >= this.limit4){
+        if (coord < this.limit1 || coord >= this.limit4){
             // First or last region; Only apply average offset
             return this.average;
         }
@@ -377,6 +377,7 @@ function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLengt
             // Overlap region: apply the full correction
             return dif;
         }
+        // If we get here, coord < this.limit4
         // Progressively apply less of the correction as we move away from the overlap
         let delta = dif - this.average;
         let fraction = 1 - (coord - this.limit3) / this.taperLength;
