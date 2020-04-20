@@ -344,10 +344,10 @@ function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLengt
     this.average = average;
     this.taperLength = taperLength;
     if (isHorizontal){
-        this.limit1 = Math.max(0, overlapBox.y0 - taperLength);
+        this.limit1 = Math.max(0, overlapBox.y0 - taperLength); // limit2 - taperLength
         this.limit2 = overlapBox.y0;
         this.limit3 = overlapBox.y1;
-        this.limit4 = Math.min(imageHeight, overlapBox.y1 + taperLength);
+        this.limit4 = Math.min(imageHeight, overlapBox.y1 + taperLength); // limit3 + taperLength
     } else {
         this.limit1 = Math.max(0, overlapBox.x0 - taperLength);
         this.limit2 = overlapBox.x0;
@@ -363,7 +363,7 @@ function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLengt
      * @returns {Number} Offset to subtract from target image
      */
     this.getOffset = function(coord, dif){
-        if (coord < this.limit1 || coord > this.limit4){
+        if (coord <= this.limit1 || coord >= this.limit4){
             // First or last region; Only apply average offset
             return this.average;
         }
@@ -437,12 +437,12 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
         let keywords = graphWindow.keywords;
         keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-        keywords.push(new FITSKeyword("COMMENT", "", "SampleSize: " + data.sampleSize));
-        keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + data.limitSampleStarsPercent));
-        keywords.push(new FITSKeyword("COMMENT", "", "LineSegments: " + data.nLineSegments));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
+        keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
+        keywords.push(new FITSKeyword("COMMENT", "", "Line Segments: " + data.nLineSegments));
         if (data.taperFlag){
-            keywords.push(new FITSKeyword("COMMENT", "", "TaperLength: " + data.taperLength));
+            keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
         }
         
         for (let c = 0; c < nColors; c++){
