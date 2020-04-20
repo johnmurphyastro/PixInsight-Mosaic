@@ -129,15 +129,16 @@ function StarsDetected(){
     /**
      * 
      * @param {View} refView
-     * @param {View} tgtView
+     * @param {Number} limitStarsPercent Percentage of detected stars used.
      * @param {Number} upperLimit Only use stars within camera's linear range
+     * @param {Number} searchRadius Search for target star within this radius
      * @returns {StarPairs[]} Array of StarPairs for all color channels
      */
-    this.getColorStarPairs = function(refView, tgtView, upperLimit){
+    this.getColorStarPairs = function(refView, limitStarsPercent, upperLimit, searchRadius){
         let colorStarPairs = [];
         let nChannels = refView.image.isColor ? 3 : 1;
         for (let channel=0; channel < nChannels; channel++){
-            let starPairs = findMatchingStars(refView, tgtView, channel, upperLimit);
+            let starPairs = findMatchingStars(channel, limitStarsPercent, upperLimit, searchRadius);
             colorStarPairs.push(starPairs);
         }
         return colorStarPairs;
@@ -295,30 +296,15 @@ function StarsDetected(){
     };
     
     /**
-     * Finds the stars that exist in both images that have no pixel above upperLimit
-     * @param {View} refView
-     * @param {View} tgtView 
+     * Finds the stars that exist in both images that have no pixel above upperLimit.
      * @param {Number} channel
+     * @param {Number} limitStarsPercent Percentage of detected stars used.
      * @param {Number} upperLimit Reject stars with one or more pixels greater than this.
+     * @param {Number} searchRadius Search for target star within this radius
      * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
      */
-    let findMatchingStars = function (refView, tgtView, channel, upperLimit) {
-        let searchRadius = 5;
+    let findMatchingStars = function (channel, limitStarsPercent, upperLimit, searchRadius) {
         let rSqr = searchRadius * searchRadius;
-
-        /**
-         * @param {Image} image
-         * @param {Star} star
-         * @param {Number} upperLimit
-         * @returns {Boolean} true if all pixels within the star's bounding box are less then upperLimit
-         */
-        let withinLimit = function (image, star, upperLimit) {
-            let r = Math.sqrt(star.size) / 2;
-            let sx = star.pos.x;
-            let sy = star.pos.y;
-            let rect = new Rect(sx - r, sy - r, sx + r, sy + r);
-            return image.maximum(rect, channel, channel) < upperLimit;
-        };
 
         /**
          * Sort on flux, brightest stars at the end of the array
@@ -331,24 +317,32 @@ function StarsDetected(){
         };
 
         // create shallow copy of cached stars that are within upperLimit, and sort them
-        let refImage = refView.image;
         let rcStars = self.refColorStars[channel];
         let refStars = [];
         for (let star of rcStars) {
-            if (withinLimit(refImage, star, upperLimit)) {
+            if (star.peak < upperLimit) {
                 refStars.push(star);
             }
         }
-        let tgtImage = tgtView.image;
         let tcStars = self.tgtColorStars[channel];
         let tgtStars = [];
         for (let star of tcStars) {
-            if (withinLimit(tgtImage, star, upperLimit)) {
+            if (star.peak < upperLimit) {
                 tgtStars.push(star);
             }
         }
         refStars.sort(sortOnFlux);
         tgtStars.sort(sortOnFlux);
+        
+        // Upper limit of stars to use is 1000 to prevent excessive calculation time
+        // Remove the faintest stars (the faintest stars are at the start of the array)
+        let maxStars = limitStarsPercent * Math.min(refStars.length, 1000) / 100;
+        if (refStars.length > maxStars){
+            refStars = refStars.slice(refStars.length - maxStars);
+        }
+        if (tgtStars.length > maxStars){
+            tgtStars = tgtStars.slice(tgtStars.length - maxStars);
+        }
 
         // Use flux and search radius to match stars
         // Start with the brightest ref star and look for the brightest
@@ -362,15 +356,15 @@ function StarsDetected(){
             while (t--) {
                 let tStar = tgtStars[t];
                 let deltaX = Math.abs(tStar.pos.x - rStar.pos.x);
-                let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
-                if (deltaX < searchRadius && deltaY < searchRadius &&
-                        rSqr > deltaX * deltaX + deltaY * deltaY) {
-                    starPairArray.push(new StarPair(rStar, tStar));
-//                        console.writeln("Length=" + tgtStars.length + " [" + t + "] flux=" + rStar.flux + ", " + tStar.flux);
-                    // Remove star so it is not matched multiple times
-                    // This should be efficient because the brightest stars are near the end of the array
-                    tgtStars.splice(t, 1);
-                    break;
+                if (deltaX < searchRadius){
+                    let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
+                    if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
+                        starPairArray.push(new StarPair(rStar, tStar));
+                        // Remove star so it is not matched multiple times
+                        // This should be efficient because the brightest stars are at the end of the array
+                        tgtStars.splice(t, 1);
+                        break;
+                    }
                 }
             }
         }
@@ -514,9 +508,11 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         let keywords = graphWindow.keywords;
         keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-        keywords.push(new FITSKeyword("COMMENT", "", "LinearRange: " + data.rejectHigh));
-        keywords.push(new FITSKeyword("COMMENT", "", "OutlierRemoval: " + data.outlierRemoval));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
+        keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.rejectHigh));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
+        keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
         let maxErr = Number.NEGATIVE_INFINITY;
         let errStar = null;
         for (let c = 0; c < nColors; c++){
@@ -683,9 +679,11 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
-    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "LinearRange: " + data.rejectHigh));
-    keywords.push(new FITSKeyword("COMMENT", "", "OutlierRemoval: " + data.outlierRemoval));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.rejectHigh));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
+    keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
     createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
@@ -733,7 +731,7 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
-    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
 
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
     createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
@@ -786,10 +784,10 @@ function displayMaskStars(refView, detectedStars, targetId, limitMaskStarsPercen
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
-    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "RadiusMultiply: " + radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "RadiusAdd: " + radiusAdd));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + radiusAdd));
     
     createDiagnosticImage(refView, bmp, detectedStars, title, keywords, 1);
 }
@@ -866,10 +864,10 @@ function displayMask(tgtView, detectedStars, limitMaskStarsPercent, radiusMult, 
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + data.referenceView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "StarDetection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "LimitStarsPercent: " + limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "RadiusMultiply: " + radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "RadiusAdd: " + radiusAdd));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + radiusAdd));
     
     w.keywords = keywords;
     view.endProcess();

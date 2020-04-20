@@ -145,6 +145,8 @@ function PhotometricMosaicData() {
         Parameters.set("starDetection", this.logStarDetection);
         Parameters.set("orientation", this.orientation);
         Parameters.set("rejectHigh", this.rejectHigh);
+        Parameters.set("starSearchRadius", this.starSearchRadius);
+        Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
         Parameters.set("outlierRemoval", this.outlierRemoval);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
@@ -175,6 +177,10 @@ function PhotometricMosaicData() {
             this.orientation = Parameters.getInteger("orientation");
         if (Parameters.has("rejectHigh"))
             this.rejectHigh = Parameters.getReal("rejectHigh");
+        if (Parameters.has("starSearchRadius"))
+            this.starSearchRadius = Parameters.getInteger("starSearchRadius");
+        if (Parameters.has("limitPhotoStarsPercent"))
+            this.limitPhotoStarsPercent = Parameters.getReal("limitPhotoStarsPercent");
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         if (Parameters.has("sampleSize"))
@@ -230,9 +236,11 @@ function PhotometricMosaicData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
-        this.logStarDetection = -1;
+        this.logStarDetection = 0;
         this.orientation = AUTO();
         this.rejectHigh = 0.5;
+        this.starSearchRadius = 3;
+        this.limitPhotoStarsPercent = 100;
         this.outlierRemoval = 0;
         this.sampleSize = 20;
         this.limitSampleStarsPercent = 50;
@@ -264,6 +272,8 @@ function PhotometricMosaicData() {
         linearFitDialog.orientationCombo.currentItem = AUTO();
         linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
         linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
+        linearFitDialog.StarSearchRadius_Control.setValue(this.starSearchRadius);
+        linearFitDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
         linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
@@ -321,6 +331,8 @@ function PhotometricMosaicDialog(data) {
             "<p>The reference image. This image will not be modified.</p>";
     this.referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
+        data.hasAreaOfInterest = false;
+        this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     };
 
     let referenceImage_Sizer = new HorizontalSizer;
@@ -348,6 +360,8 @@ function PhotometricMosaicDialog(data) {
             "is calculated and subtracted.</p>";
     this.targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
+        data.hasAreaOfInterest = false;
+        this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     };
 
     let targetImage_Sizer = new HorizontalSizer;
@@ -363,12 +377,13 @@ function PhotometricMosaicDialog(data) {
     this.starDetectionControl.real = true;
     this.starDetectionControl.label.text = "Star Detection:";
     this.starDetectionControl.label.minWidth = labelSize;
-    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>";
+    this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>" +
+            "<p>For stacked linear images, 0.0 usually works well.</p>";
     this.starDetectionControl.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
-    this.starDetectionControl.setRange(-3, 1);
-    this.starDetectionControl.slider.setRange(0, 400);
+    this.starDetectionControl.setRange(-2, 2);
+    this.starDetectionControl.slider.setRange(0, 500);
     this.starDetectionControl.setPrecision(1);
     this.starDetectionControl.slider.minWidth = 206;
     this.starDetectionControl.setValue(data.logStarDetection);
@@ -410,16 +425,59 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.onValueUpdated = function (value) {
         data.rejectHigh = value;
     };
-    this.rejectHigh_Control.setRange(0.1, 1.0);
+    this.rejectHigh_Control.setRange(0.01, 1.0);
     this.rejectHigh_Control.slider.setRange(0, 500);
     this.rejectHigh_Control.setPrecision(2);
     this.rejectHigh_Control.slider.minWidth = 206;
     this.rejectHigh_Control.setValue(data.rejectHigh);
+    
+    this.StarSearchRadius_Control = new NumericControl(this);
+    this.StarSearchRadius_Control.real = false;
+    this.StarSearchRadius_Control.label.text = "Star Search Radius:";
+    this.StarSearchRadius_Control.toolTip = 
+            "<p>Search radius used to match the reference and target stars.</p>" +
+            "<p>Increasing this helps find more photometric stars but " +
+            "at the risk of matching the wrong star. " +
+            "The star flux is used to reduce this risk.</p>" +
+            "<p>Decrease for dense star fields.</p>";
+    this.StarSearchRadius_Control.setRange(1, 10);
+    this.StarSearchRadius_Control.slider.setRange(1, 10);
+    this.StarSearchRadius_Control.setPrecision(1);
+    this.StarSearchRadius_Control.slider.minWidth = 110;
+    this.StarSearchRadius_Control.setValue(data.starSearchRadius);
+    this.StarSearchRadius_Control.onValueUpdated = function (value) {
+        data.starSearchRadius = value;
+    };
 
     let photometrySizer = new HorizontalSizer;
     photometrySizer.spacing = 4;
     photometrySizer.add(this.rejectHigh_Control);
     photometrySizer.addStretch();
+    photometrySizer.add(this.StarSearchRadius_Control);
+    
+    this.limitPhotoStarsPercent_Control = new NumericControl(this);
+    this.limitPhotoStarsPercent_Control.real = true;
+    this.limitPhotoStarsPercent_Control.label.text = "Limit Stars %:";
+    this.limitPhotoStarsPercent_Control.label.minWidth = labelSize;
+    this.limitPhotoStarsPercent_Control.toolTip = 
+            "<p>Specifies the percentage of detected stars that will be used to " +
+            "find photometric stars.</p>" +
+            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
+            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
+            "<p>0% implies no stars will be used. The scale will default to one.</p>" +
+            "<p>Reducing the number of faint stars used can reduce the risk of " +
+            "matching the wrong target star to the reference star. However, " +
+            "the matching algorithm is quite robust so this is usually unnecessary.</p>" +
+            "<p>Modifying the 'Star Detection' control will have a similar effect, " +
+            "but this control is often more convenient for fine tuning.</p>";
+    this.limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitPhotoStarsPercent = value;
+    };
+    this.limitPhotoStarsPercent_Control.setRange(0, 100);
+    this.limitPhotoStarsPercent_Control.slider.setRange(0, 200);
+    this.limitPhotoStarsPercent_Control.setPrecision(2);
+    this.limitPhotoStarsPercent_Control.slider.minWidth = 200;
+    this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
     
     this.outlierRemoval_Control = new NumericControl(this);
     this.outlierRemoval_Control.real = false;
@@ -479,6 +537,7 @@ function PhotometricMosaicDialog(data) {
     outlierSizer.add(photometryStarsButton);
 
     let photometryGroupBox = createGroupBox(this, "Photometric Scale");
+    photometryGroupBox.sizer.add(this.limitPhotoStarsPercent_Control);
     photometryGroupBox.sizer.add(photometrySizer);
     photometryGroupBox.sizer.add(outlierSizer);
 
@@ -631,8 +690,8 @@ function PhotometricMosaicDialog(data) {
     this.lineSegments_Control.onValueUpdated = function (value) {
         data.nLineSegments = value;
     };
-    this.lineSegments_Control.setRange(1, 49);
-    this.lineSegments_Control.slider.setRange(1, 25);
+    this.lineSegments_Control.setRange(1, 99);
+    this.lineSegments_Control.slider.setRange(1, 50);
     this.lineSegments_Control.slider.minWidth = 200;
     this.lineSegments_Control.setValue(data.nLineSegments);
     
@@ -684,9 +743,9 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
     };
-    this.taperLength_Control.setRange(50, 10000);
-    this.taperLength_Control.slider.setRange(1, 200);
-    this.taperLength_Control.slider.minWidth = 200;
+    this.taperLength_Control.setRange(0, 5000);
+    this.taperLength_Control.slider.setRange(0, 500);
+    this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
     
     let taperSizer = new HorizontalSizer;
@@ -695,8 +754,8 @@ function PhotometricMosaicDialog(data) {
     taperSizer.add(this.taperLength_Control);
 
     let gradientGroupBox = createGroupBox(this, "Gradient Offset");
-    gradientGroupBox.sizer.add(this.sampleSize_Control);
     gradientGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
+    gradientGroupBox.sizer.add(this.sampleSize_Control);
     gradientGroupBox.sizer.add(this.lineSegments_Control);
     gradientGroupBox.sizer.add(taperSizer);
     gradientGroupBox.sizer.add(orientationSizer);
@@ -1082,6 +1141,14 @@ function main() {
                 data.targetView.image.height !== data.referenceView.image.height) {
             (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
+        }
+        if (data.hasAreaOfInterest){
+            if (data.areaOfInterest_X1 > data.targetView.image.width || 
+                    data.areaOfInterest_Y1 > data.referenceView.image.height){
+                (new MessageBox("ERROR: Area Of Interest extends beyond the edge of the image\n" +
+                "Have you selected the wrong preview?", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+                continue;
+            }
         }
         if (data.targetView.fullId === data.referenceView.fullId ||
                 data.targetView.image.height !== data.referenceView.image.height) {

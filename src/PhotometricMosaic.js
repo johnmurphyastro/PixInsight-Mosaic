@@ -86,7 +86,9 @@ function PhotometricMosaic(data)
         return;
     }
     
-    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, targetView, data.rejectHigh);
+    // Photometry stars
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView,
+            data.limitPhotoStarsPercent, data.rejectHigh, data.starSearchRadius);
     // Remove photometric star outliers and calculate the scale
     console.writeln("<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
@@ -179,7 +181,7 @@ function PhotometricMosaic(data)
 
     // Calculate the gradient for each channel
     let gradients = [];
-    let nLineSegments = (data.nLineSegments + 1) / 2;
+    let nLineSegments = Math.floor((data.nLineSegments + 1) / 2);
     for (let c = 0; c < nChannels; c++) {
         samplePairs = colorSamplePairs[c];
         gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, 
@@ -348,13 +350,17 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".starDetection: " + data.logStarDetection));
     keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
+    keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".linearRange: " + data.rejectHigh));
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".outlierRemoval: " + data.outlierRemoval));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".limitStarsPercent: " + data.limitSampleStarsPercent));
+        SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".lineSegments: " + data.nLineSegments));
     if (taperFlag) {
