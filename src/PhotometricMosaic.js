@@ -1,4 +1,4 @@
-/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, UndoFlag_Keywords, UndoFlag_PixelData, View, UndoFlag_NoSwapFile, PixelMath */
+/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, UndoFlag_Keywords, UndoFlag_PixelData, View, UndoFlag_NoSwapFile, PixelMath, StdButton_Yes, StdIcon_Question, StdButton_No */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -29,6 +29,7 @@ Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
 #include "lib/StarLib.js"
 #include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
+#include "lib/Geometry.js"
 
 function VERSION(){return  "1.1.01";}
 function TITLE(){return "Photometric Mosaic";}
@@ -61,24 +62,32 @@ function PhotometricMosaic(data)
     console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
     processEvents();
 
-    let areaOfInterest = null;
-    if (data.hasAreaOfInterest) {
-        areaOfInterest = new Rect(data.areaOfInterest_X0, data.areaOfInterest_Y0, 
-                data.areaOfInterest_X1, data.areaOfInterest_Y1);
-    }
-    
     let detectedStars = new StarsDetected();
-    detectedStars.detectStars(referenceView, targetView, areaOfInterest, 
-            data.logStarDetection, data.starCache);
+    detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.starCache);
     if (detectedStars.overlapBox === null){
-        let msgEnd = (areaOfInterest === null) ? "." : " within area of interest.";
-        let errorMsg = "Error: '" + referenceView.fullId + "' and '" + targetView.fullId + "' do not overlap" + msgEnd;
+        let errorMsg = "Error: '" + referenceView.fullId + "' and '" + targetView.fullId + "' do not overlap.";
         new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
+    createPreview(targetView, detectedStars.overlapBox, "Overlap");
     processEvents();
     
-    createOverlapPreview(targetView, detectedStars.overlapBox, data);
+    // sampleRect is the intersection between SampleAreaPreview and the overlap,
+    // or the overlapBox if the preview was not specified
+    let sampleRect;
+    if (data.hasSampleAreaPreview) {
+        let sampleAreaPreview = new Rect(data.sampleAreaPreview_X0, data.sampleAreaPreview_Y0, 
+                data.sampleAreaPreview_X1, data.sampleAreaPreview_Y1);
+        if (!sampleAreaPreview.intersects(detectedStars.overlapBox)){
+            let errorMsg = "Error: Sample Area rectangle does not intersect with the image overlap";
+            new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
+        }
+        sampleRect = sampleAreaPreview.intersection(detectedStars.overlapBox);
+        createPreview(targetView, sampleRect, "SampleArea");
+    } else {
+        sampleRect = detectedStars.overlapBox;
+    }
     
     if (data.viewFlag === DETECTED_STARS_FLAG()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
@@ -127,31 +136,43 @@ function PhotometricMosaic(data)
         }
         return;
     }
+    
+    let isHorizontal = isJoinHorizontal(data, sampleRect);
+    let joinRect = extendSubRect(sampleRect, detectedStars.overlapBox, isHorizontal);
+    
     if (data.viewFlag === MOSAIC_MASK_FLAG()){
-        displayMask(targetView, detectedStars, 
+        displayMask(targetView, joinRect, detectedStars, 
                 data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, data);
         return;
     }
     if (data.viewFlag === MOSAIC_MASK_STARS_FLAG()){
-        displayMaskStars(referenceView, detectedStars, targetView.fullId, 
+        displayMaskStars(referenceView, joinRect, detectedStars, targetView.fullId, 
                 data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, 
                 false, "__MosaicMaskStars", data);
         return;
     }
 
+    let noStarsMsg = "";
+    for (let c = 0; c < nChannels; c++){
+        // For each color
+        let starPairs = colorStarPairs[c];
+        if (starPairs.starPairArray.length === 0){
+            noStarsMsg += "Channel [" + c + "] has no matching stars. Defaulting scale to 1.0\n";
+        }
+    }
+    if (noStarsMsg.length !== 0){
+        let messageBox = new MessageBox(noStarsMsg, "Warning: Failed to detect stars", StdIcon_Warning, StdButton_Ok, StdButton_Abort);
+        if (StdButton_Abort === messageBox.execute()) {
+            console.warningln("No matching stars. Aborting...");
+            return;
+        }
+    }
+    
     // Calculate scale for target image.
     let scaleFactors = [];
     for (let c = 0; c < nChannels; c++){
         // For each color
         let starPairs = colorStarPairs[c];
-        if (starPairs.starPairArray.length === 0){
-            let warning = "Warning: channel [" + c + "] has no matching stars. Defaulting scale to 1.0";
-            let messageBox = new MessageBox(warning, "Warning - no matching stars", StdIcon_Warning, StdButton_Ok, StdButton_Abort);
-            if (StdButton_Abort === messageBox.execute()){
-                console.warningln("No matching stars. Aborting...");
-                return;
-            }
-        }
         scaleFactors.push(starPairs.linearFitData);
         let text = "Calculated scale factor for " + targetView.fullId + " channel[" + c + "] x " + 
                 starPairs.linearFitData.m.toPrecision(5);
@@ -163,16 +184,21 @@ function PhotometricMosaic(data)
         processEvents();
     }
     
+    let maxSampleSize = Math.min(sampleRect.height, sampleRect.width);
+    if (data.sampleSize > maxSampleSize){
+        new MessageBox("Sample Size is too big for the sample area.\n" +
+                "Sample Size must be less than or equal to " + maxSampleSize, 
+                TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
+    }
+    
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, scaleFactors,
-        data.sampleSize, detectedStars.allStars, 
-        data.rejectHigh, data.limitSampleStarsPercent, detectedStars.overlapBox);
+        data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, sampleRect);
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
         new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    let sampleArea = samplePairs.getSampleArea();
-    let isHorizontal = isJoinHorizontal(data, sampleArea);
     if (data.viewFlag === DISPLAY_SAMPLES_FLAG()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
         displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, data.limitSampleStarsPercent, title, data);
@@ -185,10 +211,10 @@ function PhotometricMosaic(data)
     for (let c = 0; c < nChannels; c++) {
         samplePairs = colorSamplePairs[c];
         gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, 
-            detectedStars.overlapBox, isHorizontal);
+            sampleRect, isHorizontal);
         if (!gradients[c].isValid){
-            new MessageBox("Error: insufficient number of samples per line segment.\n" +
-                    "Decrease the number of line segments or increase the number of samples.",
+            new MessageBox("At least two samples per line segment are required.\n" +
+                    "Try decreasing either the number of line segments or the size of the samples.",
                     TITLE(), StdIcon_Error, StdButton_Ok).execute();
             return;
         }
@@ -198,15 +224,32 @@ function PhotometricMosaic(data)
         return;
     }
 
+    let isTargetAfterRef;
+    if (isHorizontal){
+        isTargetAfterRef = isImageBelowOverlap(targetView.image, joinRect, nChannels);
+        let isRefAfterTarget = isImageBelowOverlap(referenceView.image, joinRect, nChannels);
+        if (isTargetAfterRef === isRefAfterTarget){
+            // Ambiguous case, let user decide
+            let messageBox = new MessageBox("Is the reference frame above the target frame?",
+                "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
+            isTargetAfterRef = (StdButton_Yes === messageBox.execute());
+        }
+    } else {
+        isTargetAfterRef = isImageRightOfOverlap(targetView.image, joinRect, nChannels);
+        let isRefAfterTarget = isImageRightOfOverlap(referenceView.image, joinRect, nChannels);
+        if (isTargetAfterRef === isRefAfterTarget){
+            // Ambiguous case, let user decide
+            let messageBox = new MessageBox("Is the reference frame to the left of the target frame?",
+                "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
+            isTargetAfterRef = (StdButton_Yes === messageBox.execute());
+        }
+    }
+    
     console.writeln("\n<b><u>Applying scale and gradients</u></b>");
-    targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
-    applyScaleAndGradient(targetView, isHorizontal, scaleFactors, gradients, detectedStars.overlapBox, 
-        data.taperFlag, data.taperLength, data);
-    data.starCache.invalidateTargetStars();
-
-    // Save parameters to PixInsight history
-    data.saveParameters();
-    targetView.endProcess();
+//    targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
+    let correctedView = applyScaleAndGradient(referenceView, targetView, isHorizontal, isTargetAfterRef,
+            scaleFactors, gradients, joinRect, data);
+            
     processEvents();
 
     if (data.createMosaicFlag){
@@ -214,8 +257,9 @@ function PhotometricMosaic(data)
         console.writeln("<b><u>Creating ", mosaicName, "</u></b>");
 
         processEvents();
-        createMosaic(referenceView, targetView, mosaicName,
-                data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag);
+        createMosaic(referenceView, correctedView, mosaicName,
+                data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag,
+                data.hasSampleAreaPreview, joinRect, isHorizontal, isTargetAfterRef);
                 
         let mosaicView = View.viewById(mosaicName);
 
@@ -228,10 +272,10 @@ function PhotometricMosaic(data)
         mosaicView.endProcess();
 
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
-        let x0 = Math.max(0, detectedStars.overlapBox.x0 - 50);
-        let x1 = Math.min(mosaicView.image.width, detectedStars.overlapBox.x1 + 50);
-        let y0 = Math.max(0, detectedStars.overlapBox.y0 - 50);
-        let y1 = Math.min(mosaicView.image.height, detectedStars.overlapBox.y1 + 50);
+        let x0 = Math.max(0, joinRect.x0 - 50);
+        let x1 = Math.min(mosaicView.image.width, joinRect.x1 + 50);
+        let y0 = Math.max(0, joinRect.y0 - 50);
+        let y1 = Math.min(mosaicView.image.height, joinRect.y1 + 50);
         let previewRect = new Rect(x0, y0, x1, y1);
         let w = mosaicView.window;
         w.createPreview(previewRect, targetView.fullId);
@@ -258,20 +302,20 @@ function calculateScale(starPairs) {
 
 /**
  * Appy scale and subtract the detected gradient from the target view
- * @param {View} view Apply the gradient correction to this view
+ * @param {View} refView Not modified
+ * @param {View} tgtView Apply the gradient correction to a clone of this view
  * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
+ * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale to apply to target image.
  * @param {Gradient[]} gradients Gradient for each color channel
- * @param {Rect} overlapBox Bounding box of overlap region
- * @param {Boolean} taperFlag If true, apply taper to average offset in direction perpendicular to join
- * @param {Number} taperLength Length of taper to apply in pixels
+ * @param {Rect} joinRect Bounding box of join region
  * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @returns {undefined}
+ * @returns {View}
  */
-function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, overlapBox, 
-        taperFlag, taperLength, data) {
+function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef, 
+        scaleFactors, gradients, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
-    const targetImage = view.image;
+    const targetImage = tgtView.image;
     const width = targetImage.width;
     const height = targetImage.height;
     const updateInterval = height / 10;
@@ -294,6 +338,15 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
     };
     
     let nChannels = gradients.length;
+    
+    let w = tgtView.window;
+    let imgWindow = new ImageWindow(w.width, w.height, nChannels, w.bitsPerSample, 
+            w.isFloatSample, nChannels > 1, tgtView.fullId + "_PM");    
+    imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+    
+    let view = imgWindow.mainView;
+    view.image.assign(tgtView.image);
+    
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let gradientData = gradients[channel].getGradientData();
@@ -301,7 +354,7 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
         let average = Math.mean(difArray);
         console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
         let gradientOffset = new GradientOffset(targetImage.width, targetImage.height, 
-                average, overlapBox, taperLength, isHorizontal);     
+                average, joinRect, data.taperLength, isHorizontal, isTargetAfterRef);     
             
         oldTextLength = 0;
         yOld = height - 1;
@@ -315,12 +368,12 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
                     let offset;
                     if (isHorizontal){
                         offset = difArray[x];
-                        if (taperFlag){
+                        if (data.taperFlag){
                             offset = gradientOffset.getOffset(y, offset);
                         }
                     } else {
                         offset = difArray[y];
-                        if (taperFlag){
+                        if (data.taperFlag){
                             offset = gradientOffset.getOffset(x, offset);
                         }
                     }
@@ -363,7 +416,7 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".lineSegments: " + data.nLineSegments));
-    if (taperFlag) {
+    if (data.taperFlag) {
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".taperLength: " + data.taperLength));
     }
@@ -383,41 +436,96 @@ function applyScaleAndGradient(view, isHorizontal, scaleFactors, gradients, over
         view.image.truncate(0, 1);
     }
     view.window.keywords = keywords;
+    
+    view.endProcess();
+    view.stf = refView.stf;
+    imgWindow.show();
+    
+    return view;
 }
 
 /**
  * Create a mosaic by adding two images together.
  * Zero pixels are ignored.
  * 
- * @param {View} referenceView In overlay mode, displayed on top
- * @param {View} targetView In overlay mode, displayed beneath
+ * @param {View} referenceView
+ * @param {View} targetView
  * @param {String} mosaicImageName
  * @param {Boolean} overlayRefFlag Set overlapping pixels to the reference image
  * @param {Boolean} overlayTgtFlag Set overlapping pixels to the target image
  * @param {Boolean} randomFlag Set overlapping pixels randomly to reference or target pixels
+ * @param {Boolean} usingPreview True if sampleAreaPreview has been supplied 
+ * @param {Rect} joinRect Bounding box of overlap 
+ * @param {Boolean} isHorizontal True if join is horizontal
+ * @param {Boolean} isTargetAfterRef True if target is below or right of reference image
  * @returns {undefined}
  */
 function createMosaic(referenceView, targetView, mosaicImageName,
-        overlayRefFlag, overlayTgtFlag, randomFlag) {
+        overlayRefFlag, overlayTgtFlag, randomFlag, usingPreview, joinRect, isHorizontal, isTargetAfterRef) {
     let P = new PixelMath;
     P.setDescription("Create Mosaic from " + referenceView.fullId + ", " + targetView.fullId);
+    const ref = referenceView.fullId;
+    const tgt = targetView.fullId;
+    
+    // Overlay reference: // iif( ref, ref, tgt )
+    const refExp = "iif(" + ref + ", " + ref + ", " + tgt + ")";
+    
+    // Overlay target: iif( tgt, tgt, ref )
+    const tgtExp = "iif(" + tgt + ", " + tgt + ", " + ref + ")";
+    
     let expression;
     if (overlayRefFlag) {
-        expression = format("iif(%s != 0, %s, %s)", referenceView.fullId, referenceView.fullId, targetView.fullId);
+        expression = refExp;
     } else if (overlayTgtFlag){
-        expression = format("iif(%s != 0, %s, %s)", targetView.fullId, targetView.fullId, referenceView.fullId);
+        expression = tgtExp;
     } else if (randomFlag){
-        // iif( A && B, rndselect( A, B ), A + B )
-        let A = referenceView.fullId;
-        let B = targetView.fullId;
-        expression = "iif(" + A + " && " + B + ", rndselect(" + A + ", " + B + "), " + A + " + " + B + ")";
+        // Random: iif( ref && tgt, rndselect( ref, tgt ), ref + tgt )
+        expression = "iif(" + ref + " && " + tgt + ", rndselect(" + ref + ", " + tgt + "), " + ref + " + " + tgt + ")";
     } else {
-        // Average: iif( A && B, mean( A, B ), A + B )
-        let A = referenceView.fullId;
-        let B = targetView.fullId;
-        expression = "iif(" + A + " && " + B + ", (" + A + " + " + B + ")/2, " + A + " + " + B + ")";
+        // Average: iif( ref && tgt, mean( ref, tgt ), ref + tgt )
+        expression = "iif(" + ref + " && " + tgt + ", (" + ref + " + " + tgt + ")/2, " + ref + " + " + tgt + ")";
     }
-
+    
+    if (usingPreview) {
+        let outerIf;
+        if (isHorizontal) {
+            outerIf = "iif(y() < " + joinRect.y0 + ", ";
+            if (isTargetAfterRef) {
+                // First region is ref side of join. Overlay reference
+                outerIf += refExp;
+            } else {
+                // First region is tgt side of join. Overlay target
+                outerIf += tgtExp;
+            }
+            outerIf += ", iif(y() >= " + joinRect.y1 + ", ";
+            if (isTargetAfterRef) {
+                // Last region is tgt side of join. Overlay target
+                outerIf += tgtExp;
+            } else {
+                // Last region is ref side of join. Overlay reference
+                outerIf += refExp;
+            }
+        } else {
+            outerIf = "iif(x() < " + joinRect.x0 + ", ";
+            if (isTargetAfterRef) {
+                // First region is ref side of join. Overlay reference
+                outerIf += refExp;
+            } else {
+                // First region is tgt side of join. Overlay target
+                outerIf += tgtExp;
+            }
+            outerIf += ", iif(x() >= " + joinRect.x1 + ", ";
+            if (isTargetAfterRef) {
+                // Last region is tgt side of join. Overlay target
+                outerIf += tgtExp;
+            } else {
+                // Last region is ref side of join. Overlay reference
+                outerIf += refExp;
+            }
+        }
+        expression = outerIf + ", " + expression + "))";
+    }
+    
     P.expression = expression;
     P.symbols = "";
     P.useSingleExpression = true;
@@ -442,10 +550,10 @@ function createMosaic(referenceView, targetView, mosaicImageName,
 /**
  *
  * @param {PhotometricMosaicData} data
- * @param {Rect} sampleArea
+ * @param {Rect} sampleRect
  * @returns {Boolean} True if the mosaic join is mostly horizontal
  */
-function isJoinHorizontal(data, sampleArea){
+function isJoinHorizontal(data, sampleRect){
     if (data.orientation === HORIZONTAL()){
         console.writeln("<b>Mode: Horizontal Gradient</b>");
         return true;
@@ -454,7 +562,7 @@ function isJoinHorizontal(data, sampleArea){
         console.writeln("<b>Mode: Vertical Gradient</b>");
         return false;
     }
-    let isHorizontal = sampleArea.width > sampleArea.height;
+    let isHorizontal = sampleRect.width > sampleRect.height;
     if (isHorizontal) {
         console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
     } else {
@@ -464,43 +572,29 @@ function isJoinHorizontal(data, sampleArea){
 }
 
 /**
- * Create preview of detected overlap in target image and update the areaOfInterest.
- * The detected overlap is the intersection between the areaOfInterest and the
- * actual overlap between the reference and target frames.
- * The areaOfInterest is then shrunk to this intersection.
+ * Create a preview if it does not already exist
  * @param {View} targetView
- * @param {Rect} overlapBox
- * @param {PhotometricMosaicData} data
+ * @param {Rect} rect
+ * @param {String} previewName
  */
-function createOverlapPreview(targetView, overlapBox, data){
+function createPreview(targetView, rect, previewName){
     let w = targetView.window;
     let previews = w.previews;
-    let overlap = overlapBox;
     let found = false;
     let overlapPreview = null;
     for (let preview of previews){
         let r = w.previewRect( preview );
-        if (r.x0 === overlap.x0 && r.x1 === overlap.x1 &&
-                r.y0 === overlap.y0 && r.y1 === overlap.y1){
+        if (r.x0 === rect.x0 && r.x1 === rect.x1 &&
+                r.y0 === rect.y0 && r.y1 === rect.y1){
             found = true; // preview already exists
             overlapPreview = preview;
             break;
         }
     }
     if (!found){
-        let preview = w.createPreview(overlap, "Overlap");
+        let preview = w.createPreview(rect, previewName);
         overlapPreview = preview;
     }
-    
-    // Set the preview data to the overlap bounding box.
-    // The UI controls will be set when PhotmetricMosaic() returns to main
-    data.hasAreaOfInterest = true;
-    data.preview = overlapPreview;
-    let rect = targetView.window.previewRect(data.preview);
-    data.areaOfInterest_X0 = rect.x0;
-    data.areaOfInterest_Y0 = rect.y0;
-    data.areaOfInterest_X1 = rect.x1;
-    data.areaOfInterest_Y1 = rect.y1;
 }
 
 /**

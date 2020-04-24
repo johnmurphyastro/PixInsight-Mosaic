@@ -338,11 +338,14 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
  * @param {Rect} overlapBox Bounding box of the overlap between target and reference images
  * @param {Number} taperLength Taper (or feather) length
  * @param {Boolean} isHorizontal Tile join direction
+ * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @returns {GradientOffset}
  */
-function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLength, isHorizontal) {
+function GradientOffset(imageWidth, imageHeight, average, overlapBox, 
+        taperLength, isHorizontal, isTargetAfterRef) {
     this.average = average;
     this.taperLength = taperLength;
+    this.isTargetAfterRef = isTargetAfterRef;
     if (isHorizontal){
         this.limit1 = Math.max(0, overlapBox.y0 - taperLength); // limit2 - taperLength
         this.limit2 = overlapBox.y0;
@@ -356,32 +359,66 @@ function GradientOffset(imageWidth, imageHeight, average, overlapBox, taperLengt
     }
     
     /**
-     * Get the tapered offset value between the reference and target image.
-     * Outside the overlap region, it tapers down towards the average offset.
+     * Calculate the offset value to be applied to the target image.
+     * Outside the overlap and taper zone, this returns 'this.average', the average offset.
+     * Inside the overlap region, it returns 'dif', the difference at the join.
+     * In the taper zone the returned value depends on the distance from the join
+     * (calcluated from 'coord'). It gradually reduces from 'dif' to 'this.average'.
+     * If the target image extends beyond the reference side of the overlap, the 
+     * full 'dif' is applied. This is only important if the target image extends 
+     * 'around the side' of the reference image.
+     * 
      * @param {Number} coord x-coord (vertical join) or y-coord (horizontal join)
      * @param {Number} dif Value from the difArray
      * @returns {Number} Offset to subtract from target image
      */
     this.getOffset = function(coord, dif){
-        if (coord < this.limit1 || coord >= this.limit4){
-            // First or last region; Only apply average offset
-            return this.average;
+        if (coord < this.limit1){
+            // Before overlap box AND before taper
+            if (isTargetAfterRef){
+                // This is the ref side of the overlap, apply full correction
+                return dif;
+            } else {
+                // Target side. Return to average target bg level.
+                return this.average;
+            }
         }
         if (coord < this.limit2){
-            // Progressively apply more of the correction as we approach the overlap 
-            let delta = dif - this.average;
-            let fraction = 1 - (this.limit2 - coord) / this.taperLength;
-            return this.average + delta * fraction;
+            // Before overlap box, in taper region
+            if (isTargetAfterRef){
+                // This is the ref side of the overlap, apply full correction
+                return dif;
+            } else {
+                // This is the target side of the overlap, so taper is required
+                // Progressively apply more of the correction as we approach the overlap 
+                let delta = dif - this.average;
+                let fraction = 1 - (this.limit2 - coord) / this.taperLength;
+                return this.average + delta * fraction;
+            }
         }
         if (coord < this.limit3){
             // Overlap region: apply the full correction
             return dif;
         }
-        // If we get here, coord < this.limit4
-        // Progressively apply less of the correction as we move away from the overlap
-        let delta = dif - this.average;
-        let fraction = 1 - (coord - this.limit3) / this.taperLength;
-        return this.average + delta * fraction;
+        if (coord < this.limit4){
+            if (isTargetAfterRef){
+                // This is the target side of the overlap, so taper is required
+                // Progressively apply less correction as we move away from the overlap
+                let delta = dif - this.average;
+                let fraction = 1 - (coord - this.limit3) / this.taperLength;
+                return this.average + delta * fraction;
+            } else {
+                // This is the ref side of the overlap, apply full correction
+                return dif;
+            }
+        }
+        // coord >= this.limit4
+        if (isTargetAfterRef) {
+            return this.average;
+        } else {
+            // This is the ref side of the overlap, apply full correction
+            return dif;
+        }
     };
 }
 

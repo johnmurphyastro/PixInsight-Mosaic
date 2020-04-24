@@ -79,55 +79,6 @@ function getDefaultTargetView(activeWindow, referenceView){
     return targetView;
 }
 
-/**
- * Initialise the preview ViewList selection.
- * If there are no previews, do not set the preview.
- * If the areaOfInterst is uninitialised (all coords are zero) and targetView
- * only has one preview, use this preview.
- * If the areaOfInterst is uninitialised (all coords are zero) and targetView
- * has more than one preview, do not set the preview. Force the user to decide.
- * If the areaOfInterst is initialised (at least one coord is not zero) and a
- * targetView preview exactly matches the areaOfInterest, use this preview.
- * If the areaOfInterst is initialised (at least one coord is not zero) but no
- * targetView preview matches the areaOfInterest, do not set the preview.
- * @param {ViewList} previewImage_ViewList
- * @param {PhotometricMosaicData} data
- * @param {View} targetView
- */
-function setTargetPreview(previewImage_ViewList, data, targetView){
-    let previews = targetView.window.previews;
-    if (previews.length > 0) {
-        if (data.areaOfInterest_X0 === 0 &&
-                data.areaOfInterest_Y0 === 0 &&
-                data.areaOfInterest_X1 === 0 &&
-                data.areaOfInterest_Y1 === 0){
-            // areaOfInterest is uninitialised
-            if (previews.length === 1){
-                // There is only one preview, so use this preview
-                data.preview = previews[0];
-                previewImage_ViewList.currentView = data.preview;
-                
-            }
-        } else {
-            // areaOfInterst is initialised
-            let w = targetView.window;
-            let previews = w.previews;
-            for (let preview of previews){
-                let r = w.previewRect( preview );
-                if (r.x0 === data.areaOfInterest_X0 &&
-                        r.x1 === data.areaOfInterest_X1 &&
-                        r.y0 === data.areaOfInterest_Y0 &&
-                        r.y1 === data.areaOfInterest_Y1){
-                    // areaOfInterst is initialised and preview matches it.
-                    data.preview = preview;
-                    previewImage_ViewList.currentView = data.preview;
-                    break;
-                }
-            }
-        }
-    }
-}
-
 // -----------------------------------------------------------------------------
 // Form/Dialog data
 // -----------------------------------------------------------------------------
@@ -162,11 +113,11 @@ function PhotometricMosaicData() {
         Parameters.set("multiplyStarRadius", this.radiusMult);
         Parameters.set("addStarRadius", this.radiusAdd);
         
-        Parameters.set("hasAreaOfInterest", this.hasAreaOfInterest);
-        Parameters.set("areaOfInterest_X0", this.areaOfInterest_X0);
-        Parameters.set("areaOfInterest_Y0", this.areaOfInterest_Y0);
-        Parameters.set("areaOfInterest_X1", this.areaOfInterest_X1);
-        Parameters.set("areaOfInterest_Y1", this.areaOfInterest_Y1);
+        Parameters.set("hasSampleAreaPreview", this.hasSampleAreaPreview);
+        Parameters.set("sampleAreaPreview_X0", this.sampleAreaPreview_X0);
+        Parameters.set("sampleAreaPreview_Y0", this.sampleAreaPreview_Y0);
+        Parameters.set("sampleAreaPreview_X1", this.sampleAreaPreview_X1);
+        Parameters.set("sampleAreaPreview_Y1", this.sampleAreaPreview_Y1);
     };
 
     // Reload our script's data from a process icon
@@ -218,19 +169,19 @@ function PhotometricMosaicData() {
             this.referenceView = View.viewById(viewId);
         }
 
-        if (Parameters.has("hasAreaOfInterest"))
-            this.hasAreaOfInterest = Parameters.getBoolean("hasAreaOfInterest");
-        if (Parameters.has("areaOfInterest_X0")){
-            this.areaOfInterest_X0 = Parameters.getInteger("areaOfInterest_X0");
+        if (Parameters.has("hasSampleAreaPreview"))
+            this.hasSampleAreaPreview = Parameters.getBoolean("hasSampleAreaPreview");
+        if (Parameters.has("sampleAreaPreview_X0")){
+            this.sampleAreaPreview_X0 = Parameters.getInteger("sampleAreaPreview_X0");
         }
-        if (Parameters.has("areaOfInterest_Y0")){
-            this.areaOfInterest_Y0 = Parameters.getInteger("areaOfInterest_Y0");
+        if (Parameters.has("sampleAreaPreview_Y0")){
+            this.sampleAreaPreview_Y0 = Parameters.getInteger("sampleAreaPreview_Y0");
         }
-        if (Parameters.has("areaOfInterest_X1")){
-            this.areaOfInterest_X1 = Parameters.getInteger("areaOfInterest_X1");
+        if (Parameters.has("sampleAreaPreview_X1")){
+            this.sampleAreaPreview_X1 = Parameters.getInteger("sampleAreaPreview_X1");
         }
-        if (Parameters.has("areaOfInterest_Y1")){
-            this.areaOfInterest_Y1 = Parameters.getInteger("areaOfInterest_Y1");
+        if (Parameters.has("sampleAreaPreview_Y1")){
+            this.sampleAreaPreview_Y1 = Parameters.getInteger("sampleAreaPreview_Y1");
         }
     };
 
@@ -256,11 +207,11 @@ function PhotometricMosaicData() {
         this.radiusMult = 2.5;
         this.radiusAdd = -1;
 
-        this.hasAreaOfInterest = false;
-        this.areaOfInterest_X0 = 0;
-        this.areaOfInterest_Y0 = 0;
-        this.areaOfInterest_X1 = 0;
-        this.areaOfInterest_Y1 = 0;
+        this.hasSampleAreaPreview = false;
+        this.sampleAreaPreview_X0 = 0;
+        this.sampleAreaPreview_Y0 = 0;
+        this.sampleAreaPreview_X1 = 0;
+        this.sampleAreaPreview_Y1 = 0;
         
         this.starCache = new StarCache();
         this.testFlag = 0;
@@ -287,11 +238,11 @@ function PhotometricMosaicData() {
         linearFitDialog.StarRadiusMultiply_Control.setValue(this.radiusMult);
         linearFitDialog.StarRadiusAdd_Control.setValue(this.radiusAdd);
         
-        linearFitDialog.areaOfInterestCheckBox.checked = this.hasAreaOfInterest;
-        linearFitDialog.rectangleX0_Control.setValue(this.areaOfInterest_X0);
-        linearFitDialog.rectangleY0_Control.setValue(this.areaOfInterest_Y0);
-        linearFitDialog.rectangleX1_Control.setValue(this.areaOfInterest_X1);
-        linearFitDialog.rectangleY1_Control.setValue(this.areaOfInterest_Y1);
+        linearFitDialog.sampleAreaPreviewCheckBox.checked = this.hasSampleAreaPreview;
+        linearFitDialog.rectangleX0_Control.setValue(this.sampleAreaPreview_X0);
+        linearFitDialog.rectangleY0_Control.setValue(this.sampleAreaPreview_Y0);
+        linearFitDialog.rectangleX1_Control.setValue(this.sampleAreaPreview_X1);
+        linearFitDialog.rectangleY1_Control.setValue(this.sampleAreaPreview_Y1);
     };
 
     let activeWindow = ImageWindow.activeWindow;
@@ -331,8 +282,6 @@ function PhotometricMosaicDialog(data) {
             "<p>The reference image. This image will not be modified.</p>";
     this.referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
-        data.hasAreaOfInterest = false;
-        this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     };
 
     let referenceImage_Sizer = new HorizontalSizer;
@@ -360,8 +309,6 @@ function PhotometricMosaicDialog(data) {
             "is calculated and subtracted.</p>";
     this.targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
-        data.hasAreaOfInterest = false;
-        this.dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
     };
 
     let targetImage_Sizer = new HorizontalSizer;
@@ -946,30 +893,30 @@ function PhotometricMosaicDialog(data) {
     starMaskGroupBox.sizer.add(mask_Sizer);
 
     //-------------------------------------------------------
-    // Area of interest
+    // Sample Area
     //-------------------------------------------------------
     let labelWidth2 = this.font.width("Height:_");
 
-    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.areaOfInterest_X0, labelWidth2, 50);
+    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.sampleAreaPreview_X0, labelWidth2, 50);
     this.rectangleX0_Control.onValueUpdated = function (value){
-        data.areaOfInterest_X0 = value;
+        data.sampleAreaPreview_X0 = value;
     };
-    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.areaOfInterest_Y0, labelWidth2, 50);
+    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.sampleAreaPreview_Y0, labelWidth2, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
-        data.areaOfInterest_Y0 = value;
+        data.sampleAreaPreview_Y0 = value;
     };
-    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.areaOfInterest_X1, labelWidth2, 50);
+    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.sampleAreaPreview_X1, labelWidth2, 50);
     this.rectangleX1_Control.onValueUpdated = function (value){
-        data.areaOfInterest_X1 = value;
+        data.sampleAreaPreview_X1 = value;
     };
-    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.areaOfInterest_Y1, labelWidth2, 50);
+    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.sampleAreaPreview_Y1, labelWidth2, 50);
     this.rectangleY1_Control.onValueUpdated = function (value){
-        data.areaOfInterest_Y1 = value;
+        data.sampleAreaPreview_Y1 = value;
     };
 
-    this.areaOfInterestCheckBox = new CheckBox(this);
-    this.areaOfInterestCheckBox.text = "Area of Interest";
-    this.areaOfInterestCheckBox.toolTip = 
+    this.sampleAreaPreviewCheckBox = new CheckBox(this);
+    this.sampleAreaPreviewCheckBox.text = "Sample Area";
+    this.sampleAreaPreviewCheckBox.toolTip = 
             "<p>Limit the search for overlapping pixels to this bounding box.</p>" +
             "<p>If all overlapping pixels are within this area, selecting this " +
             "option reduces calculation time but does not effect the calculated overlap pixels.</p>" +
@@ -981,15 +928,15 @@ function PhotometricMosaicDialog(data) {
             "<p>The first time the overlap is calculated, the 'Area Of Interest' will be updated " +
             "to the bounding box of the overlapping pixels that will be used to calculate the " +
             "target image scale and gradient.</p>";
-    this.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
-    this.areaOfInterestCheckBox.onClick = function (checked) {
-        data.hasAreaOfInterest = checked;
+    this.sampleAreaPreviewCheckBox.checked = data.hasSampleAreaPreview;
+    this.sampleAreaPreviewCheckBox.onClick = function (checked) {
+        data.hasSampleAreaPreview = checked;
     };
 
     let coordHorizontalSizer = new HorizontalSizer;
     coordHorizontalSizer.spacing = 10;
-    coordHorizontalSizer.add(this.areaOfInterestCheckBox);
-    coordHorizontalSizer.addSpacing(20);
+    coordHorizontalSizer.add(this.sampleAreaPreviewCheckBox);
+    coordHorizontalSizer.addSpacing(36);
     coordHorizontalSizer.add(this.rectangleX0_Control);
     coordHorizontalSizer.add(this.rectangleY0_Control);
     coordHorizontalSizer.add(this.rectangleX1_Control);
@@ -999,22 +946,22 @@ function PhotometricMosaicDialog(data) {
     let previewUpdateActions = function(dialog){
         let view = data.preview;
         if (view !== null && view.isPreview) {
-            data.hasAreaOfInterest = true;
-            dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            data.hasSampleAreaPreview = true;
+            dialog.sampleAreaPreviewCheckBox.checked = data.hasSampleAreaPreview;
             ///let imageWindow = view.window;
             let rect = view.window.previewRect(view);
-            data.areaOfInterest_X0 = rect.x0;
-            data.areaOfInterest_Y0 = rect.y0;
-            data.areaOfInterest_X1 = rect.x1;
-            data.areaOfInterest_Y1 = rect.y1;
+            data.sampleAreaPreview_X0 = rect.x0;
+            data.sampleAreaPreview_Y0 = rect.y0;
+            data.sampleAreaPreview_X1 = rect.x1;
+            data.sampleAreaPreview_Y1 = rect.y1;
 
-            dialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
-            dialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
-            dialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
-            dialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
+            dialog.rectangleX0_Control.setValue(data.sampleAreaPreview_X0);
+            dialog.rectangleY0_Control.setValue(data.sampleAreaPreview_Y0);
+            dialog.rectangleX1_Control.setValue(data.sampleAreaPreview_X1);
+            dialog.rectangleY1_Control.setValue(data.sampleAreaPreview_Y1);
         } else {
-            data.hasAreaOfInterest = false;
-            dialog.areaOfInterestCheckBox.checked = data.hasAreaOfInterest;
+            data.hasSampleAreaPreview = false;
+            dialog.sampleAreaPreviewCheckBox.checked = false;
         }
     };
 
@@ -1050,9 +997,9 @@ function PhotometricMosaicDialog(data) {
     previewImage_Sizer.addSpacing(10);
     previewImage_Sizer.add(previewUpdateButton);
 
-    let areaOfInterest_GroupBox = createGroupBox(this, "Area of Interest");
-    areaOfInterest_GroupBox.sizer.add(coordHorizontalSizer, 10);
-    areaOfInterest_GroupBox.sizer.add(previewImage_Sizer);
+    let sampleAreaPreview_GroupBox = createGroupBox(this, "Sample Area");
+    sampleAreaPreview_GroupBox.sizer.add(coordHorizontalSizer, 10);
+    sampleAreaPreview_GroupBox.sizer.add(previewImage_Sizer);
 
     const helpWindowTitle = TITLE() + " Help";
     const HELP_MSG =
@@ -1078,9 +1025,9 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(titleLabel);
     this.sizer.add(referenceImage_Sizer);
     this.sizer.add(targetImage_Sizer);
-    this.sizer.add(areaOfInterest_GroupBox);
     this.sizer.add(starDetectionGroupBox);
     this.sizer.add(photometryGroupBox);
+    this.sizer.add(sampleAreaPreview_GroupBox);
     this.sizer.add(gradientGroupBox);
     this.sizer.add(starMaskGroupBox);
     this.sizer.add(mosaicGroupBox);
@@ -1115,7 +1062,6 @@ function main() {
     }
 
     let linearFitDialog = new PhotometricMosaicDialog(data);
-    setTargetPreview(linearFitDialog.previewImage_ViewList, data, data.targetView);
     for (; ; ) {
         data.viewFlag = 0;
         if (!linearFitDialog.execute())
@@ -1142,10 +1088,10 @@ function main() {
             (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.hasAreaOfInterest){
-            if (data.areaOfInterest_X1 > data.targetView.image.width || 
-                    data.areaOfInterest_Y1 > data.referenceView.image.height){
-                (new MessageBox("ERROR: Area Of Interest extends beyond the edge of the image\n" +
+        if (data.hasSampleAreaPreview){
+            if (data.sampleAreaPreview_X1 > data.targetView.image.width || 
+                    data.sampleAreaPreview_Y1 > data.referenceView.image.height){
+                (new MessageBox("ERROR: Sample Area Preview extends beyond the edge of the image\n" +
                 "Have you selected the wrong preview?", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
                 continue;
             }
@@ -1162,19 +1108,7 @@ function main() {
 
         // Calculate and apply the linear fit
         PhotometricMosaic(data);
-        
-        if (data.hasAreaOfInterest){
-            linearFitDialog.areaOfInterestCheckBox.checked = true;
-            linearFitDialog.rectangleX0_Control.setValue(data.areaOfInterest_X0);
-            linearFitDialog.rectangleY0_Control.setValue(data.areaOfInterest_Y0);
-            linearFitDialog.rectangleX1_Control.setValue(data.areaOfInterest_X1);
-            linearFitDialog.rectangleY1_Control.setValue(data.areaOfInterest_Y1);
-            linearFitDialog.previewImage_ViewList.currentView = data.preview;
-        }
         console.hide();
-
-        // Quit after successful execution.
-        //break;
     }
 
     return;

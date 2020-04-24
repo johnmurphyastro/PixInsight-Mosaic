@@ -20,34 +20,25 @@ function StarCache() {
     * User input data used to calculate stored values
     * @param {String} refId
     * @param {String} tgtId
-    * @param {Rect} previewArea
     * @param {Number} logSensitivity
     */
-    let UserInputData = function(refId, tgtId, previewArea, logSensitivity){
+    let UserInputData = function(refId, tgtId, logSensitivity){
         this.refId = refId;
         this.tgtId = tgtId;
-        this.previewArea = previewArea;       // previewArea or whole image
         this.logSensitivity = logSensitivity;
 
         /**
          * Set user input data and check if it has changed
          * @param {String} refId
          * @param {String} tgtId
-         * @param {Rect} previewArea
          * @param {Number} logSensitivity
          * @return {Boolean} true if one or more of the values don't match stored values
          */
-        this.setData = function (refId, tgtId, previewArea, logSensitivity){
+        this.setData = function (refId, tgtId, logSensitivity){
             if (refId !== this.refId || tgtId !== this.tgtId ||
-                    logSensitivity !== this.logSensitivity ||
-                    previewArea === null ||
-                    previewArea.x0 !== this.previewArea.x0 || 
-                    previewArea.x1 !== this.previewArea.x1 ||
-                    previewArea.y0 !== this.previewArea.y0 || 
-                    previewArea.y1 !== this.previewArea.y1){
+                    logSensitivity !== this.logSensitivity){
                 this.refId = refId;
                 this.tgtId = tgtId;
-                this.previewArea = previewArea;
                 this.logSensitivity = logSensitivity;
                 return true;
             }
@@ -55,11 +46,11 @@ function StarCache() {
         };
     };
     
-    this.userInputData = new UserInputData(null, null, null, Number.NaN);
+    this.userInputData = new UserInputData(null, null, Number.NaN);
     
     /** {Image} bitmap indicates were ref & tgt images overlap */
-    this.starRegionMask = null;
-    /** {Rect} starRegionMask bounding box */
+    this.overlapMask = null;
+    /** {Rect} overlapMask bounding box */
     this.overlapBox = null;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
@@ -71,11 +62,10 @@ function StarCache() {
     /**
      * @param {String} refId
      * @param {String} tgtId
-     * @param {Rect} previewArea
      * @param {Number} logSensitivity
      */
-    this.setUserInputData = function (refId, tgtId, previewArea, logSensitivity) {
-        let hasChanged = this.userInputData.setData(refId, tgtId, previewArea, logSensitivity);
+    this.setUserInputData = function (refId, tgtId, logSensitivity) {
+        let hasChanged = this.userInputData.setData(refId, tgtId, logSensitivity);
         if (hasChanged){
             this.invalidate();
         }
@@ -83,7 +73,6 @@ function StarCache() {
     
     this.setOverlapBox = function(overlapBox){
         this.overlapBox = overlapBox;
-        this.userInputData.previewArea = overlapBox;
     };
     
     this.invalidateTargetStars = function(){
@@ -92,7 +81,7 @@ function StarCache() {
     };
     
     this.invalidate = function(){
-        this.starRegionMask = null;
+        this.overlapMask = null;
         this.overlapBox = null;
         this.refColorStars = null;
         this.tgtColorStars = null;

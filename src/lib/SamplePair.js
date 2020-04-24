@@ -384,5 +384,6 @@ function displaySampleSquares(refView, samplePairs,
     keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitSampleStarsPercent));
     
-    createDiagnosticImage(refView, bmp, detectedStars, title, keywords, -2);
+    createDiagnosticImage(refView, detectedStars.overlapBox, detectedStars.overlapMask, 
+            bmp, title, keywords, -2);
 }
