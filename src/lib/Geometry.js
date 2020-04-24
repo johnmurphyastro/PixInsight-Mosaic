@@ -60,26 +60,26 @@ function getBoundingBox(image){
     let row = new Rect(width, 1);
     for (; y0 > 0; y0--){
         row.translate(0, y0 - 1);
-        if (isLineBlack(image, row, nChannels)){
+        if (isRowBlack(image, row, nChannels)){
             break;
         }
     }
     for (; y1 < height; y1++){
         row.translate(0, y1);
-        if (isLineBlack(image, row, nChannels)){
+        if (isRowBlack(image, row, nChannels)){
             break;
         }
     }
     let col = new Rect(1, height);
     for (; x0 > 0; x0--){
         col.translate(x0 - 1, 0);
-        if (isLineBlack(image, col, nChannels)){
+        if (isColBlack(image, col, nChannels)){
             break;
         }
     }
     for (; x1 < height; x1++){
         col.translate(x1, 0);
-        if (isLineBlack(image, col, nChannels)){
+        if (isColBlack(image, col, nChannels)){
             break;
         }
     }
@@ -92,7 +92,38 @@ function getBoundingBox(image){
  * @param {Number} nChannels 1 for B&W, 3 for color
  * @returns {Boolean} Return true if all pixels in rect are black
  */
-function isLineBlack(image, rect, nChannels){
+function isRowBlack(image, rect, nChannels){
+    // quick check
+    const y = rect.y0;
+    const w = rect.x1;
+    for (let x = rect.x0 + 50; x < w; x += 50){
+        if (image.sample(x, y) !== 0) return false;
+    }
+    for (let c=0; c<nChannels; c++){
+        let samples = [];
+        image.getSamples(samples, rect, c);
+        for (let sample of samples){
+            if (sample !== 0){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * @param {Image} image Target image
+ * @param {Rect} rect Rectangle that represents a single pixel row or column
+ * @param {Number} nChannels 1 for B&W, 3 for color
+ * @returns {Boolean} Return true if all pixels in rect are black
+ */
+function isColBlack(image, rect, nChannels){
+    // quick check
+    const x = rect.x0;
+    const h = rect.y1;
+    for (let y = rect.y0 + 50; y < h; y += 50){
+        if (image.sample(x, y) !== 0) return false;
+    }
     for (let c=0; c<nChannels; c++){
         let samples = [];
         image.getSamples(samples, rect, c);
