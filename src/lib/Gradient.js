@@ -397,9 +397,9 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
                     this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
                             tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.joinStart, channel);
 
-                    // Full correction from end of the join region to the end of the target image 
+                    // Full correction from start of the join region to the end of the target image 
                     this.applyScaleAndGradient(view, scale, difArray,
-                            tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd,  channel);
+                            tgtBox.x0, this.joinStart, tgtBox.x1, tgtBox.y1,  channel);
                 }
             } else {    // vertical join
                 if (isTargetAfterRef) {
@@ -425,9 +425,9 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
                     this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
                             this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
 
-                    // Taper has finished. Only apply scale and average offset
+                    // Full correction from start of the join region to the end of the target image 
                     this.applyScaleAndGradient(view, scale, difArray,
-                            this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+                            this.joinStart, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
                 }
             }
         } else {
