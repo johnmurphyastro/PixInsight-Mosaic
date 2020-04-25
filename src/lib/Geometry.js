@@ -59,26 +59,26 @@ function getBoundingBox(image){
     // Refine to accurate bounding box
     let row = new Rect(width, 1);
     for (; y0 > 0; y0--){
-        row.translate(0, y0 - 1);
+        row.moveTo(0, y0 - 1);
         if (isRowBlack(image, row, nChannels)){
             break;
         }
     }
     for (; y1 < height; y1++){
-        row.translate(0, y1);
+        row.moveTo(0, y1);
         if (isRowBlack(image, row, nChannels)){
             break;
         }
     }
     let col = new Rect(1, height);
     for (; x0 > 0; x0--){
-        col.translate(x0 - 1, 0);
+        col.moveTo(x0 - 1, 0);
         if (isColBlack(image, col, nChannels)){
             break;
         }
     }
-    for (; x1 < height; x1++){
-        col.translate(x1, 0);
+    for (; x1 < width; x1++){
+        col.moveTo(x1, 0);
         if (isColBlack(image, col, nChannels)){
             break;
         }
@@ -147,12 +147,12 @@ function isImageBelowOverlap(image, overlap, nChannels){
     for (let offset = 0; ;offset++){
         let y = overlap.y0 - offset;
         let line = new Rect(overlap.x0, y, overlap.x1, y + 1);
-        if (y === 0 || isLineBlack(image, line, nChannels)){
+        if (y === 0 || isRowBlack(image, line, nChannels)){
             return true;
         }
         y = overlap.y1 + offset;
         line = new Rect(overlap.x0, y, overlap.x1, y + 1);
-        if (y === height || isLineBlack(image, line, nChannels)){
+        if (y === height || isRowBlack(image, line, nChannels)){
             return false;
         }
     }
@@ -170,12 +170,12 @@ function isImageRightOfOverlap(image, overlap, nChannels){
     for (let offset = 0; ;offset++){
         let x = overlap.x0 - offset;
         let line = new Rect(x, overlap.y0, x + 1, overlap.y1);
-        if (x === 0 || isLineBlack(image, line, nChannels)){
+        if (x === 0 || isColBlack(image, line, nChannels)){
             return true;
         }
         x = overlap.x1 + offset;
         line = new Rect(x, overlap.y0, x + 1, overlap.y1);
-        if (x === width || isLineBlack(image, line, nChannels)){
+        if (x === width || isColBlack(image, line, nChannels)){
             return false;
         } 
     }
