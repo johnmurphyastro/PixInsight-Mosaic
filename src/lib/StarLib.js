@@ -50,6 +50,10 @@ function StarsDetected(){
     this.overlapMask = null;
     /** {Rect} overlapMask bounding box */
     this.overlapBox = null;
+    /** {Rect} refBox Reference image bounding box */
+    this.refBox = null;
+    /** {Rect} tgtBox Target image bounding box */
+    this.tgtBox = null;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -81,6 +85,8 @@ function StarsDetected(){
         }
         this.overlapMask = starCache.overlapMask;
         this.overlapBox = starCache.overlapBox;
+        this.refBox = starCache.refBox;
+        this.tgtBox = starCache.tgtBox;
          
         console.writeln("<b><u>Detecting stars</u></b>");
         processEvents();
@@ -223,7 +229,8 @@ function StarsDetected(){
         } else {
             starCache.setOverlapBox(null);
         }
-        
+        starCache.refBox = refBox;
+        starCache.tgtBox = targetBox;
         starCache.overlapMask = mask;
         console.write(getDelStr());   // remove 100% from console
         console.writeln(getElapsedTime(startTime) + "\n");
