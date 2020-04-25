@@ -52,6 +52,10 @@ function StarCache() {
     this.overlapMask = null;
     /** {Rect} overlapMask bounding box */
     this.overlapBox = null;
+    /** {Rect} refBox Reference image bounding box */
+    this.refBox = null;
+    /** {Rect} tgtBox Target image bounding box */
+    this.tgtBox = null;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -75,14 +79,11 @@ function StarCache() {
         this.overlapBox = overlapBox;
     };
     
-    this.invalidateTargetStars = function(){
-        this.tgtColorStars = null;
-        this.allStars = null;
-    };
-    
     this.invalidate = function(){
         this.overlapMask = null;
         this.overlapBox = null;
+        this.refBox = null;
+        this.tgtBox = null;
         this.refColorStars = null;
         this.tgtColorStars = null;
         this.allStars = null;
