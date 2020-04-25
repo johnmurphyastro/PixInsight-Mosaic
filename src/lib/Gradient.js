@@ -328,97 +328,294 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
 }
 
 /**
- * Calculates the offset in the direction perpendicular to the join.
- * Over the overlap area this is constant.
- * Before and after the overlap area, it tapers towards the average offset.
- * Beyond the taper length, it returns the average offset.
+ * This class is used to apply the scale and gradient to the target image
  * @param {Number} imageWidth
  * @param {Number} imageHeight
- * @param {Number} average Average offset (average value in difArray)
- * @param {Rect} overlapBox Bounding box of the overlap between target and reference images
+ * @param {Rect} joinRect The specified join area (a subset of the actual overlap)
+ * @param {Boolean} taperFlag If true, taper the gradient correction
  * @param {Number} taperLength Taper (or feather) length
- * @param {Boolean} isHorizontal Tile join direction
+ * @param {Boolean} isHorizontal If true, one image is above the other
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
- * @returns {GradientOffset}
+ * @returns {ScaleAndGradientApplier}
  */
-function GradientOffset(imageWidth, imageHeight, average, overlapBox, 
-        taperLength, isHorizontal, isTargetAfterRef) {
-    this.average = average;
+function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect, 
+        taperFlag, taperLength, isHorizontal, isTargetAfterRef) {
+    this.taperFlag = taperFlag;
     this.taperLength = taperLength;
     this.isTargetAfterRef = isTargetAfterRef;
+    this.isHorizontal = isHorizontal;
     if (isHorizontal){
-        this.limit1 = Math.max(0, overlapBox.y0 - taperLength); // limit2 - taperLength
-        this.limit2 = overlapBox.y0;
-        this.limit3 = overlapBox.y1;
-        this.limit4 = Math.min(imageHeight, overlapBox.y1 + taperLength); // limit3 + taperLength
+        this.firstTaperStart = Math.max(0, joinRect.y0 - taperLength); // joinStart - taperLength
+        this.joinStart = joinRect.y0;
+        this.joinEnd = joinRect.y1;
+        this.secondTaperEnd = Math.min(imageHeight, joinRect.y1 + taperLength); // joinEnd + taperLength
     } else {
-        this.limit1 = Math.max(0, overlapBox.x0 - taperLength);
-        this.limit2 = overlapBox.x0;
-        this.limit3 = overlapBox.x1;
-        this.limit4 = Math.min(imageWidth, overlapBox.x1 + taperLength);
+        this.firstTaperStart = Math.max(0, joinRect.x0 - taperLength);
+        this.joinStart = joinRect.x0;
+        this.joinEnd = joinRect.x1;
+        this.secondTaperEnd = Math.min(imageWidth, joinRect.x1 + taperLength);
     }
     
     /**
-     * Calculate the offset value to be applied to the target image.
-     * Outside the overlap and taper zone, this returns 'this.average', the average offset.
-     * Inside the overlap region, it returns 'dif', the difference at the join.
-     * In the taper zone the returned value depends on the distance from the join
-     * (calcluated from 'coord'). It gradually reduces from 'dif' to 'this.average'.
-     * If the target image extends beyond the reference side of the overlap, the 
-     * full 'dif' is applied. This is only important if the target image extends 
-     * 'around the side' of the reference image.
+     * Applies the scale and gradient correction to the supplied view.
      * 
-     * @param {Number} coord x-coord (vertical join) or y-coord (horizontal join)
-     * @param {Number} dif Value from the difArray
-     * @returns {Number} Offset to subtract from target image
+     * @param {type} view
+     * @param {type} scale
+     * @param {type} difArray
+     * @param {type} tgtBox
+     * @param {type} channel
+     * @returns {undefined}
      */
-    this.getOffset = function(coord, dif){
-        if (coord < this.limit1){
-            // Before overlap box AND before taper
-            if (isTargetAfterRef){
-                // This is the ref side of the overlap, apply full correction
-                return dif;
-            } else {
-                // Target side. Return to average target bg level.
-                return this.average;
+    this.applyAllCorrections = function (view, scale, difArray, tgtBox, channel){
+        
+        let average = Math.mean(difArray);
+        console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
+        processEvents();
+        
+        if (this.taperFlag) {
+            if (this.isHorizontal) {
+                if (this.isTargetAfterRef) {
+                    // Full correction from start of target up to end of the join region
+                    this.applyScaleAndGradient(view, scale, difArray,
+                            tgtBox.x0, tgtBox.y0, tgtBox.x1, this.joinEnd, channel);
+
+                    // Taper down region. Apply full scale correction but 
+                    // gradually reduce the gradient correction
+                    this.applyScaleAndGradientTaperDown(view, scale, difArray, average,
+                            tgtBox.x0, this.joinEnd, tgtBox.x1, this.secondTaperEnd, channel);
+
+                    // Taper has finished. Only apply scale and average offset
+                    this.applyScaleAndAverageGradient(view, scale, average,
+                            tgtBox.x0, this.secondTaperEnd, tgtBox.x1, tgtBox.y1, channel);
+                } else {
+                    // Taper has not yet started. Only apply scale and average offset
+                    this.applyScaleAndAverageGradient(view, scale, average,
+                            tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel);
+
+                    // Taper up region. Apply full scale correction and 
+                    // gradually increase the gradient correction from zero to full
+                    this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
+                            tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.joinStart, channel);
+
+                    // Full correction from end of the join region to the end of the target image 
+                    this.applyScaleAndGradient(view, scale, difArray,
+                            tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd,  channel);
+                }
+            } else {    // vertical join
+                if (isTargetAfterRef) {
+                    // Full correction from start of target up to end of the join region
+                    this.applyScaleAndGradient(view, scale, difArray,
+                            tgtBox.x0, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+
+                    // Taper down region. Apply full scale correction but 
+                    // gradually reduce the gradient correction
+                    this.applyScaleAndGradientTaperDown(view, scale, difArray, average,
+                            this.joinEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
+
+                    // Taper has finished. Only apply scale and average offset
+                    this.applyScaleAndAverageGradient(view, scale, average,
+                            this.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
+                } else {
+                    // Taper has not yet started. Only apply scale and average offset
+                    this.applyScaleAndAverageGradient(view, scale, average,
+                            tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel);
+
+                    // Taper down region. Apply full scale correction but 
+                    // gradually reduce the gradient correction
+                    this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
+                            this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
+
+                    // Taper has finished. Only apply scale and average offset
+                    this.applyScaleAndGradient(view, scale, difArray,
+                            this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+                }
             }
-        }
-        if (coord < this.limit2){
-            // Before overlap box, in taper region
-            if (isTargetAfterRef){
-                // This is the ref side of the overlap, apply full correction
-                return dif;
-            } else {
-                // This is the target side of the overlap, so taper is required
-                // Progressively apply more of the correction as we approach the overlap 
-                let delta = dif - this.average;
-                let fraction = 1 - (this.limit2 - coord) / this.taperLength;
-                return this.average + delta * fraction;
-            }
-        }
-        if (coord < this.limit3){
-            // Overlap region: apply the full correction
-            return dif;
-        }
-        if (coord < this.limit4){
-            if (isTargetAfterRef){
-                // This is the target side of the overlap, so taper is required
-                // Progressively apply less correction as we move away from the overlap
-                let delta = dif - this.average;
-                let fraction = 1 - (coord - this.limit3) / this.taperLength;
-                return this.average + delta * fraction;
-            } else {
-                // This is the ref side of the overlap, apply full correction
-                return dif;
-            }
-        }
-        // coord >= this.limit4
-        if (isTargetAfterRef) {
-            return this.average;
         } else {
-            // This is the ref side of the overlap, apply full correction
-            return dif;
+            // No taper. Propogate full correction from start to end of target image
+            this.applyScaleAndGradient(view, scale, difArray,
+                    tgtBox.x0, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
         }
+        
+    };
+    
+    /**
+     * @param {View} tgtView
+     * @param {Number} scale
+     * @param {Number[]} difArray
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     * @param {Number} channel
+     */
+    this.applyScaleAndGradient = function (tgtView, scale, difArray, 
+            x0, y0, x1, y1, channel){
+                
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        
+        let row;
+        let difArrayStart;
+        let apply = function(){
+            let samples = [];
+            tgtView.image.getSamples(samples, row, channel);
+            for (let i = 0; i < samples.length; i++) {
+                if (samples[i]){ // do not modify black pixels
+                    samples[i] = samples[i] * scale - difArray[difArrayStart + i];
+                }
+            }
+            tgtView.image.setSamples(samples, row, channel);
+        };
+        
+        if (this.isHorizontal){
+            row = new Rect(x0, y0, x1, y0 + 1);
+            difArrayStart = x0;
+            for (let y = y0; y < y1; y++) {
+                row.moveTo(x0, y);
+                apply();
+            }
+        } else {
+            row = new Rect(x0, y0, x0 + 1, y1);
+            difArrayStart = y0;
+            for (let x = x0; x < x1; x++) {
+                row.moveTo(x, y0);
+                apply();
+            }
+        }
+    };
+    
+    /**
+     * @param {View} tgtView
+     * @param {Number} scale
+     * @param {Number[]} difArray
+     * @param {Number} average Average of difArray
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     * @param {Number} channel
+     */
+    this.applyScaleAndGradientTaperDown = function (tgtView, scale, difArray, average,
+            x0, y0, x1, y1, channel){
+        
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        
+        const self = this;
+        let row;
+        let difArrayStart;
+        
+        let apply = function(coord, taperStart){
+            let samples = [];
+            tgtView.image.getSamples(samples, row, channel);
+            for (let i = 0; i < samples.length; i++) {
+                if (samples[i]){ // do not modify black pixels
+                    const delta = difArray[difArrayStart + i] - average;
+                    const fraction = 1 - (coord - taperStart) / self.taperLength;
+                    const taper = average + delta * fraction;
+                    samples[i] = samples[i] * scale - taper;
+                }
+            }
+            tgtView.image.setSamples(samples, row, channel);
+        };
+        
+        if (this.isHorizontal){
+            row = new Rect(x0, y0, x1, y0 + 1);
+            difArrayStart = x0;
+            for (let y = y0; y < y1; y++) {
+                row.moveTo(x0, y);
+                apply(y, y0);
+            }
+        } else {
+            row = new Rect(x0, y0, x0 + 1, y1);
+            difArrayStart = y0;
+            for (let x = x0; x < x1; x++) {
+                row.moveTo(x, y0);
+                apply(x, x0);
+            }
+        }
+    };
+    
+    /**
+     * @param {View} tgtView
+     * @param {Number} scale
+     * @param {Number[]} difArray
+     * @param {Number} average Average of difArray
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     * @param {Number} channel
+     */
+    this.applyScaleAndGradientTaperUp = function (tgtView, scale, difArray, average, 
+            x0, y0, x1, y1, channel){
+                
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        
+        const self = this;
+        let row;
+        let difArrayStart;
+        let taperEnd;
+        
+        let apply = function(coord){
+            let samples = [];
+            tgtView.image.getSamples(samples, row, channel);
+            for (let i = 0; i < samples.length; i++) {
+                if (samples[i]){ // do not modify black pixels
+                    const delta = difArray[difArrayStart + i] - average;
+                    let fraction = 1 - (taperEnd - coord) / self.taperLength;
+                    const taper = average + delta * fraction;
+                    samples[i] = samples[i] * scale - taper;
+                }
+            }
+            tgtView.image.setSamples(samples, row, channel);
+        };
+        
+        if (this.isHorizontal){
+            taperEnd = y1 - 1;
+            row = new Rect(x0, y0, x1, y0 + 1);
+            difArrayStart = x0;
+            for (let y = y0; y < y1; y++) {
+                row.moveTo(x0, y);
+                apply(y);
+            }
+        } else {
+            taperEnd = x1 - 1;
+            row = new Rect(x0, y0, x0 + 1, y1);
+            difArrayStart = y0;
+            for (let x = x0; x < x1; x++) {
+                row.moveTo(x, y0);
+                apply(x);
+            }
+        }
+    };
+    
+    /**
+     * @param {View} tgtView
+     * @param {Number} scale
+     * @param {Number} average Average of difArray
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     * @param {Number} channel
+     */
+    this.applyScaleAndAverageGradient = function (tgtView, scale, average, 
+            x0, y0, x1, y1, channel){
+                
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        
+        const area = new Rect(x0, y0, x1, y1);
+        let samples = [];
+        tgtView.image.getSamples(samples, area, channel);
+        for (let i = 0; i < samples.length; i++) {
+            if (samples[i]){ // do not modify black pixels
+                samples[i] = samples[i] * scale - average;
+            }
+        }
+        tgtView.image.setSamples(samples, area, channel);
     };
 }
 
