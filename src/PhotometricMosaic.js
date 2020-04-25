@@ -246,8 +246,7 @@ function PhotometricMosaic(data)
     }
     
     console.writeln("\n<b><u>Applying scale and gradients</u></b>");
-//    targetView.beginProcess(UndoFlag_PixelData | UndoFlag_Keywords);
-    let correctedView = applyScaleAndGradient(referenceView, targetView, isHorizontal, isTargetAfterRef,
+    let correctedView = applyScaleAndGradient(targetView, isHorizontal, isTargetAfterRef,
             scaleFactors, gradients, joinRect, data);
             
     processEvents();
@@ -262,14 +261,17 @@ function PhotometricMosaic(data)
                 data.hasSampleAreaPreview, joinRect, isHorizontal, isTargetAfterRef);
                 
         let mosaicView = View.viewById(mosaicName);
-
+        
         // Update Fits Header
         mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         copyFitsObservation(referenceView, mosaicView);
         copyFitsAstrometricSolution(referenceView, mosaicView);
         copyFitsKeywords(referenceView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
-        copyFitsKeywords(targetView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
+        copyFitsKeywords(correctedView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
         mosaicView.endProcess();
+        
+        // Don't need cloned target view any more
+        correctedView.window.forceClose();
 
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
         let x0 = Math.max(0, joinRect.x0 - 50);
@@ -282,6 +284,10 @@ function PhotometricMosaic(data)
         // But show the main mosaic view.
         w.currentView = mosaicView;
         w.zoomToFit();  
+    } else {
+        correctedView.stf = referenceView.stf;
+        correctedView.window.show();
+        correctedView.window.zoomToFit();
     }
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
@@ -302,98 +308,43 @@ function calculateScale(starPairs) {
 
 /**
  * Appy scale and subtract the detected gradient from the target view
- * @param {View} refView Not modified
  * @param {View} tgtView Apply the gradient correction to a clone of this view
- * @param {Boolean} isHorizontal True if we are applying a horizontal gradient
+ * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
- * @param {LinearFitData[]} scaleFactors Scale to apply to target image.
+ * @param {LinearFitData[]} scaleFactors Scale for each color channel.
  * @param {Gradient[]} gradients Gradient for each color channel
  * @param {Rect} joinRect Bounding box of join region
- * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @returns {View}
+ * @param {PhotometricMosaicData} data User settings for FITS header
+ * @returns {View} Clone of tgtView, with corrections applied
  */
-function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef, 
+function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef, 
         scaleFactors, gradients, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
-    const targetImage = tgtView.image;
-    const width = targetImage.width;
-    const height = targetImage.height;
-    const updateInterval = height / 10;
-    let yOld = 0;
-    let oldTextLength = 0;
+    const width = tgtView.image.width;
+    const height = tgtView.image.height;
+    const nChannels = gradients.length;
     
-    let showProgress = function (y){
-        let text = "" + Math.trunc((height - y) / height * 100) + "%";
-        console.write(getDelStr() + text);
-        processEvents();
-        oldTextLength = text.length;
-        yOld = y;
-    };
-    let getDelStr = function (){
-        let bsp = "";
-        for (let i = 0; i < oldTextLength; i++) {
-            bsp += "<bsp>";
-        }
-        return bsp;
-    };
-    
-    let nChannels = gradients.length;
-    
+    // Clone the target view and image
     let w = tgtView.window;
-    let imgWindow = new ImageWindow(w.width, w.height, nChannels, w.bitsPerSample, 
+    let imgWindow = new ImageWindow(width, height, nChannels, w.bitsPerSample, 
             w.isFloatSample, nChannels > 1, tgtView.fullId + "_PM");    
     imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
-    
     let view = imgWindow.mainView;
     view.image.assign(tgtView.image);
     
+    // Apply scale and gradient to the cloned image
+    let tgtCorrector = new ScaleAndGradientApplier(width, height, joinRect,
+            data.taperFlag, data.taperLength, isHorizontal, isTargetAfterRef);
+    let tgtBox = data.starCache.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let gradientData = gradients[channel].getGradientData();
         let difArray = gradientData.difArray;
-        let average = Math.mean(difArray);
-        console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
-        let gradientOffset = new GradientOffset(targetImage.width, targetImage.height, 
-                average, joinRect, data.taperLength, isHorizontal, isTargetAfterRef);     
-            
-        oldTextLength = 0;
-        yOld = height - 1;
-        for (let y = height - 1; y > -1 ; --y) {
-            let row = new Rect(0, y, width, y + 1);
-            let samples = [];
-            targetImage.getSamples(samples, row, channel);
-            let rowUpdated = false;
-            for (let x = samples.length - 1; x > -1; --x) {
-                if (samples[x] !== 0) {
-                    let offset;
-                    if (isHorizontal){
-                        offset = difArray[x];
-                        if (data.taperFlag){
-                            offset = gradientOffset.getOffset(y, offset);
-                        }
-                    } else {
-                        offset = difArray[y];
-                        if (data.taperFlag){
-                            offset = gradientOffset.getOffset(x, offset);
-                        }
-                    }
-                    samples[x] = samples[x] * scale - offset;
-                    rowUpdated = true;
-                }
-            }
-            if (rowUpdated){
-                view.image.setSamples(samples, row, channel);
-            }
-            
-            if (y < yOld - updateInterval){
-                showProgress(y);
-            }
-        }
-        console.write(getDelStr());   // remove 100% from console
+        tgtCorrector.applyAllCorrections(view, scale, difArray, tgtBox, channel);
     }
     
     // FITS Header
-    let keywords = view.window.keywords;
+    let keywords = tgtView.window.keywords;
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + " " + VERSION()));
     keywords.push(new FITSKeyword("HISTORY", "", 
@@ -438,9 +389,6 @@ function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef,
     view.window.keywords = keywords;
     
     view.endProcess();
-    view.stf = refView.stf;
-    imgWindow.show();
-    
     return view;
 }
 
