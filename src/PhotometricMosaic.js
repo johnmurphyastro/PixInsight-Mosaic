@@ -18,7 +18,7 @@
 #feature-id Utilities > PhotometricMosaic
 
 #feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
-Copyright & copy; 2019 John Murphy. GNU General Public License.<br/>
+Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
 
 #include <pjsr/UndoFlag.jsh>
 #include "lib/PhotometricMosaicDialog.js"
@@ -40,13 +40,14 @@ function VERTICAL(){return 1;}
 function AUTO(){return 2;}
 function MOSAIC_NAME(){return "Mosaic";}
 function WINDOW_ID_PREFIX(){return "PM__";}
-function DETECTED_STARS_FLAG(){return 1;}
-function PHOTOMETRY_STARS_FLAG(){return 2;}
-function PHOTOMETRY_GRAPH_FLAG(){return 4;}
-function DISPLAY_SAMPLES_FLAG(){return 8;}
-function GRADIENT_GRAPH_FLAG(){return 16;}
-function MOSAIC_MASK_FLAG(){return 32;}
-function MOSAIC_MASK_STARS_FLAG(){return 64;}
+function DISPLAY_DETECTED_STARS(){return 1;}
+function DISPLAY_PHOTOMETRY_STARS(){return 2;}
+function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
+function DISPLAY_GRADIENT_SAMPLES(){return 8;}
+function DISPLAY_GRADIENT_GRAPH(){return 16;}
+function DISPLAY_GRADIENT_TAPER_GRAPH(){return 32;}
+function CREATE_MOSAIC_MASK(){return 64;}
+function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 
 /**
  * Controller. Processing starts here!
@@ -89,7 +90,7 @@ function PhotometricMosaic(data)
         sampleRect = detectedStars.overlapBox;
     }
     
-    if (data.viewFlag === DETECTED_STARS_FLAG()){
+    if (data.viewFlag === DISPLAY_DETECTED_STARS()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
                 100, "__DetectedStars", data);
         return;
@@ -97,7 +98,7 @@ function PhotometricMosaic(data)
     
     // Photometry stars
     let colorStarPairs = detectedStars.getColorStarPairs(referenceView,
-            data.limitPhotoStarsPercent, data.rejectHigh, data.starSearchRadius);
+            data.limitPhotoStarsPercent, data.linearRange, data.starSearchRadius);
     // Remove photometric star outliers and calculate the scale
     console.writeln("<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
@@ -122,11 +123,11 @@ function PhotometricMosaic(data)
     }
     processEvents();
     
-    if (data.viewFlag === PHOTOMETRY_STARS_FLAG()) {
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
         displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId, data);
         return;
     }
-    if (data.viewFlag === PHOTOMETRY_GRAPH_FLAG()){
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
         let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
         if (!displayed){
             new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
@@ -140,12 +141,12 @@ function PhotometricMosaic(data)
     let isHorizontal = isJoinHorizontal(data, sampleRect);
     let joinRect = extendSubRect(sampleRect, detectedStars.overlapBox, isHorizontal);
     
-    if (data.viewFlag === MOSAIC_MASK_FLAG()){
+    if (data.viewFlag === CREATE_MOSAIC_MASK()){
         displayMask(targetView, joinRect, detectedStars, 
                 data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, data);
         return;
     }
-    if (data.viewFlag === MOSAIC_MASK_STARS_FLAG()){
+    if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
         displayMaskStars(referenceView, joinRect, detectedStars, targetView.fullId, 
                 data.limitMaskStarsPercent, data.radiusMult, data.radiusAdd, 
                 false, "__MosaicMaskStars", data);
@@ -193,13 +194,13 @@ function PhotometricMosaic(data)
     }
     
     let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image, scaleFactors,
-        data.sampleSize, detectedStars.allStars, data.rejectHigh, data.limitSampleStarsPercent, sampleRect);
+        data.sampleSize, detectedStars.allStars, data.linearRange, data.limitSampleStarsPercent, sampleRect);
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
         new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    if (data.viewFlag === DISPLAY_SAMPLES_FLAG()){
+    if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
         displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, data.limitSampleStarsPercent, title, data);
         return;
@@ -207,10 +208,10 @@ function PhotometricMosaic(data)
 
     // Calculate the gradient for each channel
     let gradients = [];
-    let nLineSegments = Math.floor((data.nLineSegments + 1) / 2);
+    let nTaperBestFitLines = Math.floor((data.nTaperBestFitLines + 1) / 2);
     for (let c = 0; c < nChannels; c++) {
         samplePairs = colorSamplePairs[c];
-        gradients[c] = new Gradient(samplePairs, nLineSegments, targetView.image, 
+        gradients[c] = new Gradient(samplePairs, nTaperBestFitLines, targetView.image, 
             sampleRect, isHorizontal);
         if (!gradients[c].isValid){
             new MessageBox("At least two samples per line segment are required.\n" +
@@ -219,7 +220,7 @@ function PhotometricMosaic(data)
             return;
         }
     }
-    if (data.viewFlag === GRADIENT_GRAPH_FLAG()) {
+    if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs, data);
         return;
     }
@@ -356,7 +357,7 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".linearRange: " + data.rejectHigh));
+        SCRIPT_NAME() + ".linearRange: " + data.linearRange));
     keywords.push(new FITSKeyword("HISTORY", "",
         SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("HISTORY", "", 
@@ -366,7 +367,7 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".lineSegments: " + data.nLineSegments));
+        SCRIPT_NAME() + ".nTaperBestFitLines: " + data.nTaperBestFitLines));
     if (data.taperFlag) {
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".taperLength: " + data.taperLength));

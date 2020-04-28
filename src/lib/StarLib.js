@@ -246,7 +246,7 @@ function StarsDetected(){
      */
     let findStars = function(view, overlapMask, logSensitivity, channel){
         const title = "TMP_ChannelExtraction";
-        const useColorManagement = true;
+        const useColorManagement = false;
         const isColor = view.image.isColor;
         let imgWindow = null;
         let starImage;
@@ -517,7 +517,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
         keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
-        keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.rejectHigh));
+        keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
         keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
         keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
         let maxErr = Number.NEGATIVE_INFINITY;
@@ -688,7 +688,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.rejectHigh));
+    keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
 

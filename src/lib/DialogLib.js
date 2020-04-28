@@ -23,6 +23,7 @@
 #include <pjsr/StdButton.jsh>
 #include <pjsr/StdIcon.jsh>
 #include <pjsr/StdCursor.jsh>
+#include <pjsr/SectionBar.jsh>
 
 /**
  * Returns the elapsed time since startTime.
@@ -142,18 +143,16 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
  * @param {String} label
  * @param {String} tooltip
  * @param {Number} initialValue
- * @param {Number} labelWidth
  * @param {Number} editWidth
  * @returns {NumericEdit}
  */
-function createNumericEdit(label, tooltip, initialValue, labelWidth, editWidth){
+function createNumericEdit(label, tooltip, initialValue, editWidth){
     let numericEditControl = new NumericEdit();
     numericEditControl.setReal(false);
     numericEditControl.setRange(0, 100000);
     numericEditControl.setValue(initialValue);
     numericEditControl.label.text = label;
     numericEditControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-//    numericEditControl.label.setFixedWidth(labelWidth);
     numericEditControl.edit.setFixedWidth(editWidth);
     numericEditControl.toolTip = tooltip;
     return numericEditControl;

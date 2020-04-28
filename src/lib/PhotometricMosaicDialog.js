@@ -87,88 +87,82 @@ function PhotometricMosaicData() {
     // It would normally also be called at the end of our script to populate the history entry,
     // but because we use PixelMath to modify the image, the history entry is automatically populated.
     this.saveParameters = function () {
-        if (this.targetView.isMainView) {
-            Parameters.set("targetView", this.targetView.fullId);
-        }
         if (this.referenceView.isMainView) {
             Parameters.set("referenceView", this.referenceView.fullId);
         }
+        if (this.targetView.isMainView) {
+            Parameters.set("targetView", this.targetView.fullId);
+        }
+          
+        // Star Detection
         Parameters.set("starDetection", this.logStarDetection);
-        Parameters.set("orientation", this.orientation);
-        Parameters.set("rejectHigh", this.rejectHigh);
-        Parameters.set("starSearchRadius", this.starSearchRadius);
-        Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
-        Parameters.set("outlierRemoval", this.outlierRemoval);
-        Parameters.set("sampleSize", this.sampleSize);
-        Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
-        Parameters.set("nLineSegments", this.nLineSegments);
-        Parameters.set("taperFlag", this.taperFlag);
-        Parameters.set("taperLength", this.taperLength);
-        Parameters.set("createMosaicFlag", this.createMosaicFlag);
-        Parameters.set("mosaicOverlayRefFlag", this.mosaicOverlayRefFlag);
-        Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
-        Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
-        Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag);
-        Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
-        Parameters.set("multiplyStarRadius", this.radiusMult);
-        Parameters.set("addStarRadius", this.radiusAdd);
         
+        // Photometric Scale
+        Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
+        Parameters.set("linearRange", this.linearRange);
+        Parameters.set("outlierRemoval", this.outlierRemoval);
+        Parameters.set("starSearchRadius", this.starSearchRadius);
+        
+        // Limit Gradient Sample Area
         Parameters.set("hasSampleAreaPreview", this.hasSampleAreaPreview);
         Parameters.set("sampleAreaPreview_X0", this.sampleAreaPreview_X0);
         Parameters.set("sampleAreaPreview_Y0", this.sampleAreaPreview_Y0);
         Parameters.set("sampleAreaPreview_X1", this.sampleAreaPreview_X1);
         Parameters.set("sampleAreaPreview_Y1", this.sampleAreaPreview_Y1);
+        
+        // Gradient Sample Generation
+        Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
+        Parameters.set("sampleSize", this.sampleSize);
+        Parameters.set("orientation", this.orientation);
+        
+        // Gradient Propagated Correction
+        Parameters.set("gradientFlag", this.gradientFlag);
+        Parameters.set("nGradientBestFitLines", this.nGradientBestFitLines);
+        
+        // Gradient Tapered Correction
+        Parameters.set("taperFlag", this.taperFlag);
+        Parameters.set("nTaperBestFitLines", this.nTaperBestFitLines);
+        Parameters.set("taperLength", this.taperLength);
+        
+        // Mosaic Star Mask
+        Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
+        Parameters.set("multiplyStarRadius", this.radiusMult);
+        Parameters.set("addStarRadius", this.radiusAdd);
+        
+        // Create Mosaic
+        Parameters.set("createMosaicFlag", this.createMosaicFlag);
+        Parameters.set("mosaicOverlayRefFlag", this.mosaicOverlayRefFlag);
+        Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
+        Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
+        Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag); 
     };
 
     // Reload our script's data from a process icon
     this.loadParameters = function () {
-        if (Parameters.has("starDetection"))
-            this.logStarDetection = Parameters.getReal("starDetection");
-        if (Parameters.has("orientation"))
-            this.orientation = Parameters.getInteger("orientation");
-        if (Parameters.has("rejectHigh"))
-            this.rejectHigh = Parameters.getReal("rejectHigh");
-        if (Parameters.has("starSearchRadius"))
-            this.starSearchRadius = Parameters.getInteger("starSearchRadius");
-        if (Parameters.has("limitPhotoStarsPercent"))
-            this.limitPhotoStarsPercent = Parameters.getReal("limitPhotoStarsPercent");
-        if (Parameters.has("outlierRemoval"))
-            this.outlierRemoval = Parameters.getInteger("outlierRemoval");
-        if (Parameters.has("sampleSize"))
-            this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("limitSampleStarsPercent"))
-            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
-        if (Parameters.has("nLineSegments"))
-            this.nLineSegments = Parameters.getInteger("nLineSegments");
-        if (Parameters.has("taperFlag"))
-            this.taperFlag = Parameters.getBoolean("taperFlag");
-        if (Parameters.has("taperLength"))
-            this.taperLength = Parameters.getInteger("taperLength");
-        if (Parameters.has("createMosaicFlag"))
-            this.createMosaicFlag = Parameters.getBoolean("createMosaicFlag");
-        if (Parameters.has("mosaicOverlayRefFlag"))
-            this.mosaicOverlayRefFlag = Parameters.getBoolean("mosaicOverlayRefFlag");
-        if (Parameters.has("mosaicOverlayTgtFlag"))
-            this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
-        if (Parameters.has("mosaicRandomFlag"))
-            this.mosaicRandomFlag = Parameters.getBoolean("mosaicRandomFlag");
-        if (Parameters.has("mosaicAverageFlag"))
-            this.mosaicAverageFlag = Parameters.getBoolean("mosaicAverageFlag");
-        if (Parameters.has("limitMaskStarsPercent"))
-            this.limitMaskStarsPercent = Parameters.getInteger("limitMaskStarsPercent");
-        if (Parameters.has("multiplyStarRadius"))
-            this.radiusMult = Parameters.getReal("multiplyStarRadius");
-        if (Parameters.has("addStarRadius"))
-            this.radiusAdd = Parameters.getReal("addStarRadius");
-        if (Parameters.has("targetView")) {
-            let viewId = Parameters.getString("targetView");
-            this.targetView = View.viewById(viewId);
-        }
         if (Parameters.has("referenceView")) {
             let viewId = Parameters.getString("referenceView");
             this.referenceView = View.viewById(viewId);
         }
-
+        if (Parameters.has("targetView")) {
+            let viewId = Parameters.getString("targetView");
+            this.targetView = View.viewById(viewId);
+        }
+        
+        // Star Detection
+        if (Parameters.has("starDetection"))
+            this.logStarDetection = Parameters.getReal("starDetection");
+        
+        // Photometric Scale
+        if (Parameters.has("limitPhotoStarsPercent"))
+            this.limitPhotoStarsPercent = Parameters.getReal("limitPhotoStarsPercent");
+        if (Parameters.has("linearRange"))
+            this.linearRange = Parameters.getReal("linearRange");
+        if (Parameters.has("outlierRemoval"))
+            this.outlierRemoval = Parameters.getInteger("outlierRemoval");
+        if (Parameters.has("starSearchRadius"))
+            this.starSearchRadius = Parameters.getInteger("starSearchRadius");
+        
+        // Limit Gradient Sample Area
         if (Parameters.has("hasSampleAreaPreview"))
             this.hasSampleAreaPreview = Parameters.getBoolean("hasSampleAreaPreview");
         if (Parameters.has("sampleAreaPreview_X0")){
@@ -183,73 +177,154 @@ function PhotometricMosaicData() {
         if (Parameters.has("sampleAreaPreview_Y1")){
             this.sampleAreaPreview_Y1 = Parameters.getInteger("sampleAreaPreview_Y1");
         }
+        
+        // Gradient Sample Generation
+        if (Parameters.has("limitSampleStarsPercent"))
+            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
+        if (Parameters.has("sampleSize"))
+            this.sampleSize = Parameters.getInteger("sampleSize");   
+        if (Parameters.has("orientation"))
+            this.orientation = Parameters.getInteger("orientation");
+        
+        // Gradient Propagated Correction
+        if (Parameters.has("gradientFlag"))
+            this.gradientFlag = Parameters.getBoolean("gradientFlag");
+        if (Parameters.has("nGradientBestFitLines"))
+            this.nGradientBestFitLines = Parameters.getInteger("nGradientBestFitLines");
+        
+        // Gradient Tapered Correction
+        if (Parameters.has("taperFlag"))
+            this.taperFlag = Parameters.getBoolean("taperFlag");
+        if (Parameters.has("nTaperBestFitLines"))
+            this.nTaperBestFitLines = Parameters.getInteger("nTaperBestFitLines");
+        if (Parameters.has("taperLength"))
+            this.taperLength = Parameters.getInteger("taperLength");
+        
+        // Mosaic Star Mask
+        if (Parameters.has("limitMaskStarsPercent"))
+            this.limitMaskStarsPercent = Parameters.getInteger("limitMaskStarsPercent");
+        if (Parameters.has("multiplyStarRadius"))
+            this.radiusMult = Parameters.getReal("multiplyStarRadius");
+        if (Parameters.has("addStarRadius"))
+            this.radiusAdd = Parameters.getReal("addStarRadius");
+        
+        // Create Mosaic
+        if (Parameters.has("createMosaicFlag"))
+            this.createMosaicFlag = Parameters.getBoolean("createMosaicFlag");
+        if (Parameters.has("mosaicOverlayRefFlag"))
+            this.mosaicOverlayRefFlag = Parameters.getBoolean("mosaicOverlayRefFlag");
+        if (Parameters.has("mosaicOverlayTgtFlag"))
+            this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
+        if (Parameters.has("mosaicRandomFlag"))
+            this.mosaicRandomFlag = Parameters.getBoolean("mosaicRandomFlag");
+        if (Parameters.has("mosaicAverageFlag"))
+            this.mosaicAverageFlag = Parameters.getBoolean("mosaicAverageFlag");
     };
 
     // Initialise the scripts data
     this.setParameters = function () {
+        // Star Detection
         this.logStarDetection = 0;
-        this.orientation = AUTO();
-        this.rejectHigh = 0.5;
-        this.starSearchRadius = 3;
+        
+        // Photometric Scale
         this.limitPhotoStarsPercent = 100;
+        this.linearRange = 0.5;
         this.outlierRemoval = 0;
-        this.sampleSize = 20;
-        this.limitSampleStarsPercent = 50;
-        this.nLineSegments = 25;
-        this.taperFlag = true;
-        this.taperLength = 1000;
-        this.createMosaicFlag = true;
-        this.mosaicOverlayRefFlag = false;
-        this.mosaicOverlayTgtFlag = false;
-        this.mosaicRandomFlag = true;
-        this.mosaicAverageFlag = false;
-        this.limitMaskStarsPercent = 20;
-        this.radiusMult = 2.5;
-        this.radiusAdd = -1;
-
+        this.starSearchRadius = 3;
+        
+        // Limit Gradient Sample Area
         this.hasSampleAreaPreview = false;
         this.sampleAreaPreview_X0 = 0;
         this.sampleAreaPreview_Y0 = 0;
         this.sampleAreaPreview_X1 = 0;
         this.sampleAreaPreview_Y1 = 0;
         
-        this.starCache = new StarCache();
+        // Gradient Sample Generation
+        this.limitSampleStarsPercent = 50;
+        this.sampleSize = 20;
+        this.orientation = AUTO();
+        
+        // Gradient Propagated Correction
+        this.gradientFlag = false;
+        this.nGradientBestFitLines = 3;
+        
+        // Gradient Tapered Correction
+        this.taperFlag = true;
+        this.nTaperBestFitLines = 25;
+        this.taperLength = 1000;
+        
+        // Mosaic Star Mask
+        this.limitMaskStarsPercent = 20;
+        this.radiusMult = 2.5;
+        this.radiusAdd = -1;
+        
+        // Create Mosaic
+        this.createMosaicFlag = true;
+        this.mosaicOverlayRefFlag = false;
+        this.mosaicOverlayTgtFlag = false;
+        this.mosaicRandomFlag = true;
+        this.mosaicAverageFlag = false;
+        
+        // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
         this.testFlag = 0;
+        
+        this.starCache = new StarCache();
+        
     };
 
     // Used when the user presses the reset button
     this.resetParameters = function (linearFitDialog) {
+        // Reset the script's data
         this.setParameters();
-        linearFitDialog.orientationCombo.currentItem = AUTO();
-        linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
-        linearFitDialog.rejectHigh_Control.setValue(this.rejectHigh);
-        linearFitDialog.StarSearchRadius_Control.setValue(this.starSearchRadius);
-        linearFitDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
-        linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
-        linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
-        linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
-        linearFitDialog.lineSegments_Control.setValue(this.nLineSegments);
-        linearFitDialog.taperFlag_Control.checked = this.taperFlag;
-        linearFitDialog.taperLength_Control.setValue(this.taperLength);
-        linearFitDialog.displayMosaicControl.checked = this.createMosaicFlag;
-        linearFitDialog.mosaicOverlayRefControl.checked = this.mosaicOverlayRefFlag;
-        linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
-        linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
-        linearFitDialog.StarRadiusMultiply_Control.setValue(this.radiusMult);
-        linearFitDialog.StarRadiusAdd_Control.setValue(this.radiusAdd);
         
-        linearFitDialog.sampleAreaPreviewCheckBox.checked = this.hasSampleAreaPreview;
+        // Star Detection
+        linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
+        
+        // Photometric Scale
+        linearFitDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
+        linearFitDialog.rejectHigh_Control.setValue(this.linearRange);
+        linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
+        linearFitDialog.StarSearchRadius_Control.setValue(this.starSearchRadius);
+        
+        // Limit Gradient Sample Area
         linearFitDialog.rectangleX0_Control.setValue(this.sampleAreaPreview_X0);
         linearFitDialog.rectangleY0_Control.setValue(this.sampleAreaPreview_Y0);
         linearFitDialog.rectangleX1_Control.setValue(this.sampleAreaPreview_X1);
         linearFitDialog.rectangleY1_Control.setValue(this.sampleAreaPreview_Y1);
+        linearFitDialog.setHasSampleAreaPreview(this.hasSampleAreaPreview);
+        
+        // Gradient Sample Generation
+        linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
+        linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
+        linearFitDialog.orientationCombo.currentItem = AUTO();
+        
+        // Gradient Propagated Correction
+        linearFitDialog.setPropagateGradientFlag(this.gradientFlag);
+        linearFitDialog.propagateBestFitLines_Control.setValue(this.nGradientBestFitLines);
+        
+        // Gradient Tapered Correction
+        linearFitDialog.setTaperGradientFlag(this.taperFlag);
+        linearFitDialog.taperBestFitLines_Control.setValue(this.nTaperBestFitLines);
+        linearFitDialog.taperLength_Control.setValue(this.taperLength);
+        
+        // Mosaic Star Mask
+        linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
+        linearFitDialog.StarRadiusMultiply_Control.setValue(this.radiusMult);
+        linearFitDialog.StarRadiusAdd_Control.setValue(this.radiusAdd);
+        
+        // Create Mosaic
+        linearFitDialog.setCreateMosaicFlag(this.createMosaicFlag);
+        linearFitDialog.mosaicOverlayRefControl.checked = this.mosaicOverlayRefFlag;
+        linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
+        linearFitDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
+        linearFitDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
     };
-
+    
+    // Initialise the script's data
+    this.setParameters();
     let activeWindow = ImageWindow.activeWindow;
     this.referenceView = getDefaultReferenceView(activeWindow);
     this.targetView = getDefaultTargetView(activeWindow, this.referenceView);
-    // Initialise the script's data
-    this.setParameters();
 }
 
 // The main dialog function
@@ -257,21 +332,47 @@ function PhotometricMosaicDialog(data) {
     this.__base__ = Dialog;
     this.__base__();
 
+    let self = this;
+    
+    const OUTLIER_REMOVAL_STRLEN = this.font.width("Outlier Removal:");
+    
+    this.onToggleSection = function(bar, beginToggle){
+        if (beginToggle){
+            this.dialog.setVariableSize();
+        } else {
+//            bar.updateSection();
+            this.dialog.setFixedSize();
+        }
+    };
+    
+    // =======================================
+    // SectionBar: "Quick Start Guide"
+    // =======================================
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
             " &mdash; Corrects the scale and gradient between two registered images.</b><br />" +
             "(1) Each join must be approximately vertical or horizontal.<br />" +
             "(2) Join frames into either columns or rows.<br />" +
-            "(3) Join these strips to create the final mosaic.");
+            "(3) Join these strips to create the final mosaic.<br />" +
+            "Detected stars are cached so consider generating all output " +
+            "(graphs, stars, sample grid) before exiting.<br />" +
+            "Copyright &copy; 2019-2020 John Murphy, GNU General Public License.");
+    let titleSection = new Control(this);
+    titleSection.sizer = new VerticalSizer;
+    titleSection.sizer.add(titleLabel);
+    titleSection.setMinSize(650, 90);
+    this.titleBar = new SectionBar(this, "Quick Start Guide");
+    this.titleBar.setSection(titleSection);
+    this.titleBar.onToggleSection = this.onToggleSection;
+    // SectionBar "Quick Start Guide" End
 
-    //-------------------------------------------------------
-    // Create the reference image field
-    //-------------------------------------------------------
-    let labelWidth1 = this.font.width("Reference View:");
+    // =======================================
+    // SectionBar: "Reference & Target Views"
+    // =======================================
     let referenceImage_Label = new Label(this);
     referenceImage_Label.text = "Reference View:";
     referenceImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    referenceImage_Label.minWidth = labelWidth1;
+    referenceImage_Label.minWidth = OUTLIER_REMOVAL_STRLEN;
     referenceImage_Label.toolTip = "<p>The reference image. This image will not be modified.</p>";
 
     this.referenceImage_ViewList = new ViewList(this);
@@ -289,13 +390,10 @@ function PhotometricMosaicDialog(data) {
     referenceImage_Sizer.add(referenceImage_Label);
     referenceImage_Sizer.add(this.referenceImage_ViewList, 100);
 
-    //-------------------------------------------------------
-    // Create the target image field
-    //-------------------------------------------------------
     let targetImage_Label = new Label(this);
     targetImage_Label.text = "Target View:";
     targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    targetImage_Label.minWidth = labelWidth1;
+    targetImage_Label.minWidth = OUTLIER_REMOVAL_STRLEN;
     targetImage_Label.toolTip = "<p>This image is first multiplied by " +
             "the photometrically determined scale factor, then the gradient " +
             "is calculated and subtracted.</p>";
@@ -315,24 +413,32 @@ function PhotometricMosaicDialog(data) {
     targetImage_Sizer.spacing = 4;
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
+    
+    let selectViewSection = new Control(this);
+    selectViewSection.sizer = new VerticalSizer;
+    selectViewSection.sizer.spacing = 4;
+    selectViewSection.sizer.add(referenceImage_Sizer);
+    selectViewSection.sizer.add(targetImage_Sizer);
+    this.selectViewBar = new SectionBar(this, "Reference & Target Views");
+    this.selectViewBar.setSection(selectViewSection);
+    this.selectViewBar.onToggleSection = this.onToggleSection;
+    // SectionBar "Reference & Target Views" End
 
-    let labelSize = this.font.width("Line Segments:") + 9;
-    //----------------------------------------------------
-    // Star detection group box
-    //----------------------------------------------------
+    // =======================================
+    // SectionBar: "Star Detection"
+    // =======================================
     this.starDetectionControl = new NumericControl(this);
-    this.starDetectionControl.real = true;
+    this.starDetectionControl.real = false;
     this.starDetectionControl.label.text = "Star Detection:";
-    this.starDetectionControl.label.minWidth = labelSize;
+    this.starDetectionControl.label.minWidth = OUTLIER_REMOVAL_STRLEN;
     this.starDetectionControl.toolTip = "<p>Smaller values detect more stars.</p>" +
             "<p>For stacked linear images, 0.0 usually works well.</p>";
     this.starDetectionControl.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
     this.starDetectionControl.setRange(-2, 2);
-    this.starDetectionControl.slider.setRange(0, 500);
-    this.starDetectionControl.setPrecision(1);
-    this.starDetectionControl.slider.minWidth = 206;
+    this.starDetectionControl.slider.setRange(0, 50);
+    this.starDetectionControl.slider.minWidth = 50;
     this.starDetectionControl.setValue(data.logStarDetection);
     
     let detectedStarsButton = new PushButton();
@@ -342,70 +448,27 @@ function PhotometricMosaicDialog(data) {
             "The detected stars are cached until either the PhotometricMosaic dialog " +
             "is closed or a modification invalidates the cache.</p>";
     detectedStarsButton.onClick = function () {
-        data.viewFlag = DETECTED_STARS_FLAG();
+        data.viewFlag = DISPLAY_DETECTED_STARS();
         this.dialog.ok();
     };
     
-    let starDetectionSizer = new HorizontalSizer;
-    starDetectionSizer.spacing = 4;
-    starDetectionSizer.add(this.starDetectionControl);
-    starDetectionSizer.addStretch();
-    starDetectionSizer.add(detectedStarsButton);
-
-    let starDetectionGroupBox = createGroupBox(this, "Star Detection");
-    starDetectionGroupBox.sizer.add(starDetectionSizer);
-    //----------------------------------------------------
-    // photometry group box
-    //----------------------------------------------------
-    this.rejectHigh_Control = new NumericControl(this);
-    this.rejectHigh_Control.real = true;
-    this.rejectHigh_Control.label.text = "Linear Range:";
-    this.rejectHigh_Control.label.minWidth = labelSize;
-    this.rejectHigh_Control.toolTip = 
-            "<p>This control restricts the stars used for photometry to those " +
-            "that have a peak pixel value less than the specified value. " +
-            "It is important that these stars are within the " +
-            "camera's linear response range.</p>" + 
-            "<p>After examining the Photometry Graph, if the brightest plotted stars " +
-            "looks suspect, they can be removed by reducing the 'Linear Range'. " +
-            "This can sometimes be easer than using 'Outlier Removal'</p>";
-    this.rejectHigh_Control.onValueUpdated = function (value) {
-        data.rejectHigh = value;
-    };
-    this.rejectHigh_Control.setRange(0.01, 1.0);
-    this.rejectHigh_Control.slider.setRange(0, 500);
-    this.rejectHigh_Control.setPrecision(2);
-    this.rejectHigh_Control.slider.minWidth = 206;
-    this.rejectHigh_Control.setValue(data.rejectHigh);
+    let starDetectionSection = new Control(this);
+    starDetectionSection.sizer = new HorizontalSizer;
+    starDetectionSection.sizer.add(this.starDetectionControl);
+    starDetectionSection.sizer.addStretch();
+    starDetectionSection.sizer.add(detectedStarsButton);
+    this.starDetectionBar = new SectionBar(this, "Star Detection");
+    this.starDetectionBar.setSection(starDetectionSection);
+    this.starDetectionBar.onToggleSection = this.onToggleSection;
+    // SectionBar "Star Detection" End
     
-    this.StarSearchRadius_Control = new NumericControl(this);
-    this.StarSearchRadius_Control.real = false;
-    this.StarSearchRadius_Control.label.text = "Star Search Radius:";
-    this.StarSearchRadius_Control.toolTip = 
-            "<p>Search radius used to match the reference and target stars.</p>" +
-            "<p>Increasing this helps find more photometric stars but " +
-            "at the risk of matching the wrong star. " +
-            "The star flux is used to reduce this risk.</p>" +
-            "<p>Decrease for dense star fields.</p>";
-    this.StarSearchRadius_Control.setRange(1, 10);
-    this.StarSearchRadius_Control.slider.setRange(1, 10);
-    this.StarSearchRadius_Control.setPrecision(1);
-    this.StarSearchRadius_Control.slider.minWidth = 110;
-    this.StarSearchRadius_Control.setValue(data.starSearchRadius);
-    this.StarSearchRadius_Control.onValueUpdated = function (value) {
-        data.starSearchRadius = value;
-    };
-
-    let photometrySizer = new HorizontalSizer;
-    photometrySizer.spacing = 4;
-    photometrySizer.add(this.rejectHigh_Control);
-    photometrySizer.addStretch();
-    photometrySizer.add(this.StarSearchRadius_Control);
-    
+    // =======================================
+    // SectionBar: "Photometric Scale"
+    // =======================================
     this.limitPhotoStarsPercent_Control = new NumericControl(this);
     this.limitPhotoStarsPercent_Control.real = true;
     this.limitPhotoStarsPercent_Control.label.text = "Limit Stars %:";
-    this.limitPhotoStarsPercent_Control.label.minWidth = labelSize;
+    this.limitPhotoStarsPercent_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
     this.limitPhotoStarsPercent_Control.toolTip = 
             "<p>Specifies the percentage of detected stars that will be used to " +
             "find photometric stars.</p>" +
@@ -426,10 +489,54 @@ function PhotometricMosaicDialog(data) {
     this.limitPhotoStarsPercent_Control.slider.minWidth = 200;
     this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
     
+    this.rejectHigh_Control = new NumericControl(this);
+    this.rejectHigh_Control.real = true;
+    this.rejectHigh_Control.label.text = "Linear Range:";
+    this.rejectHigh_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
+    this.rejectHigh_Control.toolTip = 
+            "<p>This control restricts the stars used for photometry to those " +
+            "that have a peak pixel value less than the specified value. " +
+            "It is important that these stars are within the " +
+            "camera's linear response range.</p>" + 
+            "<p>After examining the Photometry Graph, if the brightest plotted stars " +
+            "looks suspect, they can be removed by reducing the 'Linear Range'. " +
+            "This can sometimes be easer than using 'Outlier Removal'</p>";
+    this.rejectHigh_Control.onValueUpdated = function (value) {
+        data.linearRange = value;
+    };
+    this.rejectHigh_Control.setRange(0.01, 1.0);
+    this.rejectHigh_Control.slider.setRange(0, 500);
+    this.rejectHigh_Control.setPrecision(2);
+    this.rejectHigh_Control.slider.minWidth = 206;
+    this.rejectHigh_Control.setValue(data.linearRange);
+    
+    this.StarSearchRadius_Control = new NumericControl(this);
+    this.StarSearchRadius_Control.real = false;
+    this.StarSearchRadius_Control.label.text = "Star Search Radius:";
+    this.StarSearchRadius_Control.toolTip = 
+            "<p>Search radius used to match the reference and target stars.</p>" +
+            "<p>Increasing this helps find more photometric stars but " +
+            "at the risk of matching the wrong star. " +
+            "The star flux is used to reduce this risk.</p>" +
+            "<p>Decrease for dense star fields.</p>";
+    this.StarSearchRadius_Control.setRange(1, 10);
+    this.StarSearchRadius_Control.slider.setRange(1, 10);
+    this.StarSearchRadius_Control.slider.minWidth = 85;
+    this.StarSearchRadius_Control.setValue(data.starSearchRadius);
+    this.StarSearchRadius_Control.onValueUpdated = function (value) {
+        data.starSearchRadius = value;
+    };
+
+    let photometricScaleHorizSizer1 = new HorizontalSizer;
+    photometricScaleHorizSizer1.spacing = 4;
+    photometricScaleHorizSizer1.add(this.rejectHigh_Control);
+    photometricScaleHorizSizer1.addStretch();
+    photometricScaleHorizSizer1.add(this.StarSearchRadius_Control);
+    
     this.outlierRemoval_Control = new NumericControl(this);
     this.outlierRemoval_Control.real = false;
     this.outlierRemoval_Control.label.text = "Outlier Removal:";
-    this.outlierRemoval_Control.label.minWidth = labelSize;
+    this.outlierRemoval_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
     this.outlierRemoval_Control.toolTip = 
             "<p>The photometric measurement of some stars can be suspect. " +
             "For example, the area around the star that's used to calculate " +
@@ -446,19 +553,6 @@ function PhotometricMosaicDialog(data) {
     this.outlierRemoval_Control.slider.minWidth = 220;
     this.outlierRemoval_Control.setValue(data.outlierRemoval);
     
-    let photometryStarsButton = new PushButton();
-    photometryStarsButton.text = "Photometry Stars";
-    photometryStarsButton.toolTip = 
-            "<p>Use this button to display the stars that met the criteria for photometry. " +
-            "These stars were within the specified 'Linear Range' and were found " +
-            "in both target and reference images.</p>" +
-            "<p>The color represents the color channel. " +
-            "Hence a white square indicates the star was found in the red, green and blue channels.</p>";
-    photometryStarsButton.onClick = function () {
-        data.viewFlag = PHOTOMETRY_STARS_FLAG();
-        this.dialog.ok();
-    };
-    
     let photometryGraphButton = new PushButton();
     photometryGraphButton.text = "Photometry Graph";
     photometryGraphButton.toolTip = 
@@ -471,31 +565,235 @@ function PhotometricMosaicDialog(data) {
             "The gradient of these lines gives the required scale factors. </p>" +
             "<p>Useful data is also saved to the FITS header.</p>";
     photometryGraphButton.onClick = function () {
-        data.viewFlag = PHOTOMETRY_GRAPH_FLAG();
+        data.viewFlag = DISPLAY_PHOTOMETRY_GRAPH();
         this.dialog.ok();
     };
     
-    let outlierSizer = new HorizontalSizer;
-    outlierSizer.spacing = 4;
-    outlierSizer.add(this.outlierRemoval_Control);
-    outlierSizer.addStretch();
-    outlierSizer.add(photometryGraphButton);
-    outlierSizer.addSpacing(2);
-    outlierSizer.add(photometryStarsButton);
+    let photometryStarsButton = new PushButton();
+    photometryStarsButton.text = "Photometry Stars";
+    photometryStarsButton.toolTip = 
+            "<p>Use this button to display the stars that met the criteria for photometry. " +
+            "These stars were within the specified 'Linear Range' and were found " +
+            "in both target and reference images.</p>" +
+            "<p>The color represents the color channel. " +
+            "Hence a white square indicates the star was found in the red, green and blue channels.</p>";
+    photometryStarsButton.onClick = function () {
+        data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
+        this.dialog.ok();
+    };
+    
+    let photometricScaleHorizSizer2 = new HorizontalSizer;
+    photometricScaleHorizSizer2.spacing = 4;
+    photometricScaleHorizSizer2.add(this.outlierRemoval_Control);
+    photometricScaleHorizSizer2.addStretch();
+    photometricScaleHorizSizer2.add(photometryGraphButton);
+    photometricScaleHorizSizer2.addSpacing(2);
+    photometricScaleHorizSizer2.add(photometryStarsButton);
+    
+    let photometrySection = new Control(this);
+    photometrySection.sizer = new VerticalSizer;
+    photometrySection.sizer.spacing = 4;
+    photometrySection.sizer.add(this.limitPhotoStarsPercent_Control);
+    photometrySection.sizer.add(photometricScaleHorizSizer1);
+    photometrySection.sizer.add(photometricScaleHorizSizer2);
+    this.photometryBar = new SectionBar(this, "Photometric Scale");
+    this.photometryBar.setSection(photometrySection);
+    this.photometryBar.onToggleSection = this.onToggleSection;
+    // SectionBar: "Photometric Scale" End
 
-    let photometryGroupBox = createGroupBox(this, "Photometric Scale");
-    photometryGroupBox.sizer.add(this.limitPhotoStarsPercent_Control);
-    photometryGroupBox.sizer.add(photometrySizer);
-    photometryGroupBox.sizer.add(outlierSizer);
+    // =======================================
+    // SectionBar: "Limit Gradient Sample Area"
+    // =======================================
+    const getAreaFromPreviewStr = "Get area from preview:";
+    const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
+    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.",
+            data.sampleAreaPreview_X0, 50);
+    this.rectangleX0_Control.label.setFixedWidth(
+            GET_AREA_FROM_PREVIEW_STRLEN + this.font.width("Left:") + 20);
+    this.rectangleX0_Control.onValueUpdated = function (value){
+        data.sampleAreaPreview_X0 = value;
+    };
+    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.",
+            data.sampleAreaPreview_Y0, 50);
+    this.rectangleY0_Control.onValueUpdated = function (value){
+        data.sampleAreaPreview_Y0 = value;
+    };
+    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.",
+            data.sampleAreaPreview_X1, 50);
+    this.rectangleX1_Control.onValueUpdated = function (value){
+        data.sampleAreaPreview_X1 = value;
+    };
+    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.",
+            data.sampleAreaPreview_Y1, 50);
+    this.rectangleY1_Control.onValueUpdated = function (value){
+        data.sampleAreaPreview_Y1 = value;
+    };
 
-    //-------------------------------------------------------
-    // Gradient detection group box
-    //-------------------------------------------------------
+    let limitGradientSampleAreaHorizSizer1 = new HorizontalSizer;  
+    limitGradientSampleAreaHorizSizer1.spacing = 10;
+    limitGradientSampleAreaHorizSizer1.add(this.rectangleX0_Control);
+    limitGradientSampleAreaHorizSizer1.add(this.rectangleY0_Control);
+    limitGradientSampleAreaHorizSizer1.add(this.rectangleX1_Control);
+    limitGradientSampleAreaHorizSizer1.add(this.rectangleY1_Control);
+    limitGradientSampleAreaHorizSizer1.addStretch();
+
+    let previewUpdateActions = function(dialog){
+        let view = data.preview;
+        if (view !== null && view.isPreview) {
+            dialog.sampleAreaBar.checkBox.checked = data.hasSampleAreaPreview;
+            ///let imageWindow = view.window;
+            let rect = view.window.previewRect(view);
+            data.sampleAreaPreview_X0 = rect.x0;
+            data.sampleAreaPreview_Y0 = rect.y0;
+            data.sampleAreaPreview_X1 = rect.x1;
+            data.sampleAreaPreview_Y1 = rect.y1;
+
+            dialog.rectangleX0_Control.setValue(data.sampleAreaPreview_X0);
+            dialog.rectangleY0_Control.setValue(data.sampleAreaPreview_Y0);
+            dialog.rectangleX1_Control.setValue(data.sampleAreaPreview_X1);
+            dialog.rectangleY1_Control.setValue(data.sampleAreaPreview_Y1);
+            
+            dialog.setHasSampleAreaPreview(true);
+        } else {
+            dialog.setHasSampleAreaPreview(false);
+        }
+    };
+
+    // Get Area from preview
+    let previewImage_Label = new Label(this);
+    previewImage_Label.text = getAreaFromPreviewStr;
+    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+
+    this.previewImage_ViewList = new ViewList(this);
+    this.previewImage_ViewList.getPreviews();
+    this.previewImage_ViewList.minWidth = 300;
+    this.previewImage_ViewList.toolTip = "<p>Get the 'Area of Interest' from a preview image.</p>";
+    this.previewImage_ViewList.onViewSelected = function (view) {
+        data.preview = view;
+        previewUpdateActions(this.dialog);
+    };
+
+    let previewUpdateButton = new PushButton();
+    previewUpdateButton.hasFocus = false;
+    previewUpdateButton.text = "Update";
+    previewUpdateButton.onClick = function () {
+        if (!this.isUnderMouse){
+            // Ensure pressing return in a different field does not trigger this callback!
+            return;
+        }
+        previewUpdateActions(this.dialog);
+    };
+
+    let limitGradientSampleAreaHorizSizer2 = new HorizontalSizer;
+    limitGradientSampleAreaHorizSizer2.spacing = 4;
+    limitGradientSampleAreaHorizSizer2.add(previewImage_Label);
+    limitGradientSampleAreaHorizSizer2.add(this.previewImage_ViewList, 100);
+    limitGradientSampleAreaHorizSizer2.addSpacing(10);
+    limitGradientSampleAreaHorizSizer2.add(previewUpdateButton);
+    
+    this.setHasSampleAreaPreview = function(checked){
+        data.hasSampleAreaPreview = checked;
+        self.sampleAreaBar.checkBox.checked = checked;
+        self.rectangleX0_Control.enabled = checked;
+        self.rectangleX1_Control.enabled = checked;
+        self.rectangleY0_Control.enabled = checked;
+        self.rectangleY1_Control.enabled = checked;
+    };
+    
+    let sampleAreaSection = new Control(this);
+    sampleAreaSection.sizer = new VerticalSizer;
+    sampleAreaSection.sizer.spacing = 4;
+    sampleAreaSection.sizer.add(limitGradientSampleAreaHorizSizer1);
+    sampleAreaSection.sizer.add(limitGradientSampleAreaHorizSizer2);
+    this.sampleAreaBar = new SectionBar(this, "Limit Gradient Sample Area");
+    this.sampleAreaBar.setSection(sampleAreaSection);
+    this.sampleAreaBar.enableCheckBox();
+    this.sampleAreaBar.checkBox.toolTip = 
+            "<p>Limit the search for overlapping pixels to this bounding box.</p>" +
+            "<p>If all overlapping pixels are within this area, selecting this " +
+            "option reduces calculation time but does not effect the calculated overlap pixels.</p>" +
+            "<p>If this area intersects the overlapping pixels, the calculated overlap pixels " +
+            "are limited to those within the area. This is useful for a corner tile so that " +
+            "the horizontal and vertical joins can be calculated separately.</p>" +
+            "<p>If the mosaic is built by first creating the rows (or columns) and then joining " +
+            "the resulting strips, it is not necessary to set the 'Area Of Interest'.</p>" +
+            "<p>The first time the overlap is calculated, the 'Area Of Interest' will be updated " +
+            "to the bounding box of the overlapping pixels that will be used to calculate the " +
+            "target image scale and gradient.</p>";
+    this.sampleAreaBar.checkBox.onClick = this.setHasSampleAreaPreview;
+    this.sampleAreaBar.onToggleSection = this.onToggleSection;
+    this.setHasSampleAreaPreview(data.hasSampleAreaPreview);
+    // SectionBar "Limit Gradient Sample Area" End
+
+    // =======================================
+    // SectionBar: "Gradient"
+    // =======================================
+    // GroupBox: "Gradient Sample Generation"
+    // ---------------------------------------
+    const joinDirectionStrLen = this.font.width("Join Direction:");
+    this.limitSampleStarsPercent_Control = new NumericControl(this);
+    this.limitSampleStarsPercent_Control.real = true;
+    this.limitSampleStarsPercent_Control.label.text = "Limit Stars %:";
+    this.limitSampleStarsPercent_Control.label.minWidth = joinDirectionStrLen;
+    this.limitSampleStarsPercent_Control.toolTip = 
+            "<p>Specifies the percentage of detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples.</p>" +
+            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
+            "<ul><li>Bright pixels are more affected by an error in the calculated scale. " +
+            "Although the photometric strategy has a high level of accuracy, " +
+            "no measurement is perfect.</li>" +
+            "<li>Bright stars can have significantly different profiles between " +
+            "the reference and target images. This can effect how many of the " +
+            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "<p>It is not necessary to reject all faint stars. This script uses the " + 
+            "median value from each sample, so any star that takes up less than " +
+            "half the sample area will have little effect. These samples do not " + 
+            "have to be rejected.</p>";
+    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
+    };
+    this.limitSampleStarsPercent_Control.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.slider.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.setPrecision(0);
+    this.limitSampleStarsPercent_Control.slider.minWidth = 200;
+    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
+    
+    this.sampleSize_Control = new NumericControl(this);
+    this.sampleSize_Control.real = true;
+    this.sampleSize_Control.label.text = "Sample Size:";
+    this.sampleSize_Control.label.minWidth = joinDirectionStrLen;
+    this.sampleSize_Control.toolTip = 
+            "<p>Specifies the size of the sample squares.</p>" + 
+            "<p>The overlapping region is divided up into a grid of sample squares. " +
+            "A sample's value is the median of the pixels it contains. " +
+            "These sample values are used to calculate the background offset and gradient. " +
+            "Using samples ensures that the offset and gradient calculation is " +
+            "less affected by bright stars with differing FWHM sizes.</p>" + 
+            "<p>Samples are rejected if they contain one or more zero pixels in " +
+            "either image or if they contain a star bright enough to be included " +
+            "in the 'Limit Stars %' list.</p>" +
+            "<p>Larger samples are more tolerant to unrejected stars, " +
+            "but smaller samples might be necessary for small overlaps. " +
+            "Ideally set to more than 1.5x the size of the largest star in the " +
+            "overlapping region. Rejecting more samples that contain stars by " +
+            "increasing 'Limit Stars %' reduces this requirement.</p>" +
+            "<p>Use the 'Sample Grid' button to visualize the grid of samples.</p>";
+    this.sampleSize_Control.onValueUpdated = function (value) {
+        data.sampleSize = value;
+    };
+    this.sampleSize_Control.setRange(3, 50);
+    this.sampleSize_Control.slider.setRange(3, 50);
+    this.sampleSize_Control.setPrecision(0);
+    this.sampleSize_Control.slider.minWidth = 200;
+    this.sampleSize_Control.setValue(data.sampleSize);
+    
     let directionLabel = new Label(this);
-    directionLabel.text = "Direction:";
+    directionLabel.text = "Join Direction:";
     directionLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    directionLabel.minWidth = labelSize;
-
+    directionLabel.minWidth = joinDirectionStrLen;
+    
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
     this.orientationCombo.toolTip = 
@@ -530,9 +828,41 @@ function PhotometricMosaicDialog(data) {
             "The surviving samples are drawn as squares. The stars used to " +
             "reject samples are indicated by circles.</p>";
     displaySamplesButton.onClick = function () {
-        data.viewFlag = DISPLAY_SAMPLES_FLAG();
+        data.viewFlag = DISPLAY_GRADIENT_SAMPLES();
         this.dialog.ok();
     };
+    
+    let orientationSizer = new HorizontalSizer;
+    orientationSizer.spacing = 4;
+    orientationSizer.add(directionLabel);
+    orientationSizer.add(this.orientationCombo);
+    orientationSizer.addStretch();
+    orientationSizer.add(displaySamplesButton);
+    
+    let sampleGenerationGroupBox = createGroupBox(this, "Gradient Sample Generation");
+    sampleGenerationGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
+    sampleGenerationGroupBox.sizer.add(this.sampleSize_Control);
+    sampleGenerationGroupBox.sizer.add(orientationSizer);
+    // GroupBox: "Gradient Sample Generation" End
+    
+    // ------------------------------------------
+    // GroupBox: "Propagated Gradient Correction"
+    // ------------------------------------------
+    this.propagateBestFitLines_Control = new NumericControl(this);
+    this.propagateBestFitLines_Control.real = false;
+    this.propagateBestFitLines_Control.label.text = "Best Fit Lines:";
+    this.propagateBestFitLines_Control.label.minWidth = joinDirectionStrLen;
+    this.propagateBestFitLines_Control.toolTip = 
+            "<p>Determines the number of lines used to fit the gradient data.</p>" +
+            "<p>It is worth experimenting with the number of lines to get a good fit to the data. " +
+            "Too many lines may fit noise or artifacts.</p>";
+    this.propagateBestFitLines_Control.onValueUpdated = function (value) {
+        data.nGradientBestFitLines = value;
+    };
+    this.propagateBestFitLines_Control.setRange(1, 25);
+    this.propagateBestFitLines_Control.slider.setRange(1, 13);
+    this.propagateBestFitLines_Control.slider.minWidth = 200;
+    this.propagateBestFitLines_Control.setValue(data.nGradientBestFitLines);
     
     let gradientGraphButton = new PushButton();
     gradientGraphButton.text = "Gradient Graph";
@@ -555,92 +885,77 @@ function PhotometricMosaicDialog(data) {
             "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
             "or reduce the 'Sample Size'.</p>";
     gradientGraphButton.onClick = function () {
-        data.viewFlag = GRADIENT_GRAPH_FLAG();
+        data.viewFlag = DISPLAY_GRADIENT_GRAPH();
         this.dialog.ok();
     };
-
-    let orientationSizer = new HorizontalSizer;
-    orientationSizer.spacing = 4;
-    orientationSizer.add(directionLabel);
-    orientationSizer.add(this.orientationCombo);
-    orientationSizer.addStretch();
-    orientationSizer.add(gradientGraphButton);
-    orientationSizer.addSpacing(2);
-    orientationSizer.add(displaySamplesButton);
-
-    this.sampleSize_Control = new NumericControl(this);
-    this.sampleSize_Control.real = true;
-    this.sampleSize_Control.label.text = "Sample Size:";
-    this.sampleSize_Control.label.minWidth = labelSize;
-    this.sampleSize_Control.toolTip = 
-            "<p>Specifies the size of the sample squares.</p>" + 
-            "<p>The overlapping region is divided up into a grid of sample squares. " +
-            "A sample's value is the median of the pixels it contains. " +
-            "These sample values are used to calculate the background offset and gradient. " +
-            "Using samples ensures that the offset and gradient calculation is " +
-            "less affected by bright stars with differing FWHM sizes.</p>" + 
-            "<p>Samples are rejected if they contain one or more zero pixels in " +
-            "either image or if they contain a star bright enough to be included " +
-            "in the 'Limit Stars %' list.</p>" +
-            "<p>Larger samples are more tolerant to unrejected stars, " +
-            "but smaller samples might be necessary for small overlaps. " +
-            "Ideally set to more than 1.5x the size of the largest star in the " +
-            "overlapping region. Rejecting more samples that contain stars by " +
-            "increasing 'Limit Stars %' reduces this requirement.</p>" +
-            "<p>Use the 'Sample Grid' button to visualize the grid of samples.</p>";
-    this.sampleSize_Control.onValueUpdated = function (value) {
-        data.sampleSize = value;
+    
+    this.setPropagateGradientFlag = function (checked){
+        data.gradientFlag = checked;
+        self.propagateGradientFlag_Control.checked = checked;
+        self.propagateBestFitLines_Control.enabled = checked;
+        gradientGraphButton.enabled = checked;
     };
-    this.sampleSize_Control.setRange(3, 50);
-    this.sampleSize_Control.slider.setRange(3, 50);
-    this.sampleSize_Control.setPrecision(0);
-    this.sampleSize_Control.slider.minWidth = 200;
-    this.sampleSize_Control.setValue(data.sampleSize);
-
-    this.limitSampleStarsPercent_Control = new NumericControl(this);
-    this.limitSampleStarsPercent_Control.real = true;
-    this.limitSampleStarsPercent_Control.label.text = "Limit Stars %:";
-    this.limitSampleStarsPercent_Control.label.minWidth = labelSize;
-    this.limitSampleStarsPercent_Control.toolTip = 
-            "<p>Specifies the percentage of detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
-            "<p>100% implies that all detected stars are used to reject samples.</p>" +
-            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by an error in the calculated scale. " +
-            "Although the photometric strategy has a high level of accuracy, " +
-            "no measurement is perfect.</li>" +
-            "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can effect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is not necessary to reject all faint stars. This script uses the " + 
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. These samples do not " + 
-            "have to be rejected.</p>";
-    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-        data.limitSampleStarsPercent = value;
-    };
-    this.limitSampleStarsPercent_Control.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.slider.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.setPrecision(0);
-    this.limitSampleStarsPercent_Control.slider.minWidth = 200;
-    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
-
-    this.lineSegments_Control = new NumericControl(this);
-    this.lineSegments_Control.real = false;
-    this.lineSegments_Control.label.text = "Line Segments:";
-    this.lineSegments_Control.label.minWidth = labelSize;
-    this.lineSegments_Control.toolTip = 
+    
+    this.propagateGradientFlag_Control = new CheckBox(this);
+    this.propagateGradientFlag_Control.toolTip = "TODO write this tooltip";
+    this.propagateGradientFlag_Control.onClick = this.setPropagateGradientFlag;
+    this.setPropagateGradientFlag(data.gradientFlag);
+    
+    let propagateSizer = new HorizontalSizer;
+    propagateSizer.spacing = 4;
+    propagateSizer.add(this.propagateGradientFlag_Control);
+    propagateSizer.add(this.propagateBestFitLines_Control);
+    propagateSizer.addSpacing(20);
+    propagateSizer.add(gradientGraphButton);
+    
+    let propagateGradientGroupBox = createGroupBox(this, "Propagated Gradient Correction");
+    propagateGradientGroupBox.sizer.add(propagateSizer);
+    // GroupBox: "Propagated Gradient Correction" End
+    
+    // ------------------------------------------
+    // GroupBox: "Tapered Gradient Correction"
+    // ------------------------------------------
+    // Taper Gradient controls
+    this.taperBestFitLines_Control = new NumericControl(this);
+    this.taperBestFitLines_Control.real = false;
+    this.taperBestFitLines_Control.label.text = "Best Fit Lines:";
+    this.taperBestFitLines_Control.label.minWidth = joinDirectionStrLen;
+    this.taperBestFitLines_Control.toolTip = 
             "<p>Determines the number of lines used to fit the gradient data.</p>" +
             "<p>It is worth experimenting with the number of lines to get a good fit to the data. " +
             "Too many lines may fit noise or artifacts.</p>";
-    this.lineSegments_Control.onValueUpdated = function (value) {
-        data.nLineSegments = value;
+    this.taperBestFitLines_Control.onValueUpdated = function (value) {
+        data.nTaperBestFitLines = value;
     };
-    this.lineSegments_Control.setRange(1, 99);
-    this.lineSegments_Control.slider.setRange(1, 50);
-    this.lineSegments_Control.slider.minWidth = 200;
-    this.lineSegments_Control.setValue(data.nLineSegments);
+    this.taperBestFitLines_Control.setRange(1, 99);
+    this.taperBestFitLines_Control.slider.setRange(1, 50);
+    this.taperBestFitLines_Control.slider.minWidth = 200;
+    this.taperBestFitLines_Control.setValue(data.nTaperBestFitLines);
+    
+    let taperGradientGraphButton = new PushButton();
+    taperGradientGraphButton.text = "Gradient Graph";
+    taperGradientGraphButton.toolTip = 
+            "<p>The vertical axis represents the difference between the two images. " +
+            "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
+            "or Y-Coordinate (vertical join).</p>" +
+            "<p>Each plotted dot represents the difference between a target and " +
+            "reference sample. The lines drawn represent the best fit line segments. " +
+            "It is these line segments that are used to determine the relative " +
+            "gradient between the two images.</p>" +
+            "<p>The graphs produced for color images use red, green and blue dots " +
+            "and lines for each channel. The colors add together. " +
+            "For example: red, green and blue add up to white.</p>" +
+            "<p>If the plotted points have excessive scatter this may indicate that " +
+            "the sample size is too small or that samples contain bright stars that " +
+            "occupy more than half the sample area. Either increase the 'Sample Size' " +
+            "to increase the area of each sample, or increase the 'Limit Stars %' " +
+            "so that samples that contain bright stars are rejected.</p>" +
+            "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
+            "or reduce the 'Sample Size'.</p>";
+    taperGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_GRADIENT_TAPER_GRAPH();
+        this.dialog.ok();
+    };
     
     let taperTooltip = "<p>The gradient correction is applied to the target image " +
             "along a line perpendicular to the horizontal or vertical join.</p>" +
@@ -675,17 +990,11 @@ function PhotometricMosaicDialog(data) {
             "the gradient to propagate across the whole of the target frame " +
             "(i.e. no taper) will most likely be beneficial. It will tend to " +
             "partially correct the gradient across the whole of the target frame.</p>";
-    this.taperFlag_Control = new CheckBox(this);
-    this.taperFlag_Control.text = "Taper";
-    this.taperFlag_Control.toolTip = taperTooltip;
-    this.taperFlag_Control.checked = data.taperFlag;
-    this.taperFlag_Control.onClick = function (checked) {
-        data.taperFlag = checked;
-    };
     
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
-    this.taperLength_Control.label.text = "Length:";
+    this.taperLength_Control.label.text = "Taper Length:";
+    this.taperLength_Control.label.minWidth = this.font.width("Best Fit Lines:") + 11;
     this.taperLength_Control.toolTip = taperTooltip;
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
@@ -695,37 +1004,148 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
     
+    this.setTaperGradientFlag = function (checked){
+        data.taperFlag = checked;
+        self.taperGradientFlag_Control.checked = checked;
+        self.taperBestFitLines_Control.enabled = checked;
+        self.taperLength_Control.enabled = checked;
+        taperGradientGraphButton.enabled = checked;
+    };
+    this.taperGradientFlag_Control = new CheckBox(this);
+    this.taperGradientFlag_Control.toolTip = "TODO write this tooltip";
+    this.taperGradientFlag_Control.onClick = this.setTaperGradientFlag;
+    this.setTaperGradientFlag(data.taperFlag);
+    
     let taperSizer = new HorizontalSizer;
     taperSizer.spacing = 4;
-    taperSizer.add(this.taperFlag_Control);
-    taperSizer.add(this.taperLength_Control);
+    taperSizer.add(this.taperGradientFlag_Control);
+    taperSizer.add(this.taperBestFitLines_Control);
+    taperSizer.addSpacing(20);
+    taperSizer.add(taperGradientGraphButton);
+    
+    let taperGradientGroupBox = createGroupBox(this, "Tapered Gradient Correction");
+    taperGradientGroupBox.sizer.add(taperSizer);
+    taperGradientGroupBox.sizer.add(this.taperLength_Control);
+    // GroupBox: "Tapered Gradient Correction" End
+    
 
-    let gradientGroupBox = createGroupBox(this, "Gradient Offset");
-    gradientGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
-    gradientGroupBox.sizer.add(this.sampleSize_Control);
-    gradientGroupBox.sizer.add(this.lineSegments_Control);
-    gradientGroupBox.sizer.add(taperSizer);
-    gradientGroupBox.sizer.add(orientationSizer);
-
-    //-------------------------------------------------------
-    // Mosaic Group Box
-    //-------------------------------------------------------
-    this.displayMosaicControl = new CheckBox(this);
-    this.displayMosaicControl.text = "Create Mosaic";
-    this.displayMosaicControl.toolTip = 
-            "<p>Combines the reference and target frames together and " +
-            "displays the result in a '" + MOSAIC_NAME() + "' window</p>" +
-            "<p>If this option is not selected, the corrections will still be " +
-            "applied to the target image, but the mosaic is not created.</p>" +
-            "<p>After the first mosaic join, it is usually convenient to set " +
-            "the reference view to '" + MOSAIC_NAME() + "'</p>";
-    this.displayMosaicControl.checked = data.createMosaicFlag;
-    this.displayMosaicControl.onClick = function (checked) {
-        data.createMosaicFlag = checked;
+    let gradientSection = new Control(this);
+    gradientSection.sizer = new VerticalSizer;
+    gradientSection.sizer.spacing = 4;
+    gradientSection.sizer.add(sampleGenerationGroupBox);
+    gradientSection.sizer.add(propagateGradientGroupBox);
+    gradientSection.sizer.add(taperGradientGroupBox);
+    this.gradientBar = new SectionBar(this, "Gradient");
+    this.gradientBar.setSection(gradientSection);
+    this.gradientBar.onToggleSection = this.onToggleSection;
+    //SectionBar: "Gradient" End
+    
+    // =======================================
+    // SectionBar: "Mosaic Star Mask"
+    // =======================================
+    let starMaskLabelSize = this.font.width("Multiply Star Radius:");
+    this.LimitMaskStars_Control = new NumericControl(this);
+    this.LimitMaskStars_Control.real = false;
+    this.LimitMaskStars_Control.label.text = "Limit Stars %:";
+    this.LimitMaskStars_Control.toolTip =
+            "<p>Specifies the percentage of detected stars that will be used to " +
+            "create the star mask.</p>" +
+            "<p>0% will produce a solid mask with no stars.<br />" +
+            "100% will produce a mask that includes all detected stars.</p>" +
+            "<p>Small faint stars are usually free of artifacts, so normally " +
+            "only a small percentage of the detected stars need to be used.</p>";
+    this.LimitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
+    this.LimitMaskStars_Control.setRange(0, 100);
+    this.LimitMaskStars_Control.slider.setRange(0, 100);
+    this.LimitMaskStars_Control.setPrecision(0);
+    this.LimitMaskStars_Control.slider.minWidth = 200;
+    this.LimitMaskStars_Control.setValue(data.limitMaskStarsPercent);
+    this.LimitMaskStars_Control.onValueUpdated = function (value) {
+        data.limitMaskStarsPercent = value;
     };
+    
+    this.StarRadiusMultiply_Control = new NumericControl(this);
+    this.StarRadiusMultiply_Control.real = true;
+    this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
+    this.StarRadiusMultiply_Control.toolTip = 
+            "<p>Sets the mask star radius to a multiple of the star's radius.</p>" +
+            "<p>This increases the size for large stars more than small ones.</p>";
+    this.StarRadiusMultiply_Control.setRange(1, 5);
+    this.StarRadiusMultiply_Control.slider.setRange(1, 150);
+    this.StarRadiusMultiply_Control.setPrecision(1);
+    this.StarRadiusMultiply_Control.slider.minWidth = 150;
+    this.StarRadiusMultiply_Control.setValue(data.radiusMult);
+    this.StarRadiusMultiply_Control.onValueUpdated = function (value) {
+        data.radiusMult = value;
+    };
+    
+    this.StarRadiusAdd_Control = new NumericControl(this);
+    this.StarRadiusAdd_Control.real = true;
+    this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
+    this.StarRadiusAdd_Control.toolTip = 
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply Star Radius'.</p>";
+    this.StarRadiusAdd_Control.setRange(-5, 10);
+    this.StarRadiusAdd_Control.slider.setRange(0, 150);
+    this.StarRadiusAdd_Control.setPrecision(1);
+    this.StarRadiusAdd_Control.slider.minWidth = 150;
+    this.StarRadiusAdd_Control.setValue(data.radiusAdd);
+    this.StarRadiusAdd_Control.onValueUpdated = function (value) {
+        data.radiusAdd = value;
+    };
+    
+    let radiusHorizontalSizer = new HorizontalSizer;
+    radiusHorizontalSizer.spacing = 20;
+    radiusHorizontalSizer.add(this.StarRadiusMultiply_Control);
+    radiusHorizontalSizer.add(this.StarRadiusAdd_Control);
+    //radiusHorizontalSizer.addStretch();
+    
+    
+    let createMaskButton = new PushButton();
+    createMaskButton.text = "Create Mask";
+    createMaskButton.toolTip = 
+            "<p>Creates a star mask that reveals bright stars.</p>" +
+            "<p>A mosaic join using the 'Random' mode is highly affective, but " +
+            "often produces a speckled pattern around bright stars. This " +
+            "mask option is provided to help fix this.</p>";
+    createMaskButton.onClick = function () {
+        data.viewFlag = CREATE_MOSAIC_MASK();
+        this.dialog.ok();
+    };
+    
+    let maskStarsButton = new PushButton();
+    maskStarsButton.text = "Stars";
+    maskStarsButton.toolTip = 
+            "<p>Displays the stars used to create the mosaic star mask.</p>";
+    maskStarsButton.onClick = function () {
+        data.viewFlag = DISPLAY_MOSAIC_MASK_STARS();
+        this.dialog.ok();
+    };
+    
+    let mask_Sizer = new HorizontalSizer;
+    mask_Sizer.spacing = 4;
+    mask_Sizer.addStretch();
+    mask_Sizer.add(createMaskButton);
+    mask_Sizer.addSpacing(2);
+    mask_Sizer.add(maskStarsButton);
+    
+    
+    let starMaskSection = new Control(this);
+    starMaskSection.sizer = new VerticalSizer;
+    starMaskSection.sizer.spacing = 4;
+    starMaskSection.sizer.add(this.LimitMaskStars_Control);
+    starMaskSection.sizer.add(radiusHorizontalSizer);
+    starMaskSection.sizer.add(mask_Sizer);
+    this.starMaskBar = new SectionBar(this, "Mosaic Star Mask");
+    this.starMaskBar.setSection(starMaskSection);
+    this.starMaskBar.onToggleSection = this.onToggleSection;
+    // SectionBar: "Mosaic Star Mask" End
 
+    // =======================================
+    // SectionBar: "Create Mosaic"
+    // =======================================
     let overlay_Label = new Label(this);
-    overlay_Label.text = "Overlay:";
+    overlay_Label.text = "Combination Mode:";
     overlay_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     overlay_Label.minWidth = this.font.width("Overlay:");
 
@@ -784,222 +1204,36 @@ function PhotometricMosaicDialog(data) {
         data.mosaicOverlayRefFlag = !checked;
         data.mosaicOverlayTgtFlag = !checked;
     };
-
-    let mosaic_Sizer = new HorizontalSizer;
-    mosaic_Sizer.spacing = 10;
-    mosaic_Sizer.add(this.displayMosaicControl);
-    mosaic_Sizer.addSpacing(50);
-    mosaic_Sizer.add(overlay_Label);
-    mosaic_Sizer.add(this.mosaicOverlayRefControl);
-    mosaic_Sizer.add(this.mosaicOverlayTgtControl);
-    mosaic_Sizer.add(this.mosaicRandomControl);
-    mosaic_Sizer.add(this.mosaicAverageControl);
-    mosaic_Sizer.addStretch();
-
-    let mosaicGroupBox = createGroupBox(this, "Mosaic");
-    mosaicGroupBox.sizer.add(mosaic_Sizer);
     
-    //-------------------------------------------------------
-    // Mask Generation Group Box
-    //-------------------------------------------------------
-    let createMaskButton = new PushButton();
-    createMaskButton.text = "Create Mask";
-    createMaskButton.toolTip = 
-            "<p>Creates a star mask that reveals bright stars.</p>" +
-            "<p>A mosaic join using the 'Random' mode is highly affective, but " +
-            "often produces a speckled pattern around bright stars. This " +
-            "mask option is provided to help fix this.</p>";
-    createMaskButton.onClick = function () {
-        data.viewFlag = MOSAIC_MASK_FLAG();
-        this.dialog.ok();
+    this.setCreateMosaicFlag = function(checked){
+        self.mosaicBar.checkBox.checked = checked;
+        data.createMosaicFlag = checked;
+        mosaicSection.enabled = checked;
     };
     
-    let maskStarsButton = new PushButton();
-    maskStarsButton.text = "Stars";
-    maskStarsButton.toolTip = 
-            "<p>Displays the stars used to create the mosaic star mask.</p>";
-    maskStarsButton.onClick = function () {
-        data.viewFlag = MOSAIC_MASK_STARS_FLAG();
-        this.dialog.ok();
-    };
+    let mosaicSection = new Control(this);
+    mosaicSection.sizer = new HorizontalSizer;
+    mosaicSection.sizer.spacing = 10;
+    mosaicSection.sizer.add(overlay_Label);
+    mosaicSection.sizer.add(this.mosaicOverlayRefControl);
+    mosaicSection.sizer.add(this.mosaicOverlayTgtControl);
+    mosaicSection.sizer.add(this.mosaicRandomControl);
+    mosaicSection.sizer.add(this.mosaicAverageControl);
+    mosaicSection.sizer.addStretch();
+    this.mosaicBar = new SectionBar(this, "Create Mosaic");
+    this.mosaicBar.setSection(mosaicSection);
+    this.mosaicBar.enableCheckBox();
+    this.mosaicBar.toolTip = "<p>Combines the reference and target frames together and " +
+            "displays the result in a '" + MOSAIC_NAME() + "' window</p>" +
+            "<p>If this option is not selected, the corrections will still be " +
+            "applied to the target image, but the mosaic is not created.</p>" +
+            "<p>After the first mosaic join, it is usually convenient to set " +
+            "the reference view to '" + MOSAIC_NAME() + "'</p>";
+    this.mosaicBar.checkBox.onClick = this.setCreateMosaicFlag;
+    this.mosaicBar.onToggleSection = this.onToggleSection;
+    this.setCreateMosaicFlag(data.createMosaicFlag);
+    // SectionBar: "Create Mosaic" End
     
-    let mask_Sizer = new HorizontalSizer;
-    mask_Sizer.spacing = 4;
-    mask_Sizer.addStretch();
-    mask_Sizer.add(createMaskButton);
-    mask_Sizer.addSpacing(2);
-    mask_Sizer.add(maskStarsButton);
-    
-    let starMaskLabelSize = this.font.width("Multiply Star Radius:");
-    this.LimitMaskStars_Control = new NumericControl(this);
-    this.LimitMaskStars_Control.real = false;
-    this.LimitMaskStars_Control.label.text = "Limit Stars %:";
-    this.LimitMaskStars_Control.toolTip =
-            "<p>Specifies the percentage of detected stars that will be used to " +
-            "create the star mask.</p>" +
-            "<p>0% will produce a solid mask with no stars.<br />" +
-            "100% will produce a mask that includes all detected stars.</p>" +
-            "<p>Small faint stars are usually free of artifacts, so normally " +
-            "only a small percentage of the detected stars need to be used.</p>";
-    this.LimitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
-    this.LimitMaskStars_Control.setRange(0, 100);
-    this.LimitMaskStars_Control.slider.setRange(0, 100);
-    this.LimitMaskStars_Control.setPrecision(0);
-    this.LimitMaskStars_Control.slider.minWidth = 200;
-    this.LimitMaskStars_Control.setValue(data.limitMaskStarsPercent);
-    this.LimitMaskStars_Control.onValueUpdated = function (value) {
-        data.limitMaskStarsPercent = value;
-    };
-    
-    this.StarRadiusMultiply_Control = new NumericControl(this);
-    this.StarRadiusMultiply_Control.real = true;
-    this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
-    this.StarRadiusMultiply_Control.toolTip = 
-            "<p>Sets the mask star radius to a multiple of the star's radius.</p>" +
-            "<p>This increases the size for large stars more than small ones.</p>";
-    this.StarRadiusMultiply_Control.setRange(1, 5);
-    this.StarRadiusMultiply_Control.slider.setRange(1, 150);
-    this.StarRadiusMultiply_Control.setPrecision(1);
-    this.StarRadiusMultiply_Control.slider.minWidth = 150;
-    this.StarRadiusMultiply_Control.setValue(data.radiusMult);
-    this.StarRadiusMultiply_Control.onValueUpdated = function (value) {
-        data.radiusMult = value;
-    };
-    
-    this.StarRadiusAdd_Control = new NumericControl(this);
-    this.StarRadiusAdd_Control.real = true;
-    this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
-    this.StarRadiusAdd_Control.toolTip = 
-            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply Star Radius'.</p>";
-    this.StarRadiusAdd_Control.setRange(-5, 10);
-    this.StarRadiusAdd_Control.slider.setRange(0, 150);
-    this.StarRadiusAdd_Control.setPrecision(1);
-    this.StarRadiusAdd_Control.slider.minWidth = 150;
-    this.StarRadiusAdd_Control.setValue(data.radiusAdd);
-    this.StarRadiusAdd_Control.onValueUpdated = function (value) {
-        data.radiusAdd = value;
-    };
-    
-    let radiusHorizontalSizer = new HorizontalSizer;
-    radiusHorizontalSizer.spacing = 20;
-    radiusHorizontalSizer.add(this.StarRadiusMultiply_Control);
-    radiusHorizontalSizer.add(this.StarRadiusAdd_Control);
-    //radiusHorizontalSizer.addStretch();
-
-    let starMaskGroupBox = createGroupBox(this, "Mosaic Star Mask");
-    starMaskGroupBox.sizer.add(this.LimitMaskStars_Control);
-    starMaskGroupBox.sizer.add(radiusHorizontalSizer);
-    starMaskGroupBox.sizer.add(mask_Sizer);
-
-    //-------------------------------------------------------
-    // Sample Area
-    //-------------------------------------------------------
-    let labelWidth2 = this.font.width("Height:_");
-
-    this.rectangleX0_Control = createNumericEdit("Left:", "Top left of rectangle X-Coordinate.", data.sampleAreaPreview_X0, labelWidth2, 50);
-    this.rectangleX0_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_X0 = value;
-    };
-    this.rectangleY0_Control = createNumericEdit("Top:", "Top left of rectangle Y-Coordinate.", data.sampleAreaPreview_Y0, labelWidth2, 50);
-    this.rectangleY0_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_Y0 = value;
-    };
-    this.rectangleX1_Control = createNumericEdit("Right:", "Bottom right of rectangle X-Coordinate.", data.sampleAreaPreview_X1, labelWidth2, 50);
-    this.rectangleX1_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_X1 = value;
-    };
-    this.rectangleY1_Control = createNumericEdit("Bottom:", "Bottom right of rectangle Y-Coordinate.", data.sampleAreaPreview_Y1, labelWidth2, 50);
-    this.rectangleY1_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_Y1 = value;
-    };
-
-    this.sampleAreaPreviewCheckBox = new CheckBox(this);
-    this.sampleAreaPreviewCheckBox.text = "Sample Area";
-    this.sampleAreaPreviewCheckBox.toolTip = 
-            "<p>Limit the search for overlapping pixels to this bounding box.</p>" +
-            "<p>If all overlapping pixels are within this area, selecting this " +
-            "option reduces calculation time but does not effect the calculated overlap pixels.</p>" +
-            "<p>If this area intersects the overlapping pixels, the calculated overlap pixels " +
-            "are limited to those within the area. This is useful for a corner tile so that " +
-            "the horizontal and vertical joins can be calculated separately.</p>" +
-            "<p>If the mosaic is built by first creating the rows (or columns) and then joining " +
-            "the resulting strips, it is not necessary to set the 'Area Of Interest'.</p>" +
-            "<p>The first time the overlap is calculated, the 'Area Of Interest' will be updated " +
-            "to the bounding box of the overlapping pixels that will be used to calculate the " +
-            "target image scale and gradient.</p>";
-    this.sampleAreaPreviewCheckBox.checked = data.hasSampleAreaPreview;
-    this.sampleAreaPreviewCheckBox.onClick = function (checked) {
-        data.hasSampleAreaPreview = checked;
-    };
-
-    let coordHorizontalSizer = new HorizontalSizer;
-    coordHorizontalSizer.spacing = 10;
-    coordHorizontalSizer.add(this.sampleAreaPreviewCheckBox);
-    coordHorizontalSizer.addSpacing(36);
-    coordHorizontalSizer.add(this.rectangleX0_Control);
-    coordHorizontalSizer.add(this.rectangleY0_Control);
-    coordHorizontalSizer.add(this.rectangleX1_Control);
-    coordHorizontalSizer.add(this.rectangleY1_Control);
-    coordHorizontalSizer.addStretch();
-
-    let previewUpdateActions = function(dialog){
-        let view = data.preview;
-        if (view !== null && view.isPreview) {
-            data.hasSampleAreaPreview = true;
-            dialog.sampleAreaPreviewCheckBox.checked = data.hasSampleAreaPreview;
-            ///let imageWindow = view.window;
-            let rect = view.window.previewRect(view);
-            data.sampleAreaPreview_X0 = rect.x0;
-            data.sampleAreaPreview_Y0 = rect.y0;
-            data.sampleAreaPreview_X1 = rect.x1;
-            data.sampleAreaPreview_Y1 = rect.y1;
-
-            dialog.rectangleX0_Control.setValue(data.sampleAreaPreview_X0);
-            dialog.rectangleY0_Control.setValue(data.sampleAreaPreview_Y0);
-            dialog.rectangleX1_Control.setValue(data.sampleAreaPreview_X1);
-            dialog.rectangleY1_Control.setValue(data.sampleAreaPreview_Y1);
-        } else {
-            data.hasSampleAreaPreview = false;
-            dialog.sampleAreaPreviewCheckBox.checked = false;
-        }
-    };
-
-    // Area of interest Target->preview
-    let previewImage_Label = new Label(this);
-    previewImage_Label.text = "Get area from preview:";
-    previewImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-
-    this.previewImage_ViewList = new ViewList(this);
-    this.previewImage_ViewList.getPreviews();
-    this.previewImage_ViewList.minWidth = 300;
-    this.previewImage_ViewList.toolTip = "<p>Get the 'Area of Interest' from a preview image.</p>";
-    this.previewImage_ViewList.onViewSelected = function (view) {
-        data.preview = view;
-        previewUpdateActions(this.dialog);
-    };
-
-    let previewUpdateButton = new PushButton();
-    previewUpdateButton.hasFocus = false;
-    previewUpdateButton.text = "Update";
-    previewUpdateButton.onClick = function () {
-        if (!this.isUnderMouse){
-            // Ensure pressing return in a different field does not trigger this callback!
-            return;
-        }
-        previewUpdateActions(this.dialog);
-    };
-
-    let previewImage_Sizer = new HorizontalSizer;
-    previewImage_Sizer.spacing = 4;
-    previewImage_Sizer.add(previewImage_Label);
-    previewImage_Sizer.add(this.previewImage_ViewList, 100);
-    previewImage_Sizer.addSpacing(10);
-    previewImage_Sizer.add(previewUpdateButton);
-
-    let sampleAreaPreview_GroupBox = createGroupBox(this, "Sample Area");
-    sampleAreaPreview_GroupBox.sizer.add(coordHorizontalSizer, 10);
-    sampleAreaPreview_GroupBox.sizer.add(previewImage_Sizer);
 
     const helpWindowTitle = TITLE() + " Help";
     const HELP_MSG =
@@ -1016,23 +1250,36 @@ function PhotometricMosaicDialog(data) {
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, 
             helpWindowTitle, HELP_MSG, "PhotometricMosaic", okTooltip);
 
-    //-------------------------------------------------------
-    // Vertically stack all the objects
-    //-------------------------------------------------------
+    //---------------------------------------------------------------
+    // Vertically stack all the SectionBars and OK/Cancel button bar
+    //---------------------------------------------------------------
     this.sizer = new VerticalSizer;
     this.sizer.margin = 6;
     this.sizer.spacing = 4;
-    this.sizer.add(titleLabel);
-    this.sizer.add(referenceImage_Sizer);
-    this.sizer.add(targetImage_Sizer);
-    this.sizer.add(starDetectionGroupBox);
-    this.sizer.add(photometryGroupBox);
-    this.sizer.add(sampleAreaPreview_GroupBox);
-    this.sizer.add(gradientGroupBox);
-    this.sizer.add(starMaskGroupBox);
-    this.sizer.add(mosaicGroupBox);
+    this.sizer.add(this.titleBar);
+    this.sizer.add(titleSection);
+    this.sizer.add(this.selectViewBar);
+    this.sizer.add(selectViewSection);
+    this.sizer.add(this.starDetectionBar);
+    this.sizer.add(starDetectionSection);
+    this.sizer.add(this.photometryBar);
+    this.sizer.add(photometrySection);
+    this.sizer.add(this.sampleAreaBar);
+    this.sizer.add(sampleAreaSection);
+    this.sizer.add(this.gradientBar);
+    this.sizer.add(gradientSection);
+    this.sizer.add(this.starMaskBar);
+    this.sizer.add(starMaskSection);
+    this.sizer.add(this.mosaicBar);
+    this.sizer.add(mosaicSection);
     this.sizer.addSpacing(5);
     this.sizer.add(buttons_Sizer);
+    
+    titleSection.hide();
+    starDetectionSection.hide();
+    sampleAreaSection.hide();
+    starMaskSection.hide();
+    mosaicSection.hide();
 
     //-------------------------------------------------------
     // Set all the window data

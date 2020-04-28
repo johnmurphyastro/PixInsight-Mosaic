@@ -674,8 +674,8 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
         keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
-        keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
-        keywords.push(new FITSKeyword("COMMENT", "", "Line Segments: " + data.nLineSegments));
+        keywords.push(new FITSKeyword("COMMENT", "", "Limit Sample Stars Percent: " + data.limitSampleStarsPercent));
+        keywords.push(new FITSKeyword("COMMENT", "", "Taper Best Fit Lines: " + data.nTaperBestFitLines));
         if (data.taperFlag){
             keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
         }
