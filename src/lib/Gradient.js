@@ -38,9 +38,10 @@ function GradientData(difArray, minLineValue, maxLineValue){
  * @param {Image} targetImage Used to get image width and height
  * @param {Rect} overlapBox Overlap bounding box
  * @param {Boolean} isHorizontal True if the mosaic join is a horizontal strip
+ * @param {GradientData} propagatedGradientData If not null, this correction is applied first
  * @returns {Gradient}
  */
-function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal){
+function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal, propagatedGradientData){
     this.isValid = true;
     let self = this;
     /**
@@ -49,9 +50,10 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
      * Returns an array of all the sections.
      * @param {SamplePairs} samplePairs Contains the SamplePairArray and their bounding box.
      * @param {Boolean} isHorizontal True if the mosaic join is a horizontal strip
+     * @param {GradientData} propagatedGradientData If not null, this correction is applied first
      * @returns {SampleSection[]} Each entry contains the calculated best fit gradient line
      */
-    let getSampleSections = function (samplePairs, isHorizontal){
+    let getSampleSections = function (samplePairs, isHorizontal, propagatedGradientData){
         // Start the first section at the start of the SamplePair area
         let sampleAreaStart;
         let sampleAreaEnd;
@@ -64,6 +66,7 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
             sampleAreaEnd = sampleCoverageArea.y1;
         }
         let interval = (sampleAreaEnd - sampleAreaStart) / nSections;
+        let difArray = propagatedGradientData !== null ? propagatedGradientData.difArray : null;
 
         // Split the SamplePair area into sections of equal size.
         let sections = [];
@@ -72,7 +75,7 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
             let minCoord = Math.floor(sampleAreaStart + interval * i);
             let maxCoord = Math.floor(sampleAreaStart + interval * (i+1));
             let newSampleSection = new SampleSection(minCoord, maxCoord, isHorizontal);
-            self.isValid = newSampleSection.calcLinearFit(samplePairs);
+            self.isValid = newSampleSection.calcLinearFit(samplePairs, difArray);
             if (!self.isValid){
                 // Not enough samples in a section to calculate the line
                 return [];
@@ -232,7 +235,7 @@ function Gradient(samplePairs, nSections, targetImage, overlapBox, isHorizontal)
         return this.gradientData;
     };
     
-    let sampleSections = getSampleSections(samplePairs, isHorizontal);
+    let sampleSections = getSampleSections(samplePairs, isHorizontal, propagatedGradientData);
     if (this.isValid){
         sampleSections = joinSectionLines(sampleSections);
         this.eqnLineArray = createGradientLines(sampleSections, overlapBox, targetImage, isHorizontal);
@@ -261,9 +264,10 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
      * Determine which SamplePair are within this section's area, and uses
      * them to calculate their best linear fit
      * @param {SamplePairs} samplePairs Contains samplePairArray
+     * @param {Number[]} initialDifArray Propagated gradient difArray, or null
      * @returns {Boolean} True if a valid line could be fitted to the points
      */
-    this.calcLinearFit = function (samplePairs) {
+    this.calcLinearFit = function (samplePairs, initialDifArray) {
         let samplePairArray = [];
         for (let samplePair of samplePairs.samplePairArray) {
             // Discover which SamplePair are within this section's area and store them
@@ -285,15 +289,15 @@ function SampleSection(minCoord, maxCoord, isHorizontal){
         }
         // Calculate the linear fit
         let algorithm = new LeastSquareFitAlgorithm();
-        if (isHorizontal) {
-            samplePairArray.forEach((samplePair) => {
-                algorithm.addValue(samplePair.rect.center.x, samplePair.targetMedian - samplePair.referenceMedian);
-            });
-        } else {
-            samplePairArray.forEach((samplePair) => {
-                algorithm.addValue(samplePair.rect.center.y, samplePair.targetMedian - samplePair.referenceMedian);
-            });
-        }
+        
+        samplePairArray.forEach((samplePair) => {
+            let coord = isHorizontal ? samplePair.rect.center.x : samplePair.rect.center.y;
+            let value = samplePair.targetMedian - samplePair.referenceMedian;
+            if (initialDifArray){
+                value -= initialDifArray[coord];
+            }
+            algorithm.addValue(coord, value);
+        });
         this.linearFitData = algorithm.getLinearFit();
         
         // If all points in this section were at the same coordinate the gradient will be infinite (invalid)
@@ -359,81 +363,106 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
     /**
      * Applies the scale and gradient correction to the supplied view.
      * 
-     * @param {type} view
-     * @param {type} scale
-     * @param {type} difArray
-     * @param {type} tgtBox
-     * @param {type} channel
+     * @param {View} view
+     * @param {Number} scale
+     * @param {Number[]} propagateDifArray
+     * @param {Number[]} taperDifArray
+     * @param {Rect} tgtBox Target image bounding box
+     * @param {Number} channel
      * @returns {undefined}
      */
-    this.applyAllCorrections = function (view, scale, difArray, tgtBox, channel){
-        
-        let average = Math.mean(difArray);
-        console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
+    this.applyAllCorrections = function (view, scale, propagateDifArray, taperDifArray, tgtBox, channel){
         processEvents();
         
         if (this.taperFlag) {
+            const length = taperDifArray.length;
+            let bgDif;
+            let fullDif;
+            if (propagateDifArray !== null){
+                // Apply propagateDifArray + taperDifArray to the join area
+                // Apply propagateDifArray + taperDifArray * taperFraction in taper area
+                // Apply propagateDifArray outside the join and taper area
+                bgDif = propagateDifArray;
+                fullDif = [];
+                for (let i=0; i<length; i++){
+                    fullDif.push(propagateDifArray[i] + taperDifArray[i]);
+                }
+            } else {
+                // Apply taperDifArray to the join area
+                // Apply average taperDifArray outside the join and taper area
+                let average = Math.mean(taperDifArray);
+                //bgDif = Array(length).fill(average);
+                bgDif = [];
+                for (let i=0; i<length; i++){
+                    bgDif.push(average);
+                }
+                fullDif = taperDifArray;
+                console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
+            }
+            
             if (this.isHorizontal) {
                 if (this.isTargetAfterRef) {
                     // Full correction from start of target up to end of the join region
-                    this.applyScaleAndGradient(view, scale, difArray,
+                    this.applyScaleAndGradient(view, scale, fullDif,
                             tgtBox.x0, tgtBox.y0, tgtBox.x1, this.joinEnd, channel);
 
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(view, scale, difArray, average,
+                    this.applyScaleAndGradientTaperDown(view, scale, fullDif, bgDif,
                             tgtBox.x0, this.joinEnd, tgtBox.x1, this.secondTaperEnd, channel);
 
                     // Taper has finished. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, average,
+                    this.applyScaleAndAverageGradient(view, scale, bgDif,
                             tgtBox.x0, this.secondTaperEnd, tgtBox.x1, tgtBox.y1, channel);
                 } else {
                     // Taper has not yet started. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, average,
+                    this.applyScaleAndAverageGradient(view, scale, bgDif,
                             tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel);
 
                     // Taper up region. Apply full scale correction and 
                     // gradually increase the gradient correction from zero to full
-                    this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
+                    this.applyScaleAndGradientTaperUp(view, scale, fullDif, bgDif,
                             tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.joinStart, channel);
 
                     // Full correction from start of the join region to the end of the target image 
-                    this.applyScaleAndGradient(view, scale, difArray,
+                    this.applyScaleAndGradient(view, scale, fullDif,
                             tgtBox.x0, this.joinStart, tgtBox.x1, tgtBox.y1,  channel);
                 }
             } else {    // vertical join
                 if (isTargetAfterRef) {
                     // Full correction from start of target up to end of the join region
-                    this.applyScaleAndGradient(view, scale, difArray,
+                    this.applyScaleAndGradient(view, scale, fullDif,
                             tgtBox.x0, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
 
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(view, scale, difArray, average,
+                    this.applyScaleAndGradientTaperDown(view, scale, fullDif, bgDif,
                             this.joinEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
 
                     // Taper has finished. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, average,
+                    this.applyScaleAndAverageGradient(view, scale, bgDif,
                             this.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
                 } else {
                     // Taper has not yet started. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, average,
+                    this.applyScaleAndAverageGradient(view, scale, bgDif,
                             tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel);
 
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperUp(view, scale, difArray, average,
+                    this.applyScaleAndGradientTaperUp(view, scale, fullDif, bgDif,
                             this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
 
                     // Full correction from start of the join region to the end of the target image 
-                    this.applyScaleAndGradient(view, scale, difArray,
+                    this.applyScaleAndGradient(view, scale, fullDif,
                             this.joinStart, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
                 }
             }
-        } else {
+        } else if (propagateDifArray !== null){
             // No taper. Propogate full correction from start to end of target image
-            this.applyScaleAndGradient(view, scale, difArray,
+            this.applyScaleAndGradient(view, scale, propagateDifArray,
                     tgtBox.x0, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
+        } else {
+            console.criticalln("No gradient specified!");
         }
         
     };
@@ -487,15 +516,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
     /**
      * @param {View} tgtView
      * @param {Number} scale
-     * @param {Number[]} difArray
-     * @param {Number} average Average of difArray
+     * @param {Number[]} difArray Apply to join
+     * @param {Number[]} bgDif Apply outside join and taper areas
      * @param {Number} x0
      * @param {Number} y0
      * @param {Number} x1
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndGradientTaperDown = function (tgtView, scale, difArray, average,
+    this.applyScaleAndGradientTaperDown = function (tgtView, scale, difArray, bgDif,
             x0, y0, x1, y1, channel){
         
         if (x0 >= x1 || y0 >= y1)
@@ -510,9 +539,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
-                    const delta = difArray[difArrayStart + i] - average;
+                    const idx = difArrayStart + i;
+                    const bg = bgDif[idx];
+                    const delta = difArray[idx] - bg;
                     const fraction = 1 - (coord - taperStart) / self.taperLength;
-                    const taper = average + delta * fraction;
+                    const taper = bg + delta * fraction;
                     samples[i] = samples[i] * scale - taper;
                 }
             }
@@ -539,15 +570,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
     /**
      * @param {View} tgtView
      * @param {Number} scale
-     * @param {Number[]} difArray
-     * @param {Number} average Average of difArray
+     * @param {Number[]} difArray Apply to join
+     * @param {Number[]} bgDif Apply outside join and taper areas
      * @param {Number} x0
      * @param {Number} y0
      * @param {Number} x1
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndGradientTaperUp = function (tgtView, scale, difArray, average, 
+    this.applyScaleAndGradientTaperUp = function (tgtView, scale, difArray, bgDif, 
             x0, y0, x1, y1, channel){
                 
         if (x0 >= x1 || y0 >= y1)
@@ -563,9 +594,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
-                    const delta = difArray[difArrayStart + i] - average;
+                    const idx = difArrayStart + i;
+                    const bg = bgDif[idx];
+                    const delta = difArray[idx] - bg;
                     let fraction = 1 - (taperEnd - coord) / self.taperLength;
-                    const taper = average + delta * fraction;
+                    const taper = bg + delta * fraction;
                     samples[i] = samples[i] * scale - taper;
                 }
             }
@@ -594,38 +627,59 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
     /**
      * @param {View} tgtView
      * @param {Number} scale
-     * @param {Number} average Average of difArray
+     * @param {Number[]} bgDif Apply outside join and taper areas
      * @param {Number} x0
      * @param {Number} y0
      * @param {Number} x1
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndAverageGradient = function (tgtView, scale, average, 
+    this.applyScaleAndAverageGradient = function (tgtView, scale, bgDif, 
             x0, y0, x1, y1, channel){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
         
-        const area = new Rect(x0, y0, x1, y1);
-        let samples = [];
-        tgtView.image.getSamples(samples, area, channel);
-        for (let i = 0; i < samples.length; i++) {
-            if (samples[i]){ // do not modify black pixels
-                samples[i] = samples[i] * scale - average;
+        let row;
+        let difArrayStart;
+        let apply = function(){
+            let samples = [];
+            tgtView.image.getSamples(samples, row, channel);
+            for (let i = 0; i < samples.length; i++) {
+                if (samples[i]){ // do not modify black pixels
+                    samples[i] = samples[i] * scale - bgDif[difArrayStart + i];
+                }
+            }
+            tgtView.image.setSamples(samples, row, channel);
+        };
+
+        if (this.isHorizontal) {
+            row = new Rect(x0, y0, x1, y0 + 1);
+            difArrayStart = x0;
+            for (let y = y0; y < y1; y++) {
+                row.moveTo(x0, y);
+                apply();
+            }
+        } else {
+            row = new Rect(x0, y0, x0 + 1, y1);
+            difArrayStart = y0;
+            for (let x = x0; x < x1; x++) {
+                row.moveTo(x, y0);
+                apply();
             }
         }
-        tgtView.image.setSamples(samples, area, channel);
     };
 }
 
 /**
  * Calculates maximum and minimum values for the samples and the best fit line(s)
  * @param {SamplePairs[]} colorSamplePairs Contains samplePairArray
+ * @param {Gradient[]} initialGradients Apply this gradient to data points before calculating min max
  * @param {Gradient[]} gradients This stores the min and max line y values
+ * @param {Boolean} isHorizontal 
  * @returns {SamplePairDifMinMax}
  */
-function SamplePairDifMinMax(colorSamplePairs, gradients) {
+function SamplePairDifMinMax(colorSamplePairs, initialGradients, gradients, isHorizontal) {
     let gradientData = gradients[0].getGradientData();
     this.minDif = gradientData.minLineValue;
     this.maxDif = gradientData.maxLineValue;
@@ -635,12 +689,19 @@ function SamplePairDifMinMax(colorSamplePairs, gradients) {
         this.minDif = Math.min(this.minDif, gradientData1.minLineValue, gradientData2.minLineValue);
         this.maxDif = Math.max(this.maxDif, gradientData1.maxLineValue, gradientData2.maxLineValue);
     }
-
-    for (let samplePairs of colorSamplePairs) {
+    
+    for (let c=0; c<colorSamplePairs.length; c++) {
+        let samplePairs = colorSamplePairs[c];
         for (let samplePair of samplePairs.samplePairArray) {
             // works for both horizontal and vertical
-            this.minDif = Math.min(this.minDif, samplePair.targetMedian - samplePair.referenceMedian);
-            this.maxDif = Math.max(this.maxDif, samplePair.targetMedian - samplePair.referenceMedian);
+            let dif = samplePair.targetMedian - samplePair.referenceMedian;
+            if (initialGradients !== null) {
+                let coord = isHorizontal ? samplePair.rect.center.x : samplePair.rect.center.y;
+                let initialDifArray = initialGradients[c].getGradientData().difArray;
+                dif -= initialDifArray[coord];
+            }
+            this.minDif = Math.min(this.minDif, dif);
+            this.maxDif = Math.max(this.maxDif, dif);
         }
     }
 }
@@ -651,35 +712,22 @@ function SamplePairDifMinMax(colorSamplePairs, gradients) {
  * @param {View} referenceView Used for view name
  * @param {Number} width Graph width. Limited to target image size (width or height).
  * @param {Boolean} isHorizontal
+ * @param {Gradient[]} initialGradients If not null, apply this gradient to data points before displaying them
  * @param {Gradient[]} gradients Contains best fit gradient lines for each channel
  * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {undefined}
  */
-function displayGradientGraph(targetView, referenceView, width, isHorizontal, gradients, colorSamplePairs, data){
+function displayGradientGraph(targetView, referenceView, width, isHorizontal, 
+        initialGradients, gradients, colorSamplePairs, data){
+            
     /**
-     * @param {View} refView
-     * @param {View} tgtView
-     * @param {ImageWindow} graphWindow Graph window
-     * @param {Gradient[]} gradients Contains best fit lines for each channel
-     * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @return {undefined}
+     * @param {FITSKeyword[]} keywords
+     * @param {Gradient[]} gradients
+     * @returns {FITSKeyword[]}
      */
-    let gradientGraphFitsHeader = function(refView, tgtView, graphWindow, gradients, data){
-        let view = graphWindow.mainView;
-        let nColors = gradients.length;
-        view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-        let keywords = graphWindow.keywords;
-        keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-        keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
-        keywords.push(new FITSKeyword("COMMENT", "", "Limit Sample Stars Percent: " + data.limitSampleStarsPercent));
-        keywords.push(new FITSKeyword("COMMENT", "", "Taper Best Fit Lines: " + data.nTaperBestFitLines));
-        if (data.taperFlag){
-            keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
-        }
-        
+    let addOffsetsToFitsHeader = function (keywords, gradients){
+        const nColors = gradients.length;
         for (let c = 0; c < nColors; c++){
             let eqnLines = gradients[c].getGradientLines();
             for (let i=0; i<eqnLines.length; i++){
@@ -694,6 +742,40 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
                 }
             }
         }
+        return keywords;
+    };
+    
+    /**
+     * @param {View} refView
+     * @param {View} tgtView
+     * @param {ImageWindow} graphWindow Graph window
+     * @param {Gradient[]} initialGradients The displayed graph line & points have already been corrected by this
+     * @param {Gradient[]} gradients Contains best fit lines for each channel
+     * @param {PhotometricMosaicData} data User settings used to create FITS header
+     * @return {undefined}
+     */
+    let gradientGraphFitsHeader = function(refView, tgtView, graphWindow, initialGradients, gradients, data){
+        let view = graphWindow.mainView;
+        view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
+        let keywords = graphWindow.keywords;
+        keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
+        keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
+        keywords.push(new FITSKeyword("COMMENT", "", "Limit Sample Stars Percent: " + data.limitSampleStarsPercent));
+        if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()){
+            keywords.push(new FITSKeyword("COMMENT", "", "Gradient Best Fit Lines: " + data.nGradientBestFitLines));
+            addOffsetsToFitsHeader(keywords, gradients);
+        } else if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()){
+            if (data.gradientFlag){
+                keywords.push(new FITSKeyword("COMMENT", "", "Gradient Best Fit Lines: " + data.nGradientBestFitLines));
+                addOffsetsToFitsHeader(keywords, initialGradients);
+            }
+            keywords.push(new FITSKeyword("COMMENT", "", "Taper Best Fit Lines: " + data.nTaperBestFitLines));
+            keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
+            addOffsetsToFitsHeader(keywords, gradients);
+        }
+        
         graphWindow.keywords = keywords;
         view.endProcess();
     };
@@ -701,24 +783,25 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
      * Draw gradient line and sample points for a single color channel.
      * @param {Graph} graph
      * @param {Boolean} isHorizontal
+     * @param {Number[]} initialDifArray If not null, apply this to data points before displaying 
      * @param {EquationOfLine[]} eqnLines
      * @param {Number} lineColor
      * @param {SamplePairs} samplePairs
      * @param {Number} pointColor
      * @returns {undefined}
      */
-    let drawLineAndPoints = function(graph, isHorizontal, eqnLines, lineColor, samplePairs, pointColor) {
+    let drawLineAndPoints = function(graph, isHorizontal, initialDifArray,
+            eqnLines, lineColor, samplePairs, pointColor) {
+                
         for (let eqnLine of eqnLines){
             graph.drawLineSegment(eqnLine.m, eqnLine.b, lineColor, true, eqnLine.x0, eqnLine.x1);
         }
         for (let samplePair of samplePairs.samplePairArray) {
             // Draw the sample points
+            let coord = isHorizontal ? samplePair.rect.center.x : samplePair.rect.center.y;
             let dif = samplePair.targetMedian - samplePair.referenceMedian;
-            let coord;
-            if (isHorizontal) {
-                coord = samplePair.rect.center.x;
-            } else {
-                coord = samplePair.rect.center.y;
+            if (initialDifArray){
+                dif -= initialDifArray[coord];
             }
             graph.drawPoint(coord, dif, pointColor);
         }
@@ -742,7 +825,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
     const minScaleDif = 2e-4;
-    let minMax = new SamplePairDifMinMax(colorSamplePairs, gradients);
+    let minMax = new SamplePairDifMinMax(colorSamplePairs, initialGradients, gradients, isHorizontal);
     let maxY = minMax.maxDif;
     let minY = minMax.minDif;
     if (maxY - minY < minScaleDif){
@@ -754,7 +837,8 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
     graphWithAxis.createGraph(xLabel, yLabel);
 
     if (colorSamplePairs.length === 1){ // B&W
-        drawLineAndPoints(graphWithAxis, isHorizontal, 
+        let initialDifArray = initialGradients !== null ? initialGradients[0].getGradientData().difArray : null;
+        drawLineAndPoints(graphWithAxis, isHorizontal, initialDifArray,
             gradients[0].getGradientLines(), 0xFFFFFFFF,
             colorSamplePairs[0], 0xFFFFFFFF);
         imageWindow = graphWithAxis.createWindow(windowTitle, false);
@@ -764,14 +848,15 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal, gr
         let lineColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
         let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
         for (let c = 0; c < colorSamplePairs.length; c++){
+            let initialDifArray = initialGradients !== null ? initialGradients[c].getGradientData().difArray : null;
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawLineAndPoints(graphAreaOnly, isHorizontal, 
+            drawLineAndPoints(graphAreaOnly, isHorizontal, initialDifArray,
                 gradients[c].getGradientLines(), lineColors[c],
                 colorSamplePairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
         imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    gradientGraphFitsHeader(referenceView, targetView, imageWindow, gradients, data);
+    gradientGraphFitsHeader(referenceView, targetView, imageWindow, initialGradients, gradients, data);
     imageWindow.show();
 }

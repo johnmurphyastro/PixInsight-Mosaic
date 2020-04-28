@@ -207,21 +207,52 @@ function PhotometricMosaic(data)
     }
 
     // Calculate the gradient for each channel
-    let gradients = [];
-    let nTaperBestFitLines = Math.floor((data.nTaperBestFitLines + 1) / 2);
-    for (let c = 0; c < nChannels; c++) {
-        samplePairs = colorSamplePairs[c];
-        gradients[c] = new Gradient(samplePairs, nTaperBestFitLines, targetView.image, 
-            sampleRect, isHorizontal);
-        if (!gradients[c].isValid){
-            new MessageBox("At least two samples per line segment are required.\n" +
-                    "Try decreasing either the number of line segments or the size of the samples.",
-                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
-            return;
+    const gradientErrMsg = 
+            "At least two samples per line segment are required.\n" +
+            "Try decreasing either the number of line segments or the size of the samples.";
+    let propagateGradient;
+    if (data.gradientFlag) {
+        propagateGradient = [];
+        let nGradientBestFitLines = Math.floor((data.nGradientBestFitLines + 1) / 2);
+        for (let c = 0; c < nChannels; c++) {
+            samplePairs = colorSamplePairs[c];
+            propagateGradient[c] = new Gradient(samplePairs, nGradientBestFitLines, targetView.image,
+                    sampleRect, isHorizontal, null);
+            if (!propagateGradient[c].isValid) {
+                new MessageBox(gradientErrMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+                return;
+            }
         }
+    } else {
+        propagateGradient = null;
     }
+    let taperGradient;
+    if (data.taperFlag) {
+        taperGradient = [];
+        let nTaperBestFitLines = Math.floor((data.nTaperBestFitLines + 1) / 2);
+        for (let c = 0; c < nChannels; c++) {
+            let propogateGradientData = data.gradientFlag ? propagateGradient[c].getGradientData() : null;
+            samplePairs = colorSamplePairs[c];
+            taperGradient[c] = new Gradient(samplePairs, nTaperBestFitLines, targetView.image,
+                    sampleRect, isHorizontal, propogateGradientData);
+            if (!taperGradient[c].isValid) {
+                new MessageBox(gradientErrMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+                return;
+            }
+        }
+    } else {
+        taperGradient = null;
+    }
+
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, gradients, colorSamplePairs, data);
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
+                null, propagateGradient, colorSamplePairs, data);
+        return;
+    }
+
+    if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()) {
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
+                propagateGradient, taperGradient, colorSamplePairs, data);
         return;
     }
 
@@ -232,7 +263,7 @@ function PhotometricMosaic(data)
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
             let messageBox = new MessageBox("Is the reference frame above the target frame?",
-                "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
+                    "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
             isTargetAfterRef = (StdButton_Yes === messageBox.execute());
         }
     } else {
@@ -241,15 +272,15 @@ function PhotometricMosaic(data)
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
             let messageBox = new MessageBox("Is the reference frame to the left of the target frame?",
-                "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
+                    "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
             isTargetAfterRef = (StdButton_Yes === messageBox.execute());
         }
     }
-    
+
     console.writeln("\n<b><u>Applying scale and gradients</u></b>");
     let correctedView = applyScaleAndGradient(targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, gradients, joinRect, data);
-            
+            scaleFactors, propagateGradient, taperGradient, joinRect, data);
+
     processEvents();
 
     if (data.createMosaicFlag){
@@ -260,9 +291,9 @@ function PhotometricMosaic(data)
         createMosaic(referenceView, correctedView, mosaicName,
                 data.mosaicOverlayRefFlag, data.mosaicOverlayTgtFlag, data.mosaicRandomFlag,
                 data.hasSampleAreaPreview, joinRect, isHorizontal, isTargetAfterRef);
-                
+
         let mosaicView = View.viewById(mosaicName);
-        
+
         // Update Fits Header
         mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         copyFitsObservation(referenceView, mosaicView);
@@ -270,7 +301,7 @@ function PhotometricMosaic(data)
         copyFitsKeywords(referenceView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
         copyFitsKeywords(correctedView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
         mosaicView.endProcess();
-        
+
         // Don't need cloned target view any more
         correctedView.window.forceClose();
 
@@ -284,13 +315,13 @@ function PhotometricMosaic(data)
         w.createPreview(previewRect, targetView.fullId);
         // But show the main mosaic view.
         w.currentView = mosaicView;
-        w.zoomToFit();  
+        w.zoomToFit();
     } else {
         correctedView.stf = referenceView.stf;
         correctedView.window.show();
         correctedView.window.zoomToFit();
     }
-    
+
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
     processEvents();
 }
@@ -313,17 +344,18 @@ function calculateScale(starPairs) {
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
- * @param {Gradient[]} gradients Gradient for each color channel
+ * @param {Gradient[]} propagateGradient Gradient for each color channel, propogated
+ * @param {Gradient[]} taperGradient Gradient for each color channel, tapered
  * @param {Rect} joinRect Bounding box of join region
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {View} Clone of tgtView, with corrections applied
  */
 function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, gradients, joinRect, data) {
+        scaleFactors, propagateGradient, taperGradient, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
     const width = tgtView.image.width;
     const height = tgtView.image.height;
-    const nChannels = gradients.length;
+    const nChannels = scaleFactors.length;
     
     // Clone the target view and image
     let w = tgtView.window;
@@ -339,9 +371,15 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
     let tgtBox = data.starCache.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
-        let gradientData = gradients[channel].getGradientData();
-        let difArray = gradientData.difArray;
-        tgtCorrector.applyAllCorrections(view, scale, difArray, tgtBox, channel);
+        let propagateDifArray = null;
+        if (data.gradientFlag){
+            propagateDifArray = propagateGradient[channel].getGradientData().difArray;
+        }
+        let taperDifArray = null;
+        if (data.taperFlag){
+            taperDifArray = taperGradient[channel].getGradientData().difArray;
+        }
+        tgtCorrector.applyAllCorrections(view, scale, propagateDifArray, taperDifArray, tgtBox, channel);
     }
     
     // FITS Header
@@ -366,9 +404,13 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
         SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".nTaperBestFitLines: " + data.nTaperBestFitLines));
+    if (data.gradientFlag){
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".nGradientBestFitLines: " + data.nGradientBestFitLines));
+    }
     if (data.taperFlag) {
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".nTaperBestFitLines: " + data.nTaperBestFitLines));
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".taperLength: " + data.taperLength));
     }
