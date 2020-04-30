@@ -485,8 +485,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         
         let row;
         let difArrayStart;
-        let apply = function(){
-            let samples = [];
+
+        let apply = function(samples){
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
@@ -498,17 +498,19 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         
         if (this.isHorizontal){
             row = new Rect(x0, y0, x1, y0 + 1);
+            let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply();
+                apply(samples);
             }
         } else {
             row = new Rect(x0, y0, x0 + 1, y1);
+            let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply();
+                apply(samples);
             }
         }
     };
@@ -534,8 +536,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         let row;
         let difArrayStart;
         
-        let apply = function(coord, taperStart){
-            let samples = [];
+        let apply = function(coord, taperStart, samples){
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
@@ -552,17 +553,19 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         
         if (this.isHorizontal){
             row = new Rect(x0, y0, x1, y0 + 1);
+            let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply(y, y0);
+                apply(y, y0, samples);
             }
         } else {
             row = new Rect(x0, y0, x0 + 1, y1);
+            let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply(x, x0);
+                apply(x, x0, samples);
             }
         }
     };
@@ -589,8 +592,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         let difArrayStart;
         let taperEnd;
         
-        let apply = function(coord){
-            let samples = [];
+        let apply = function(coord, samples){
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
@@ -608,18 +610,20 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         if (this.isHorizontal){
             taperEnd = y1 - 1;
             row = new Rect(x0, y0, x1, y0 + 1);
+            let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply(y);
+                apply(y, samples);
             }
         } else {
             taperEnd = x1 - 1;
             row = new Rect(x0, y0, x0 + 1, y1);
+            let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply(x);
+                apply(x, samples);
             }
         }
     };
@@ -642,8 +646,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         
         let row;
         let difArrayStart;
-        let apply = function(){
-            let samples = [];
+        let apply = function(samples){
             tgtView.image.getSamples(samples, row, channel);
             for (let i = 0; i < samples.length; i++) {
                 if (samples[i]){ // do not modify black pixels
@@ -655,17 +658,19 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
 
         if (this.isHorizontal) {
             row = new Rect(x0, y0, x1, y0 + 1);
+            let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply();
+                apply(samples);
             }
         } else {
             row = new Rect(x0, y0, x0 + 1, y1);
+            let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply();
+                apply(samples);
             }
         }
     };

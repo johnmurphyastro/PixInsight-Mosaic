@@ -97,9 +97,8 @@ function StarsDetected(){
             starCache.allStars = null;
             starCache.refColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(refView, this.overlapMask, logSensitivity, c);
+                let stars = findStars(refView, this.overlapMask, this.overlapBox, logSensitivity, c);
                 starCache.refColorStars.push(stars);
-                
                 console.writeln("Reference[", c, "] detected ", stars.length, " stars");
                 processEvents();
             }
@@ -111,9 +110,8 @@ function StarsDetected(){
             starCache.allStars = null;
             starCache.tgtColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(tgtView, this.overlapMask, logSensitivity, c);
+                let stars = findStars(tgtView, this.overlapMask, this.overlapBox, logSensitivity, c);
                 starCache.tgtColorStars.push(stars);
-                
                 console.writeln("Target[", c, "] detected ", stars.length, " stars");
                 processEvents();
             }
@@ -177,53 +175,49 @@ function StarsDetected(){
         const yMax = boundingBox.y1;  
         const width = boundingBox.width;
         
-        const updateInterval = width / 10;
-        let xOld = 0;
-        let oldTextLength = 0;
-        
-        let showProgress = function (x, xMin){
-            let text = "" + Math.trunc((x - xMin) / width * 100) + "%";
-            console.write(getDelStr() + text);
-            processEvents();
-            oldTextLength = text.length;
-            xOld = x;
-        };
-        let getDelStr = function (){
-            let bsp = "";
-            for (let i = 0; i < oldTextLength; i++) {
-                bsp += "<bsp>";
-            }
-            return bsp;
-        };
-        
         // Overlap bounding box coordinates
         let x0 = Number.POSITIVE_INFINITY;
         let x1 = Number.NEGATIVE_INFINITY;
         let y0 = Number.POSITIVE_INFINITY;
         let y1 = Number.NEGATIVE_INFINITY;
         // Create a mask to restrict the star detection to the overlapping area and previewArea
-        for (let x = xMin; x < xMax; x++) {
-            for (let y = yMin; y < yMax; y++) {
-                let isOverlap = true;
-                for (let c = self.nChannels - 1; c > -1; c--) {
-                    if (tgtImage.sample(x, y, c) === 0 || refImage.sample(x, y, c) === 0) {
-                        isOverlap = false;
-                        break;
-                    }
-                }
-                if (isOverlap) {
-                    mask.setSample(1, x, y);
-                    // Determine bounding box
-                    x0 = Math.min(x0, x);
-                    x1 = Math.max(x1, x);
-                    y0 = Math.min(y0, y);
-                    y1 = Math.max(y1, y);
+        
+        const size = boundingBox.area;
+        let refBuffer = [];
+        let tgtBuffer = [];
+        for (let c=0; c<self.nChannels; c++){
+            refBuffer[c] = new Float32Array(size);
+            tgtBuffer[c] = new Float32Array(size);
+            refImage.getSamples(refBuffer[c], boundingBox, c);
+            tgtImage.getSamples(tgtBuffer[c], boundingBox, c);
+        }
+        let maskBuffer = new Float32Array(size);
+        
+        for (let i=0; i<size; i++){
+            let isOverlap = true;
+            for (let c = self.nChannels - 1; c > -1; c--) {
+                if (tgtBuffer[c][i] === 0 || refBuffer[c][i] === 0) {
+                    isOverlap = false;
+                    break;
                 }
             }
-            if (x > xOld + updateInterval){
-                showProgress(x, xMin);
+            if (isOverlap) {
+                maskBuffer[i] = 1;
+                // Determine bounding box
+                let y = Math.floor(i/width);
+                let x = i % width;
+                x0 = Math.min(x0, x);
+                x1 = Math.max(x1, x);
+                y0 = Math.min(y0, y);
+                y1 = Math.max(y1, y);
             }
         }
+        mask.setSamples(maskBuffer, boundingBox);
+        
+        x0 += boundingBox.x0;
+        x1 += boundingBox.x0;
+        y0 += boundingBox.y0;
+        y1 += boundingBox.y0;
         if (x0 !== Number.POSITIVE_INFINITY){
             starCache.setOverlapBox(new Rect(x0, y0, x1+1, y1+1));
         } else {
@@ -232,7 +226,6 @@ function StarsDetected(){
         starCache.refBox = refBox;
         starCache.tgtBox = targetBox;
         starCache.overlapMask = mask;
-        console.write(getDelStr());   // remove 100% from console
         console.writeln(getElapsedTime(startTime) + "\n");
     };
     
@@ -240,50 +233,20 @@ function StarsDetected(){
      * Private
      * @param {View} view
      * @param {Image} overlapMask Bitmap represents overlapping region
+     * @param {Rect} overlapBox Bounding box of the overlap area
      * @param {Number} logSensitivity
      * @param {Number} channel
      * @returns {Star[]}
      */
-    let findStars = function(view, overlapMask, logSensitivity, channel){
-        const title = "TMP_ChannelExtraction";
-        const useColorManagement = false;
-        const isColor = view.image.isColor;
-        let imgWindow = null;
+    let findStars = function(view, overlapMask, overlapBox, logSensitivity, channel){
         let starImage;
-        if (isColor){
-            if (useColorManagement){
-                // Extract the specified color channel from both target and reference images
-                // Slightly more accurate, but slow
-                // ChannelExtraction creates a new B&W image for the extracted channel
-                let P = new ChannelExtraction;
-                P.colorSpace = ChannelExtraction.prototype.RGB;
-                P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
-                P.channels = [// enabled, id
-                    [channel % 3 === 0, title],
-                    [channel % 3 === 1, title],
-                    [channel % 3 === 2, title]
-                ];
-                P.executeOn(view);
-                imgWindow = ImageWindow.windowById( title );
-                starImage = imgWindow.mainView.image;
-            } else {
-                // Dont color manage to increase speed
-                // The extra error when the scale is calculated is small:
-                // Example: slow method gives 1.100000299505084, this method: 1.1003654077279212
-                // Create grey scale 32bit floating point images
-                let width = view.image.width;
-                let height = view.image.height;
-                starImage = new Image(width, height, 1);
-                for (let x = width - 1; x !== 0; x-- ){
-                    for (let y = height - 1; y !== 0; y--){
-                        starImage.setSample(view.image.sample(x, y, channel), x, y);
-                    }
-                }
-            }
-        } else {
-            // Input images are B&W so we can use them directly
-            starImage = view.image;
-        }
+        // Create grey scale 32bit floating point images
+        let width = view.image.width;
+        let height = view.image.height;
+        starImage = new Image(width, height, 1);
+        let samples = new Float32Array(overlapBox.area);
+        view.image.getSamples(samples, overlapBox, channel);
+        starImage.setSamples(samples, overlapBox);
 
         // Detect stars in target and reference images
         let starDetector = new StarDetector();
@@ -293,13 +256,7 @@ function StarsDetected(){
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
         self.bkgDelta = starDetector.bkgDelta;
-        let stars = starDetector.stars(starImage);
-
-        if (useColorManagement && isColor){
-            // We must close the temporary windows we created
-            imgWindow.forceClose();
-        }
-        return stars;
+        return starDetector.stars(starImage);
     };
     
     /**
@@ -897,25 +854,21 @@ function displayMask(tgtView, joinArea, detectedStars, limitMaskStarsPercent, ra
 function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWords, minZoom) {
     /**
      * Get all the samples from the image that are within the area rectangle.
-     * @param {Image} image Return subset of samples from this image
-     * @param {Array} mask If mask is zero, set output sample to zero
-     * @param {Rect} area Get samples from within this area
-     * @param {Number} c channel
-     * @returns {Array} Samples
+     * @param {Float32Array} refSamples Overlap area from refView (modified)
+     * @param {Float32Array} mask If mask is zero, set refSamples to zero
      */
-    let getOverlapSamples = function (image, mask, area, c) {
-        let refSamples = [];
-        image.getSamples(refSamples, area, c);
+    let applyMask = function (refSamples, mask) {
         for (let i = mask.length - 1; i > -1; i--) {
             if (mask[i] === 0) {
                 refSamples[i] = 0;
             }
         }
-        return refSamples;
     };
-    
+
     // Create the new image and copy the samples from refView to it
-    let maskSamples = [];
+    let maskSamples = new Float32Array(area.area);
+    let refSamples = new Float32Array(area.area);
+    
     overlapMask.getSamples(maskSamples, area);
     let rect = new Rect(area.width, area.height);
     
@@ -928,11 +881,13 @@ function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWo
     view.beginProcess(UndoFlag_NoSwapFile);
     if (refImage.isColor){
         for (let c = 0; c < 3; c++){
-            let refSamples = getOverlapSamples(refImage, maskSamples, area, c);
+            refImage.getSamples(refSamples, area, c);
+            applyMask(refSamples, maskSamples);
             view.image.setSamples(refSamples, rect, c);
         }
     } else {
-        let refSamples = getOverlapSamples(refImage, maskSamples, area, 0);
+        refImage.getSamples(refSamples, area, 0);
+        applyMask(refSamples, maskSamples);
         view.image.setSamples(refSamples, rect, 0);
         view.image.setSamples(refSamples, rect, 1);
         view.image.setSamples(refSamples, rect, 2);
@@ -944,7 +899,7 @@ function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWo
         w.keywords = fitsKeyWords;
     }
     view.endProcess();
-    
+
     // Ensure the user can see it!
     view.stf = refView.stf;
     w.zoomToFit();

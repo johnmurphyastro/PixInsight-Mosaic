@@ -27,59 +27,65 @@ function getBoundingBox(image){
     let x1 = image.width;
     let y0 = 0;
     let y1 = image.height;
+
+    let row = new Rect(width, 1);
+    let col = new Rect(1, height);
+    let rowBuffer = new Float32Array(row.area);
+    let colBuffer = new Float32Array(col.area);
     
     // Find the approximate edges
-    let y = startP.y;
+    row.moveTo(0, startP.y);
+    image.getSamples(rowBuffer, row);
     for (let x = startP.x; x >= 0; x--){
-        if (0 === image.sample(x, y)){
+        if (!rowBuffer[x]){
             x0 = Math.min(x + 1, width);
             break;
         }
     }
     for (let x = startP.x; x < width; x++){
-        if (0 === image.sample(x, y)){
+        if (!rowBuffer[x]){
             x1 = x;
             break;
         }
     }
-    let x = startP.x;
+    col.moveTo(startP.x, 0);
+    image.getSamples(colBuffer, col);
     for (let y = startP.y; y >= 0; y--){
-        if (0 === image.sample(x, y)){
+        if (!colBuffer[y]){
             y0 = Math.min(y + 1, height);
             break;
         }
     }
     for (let y = startP.y; y < height; y++){
-        if (0 === image.sample(x, y)){
+        if (!colBuffer[y]){
             y1 = y;
             break;
         }
     }
     
     // Refine to accurate bounding box
-    let row = new Rect(width, 1);
     for (; y0 > 0; y0--){
         row.moveTo(0, y0 - 1);
-        if (isRowBlack(image, row, nChannels)){
+        if (isBlack(image, rowBuffer, row, nChannels)){
             break;
         }
     }
     for (; y1 < height; y1++){
         row.moveTo(0, y1);
-        if (isRowBlack(image, row, nChannels)){
+        if (isBlack(image, rowBuffer, row, nChannels)){
             break;
         }
     }
-    let col = new Rect(1, height);
+    
     for (; x0 > 0; x0--){
         col.moveTo(x0 - 1, 0);
-        if (isColBlack(image, col, nChannels)){
+        if (isBlack(image, colBuffer, col, nChannels)){
             break;
         }
     }
     for (; x1 < width; x1++){
         col.moveTo(x1, 0);
-        if (isColBlack(image, col, nChannels)){
+        if (isBlack(image, colBuffer, col, nChannels)){
             break;
         }
     }
@@ -88,49 +94,22 @@ function getBoundingBox(image){
 
 /**
  * @param {Image} image Target image
+ * @param {TypedArray} buffer Samples in rect will be read into this buffer. 
  * @param {Rect} rect Rectangle that represents a single pixel row or column
  * @param {Number} nChannels 1 for B&W, 3 for color
  * @returns {Boolean} Return true if all pixels in rect are black
  */
-function isRowBlack(image, rect, nChannels){
-    // quick check
-    const y = rect.y0;
-    const w = rect.x1;
-    for (let x = rect.x0 + 50; x < w; x += 50){
-        if (image.sample(x, y) !== 0) return false;
+function isBlack(image, buffer, rect, nChannels){
+    image.getSamples(buffer, rect);
+    for (let i=0; i<buffer.length; i+=100){
+        if (buffer[i])
+            return false;
     }
     for (let c=0; c<nChannels; c++){
-        let samples = [];
-        image.getSamples(samples, rect, c);
-        for (let sample of samples){
-            if (sample !== 0){
+        image.getSamples(buffer, rect, c);
+        for (let i=0; i<buffer.length; i++){
+            if (buffer[i])
                 return false;
-            }
-        }
-    }
-    return true;
-}
-
-/**
- * @param {Image} image Target image
- * @param {Rect} rect Rectangle that represents a single pixel row or column
- * @param {Number} nChannels 1 for B&W, 3 for color
- * @returns {Boolean} Return true if all pixels in rect are black
- */
-function isColBlack(image, rect, nChannels){
-    // quick check
-    const x = rect.x0;
-    const h = rect.y1;
-    for (let y = rect.y0 + 50; y < h; y += 50){
-        if (image.sample(x, y) !== 0) return false;
-    }
-    for (let c=0; c<nChannels; c++){
-        let samples = [];
-        image.getSamples(samples, rect, c);
-        for (let sample of samples){
-            if (sample !== 0){
-                return false;
-            }
         }
     }
     return true;
@@ -144,15 +123,17 @@ function isColBlack(image, rect, nChannels){
  */
 function isImageBelowOverlap(image, overlap, nChannels){
     const height = image.height;
+    let line = new Rect(overlap.x0, 0, overlap.x1, 1);
+    let lineBuffer = new Float32Array(line.area);
     for (let offset = 0; ;offset++){
         let y = overlap.y0 - offset;
-        let line = new Rect(overlap.x0, y, overlap.x1, y + 1);
-        if (y === 0 || isRowBlack(image, line, nChannels)){
+        line.moveTo(overlap.x0, y);
+        if (y === 0 || isBlack(image, lineBuffer, line, nChannels)){
             return true;
         }
         y = overlap.y1 + offset;
-        line = new Rect(overlap.x0, y, overlap.x1, y + 1);
-        if (y === height || isRowBlack(image, line, nChannels)){
+        line.moveTo(overlap.x0, y);
+        if (y === height || isBlack(image, lineBuffer, line, nChannels)){
             return false;
         }
     }
@@ -167,17 +148,19 @@ function isImageBelowOverlap(image, overlap, nChannels){
  */
 function isImageRightOfOverlap(image, overlap, nChannels){
     const width = image.width;
+    let line = new Rect(0, overlap.y0, 1, overlap.y1);
+    let lineBuffer = new Float32Array(line.area);
     for (let offset = 0; ;offset++){
         let x = overlap.x0 - offset;
-        let line = new Rect(x, overlap.y0, x + 1, overlap.y1);
-        if (x === 0 || isColBlack(image, line, nChannels)){
+        line.moveTo(x, overlap.y0);
+        if (x === 0 || isBlack(image, lineBuffer, line, nChannels)){
             return true;
         }
         x = overlap.x1 + offset;
-        line = new Rect(x, overlap.y0, x + 1, overlap.y1);
-        if (x === width || isColBlack(image, line, nChannels)){
+        line.moveTo(x, overlap.y0);
+        if (x === width || isBlack(image, lineBuffer, line, nChannels)){
             return false;
-        } 
+        }
     }
 }
 
