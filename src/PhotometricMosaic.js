@@ -48,6 +48,7 @@ function DISPLAY_GRADIENT_GRAPH(){return 16;}
 function DISPLAY_GRADIENT_TAPER_GRAPH(){return 32;}
 function CREATE_MOSAIC_MASK(){return 64;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
+function CREATE_JOIN_MASK(){return 256;}
 
 /**
  * Controller. Processing starts here!
@@ -97,10 +98,10 @@ function PhotometricMosaic(data)
     }
     
     // Photometry stars
-    let colorStarPairs = detectedStars.getColorStarPairs(referenceView,
-            data.limitPhotoStarsPercent, data.linearRange, data.starSearchRadius);
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
+           
     // Remove photometric star outliers and calculate the scale
-    console.writeln("<b><u>Calculating scale</u></b>");
+    console.writeln("\n<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
         let starPairs = colorStarPairs[c];
         starPairs.linearFitData = calculateScale(starPairs);
@@ -140,6 +141,11 @@ function PhotometricMosaic(data)
     
     let isHorizontal = isJoinHorizontal(data, sampleRect);
     let joinRect = extendSubRect(sampleRect, detectedStars.overlapBox, isHorizontal);
+    
+    if (data.viewFlag === CREATE_JOIN_MASK()){
+        createJoinMask(detectedStars.overlapMask, joinRect);
+        return;
+    }
     
     if (data.viewFlag === CREATE_MOSAIC_MASK()){
         displayMask(targetView, joinRect, detectedStars, 
@@ -304,15 +310,17 @@ function PhotometricMosaic(data)
 
         // Don't need cloned target view any more
         correctedView.window.forceClose();
-
+        
+        let w = mosaicView.window;
+        // Show the join area in a preview
+        w.createPreview(joinRect, "Join");
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
         let x0 = Math.max(0, joinRect.x0 - 50);
         let x1 = Math.min(mosaicView.image.width, joinRect.x1 + 50);
         let y0 = Math.max(0, joinRect.y0 - 50);
         let y1 = Math.min(mosaicView.image.height, joinRect.y1 + 50);
         let previewRect = new Rect(x0, y0, x1, y1);
-        let w = mosaicView.window;
-        w.createPreview(previewRect, targetView.fullId);
+        w.createPreview(previewRect, "InspectJoin");
         // But show the main mosaic view.
         w.currentView = mosaicView;
         w.zoomToFit();

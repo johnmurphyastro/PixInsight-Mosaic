@@ -132,16 +132,14 @@ function StarsDetected(){
     /**
      * 
      * @param {View} refView
-     * @param {Number} limitStarsPercent Percentage of detected stars used.
-     * @param {Number} upperLimit Only use stars within camera's linear range
-     * @param {Number} searchRadius Search for target star within this radius
+     * @param {PhotometricMosaicData} data Values from user interface
      * @returns {StarPairs[]} Array of StarPairs for all color channels
      */
-    this.getColorStarPairs = function(refView, limitStarsPercent, upperLimit, searchRadius){
+    this.getColorStarPairs = function(refView, data){
         let colorStarPairs = [];
         let nChannels = refView.image.isColor ? 3 : 1;
         for (let channel=0; channel < nChannels; channel++){
-            let starPairs = findMatchingStars(channel, limitStarsPercent, upperLimit, searchRadius);
+            let starPairs = findMatchingStars(channel, data);
             colorStarPairs.push(starPairs);
         }
         return colorStarPairs;
@@ -262,12 +260,11 @@ function StarsDetected(){
     /**
      * Finds the stars that exist in both images that have no pixel above upperLimit.
      * @param {Number} channel
-     * @param {Number} limitStarsPercent Percentage of detected stars used.
-     * @param {Number} upperLimit Reject stars with one or more pixels greater than this.
-     * @param {Number} searchRadius Search for target star within this radius
+     * @param {PhotometricMosaicData} data Values from user interface
      * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
      */
-    let findMatchingStars = function (channel, limitStarsPercent, upperLimit, searchRadius) {
+    let findMatchingStars = function (channel, data) {
+        let searchRadius = data.starSearchRadius;
         let rSqr = searchRadius * searchRadius;
 
         /**
@@ -280,56 +277,96 @@ function StarsDetected(){
             return a.flux - b.flux;
         };
 
-        // create shallow copy of cached stars that are within upperLimit, and sort them
-        let rcStars = self.refColorStars[channel];
-        let refStars = [];
-        for (let star of rcStars) {
-            if (star.peak < upperLimit) {
-                refStars.push(star);
+        /**
+         * Filter out stars with a peak pixel value greater than peakUpperLimit,
+         * sort the stars on flux (brightest star at end of array).
+         * Limit the total number of stars to a percentage of the input stars,
+         * or a percentage of 1000 if there are more than 1000 stars in the input
+         * array. The dimmest stars are filtered out.
+         * @param {Star[]} stars Stars to be filered. This array is not modified.
+         * @param {PhotometricMosaicData} data Values from user interface
+         * @returns {Star[]} The filtered stars
+         */
+        let filterStars = function (stars, data){
+            let peakUpperLimit = data.linearRange;
+            let limitStarsPercent = data.limitPhotoStarsPercent;
+            let filteredStars = [];
+            for (let star of stars) {
+                if (star.peak < peakUpperLimit) {
+                    filteredStars.push(star);
+                }
             }
-        }
-        let tcStars = self.tgtColorStars[channel];
-        let tgtStars = [];
-        for (let star of tcStars) {
-            if (star.peak < upperLimit) {
-                tgtStars.push(star);
+            filteredStars.sort(sortOnFlux);
+            let maxStars = Math.min(filteredStars.length, 1000) * limitStarsPercent / 100;
+            if (filteredStars.length > maxStars) {
+                filteredStars = filteredStars.slice(filteredStars.length - maxStars);
             }
-        }
-        refStars.sort(sortOnFlux);
-        tgtStars.sort(sortOnFlux);
+            return filteredStars;
+        };
         
-        // Upper limit of stars to use is 1000 to prevent excessive calculation time
-        // Remove the faintest stars (the faintest stars are at the start of the array)
-        let maxStars = limitStarsPercent * Math.min(refStars.length, 1000) / 100;
-        if (refStars.length > maxStars){
-            refStars = refStars.slice(refStars.length - maxStars);
-        }
-        if (tgtStars.length > maxStars){
-            tgtStars = tgtStars.slice(tgtStars.length - maxStars);
-        }
-
-        // Use flux and search radius to match stars
-        // Start with the brightest ref star and look for the brightest
-        // tgt star within the searchRadius. If a tgt star is found it is removed
-        // from the tgtStar array.
-        let starPairArray = [];
-        let r = refStars.length;
-        while (r--) {
-            let rStar = refStars[r];
-            let t = tgtStars.length;
-            while (t--) {
-                let tStar = tgtStars[t];
-                let deltaX = Math.abs(tStar.pos.x - rStar.pos.x);
-                if (deltaX < searchRadius){
-                    let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
-                    if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
-                        starPairArray.push(new StarPair(rStar, tStar));
-                        // Remove star so it is not matched multiple times
-                        // This should be efficient because the brightest stars are at the end of the array
-                        tgtStars.splice(t, 1);
-                        break;
+        /**
+         * Use flux and search radius to match stars.
+         * Start with the brightest ref star and look for the brightest tgt star
+         * within the searchRadius. If a tgt star is found it is removed from tgtStar array.
+         * @param {Star[]} tgtStars Modified (entries are removed)
+         * @param {Star[]} refStars
+         * @param {Number} searchRadius
+         * @param {Boolean} useRange If true, reject pairs if the flux difference is too great
+         * @param {Number} minGradient Minimum allowed (ref flux / target flux) 
+         * @param {Number} maxGradient Maximum allowed (ref flux / target flux) 
+         * @returns {StarPair[]} Array of matched stars
+         */
+        let matchStars = function (tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient){
+            let starPairArray = [];
+            let r = refStars.length;
+            while (r--) {
+                let rStar = refStars[r];
+                let t = tgtStars.length;
+                while (t--) {
+                    let tStar = tgtStars[t];
+                    if (useRange){
+                        let gradient = rStar.flux / tStar.flux;
+                        if (gradient < minGradient || gradient > maxGradient){
+                            continue;
+                        }
+                    }
+                    let deltaX = Math.abs(tStar.pos.x - rStar.pos.x);
+                    if (deltaX < searchRadius){
+                        let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
+                        if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
+                            starPairArray.push(new StarPair(rStar, tStar));
+                            // Remove star so it is not matched multiple times
+                            // This should be efficient because the brightest stars are at the end of the array
+                            tgtStars.splice(t, 1);
+                            break;
+                        }
                     }
                 }
+            }
+            return starPairArray;
+        };
+        
+        let refStars = filterStars(self.refColorStars[channel], data);
+        let tgtStars = filterStars(self.tgtColorStars[channel], data);
+        
+        // Use our first pass to calculate the approximate gradient. This pass might contain
+        // stars that matched with noise or very faint stars
+        let tgtStarsClone = tgtStars.slice();
+        let starPairArray = matchStars(tgtStarsClone, refStars, searchRadius, false, 0, 0);
+        if (starPairArray.length > 10) {
+            // Second pass rejects stars if (refFlux / tgtFlux) is higher or lower than expected
+            let linearFit = calculateScale(new StarPairs(starPairArray));
+            const gradient = linearFit.m;
+            const tolerance = data.starFluxTolerance;
+            let starPairArray2 = matchStars(tgtStars, refStars, searchRadius,
+                    true, gradient / tolerance, gradient * tolerance);
+            if (starPairArray2.length > 5){
+                let nRemoved = starPairArray.length - starPairArray2.length;
+                if (nRemoved){
+                    console.writeln("[" + channel + "] Removed " + nRemoved +
+                            " photometry stars with large flux differences");
+                }
+                return new StarPairs(starPairArray2);
             }
         }
         return new StarPairs(starPairArray);
@@ -449,6 +486,45 @@ function StarMinMax() {
 }
 
 /**
+ * 
+ * @param {FITSKeyword} keywords
+ * @param {StarPairs[]} colorStarPairs StarPairs for L or R,G,B
+ * @param {type} nColors
+ * @param {type} rect OverlapBox for photometricStar image, null for photometric graph
+ */
+function addScaleToFitsHeader(keywords, colorStarPairs, nColors, rect){
+    let maxErr = Number.NEGATIVE_INFINITY;
+    let errStar = null;
+    for (let c = 0; c < nColors; c++) {
+        let starPairs = colorStarPairs[c];
+        let linearFit = starPairs.linearFitData;
+        let comment = "Scale[" + c + "]: " + linearFit.m.toPrecision(5) +
+                " (" + starPairs.starPairArray.length + " stars)";
+        keywords.push(new FITSKeyword("COMMENT", "", comment));
+
+        for (let starPair of starPairs.starPairArray) {
+            // y = ref; x = tgt
+            let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
+            let dif = Math.abs(y - starPair.refStar.flux);
+            if (dif > maxErr) {
+                maxErr = dif;
+                errStar = starPair.tgtStar;
+            }
+        }
+    }
+    if (maxErr > Number.NEGATIVE_INFINITY) {
+        let x = Math.round(errStar.pos.x);
+        let y = Math.round(errStar.pos.y);
+        if (rect){
+            x -= rect.x0;
+            y -= rect.y0;
+        }
+        let text = "Max error: " + maxErr.toPrecision(5) + " at (" + x + ", " + y + ")";
+        keywords.push(new FITSKeyword("COMMENT", "", text));
+    }
+}
+
+/**
  * @param {String} refView
  * @param {String} tgtView
  * @param {Number} height
@@ -477,31 +553,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
         keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
         keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
-        let maxErr = Number.NEGATIVE_INFINITY;
-        let errStar = null;
-        for (let c = 0; c < nColors; c++){
-            let starPairs = colorStarPairs[c];
-            let linearFit = starPairs.linearFitData;
-            let comment = "Scale[" + c + "]: " + linearFit.m.toPrecision(5) + 
-                    " (" + starPairs.starPairArray.length + " stars)";
-            keywords.push(new FITSKeyword("COMMENT", "", comment));
-
-            for (let starPair of starPairs.starPairArray){
-                // y = ref; x = tgt
-                let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
-                let dif = Math.abs(y - starPair.refStar.flux);
-                if (dif > maxErr){
-                    maxErr = dif;
-                    errStar = starPair.tgtStar;
-                }
-            }
-        }
-        if (maxErr > Number.NEGATIVE_INFINITY){
-            let text = "" + maxErr.toPrecision(5) + 
-                    " at (" + errStar.pos.x + ", " + errStar.pos.y + ")";
-            keywords.push(new FITSKeyword("COMMENT", "", "Max error: " + text));
-            console.writeln("Photomertry maximum error: " + text);
-        }
+        addScaleToFitsHeader(keywords, colorStarPairs, nColors, null);
         graphWindow.keywords = keywords;
         view.endProcess();
     };
@@ -648,6 +700,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
+    addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
     createDiagnosticImage(refView, overlapBox, detectedStars.overlapMask, bmp, title, keywords, 1);
@@ -754,6 +807,21 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, limitMaskS
     keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + radiusAdd));
     
     createDiagnosticImage(refView, joinArea, detectedStars.overlapMask, bmp, title, keywords, 1);
+}
+
+/**
+ * @param {Image} overlapMask
+ * @param {Rect} joinRect
+ */
+function createJoinMask(overlapMask, joinRect){
+    let w = new ImageWindow(overlapMask.width, overlapMask.height, 1, 8, false, false, "JoinMask");
+    let view = w.mainView;
+    view.beginProcess(UndoFlag_NoSwapFile);
+    let maskSamples = new Float32Array(joinRect.area);
+    overlapMask.getSamples(maskSamples, joinRect);
+    view.image.setSamples(maskSamples, joinRect);
+    view.endProcess();
+    w.show();
 }
 
 /**

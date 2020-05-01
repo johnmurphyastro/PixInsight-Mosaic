@@ -97,11 +97,14 @@ function PhotometricMosaicData() {
         // Star Detection
         Parameters.set("starDetection", this.logStarDetection);
         
+        // Photometric Star Search
+        Parameters.set("starFluxTolerance", this.starFluxTolerance);
+        Parameters.set("starSearchRadius", this.starSearchRadius);
+        
         // Photometric Scale
         Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
-        Parameters.set("starSearchRadius", this.starSearchRadius);
         
         // Limit Gradient Sample Area
         Parameters.set("hasSampleAreaPreview", this.hasSampleAreaPreview);
@@ -152,6 +155,12 @@ function PhotometricMosaicData() {
         if (Parameters.has("starDetection"))
             this.logStarDetection = Parameters.getReal("starDetection");
         
+        // Photometric Star Search
+        if (Parameters.has("starFluxTolerance"))
+            this.starFluxTolerance = Parameters.getReal("starFluxTolerance");
+        if (Parameters.has("starSearchRadius"))
+            this.starSearchRadius = Parameters.getReal("starSearchRadius");
+        
         // Photometric Scale
         if (Parameters.has("limitPhotoStarsPercent"))
             this.limitPhotoStarsPercent = Parameters.getReal("limitPhotoStarsPercent");
@@ -159,8 +168,6 @@ function PhotometricMosaicData() {
             this.linearRange = Parameters.getReal("linearRange");
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
-        if (Parameters.has("starSearchRadius"))
-            this.starSearchRadius = Parameters.getInteger("starSearchRadius");
         
         // Limit Gradient Sample Area
         if (Parameters.has("hasSampleAreaPreview"))
@@ -226,13 +233,17 @@ function PhotometricMosaicData() {
         // Star Detection
         this.logStarDetection = 0;
         
+        // Photometric Star Search
+        this.starFluxTolerance = 1.2;
+        this.starSearchRadius = 3;
+        
         // Photometric Scale
         this.limitPhotoStarsPercent = 100;
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
-        this.starSearchRadius = 3;
         
         // Limit Gradient Sample Area
+        this.preview = false;
         this.hasSampleAreaPreview = false;
         this.sampleAreaPreview_X0 = 0;
         this.sampleAreaPreview_Y0 = 0;
@@ -280,11 +291,14 @@ function PhotometricMosaicData() {
         // Star Detection
         linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
         
+        // Photometric Star Search
+        linearFitDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
+        linearFitDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
+        
         // Photometric Scale
         linearFitDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
         linearFitDialog.rejectHigh_Control.setValue(this.linearRange);
         linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
-        linearFitDialog.StarSearchRadius_Control.setValue(this.starSearchRadius);
         
         // Limit Gradient Sample Area
         linearFitDialog.rectangleX0_Control.setValue(this.sampleAreaPreview_X0);
@@ -463,6 +477,57 @@ function PhotometricMosaicDialog(data) {
     // SectionBar "Star Detection" End
     
     // =======================================
+    // SectionBar: "Photometric Star Search"
+    // =======================================
+    const labelWidth = Math.max(
+            this.font.width("Star Flux Tolerance:"), 
+            this.font.width("Star Search Radius:"));
+    this.starFluxTolerance_Control = new NumericControl(this);
+    this.starFluxTolerance_Control.real = true;
+    this.starFluxTolerance_Control.label.text = "Star Flux Tolerance:";
+    this.starFluxTolerance_Control.toolTip = 
+            "<p>Filter out star matches when the difference in star brightness " +
+            "is too large.</p>";
+    this.starFluxTolerance_Control.label.minWidth = labelWidth;
+    this.starFluxTolerance_Control.setRange(1.01, 2);
+    this.starFluxTolerance_Control.slider.setRange(100, 200);
+    this.starFluxTolerance_Control.setPrecision(2);
+    this.starFluxTolerance_Control.slider.minWidth = 100;
+    this.starFluxTolerance_Control.setValue(data.starFluxTolerance);
+    this.starFluxTolerance_Control.onValueUpdated = function (value) {
+        data.starFluxTolerance = value;
+    };
+    
+    this.starSearchRadius_Control = new NumericControl(this);
+    this.starSearchRadius_Control.real = true;
+    this.starSearchRadius_Control.label.text = "Star Search Radius:";
+    this.starSearchRadius_Control.toolTip = 
+            "<p>Search radius used to match the reference and target stars.</p>" +
+            "<p>Increasing this helps find more photometric stars but " +
+            "at the risk of matching the wrong star. " +
+            "The star flux is used to reduce this risk.</p>" +
+            "<p>Decrease for dense star fields.</p>";
+    this.starSearchRadius_Control.label.minWidth = labelWidth;
+    this.starSearchRadius_Control.setRange(1, 10);
+    this.starSearchRadius_Control.slider.setRange(1, 100);
+    this.starSearchRadius_Control.setPrecision(1);
+    this.starSearchRadius_Control.slider.minWidth = 100;
+    this.starSearchRadius_Control.setValue(data.starSearchRadius);
+    this.starSearchRadius_Control.onValueUpdated = function (value) {
+        data.starSearchRadius = value;
+    };
+    
+    let photometrySearchSection = new Control(this);
+    photometrySearchSection.sizer = new VerticalSizer;
+    photometrySearchSection.sizer.spacing = 4;
+    photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
+    photometrySearchSection.sizer.add(this.starSearchRadius_Control);
+    this.photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+    this.photometrySearchBar.setSection(photometrySearchSection);
+    this.photometrySearchBar.onToggleSection = this.onToggleSection;
+    // SectionBar: "Photometric Star Search" End
+    
+    // =======================================
     // SectionBar: "Photometric Scale"
     // =======================================
     this.limitPhotoStarsPercent_Control = new NumericControl(this);
@@ -509,29 +574,11 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.setPrecision(2);
     this.rejectHigh_Control.slider.minWidth = 206;
     this.rejectHigh_Control.setValue(data.linearRange);
-    
-    this.StarSearchRadius_Control = new NumericControl(this);
-    this.StarSearchRadius_Control.real = false;
-    this.StarSearchRadius_Control.label.text = "Star Search Radius:";
-    this.StarSearchRadius_Control.toolTip = 
-            "<p>Search radius used to match the reference and target stars.</p>" +
-            "<p>Increasing this helps find more photometric stars but " +
-            "at the risk of matching the wrong star. " +
-            "The star flux is used to reduce this risk.</p>" +
-            "<p>Decrease for dense star fields.</p>";
-    this.StarSearchRadius_Control.setRange(1, 10);
-    this.StarSearchRadius_Control.slider.setRange(1, 10);
-    this.StarSearchRadius_Control.slider.minWidth = 85;
-    this.StarSearchRadius_Control.setValue(data.starSearchRadius);
-    this.StarSearchRadius_Control.onValueUpdated = function (value) {
-        data.starSearchRadius = value;
-    };
 
     let photometricScaleHorizSizer1 = new HorizontalSizer;
     photometricScaleHorizSizer1.spacing = 4;
     photometricScaleHorizSizer1.add(this.rejectHigh_Control);
     photometricScaleHorizSizer1.addStretch();
-    photometricScaleHorizSizer1.add(this.StarSearchRadius_Control);
     
     this.outlierRemoval_Control = new NumericControl(this);
     this.outlierRemoval_Control.real = false;
@@ -818,6 +865,15 @@ function PhotometricMosaicDialog(data) {
         data.orientation = this.currentItem;
     };
     
+    let joinMaskButton = new PushButton();
+    joinMaskButton.text = "Join Mask";
+    joinMaskButton.toolTip = 
+            "<p>Create a mask of the mosaic join.</p>";
+    joinMaskButton.onClick = function () {
+        data.viewFlag = CREATE_JOIN_MASK();
+        this.dialog.ok();
+    };
+    
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample Grid";
     displaySamplesButton.toolTip = 
@@ -837,6 +893,7 @@ function PhotometricMosaicDialog(data) {
     orientationSizer.add(directionLabel);
     orientationSizer.add(this.orientationCombo);
     orientationSizer.addStretch();
+    orientationSizer.add(joinMaskButton);
     orientationSizer.add(displaySamplesButton);
     
     let sampleGenerationGroupBox = createGroupBox(this, "Gradient Sample Generation");
@@ -1262,6 +1319,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(selectViewSection);
     this.sizer.add(this.starDetectionBar);
     this.sizer.add(starDetectionSection);
+    this.sizer.add(this.photometrySearchBar);
+    this.sizer.add(photometrySearchSection);
     this.sizer.add(this.photometryBar);
     this.sizer.add(photometrySection);
     this.sizer.add(this.sampleAreaBar);
@@ -1275,11 +1334,10 @@ function PhotometricMosaicDialog(data) {
     this.sizer.addSpacing(5);
     this.sizer.add(buttons_Sizer);
     
-    titleSection.hide();
     starDetectionSection.hide();
+    photometrySearchSection.hide();
     sampleAreaSection.hide();
     starMaskSection.hide();
-    mosaicSection.hide();
 
     //-------------------------------------------------------
     // Set all the window data
@@ -1357,6 +1415,7 @@ function main() {
         PhotometricMosaic(data);
         console.hide();
     }
-
+    
+    data.starCache.invalidate(); // free memory
     return;
 }

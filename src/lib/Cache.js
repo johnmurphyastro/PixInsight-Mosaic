@@ -80,7 +80,10 @@ function StarCache() {
     };
     
     this.invalidate = function(){
-        this.overlapMask = null;
+        if (this.overlapMask){
+            this.overlapMask.free();
+            this.overlapMask = null;
+        }
         this.overlapBox = null;
         this.refBox = null;
         this.tgtBox = null;
