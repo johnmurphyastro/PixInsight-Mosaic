@@ -114,3 +114,17 @@ function copyFitsKeywords(view, mosaicView, startsWith, orStartsWith){
         mosaicView.window.keywords = mosaicKeywords;
     }
 }
+
+/**
+ * 
+ * @param {View} view
+ * @param {String} word
+ * @returns {Boolean}
+ */
+function searchFitsHistory(view, word){
+    for (let fitsKeyword of view.window.keywords) {
+        if (fitsKeyword.name === "HISTORY" && fitsKeyword.comment.contains(word))
+            return true;
+    }
+    return false;
+}

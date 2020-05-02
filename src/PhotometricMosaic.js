@@ -15,7 +15,7 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 "use strict";
-#feature-id Utilities > PhotometricMosaic
+#feature-id Mosaic > PhotometricMosaic
 
 #feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
 Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
@@ -31,6 +31,7 @@ Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"
 
+// To stop my IDE from generating warnings...
 function VERSION(){return  "1.1.01";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
@@ -62,6 +63,12 @@ function PhotometricMosaic(data)
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
 
     console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
+    if (!searchFitsHistory(referenceView, TRIM_NAME())){
+        console.warningln("Warning: '" + referenceView.fullId +"' has not been trimmed by the MosaicTrimImage script");
+    }
+    if (!searchFitsHistory(targetView, TRIM_NAME())){
+        console.warningln("Warning: '" + targetView.fullId +"' has not been trimmed by the MosaicTrimImage script");
+    }
     processEvents();
 
     let detectedStars = new StarsDetected();
