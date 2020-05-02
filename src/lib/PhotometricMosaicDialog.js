@@ -20,7 +20,8 @@
  * Default the Reference view to a view that contains "Mosaic" in its name, but
  * doesn't start with "PM_" (e.g. graph windows).
  * If there is more than one "Mosaic" view, sort them and take the last one.
- * If there are no "Mosaic" views yet, return null
+ * If there are no "Mosaic" views yet, return a view that doesn't start with
+ * "PM_" and is not the active window.
  * @return {View} default reference view
  */
 function getDefaultReferenceView() {
@@ -36,6 +37,12 @@ function getDefaultReferenceView() {
     if (mosaicWindows.length > 0){
         mosaicWindows.sort();
         return View.viewById( mosaicWindows[mosaicWindows.length - 1] );
+    }
+    for (let win of allWindows) {
+        if (!win.mainView.fullId.startsWith(WINDOW_ID_PREFIX()) &&
+                win !== ImageWindow.activeWindow){
+            return win.mainView;
+        }
     }
     return null;
 }
@@ -217,14 +224,14 @@ function PhotometricMosaicData() {
     // Initialise the scripts data
     this.setParameters = function () {
         // Star Detection
-        this.logStarDetection = 0;
+        this.logStarDetection = -1;
         
         // Photometric Star Search
-        this.starFluxTolerance = 1.2;
+        this.starFluxTolerance = 1.5;
         this.starSearchRadius = 3;
         
         // Photometric Scale
-        this.limitPhotoStarsPercent = 100;
+        this.limitPhotoStarsPercent = 90;
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
         
@@ -236,7 +243,7 @@ function PhotometricMosaicData() {
         this.sampleAreaPreview_Y1 = 0;
         
         // Gradient Sample Generation
-        this.limitSampleStarsPercent = 50;
+        this.limitSampleStarsPercent = 25;
         this.sampleSize = 20;
         this.orientation = AUTO();
         
@@ -250,7 +257,7 @@ function PhotometricMosaicData() {
         this.taperLength = 1000;
         
         // Mosaic Star Mask
-        this.limitMaskStarsPercent = 20;
+        this.limitMaskStarsPercent = 10;
         this.radiusMult = 2.5;
         this.radiusAdd = -1;
         
