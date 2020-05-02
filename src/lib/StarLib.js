@@ -239,24 +239,37 @@ function StarsDetected(){
     let findStars = function(view, overlapMask, overlapBox, logSensitivity, channel){
         let starImage;
         // Create grey scale 32bit floating point images
-        let width = view.image.width;
-        let height = view.image.height;
+        let width = overlapBox.width;
+        let height = overlapBox.height;
         starImage = new Image(width, height, 1);
         let samples = new Float32Array(overlapBox.area);
         view.image.getSamples(samples, overlapBox, channel);
-        starImage.setSamples(samples, overlapBox);
+        starImage.setSamples(samples);
+        
+        let mask = new Image(width, height, 1);
+        overlapMask.getSamples(samples, overlapBox, 0);
+        mask.setSamples(samples);
+        
         // In tests this was 8% slower, probably because we had to assign the whole area
 //        starImage.assign(view.image, new Rect(width, height), channel, channel); // 8% slower
         // Detect stars in target and reference images
         let starDetector = new StarDetector();
-        starDetector.mask = overlapMask;
+        starDetector.mask = mask;
         starDetector.sensitivity = Math.pow(10.0, logSensitivity);
         starDetector.upperLimit = 1;
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
         self.bkgDelta = starDetector.bkgDelta;
+        
+        const x0 = overlapBox.x0;
+        const y0 = overlapBox.y0;
         let stars = starDetector.stars(starImage);
         starImage.free();
+        mask.free();
+        for (let star of stars){
+            star.pos.x += x0;
+            star.pos.y += y0;
+        }
         return stars;
     };
     
