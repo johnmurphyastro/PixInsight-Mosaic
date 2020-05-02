@@ -17,66 +17,52 @@
 //"use strict";
 #include "DialogLib.js"
 /**
- * Default the Reference view to the open view named "Mosaic".
- * If this view does not exist, default to any view that is NOT the current view
- * (the Target view will be set to the current view).
- * Avoid all graph / sample windows that start with "PM__"
- * @param {ImageWindow} activeWindow
+ * Default the Reference view to a view that contains "Mosaic" in its name, but
+ * doesn't start with "PM_" (e.g. graph windows).
+ * If there is more than one "Mosaic" view, sort them and take the last one.
+ * If there are no "Mosaic" views yet, return null
  * @return {View} default reference view
  */
-function getDefaultReferenceView(activeWindow) {
+function getDefaultReferenceView() {
     // Get access to the active image window
     let allWindows = ImageWindow.openWindows;
-    let referenceView = null;
-    // Oldest images at start of array, iconised images at end
-    for (let i = allWindows.length - 1; i > -1; --i) {
-        let win = allWindows[i];
-        if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX()) || !win.visible ){
-            continue;
-        }
-        if (win.mainView.fullId.toLowerCase().contains("mosaic")) {
-            referenceView = win.mainView;
-            break;
+    let mosaicWindows = [];
+    for (let win of allWindows) {
+        if (!win.mainView.fullId.startsWith(WINDOW_ID_PREFIX()) &&
+                win.mainView.fullId.toLowerCase().contains("mosaic")){
+            mosaicWindows.push(win.mainView.fullId);
         }
     }
-    if (null === referenceView) {
-        for (let win of allWindows) {
-            if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX())) {
-                continue;
-            }
-            if (activeWindow.mainView.fullId !== win.mainView.fullId) {
-                referenceView = win.mainView;
-                break;
-            }
-        }
+    if (mosaicWindows.length > 0){
+        mosaicWindows.sort();
+        return View.viewById( mosaicWindows[mosaicWindows.length - 1] );
     }
-    return referenceView;
+    return null;
 }
 
 /**
  * Default the target view to the current view provided it is not a graph/sample
- * window (starting with "PM__").
- * @param {ImageWindow} activeWindow
+ * window (starting with "PM__") and not the reference view.
+ * Otherwise, return the first view that is not the reference view and is not
+ * a graph/sample view. If all fails, return null
  * @param {View} referenceView
- * @returns {win.mainView}
+ * @returns {View} default target view
  */
-function getDefaultTargetView(activeWindow, referenceView){
-    let targetView = null;
-    if (!activeWindow.mainView.fullId.startsWith(WINDOW_ID_PREFIX())){
-        targetView = activeWindow.mainView;
-    } else {
-        let allWindows = ImageWindow.openWindows;
-        for (let win of allWindows) {
-            if (win.mainView.fullId.startsWith(WINDOW_ID_PREFIX())) {
-                continue;
-            }
-            if (referenceView !== win.mainView.fullId) {
-                targetView = win.mainView;
-                break;
-            }
+function getDefaultTargetView(referenceView){
+    let isGoodChoice = function(view){
+        return !view.fullId.startsWith(WINDOW_ID_PREFIX()) &&
+        (referenceView === null || referenceView.fullId !== view.fullId);
+    };
+    if (isGoodChoice(ImageWindow.activeWindow.mainView)){
+        return ImageWindow.activeWindow.mainView;
+    }
+    let allWindows = ImageWindow.openWindows;
+    for (let win of allWindows) {
+        if (isGoodChoice(win.mainView)){
+            return win.mainView;
         }
     }
-    return targetView;
+    return null;
 }
 
 // -----------------------------------------------------------------------------
@@ -243,7 +229,6 @@ function PhotometricMosaicData() {
         this.outlierRemoval = 0;
         
         // Limit Gradient Sample Area
-        this.preview = false;
         this.hasSampleAreaPreview = false;
         this.sampleAreaPreview_X0 = 0;
         this.sampleAreaPreview_Y0 = 0;
@@ -336,9 +321,8 @@ function PhotometricMosaicData() {
     
     // Initialise the script's data
     this.setParameters();
-    let activeWindow = ImageWindow.activeWindow;
-    this.referenceView = getDefaultReferenceView(activeWindow);
-    this.targetView = getDefaultTargetView(activeWindow, this.referenceView);
+    this.referenceView = getDefaultReferenceView();
+    this.targetView = getDefaultTargetView(this.referenceView);
 }
 
 // The main dialog function
@@ -375,9 +359,9 @@ function PhotometricMosaicDialog(data) {
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
     titleSection.setMinSize(650, 90);
-    this.titleBar = new SectionBar(this, "Quick Start Guide");
-    this.titleBar.setSection(titleSection);
-    this.titleBar.onToggleSection = this.onToggleSection;
+    let titleBar = new SectionBar(this, "Quick Start Guide");
+    titleBar.setSection(titleSection);
+    titleBar.onToggleSection = this.onToggleSection;
     // SectionBar "Quick Start Guide" End
 
     // =======================================
@@ -389,20 +373,22 @@ function PhotometricMosaicDialog(data) {
     referenceImage_Label.minWidth = OUTLIER_REMOVAL_STRLEN;
     referenceImage_Label.toolTip = "<p>The reference image. This image will not be modified.</p>";
 
-    this.referenceImage_ViewList = new ViewList(this);
-    this.referenceImage_ViewList.getMainViews();
-    this.referenceImage_ViewList.minWidth = 300;
-    this.referenceImage_ViewList.currentView = data.referenceView;
-    this.referenceImage_ViewList.toolTip = 
+    let referenceImage_ViewList = new ViewList(this);
+    referenceImage_ViewList.getMainViews();
+    referenceImage_ViewList.minWidth = 300;
+    if (data.referenceView !== null){
+        referenceImage_ViewList.currentView = data.referenceView;
+    }
+    referenceImage_ViewList.toolTip = 
             "<p>The reference image. This image will not be modified.</p>";
-    this.referenceImage_ViewList.onViewSelected = function (view) {
+    referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
     };
 
     let referenceImage_Sizer = new HorizontalSizer;
     referenceImage_Sizer.spacing = 4;
     referenceImage_Sizer.add(referenceImage_Label);
-    referenceImage_Sizer.add(this.referenceImage_ViewList, 100);
+    referenceImage_Sizer.add(referenceImage_ViewList, 100);
 
     let targetImage_Label = new Label(this);
     targetImage_Label.text = "Target View:";
@@ -412,30 +398,32 @@ function PhotometricMosaicDialog(data) {
             "the photometrically determined scale factor, then the gradient " +
             "is calculated and subtracted.</p>";
 
-    this.targetImage_ViewList = new ViewList(this);
-    this.targetImage_ViewList.getMainViews();
-    this.targetImage_ViewList.minWidth = 300;
-    this.targetImage_ViewList.currentView = data.targetView;
-    this.targetImage_ViewList.toolTip = "<p>This image is first multiplied by " +
+    let targetImage_ViewList = new ViewList(this);
+    targetImage_ViewList.getMainViews();
+    targetImage_ViewList.minWidth = 300;
+    if (data.targetView !== null){
+        targetImage_ViewList.currentView = data.targetView;
+    }
+    targetImage_ViewList.toolTip = "<p>This image is first multiplied by " +
             "the photometrically determined scale factor, then the gradient " +
             "is calculated and subtracted.</p>";
-    this.targetImage_ViewList.onViewSelected = function (view) {
+    targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
     };
 
     let targetImage_Sizer = new HorizontalSizer;
     targetImage_Sizer.spacing = 4;
     targetImage_Sizer.add(targetImage_Label);
-    targetImage_Sizer.add(this.targetImage_ViewList, 100);
+    targetImage_Sizer.add(targetImage_ViewList, 100);
     
     let selectViewSection = new Control(this);
     selectViewSection.sizer = new VerticalSizer;
     selectViewSection.sizer.spacing = 4;
     selectViewSection.sizer.add(referenceImage_Sizer);
     selectViewSection.sizer.add(targetImage_Sizer);
-    this.selectViewBar = new SectionBar(this, "Reference & Target Views");
-    this.selectViewBar.setSection(selectViewSection);
-    this.selectViewBar.onToggleSection = this.onToggleSection;
+    let selectViewBar = new SectionBar(this, "Reference & Target Views");
+    selectViewBar.setSection(selectViewSection);
+    selectViewBar.onToggleSection = this.onToggleSection;
     // SectionBar "Reference & Target Views" End
 
     // =======================================
@@ -471,9 +459,9 @@ function PhotometricMosaicDialog(data) {
     starDetectionSection.sizer.add(this.starDetectionControl);
     starDetectionSection.sizer.addStretch();
     starDetectionSection.sizer.add(detectedStarsButton);
-    this.starDetectionBar = new SectionBar(this, "Star Detection");
-    this.starDetectionBar.setSection(starDetectionSection);
-    this.starDetectionBar.onToggleSection = this.onToggleSection;
+    let starDetectionBar = new SectionBar(this, "Star Detection");
+    starDetectionBar.setSection(starDetectionSection);
+    starDetectionBar.onToggleSection = this.onToggleSection;
     // SectionBar "Star Detection" End
     
     // =======================================
@@ -522,9 +510,9 @@ function PhotometricMosaicDialog(data) {
     photometrySearchSection.sizer.spacing = 4;
     photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
     photometrySearchSection.sizer.add(this.starSearchRadius_Control);
-    this.photometrySearchBar = new SectionBar(this, "Photometric Star Search");
-    this.photometrySearchBar.setSection(photometrySearchSection);
-    this.photometrySearchBar.onToggleSection = this.onToggleSection;
+    let photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+    photometrySearchBar.setSection(photometrySearchSection);
+    photometrySearchBar.onToggleSection = this.onToggleSection;
     // SectionBar: "Photometric Star Search" End
     
     // =======================================
@@ -643,9 +631,9 @@ function PhotometricMosaicDialog(data) {
     photometrySection.sizer.add(this.limitPhotoStarsPercent_Control);
     photometrySection.sizer.add(photometricScaleHorizSizer1);
     photometrySection.sizer.add(photometricScaleHorizSizer2);
-    this.photometryBar = new SectionBar(this, "Photometric Scale");
-    this.photometryBar.setSection(photometrySection);
-    this.photometryBar.onToggleSection = this.onToggleSection;
+    let photometryBar = new SectionBar(this, "Photometric Scale");
+    photometryBar.setSection(photometrySection);
+    photometryBar.onToggleSection = this.onToggleSection;
     // SectionBar: "Photometric Scale" End
 
     // =======================================
@@ -685,7 +673,7 @@ function PhotometricMosaicDialog(data) {
     limitGradientSampleAreaHorizSizer1.addStretch();
 
     let previewUpdateActions = function(dialog){
-        let view = data.preview;
+        let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
             dialog.sampleAreaBar.checkBox.checked = data.hasSampleAreaPreview;
             ///let imageWindow = view.window;
@@ -716,7 +704,6 @@ function PhotometricMosaicDialog(data) {
     this.previewImage_ViewList.minWidth = 300;
     this.previewImage_ViewList.toolTip = "<p>Get the 'Area of Interest' from a preview image.</p>";
     this.previewImage_ViewList.onViewSelected = function (view) {
-        data.preview = view;
         previewUpdateActions(this.dialog);
     };
 
@@ -1092,9 +1079,9 @@ function PhotometricMosaicDialog(data) {
     gradientSection.sizer.add(sampleGenerationGroupBox);
     gradientSection.sizer.add(propagateGradientGroupBox);
     gradientSection.sizer.add(taperGradientGroupBox);
-    this.gradientBar = new SectionBar(this, "Gradient");
-    this.gradientBar.setSection(gradientSection);
-    this.gradientBar.onToggleSection = this.onToggleSection;
+    let gradientBar = new SectionBar(this, "Gradient");
+    gradientBar.setSection(gradientSection);
+    gradientBar.onToggleSection = this.onToggleSection;
     //SectionBar: "Gradient" End
     
     // =======================================
@@ -1193,9 +1180,9 @@ function PhotometricMosaicDialog(data) {
     starMaskSection.sizer.add(this.LimitMaskStars_Control);
     starMaskSection.sizer.add(radiusHorizontalSizer);
     starMaskSection.sizer.add(mask_Sizer);
-    this.starMaskBar = new SectionBar(this, "Mosaic Star Mask");
-    this.starMaskBar.setSection(starMaskSection);
-    this.starMaskBar.onToggleSection = this.onToggleSection;
+    let starMaskBar = new SectionBar(this, "Mosaic Star Mask");
+    starMaskBar.setSection(starMaskSection);
+    starMaskBar.onToggleSection = this.onToggleSection;
     // SectionBar: "Mosaic Star Mask" End
 
     // =======================================
@@ -1313,21 +1300,21 @@ function PhotometricMosaicDialog(data) {
     this.sizer = new VerticalSizer;
     this.sizer.margin = 6;
     this.sizer.spacing = 4;
-    this.sizer.add(this.titleBar);
+    this.sizer.add(titleBar);
     this.sizer.add(titleSection);
-    this.sizer.add(this.selectViewBar);
+    this.sizer.add(selectViewBar);
     this.sizer.add(selectViewSection);
-    this.sizer.add(this.starDetectionBar);
+    this.sizer.add(starDetectionBar);
     this.sizer.add(starDetectionSection);
-    this.sizer.add(this.photometrySearchBar);
+    this.sizer.add(photometrySearchBar);
     this.sizer.add(photometrySearchSection);
-    this.sizer.add(this.photometryBar);
+    this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
     this.sizer.add(this.sampleAreaBar);
     this.sizer.add(sampleAreaSection);
-    this.sizer.add(this.gradientBar);
+    this.sizer.add(gradientBar);
     this.sizer.add(gradientSection);
-    this.sizer.add(this.starMaskBar);
+    this.sizer.add(starMaskBar);
     this.sizer.add(starMaskSection);
     this.sizer.add(this.mosaicBar);
     this.sizer.add(mosaicSection);
