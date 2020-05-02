@@ -156,7 +156,7 @@ function StarsDetected(){
         console.writeln("<b><u>Calculating overlap</u></b>");
         processEvents();
         let mask = new Image(refImage.width, refImage.height, 1);
-        mask.fill(0);
+//        mask.fill(0);
         
         // boundingBox will be equal to or larger than the overlap region
         let refBox = getBoundingBox(refImage);
@@ -245,7 +245,8 @@ function StarsDetected(){
         let samples = new Float32Array(overlapBox.area);
         view.image.getSamples(samples, overlapBox, channel);
         starImage.setSamples(samples, overlapBox);
-
+        // In tests this was 8% slower, probably because we had to assign the whole area
+//        starImage.assign(view.image, new Rect(width, height), channel, channel); // 8% slower
         // Detect stars in target and reference images
         let starDetector = new StarDetector();
         starDetector.mask = overlapMask;
@@ -254,7 +255,9 @@ function StarsDetected(){
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
         self.bkgDelta = starDetector.bkgDelta;
-        return starDetector.stars(starImage);
+        let stars = starDetector.stars(starImage);
+        starImage.free();
+        return stars;
     };
     
     /**
