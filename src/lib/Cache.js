@@ -70,17 +70,11 @@ function MosaicCache() {
     };
     
     this.setOverlap = function(overlap){
-        if (this.overlap){
-            overlap.free();
-        }
         this.overlap = overlap;
     };
     
     this.invalidate = function(){
-        if (this.overlap){
-            this.overlap.free();
-            this.overlap = null;
-        }
+        this.overlap = null;
         this.refColorStars = null;
         this.tgtColorStars = null;
         this.allStars = null;

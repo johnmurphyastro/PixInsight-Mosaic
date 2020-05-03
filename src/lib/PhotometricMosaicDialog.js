@@ -1410,6 +1410,5 @@ function main() {
         console.hide();
     }
     
-    data.cache.invalidate(); // free memory
     return;
 }

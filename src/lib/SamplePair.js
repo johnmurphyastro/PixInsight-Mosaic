@@ -343,7 +343,6 @@ function SampleBinMap(overlapBox, binSize, nChannels){
  */
 function displaySampleSquares(refView, samplePairs, detectedStars, title, data) {
     const overlapBox = data.cache.overlap.overlapBox;
-    const overlapMask = data.cache.overlap.overlapMask;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
     let bmp = new Bitmap(overlapBox.width, overlapBox.height);
@@ -381,5 +380,5 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
     
-    createDiagnosticImage(refView, overlapBox, overlapMask, bmp, title, keywords, -2);
+    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, -2);
 }

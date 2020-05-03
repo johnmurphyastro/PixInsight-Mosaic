@@ -67,33 +67,28 @@ function StarsDetected(){
         this.nChannels = refView.image.isColor ? 3 : 1;
         console.writeln("<b><u>Detecting stars</u></b>");
         processEvents();
-        const overlapMask = cache.overlap.overlapMask;
         const overlapBox = cache.overlap.overlapBox;
         let detectStarTime = new Date().getTime();
-        // Reference image stars
-        if (cache.refColorStars === null){
+        // Reference and target image stars
+        if (cache.refColorStars === null || cache.tgtColorStars === null){
             cache.allStars = null;
             cache.refColorStars = [];
+            cache.tgtColorStars = [];
+            let overlapMask = cache.overlap.getOverlapMask();
             for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(refView, overlapMask, overlapBox, logSensitivity, c);
-                cache.refColorStars.push(stars);
-                console.writeln("Reference[", c, "] detected ", stars.length, " stars");
+                let refStars = findStars(refView, overlapMask, overlapBox, logSensitivity, c);
+                cache.refColorStars.push(refStars);
+                console.writeln("Reference[", c, "] detected ", refStars.length, " stars");
+                processEvents();
+                
+                let tgtStars = findStars(tgtView, overlapMask, overlapBox, logSensitivity, c);
+                cache.tgtColorStars.push(tgtStars);
+                console.writeln("Target   [", c, "] detected ", tgtStars.length, " stars");
                 processEvents();
             }
+            overlapMask.free();
         }
         this.refColorStars = cache.refColorStars;
-        
-        // Target image stars
-        if (cache.tgtColorStars === null){
-            cache.allStars = null;
-            cache.tgtColorStars = [];
-            for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(tgtView, overlapMask, overlapBox, logSensitivity, c);
-                cache.tgtColorStars.push(stars);
-                console.writeln("Target[", c, "] detected ", stars.length, " stars");
-                processEvents();
-            }
-        }
         this.tgtColorStars = cache.tgtColorStars;
         
         // Reference and target stars, sorted by star flux
@@ -126,13 +121,13 @@ function StarsDetected(){
     /**
      * Private
      * @param {View} view
-     * @param {Image} overlapMask Bitmap represents overlapping region
+     * @param {Image} mask Bitmap represents overlapping region
      * @param {Rect} overlapBox Bounding box of the overlap area
      * @param {Number} logSensitivity
      * @param {Number} channel
      * @returns {Star[]}
      */
-    let findStars = function(view, overlapMask, overlapBox, logSensitivity, channel){
+    let findStars = function(view, mask, overlapBox, logSensitivity, channel){
         let starImage;
         // Create grey scale 32bit floating point images
         let width = overlapBox.width;
@@ -141,10 +136,6 @@ function StarsDetected(){
         let samples = new Float32Array(overlapBox.area);
         view.image.getSamples(samples, overlapBox, channel);
         starImage.setSamples(samples);
-        
-        let mask = new Image(width, height, 1);
-        overlapMask.getSamples(samples, overlapBox, 0);
-        mask.setSamples(samples);
         
         // In tests this was 8% slower, probably because we had to assign the whole area
 //        starImage.assign(view.image, new Rect(width, height), channel, channel); // 8% slower
@@ -161,7 +152,6 @@ function StarsDetected(){
         const y0 = overlapBox.y0;
         let stars = starDetector.stars(starImage);
         starImage.free();
-        mask.free();
         for (let star of stars){
             star.pos.x += x0;
             star.pos.y += y0;
@@ -572,7 +562,6 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     };
     
     const overlapBox = data.cache.overlap.overlapBox;
-    const overlapMask = data.cache.overlap.overlapMask;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
     let color = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // red, green, blue
@@ -616,7 +605,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
-    createDiagnosticImage(refView, overlapBox, overlapMask, bmp, title, keywords, 1);
+    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**
@@ -664,8 +653,7 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
 
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createDiagnosticImage(refView, overlapBox, data.cache.overlap.overlapMask, 
-            bmp, title, keywords, 1);
+    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**
@@ -716,19 +704,24 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
     keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + data.radiusMult));
     keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + data.radiusAdd));
     
-    createDiagnosticImage(refView, joinArea, data.cache.overlap.overlapMask, bmp, title, keywords, 1);
+    createJoinImage(refView, joinArea, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**
- * @param {Image} overlapMask
+ * @param {Overlap} overlap
  * @param {Rect} joinRect
  */
-function createJoinMask(overlapMask, joinRect){
-    let w = new ImageWindow(overlapMask.width, overlapMask.height, 1, 8, false, false, "JoinMask");
-    let view = w.mainView;
-    view.beginProcess(UndoFlag_NoSwapFile);
+function createJoinMask(overlap, joinRect){
+    const overlapMask = overlap.getFullImageMask();
+    const width = overlapMask.width;
+    const height = overlapMask.height;
     let maskSamples = new Float32Array(joinRect.area);
     overlapMask.getSamples(maskSamples, joinRect);
+    overlapMask.free();
+    
+    let w = new ImageWindow(width, height, 1, 8, false, false, "JoinMask");
+    let view = w.mainView;
+    view.beginProcess(UndoFlag_NoSwapFile);
     view.image.setSamples(maskSamples, joinRect);
     view.endProcess();
     w.show();
@@ -787,7 +780,7 @@ function displayMask(tgtView, joinArea, detectedStars, data){
     P.executeOn(w.mainView, false);
     
     // Make sure the star mask circles do not include pixels beyond the overlap.
-    let overlapMask = data.cache.overlap.overlapMask;
+    let overlapMask = data.cache.overlap.getFullImageMask();
     let minX = Math.max(0, joinArea.x0 - 10);
     let minY = Math.max(0, joinArea.y0 - 10);
     let maxX = Math.min(bmp.width, joinArea.x1 + 10);
@@ -799,6 +792,7 @@ function displayMask(tgtView, joinArea, detectedStars, data){
             }
         }
     }
+    overlapMask.free();
 
     let keywords = [];
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + data.referenceView.fullId));
@@ -819,14 +813,14 @@ function displayMask(tgtView, joinArea, detectedStars, data){
  * to black. The bitmap image is copied on top of the background. 
  * The bitmap image must have the same width and height as the specified area.
  * @param {View} refView Used to create background image
- * @param {Rect} area The area to copy from refView 
- * @param {Bitmap} overlapMask Overlapping pixels mask
+ * @param {Rect} imageRect The area to copy from refView 
+ * @param {TypedArray} maskSamples
  * @param {Bitmap} bmp The bitmap image to lay on top of the background image
  * @param {String} title Window title
  * @param {FITSKeyword[]} fitsKeyWords
  * @param {Number} minZoom -2 is half size, 1 is 1:1
  */
-function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWords, minZoom) {
+function createImageFromRefAndBitmap(refView, imageRect, maskSamples, bmp, title, fitsKeyWords, minZoom){
     /**
      * Get all the samples from the image that are within the area rectangle.
      * @param {Float32Array} refSamples Overlap area from refView (modified)
@@ -839,13 +833,13 @@ function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWo
             }
         }
     };
-
-    // Create the new image and copy the samples from refView to it
-    let maskSamples = new Float32Array(area.area);
-    let refSamples = new Float32Array(area.area);
     
-    overlapMask.getSamples(maskSamples, area);
-    let rect = new Rect(area.width, area.height);
+    if (bmp.width !== imageRect.width || bmp.height !== imageRect.height){
+        console.criticalln("Error in createImageFromRefAndBitmap: bmp size does not match overlap");
+        return;
+    }
+    let refSamples = new Float32Array(maskSamples.length);
+    let rect = new Rect(bmp.width, bmp.height);
     
     // If read only, we can use the image directly.
     // If write access, we need to access it via the view.
@@ -856,12 +850,12 @@ function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWo
     view.beginProcess(UndoFlag_NoSwapFile);
     if (refImage.isColor){
         for (let c = 0; c < 3; c++){
-            refImage.getSamples(refSamples, area, c);
+            refImage.getSamples(refSamples, imageRect, c);
             applyMask(refSamples, maskSamples);
             view.image.setSamples(refSamples, rect, c);
         }
     } else {
-        refImage.getSamples(refSamples, area, 0);
+        refImage.getSamples(refSamples, imageRect, 0);
         applyMask(refSamples, maskSamples);
         view.image.setSamples(refSamples, rect, 0);
         view.image.setSamples(refSamples, rect, 1);
@@ -883,4 +877,48 @@ function createDiagnosticImage(refView, area, overlapMask, bmp, title, fitsKeyWo
         w.fitWindow();
     }
     w.show();
+    
+}
+
+/**
+ * Create an image from the overlapBox area of the refView and the supplied bitmap.
+ * The background is copied from refView, but pixels not included in the overlapMask are set
+ * to black. The bitmap image is copied on top of the background. 
+ * The bitmap image must have the same width and height as the overlapBox.
+ * @param {View} refView Used to create background image
+ * @param {Overlap} overlap Overlapping pixels mask
+ * @param {Bitmap} bmp The bitmap image to lay on top of the background image
+ * @param {String} title Window title
+ * @param {FITSKeyword[]} fitsKeyWords
+ * @param {Number} minZoom -2 is half size, 1 is 1:1
+ */
+function createOverlapImage(refView, overlap, bmp, title, fitsKeyWords, minZoom) {
+    // Create the new image and copy the samples from refView to it
+    createImageFromRefAndBitmap(refView, overlap.overlapBox, overlap.overlapBuf,
+            bmp, title, fitsKeyWords, minZoom);
+}
+
+/**
+ * Create an image from an area in the refView and the supplied bitmap.
+ * The background is copied from refView, but pixels not included in the overlapMask are set
+ * to black. The bitmap image is copied on top of the background. 
+ * The bitmap image must have the same width and height as the specified area.
+ * @param {View} refView Used to create background image
+ * @param {Rect} joinRect The area to copy from refView 
+ * @param {Overlap} overlap
+ * @param {Bitmap} bmp The bitmap image to lay on top of the background image
+ * @param {String} title Window title
+ * @param {FITSKeyword[]} fitsKeyWords
+ * @param {Number} minZoom -2 is half size, 1 is 1:1
+ */
+function createJoinImage(refView, joinRect, overlap, bmp, title, fitsKeyWords, minZoom) {
+
+    // Create the new image and copy the samples from refView to it
+    let maskSamples = new Float32Array(joinRect.area);
+    let overlapMask = overlap.getFullImageMask();
+    overlapMask.getSamples(maskSamples, joinRect);
+    overlapMask.free();
+    
+    createImageFromRefAndBitmap(refView, joinRect, maskSamples,
+            bmp, title, fitsKeyWords, minZoom);
 }

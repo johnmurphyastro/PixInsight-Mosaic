@@ -167,7 +167,7 @@ function PhotometricMosaic(data)
     const joinRect = extendSubRect(sampleRect, data.cache.overlap.overlapBox, isHorizontal);
     
     if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(data.cache.overlap.overlapMask, joinRect);
+        createJoinMask(data.cache.overlap, joinRect);
         return;
     }
     

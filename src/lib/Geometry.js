@@ -184,31 +184,21 @@ function extendSubRect(subRect, superRect, isHorizontal){
  * @param {Image} tgtImage
  */
 function Overlap(refImage, tgtImage){
-    this.free = function(){
-        this.hasOverlap = false;
-        this.refBox = null;
-        this.tgtBox = null;
-        this.overlapBox = null;
-        if (this.overlapMask !== null){
-            this.overlapMask.free();
-            this.overlapMask = null;
-        }
-    };
-    
     // Please treat as read only outside this class
     /** {Rect} overlapMask bounding box */
     this.overlapBox = null;
-    /** {Image} bitmap indicates were ref & tgt images overlap */
-    this.overlapMask = null;
+    /** {TypedArray} bitmap array from overlapBox. A value of 1 indicates were ref & tgt images overlap */
+    this.overlapBuf = null;
     /** True if refBox and TgtBox intersect */
     this.hasOverlap = false;
     /** {Rect} refBox Reference image bounding box */
     this.refBox = getBoundingBox(refImage);
     /** {Rect} tgtBox Target image bounding box */
     this.tgtBox = getBoundingBox(tgtImage);
+    this.refImage = refImage;
+    this.tgtImage = tgtImage;
     
     if (!this.refBox.intersects(this.tgtBox)){
-        this.free();
         return;
     }
     this.hasOverlap = true;
@@ -260,18 +250,49 @@ function Overlap(refImage, tgtImage){
             y1 = Math.max(y1, y);
         }
     }
-
-    this.overlapMask = new Image(refImage.width, refImage.height, 1);
-//        mask.fill(0);     // I assume this is not necessary
-    this.overlapMask.setSamples(maskBuffer, intersectBox);
-
+    // x1 and y1 both need to be just after the last pixel (x1 - x0 = width)
+    x1++;
+    y1++;
+    
+    // We have the mask buffer in terms of the intersection box.
+    // We need it in terms of the overlapBox
+    this.overlapBuf = new Float32Array((x1 - x0) * (y1 - y0));
+    let i = 0;
+    for (let y = y0; y < y1; y++){
+        let yXwidth = y * width;
+        for (let x = x0; x < x1; x++){
+            this.overlapBuf[i++] = maskBuffer[yXwidth + x];
+        }
+    }
+    
     x0 += intersectBox.x0;
     x1 += intersectBox.x0;
     y0 += intersectBox.y0;
     y1 += intersectBox.y0;
-    if (x0 !== Number.POSITIVE_INFINITY){
-        this.overlapBox = new Rect(x0, y0, x1+1, y1+1);
-    } else {
-        this.overlapBox = null;
-    }
+    this.overlapBox = new Rect(x0, y0, x1, y1);
+    
+    /**
+     * Create a mask image that is the same size as the reference image
+     * Only the pixels within the overlapBox will be non zero.
+     * Call Image.free() when the image is no longer needed.
+     * @returns {Image}
+     */
+    this.getFullImageMask = function(){
+        let imageMask = new Image(this.refImage.width, this.refImage.height, 1);
+//        mask.fill(0);     // I assume this is not necessary
+        imageMask.setSamples(this.overlapBuf, this.overlapBox);
+        return imageMask;
+    };
+    
+    /**
+     * Create a mask image for the overlapBox.
+     * The image is the same size as the overlapBox.
+     * Call Image.free() when the image is no longer needed.
+     * @returns {Image}
+     */
+    this.getOverlapMask = function(){
+        let overlapMask = new Image(this.overlapBox.width, this.overlapBox.height, 1);
+        overlapMask.setSamples(this.overlapBuf);
+        return overlapMask;
+    };
 }
