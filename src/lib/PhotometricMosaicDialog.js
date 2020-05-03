@@ -271,7 +271,7 @@ function PhotometricMosaicData() {
         // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
         this.testFlag = 0;
         
-        this.starCache = new StarCache();
+        this.cache = new MosaicCache();
         
     };
 
@@ -1410,6 +1410,6 @@ function main() {
         console.hide();
     }
     
-    data.starCache.invalidate(); // free memory
+    data.cache.invalidate(); // free memory
     return;
 }

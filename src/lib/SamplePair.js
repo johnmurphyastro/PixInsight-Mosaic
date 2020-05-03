@@ -71,32 +71,30 @@ function SamplePairs(samplePairArray, sampleSize, overlapBox){
 }
 
 // ============ Algorithms ============
-/** TODO rejectHigh is not currently used. If not needed for RGB images, remove.
+/**
  * Create SamplePairs for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
  * @param {LinearFitData[]} scaleFactors
- * @param {Number} sampleSize
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
- * @param {Number} rejectHigh Ignore samples that contain pixels > rejectHigh
- * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars
- * @param {Rect} overlapBox Reject samples outside this area (overlap bounding box)
+ * @param {Rect} sampleRect Reject samples outside this area (overlap bounding box)
+ * @param {PhotometricMosaicData} data User settings
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
 function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
-        sampleSize, stars, rejectHigh, limitSampleStarsPercent, overlapBox) {
+        stars, sampleRect, data) {
 
     let firstNstars;
-    if (limitSampleStarsPercent < 100){
-        firstNstars = Math.floor(stars.length * limitSampleStarsPercent / 100);
+    if (data.limitSampleStarsPercent < 100){
+        firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
     } else {
         firstNstars = stars.length;
     }
                 
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
-    let bins = new SampleBinMap(overlapBox, sampleSize, nChannels);
-    bins.addSampleBins(targetImage, referenceImage, rejectHigh);
+    let bins = new SampleBinMap(sampleRect, data.sampleSize, nChannels);
+    bins.addSampleBins(targetImage, referenceImage, data.linearRange);
     bins.removeBinRectWithStars(stars, firstNstars);
     
     // Use the radius of the brightest detected star * 2
@@ -106,7 +104,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
     for (let c=0; c<nChannels; c++){
         let scale = scaleFactors[c].m;
         let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, scale, c);
-        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleSize, overlapBox));
+        colorSamplePairs.push(new SamplePairs(samplePairArray, data.sampleSize, sampleRect));
     }
     return colorSamplePairs;
 }
@@ -339,14 +337,13 @@ function SampleBinMap(overlapBox, binSize, nChannels){
 /** Display the SamplePair squares
  * @param {Image} refView Copy image and STF from this view.
  * @param {SamplePairs} samplePairs The samplePairs to be displayed.
- * @param {StarsDetected} detectedStars 
- * @param {Number} limitSampleStarsPercent Percentage of stars to avoid. Lower values ignore more faint stars 
+ * @param {StarsDetected} detectedStars
  * @param {String} title Window title
- * @param {PhotometricMosaicData} data User settings used to create FITS header
+ * @param {PhotometricMosaicData} data User settings
  */
-function displaySampleSquares(refView, samplePairs, 
-        detectedStars, limitSampleStarsPercent, title, data) {
-    let overlapBox = detectedStars.overlapBox;
+function displaySampleSquares(refView, samplePairs, detectedStars, title, data) {
+    const overlapBox = data.cache.overlap.overlapBox;
+    const overlapMask = data.cache.overlap.overlapMask;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
     let bmp = new Bitmap(overlapBox.width, overlapBox.height);
@@ -362,8 +359,8 @@ function displaySampleSquares(refView, samplePairs,
 
     let stars = detectedStars.allStars;
     let firstNstars;
-    if (limitSampleStarsPercent < 100){
-        firstNstars = Math.floor(stars.length * limitSampleStarsPercent / 100);
+    if (data.limitSampleStarsPercent < 100){
+        firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
     } else {
         firstNstars = stars.length;
     }
@@ -382,8 +379,7 @@ function displaySampleSquares(refView, samplePairs,
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + data.targetView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
     keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitSampleStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
     
-    createDiagnosticImage(refView, detectedStars.overlapBox, detectedStars.overlapMask, 
-            bmp, title, keywords, -2);
+    createDiagnosticImage(refView, overlapBox, overlapMask, bmp, title, keywords, -2);
 }

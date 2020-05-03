@@ -15,7 +15,7 @@
 // =================================================================================
 //"use strict";
 
-function StarCache() {
+function MosaicCache() {
     /**
     * User input data used to calculate stored values
     * @param {String} refId
@@ -48,14 +48,8 @@ function StarCache() {
     
     this.userInputData = new UserInputData(null, null, Number.NaN);
     
-    /** {Image} bitmap indicates were ref & tgt images overlap */
-    this.overlapMask = null;
-    /** {Rect} overlapMask bounding box */
-    this.overlapBox = null;
-    /** {Rect} refBox Reference image bounding box */
-    this.refBox = null;
-    /** {Rect} tgtBox Target image bounding box */
-    this.tgtBox = null;
+    /** Stores refBox, tgtBox, overlapBox, overlapMask, hasOverlap */
+    this.overlap = null;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -75,18 +69,18 @@ function StarCache() {
         }
     };
     
-    this.setOverlapBox = function(overlapBox){
-        this.overlapBox = overlapBox;
+    this.setOverlap = function(overlap){
+        if (this.overlap){
+            overlap.free();
+        }
+        this.overlap = overlap;
     };
     
     this.invalidate = function(){
-        if (this.overlapMask){
-            this.overlapMask.free();
-            this.overlapMask = null;
+        if (this.overlap){
+            this.overlap.free();
+            this.overlap = null;
         }
-        this.overlapBox = null;
-        this.refBox = null;
-        this.tgtBox = null;
         this.refColorStars = null;
         this.tgtColorStars = null;
         this.allStars = null;

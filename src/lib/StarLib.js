@@ -46,14 +46,6 @@ function StarPairs(starPairArray){
 function StarsDetected(){
     this.nChannels = 1;
     
-    /** {Image} bitmap indicates were ref & tgt images overlap */
-    this.overlapMask = null;
-    /** {Rect} overlapMask bounding box */
-    this.overlapBox = null;
-    /** {Rect} refBox Reference image bounding box */
-    this.refBox = null;
-    /** {Rect} tgtBox Target image bounding box */
-    this.tgtBox = null;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -69,62 +61,48 @@ function StarsDetected(){
      * @param {View} refView
      * @param {View} tgtView
      * @param {Number} logSensitivity
-     * @param {StarCache} starCache
-     * @return {StarCache} new star cache
+     * @param {MosaicCache} cache
      */
-    this.detectStars = function (refView, tgtView, logSensitivity, starCache) {
+    this.detectStars = function (refView, tgtView, logSensitivity, cache) {
         this.nChannels = refView.image.isColor ? 3 : 1;
-        
-        // let the StarCache know about any relevant input parameter changes
-        starCache.setUserInputData(refView.fullId, tgtView.fullId, logSensitivity);
-        
-        // StarRegionMask
-        if (starCache.overlapMask === null || starCache.overlapBox === null){
-            // Create ref/tgt overlap bitmap (overlapMask) and its bounding box (ovelapBox)
-            cacheStarRegionMask(refView.image, tgtView.image, starCache);
-        }
-        this.overlapMask = starCache.overlapMask;
-        this.overlapBox = starCache.overlapBox;
-        this.refBox = starCache.refBox;
-        this.tgtBox = starCache.tgtBox;
-         
         console.writeln("<b><u>Detecting stars</u></b>");
         processEvents();
-        
+        const overlapMask = cache.overlap.overlapMask;
+        const overlapBox = cache.overlap.overlapBox;
         let detectStarTime = new Date().getTime();
         // Reference image stars
-        if (starCache.refColorStars === null){
-            starCache.allStars = null;
-            starCache.refColorStars = [];
+        if (cache.refColorStars === null){
+            cache.allStars = null;
+            cache.refColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(refView, this.overlapMask, this.overlapBox, logSensitivity, c);
-                starCache.refColorStars.push(stars);
+                let stars = findStars(refView, overlapMask, overlapBox, logSensitivity, c);
+                cache.refColorStars.push(stars);
                 console.writeln("Reference[", c, "] detected ", stars.length, " stars");
                 processEvents();
             }
         }
-        this.refColorStars = starCache.refColorStars;
+        this.refColorStars = cache.refColorStars;
         
         // Target image stars
-        if (starCache.tgtColorStars === null){
-            starCache.allStars = null;
-            starCache.tgtColorStars = [];
+        if (cache.tgtColorStars === null){
+            cache.allStars = null;
+            cache.tgtColorStars = [];
             for (let c = 0; c < this.nChannels; c++) {
-                let stars = findStars(tgtView, this.overlapMask, this.overlapBox, logSensitivity, c);
-                starCache.tgtColorStars.push(stars);
+                let stars = findStars(tgtView, overlapMask, overlapBox, logSensitivity, c);
+                cache.tgtColorStars.push(stars);
                 console.writeln("Target[", c, "] detected ", stars.length, " stars");
                 processEvents();
             }
         }
-        this.tgtColorStars = starCache.tgtColorStars;
+        this.tgtColorStars = cache.tgtColorStars;
         
         // Reference and target stars, sorted by star flux
-        if (starCache.allStars === null){
-            starCache.allStars = combienStarArrays(starCache.refColorStars, starCache.tgtColorStars);
+        if (cache.allStars === null){
+            cache.allStars = combienStarArrays(cache.refColorStars, cache.tgtColorStars);
         }
-        this.allStars = starCache.allStars;
+        this.allStars = cache.allStars;
 
-        console.writeln("\n<b>Star cache:</b>\n" + starCache.getStatus() + 
+        console.writeln("\n<b>Star cache:</b>\n" + cache.getStatus() + 
                 "\n    (" + getElapsedTime(detectStarTime) + ")\n");
         processEvents();
     };
@@ -144,88 +122,6 @@ function StarsDetected(){
         }
         return colorStarPairs;
     };  
-    
-    /** Private
-     * Create bitmap image with overlapping region set to 1
-     * @param {Image} refImage
-     * @param {Image} tgtImage
-     * @param {StarCache} starCache
-     */
-    let cacheStarRegionMask = function (refImage, tgtImage, starCache) {
-        const startTime = new Date().getTime();
-        console.writeln("<b><u>Calculating overlap</u></b>");
-        processEvents();
-        let mask = new Image(refImage.width, refImage.height, 1);
-//        mask.fill(0);
-        
-        // boundingBox will be equal to or larger than the overlap region
-        let refBox = getBoundingBox(refImage);
-        let targetBox = getBoundingBox(tgtImage);
-        if (!refBox.intersects(targetBox)){
-            starCache.setOverlapBox(null);
-            starCache.overlapMask = mask;
-            return;
-        }
-        const boundingBox = refBox.intersection(targetBox);
-        const xMin = boundingBox.x0;
-        const xMax = boundingBox.x1;
-        const yMin = boundingBox.y0;
-        const yMax = boundingBox.y1;  
-        const width = boundingBox.width;
-        
-        // Overlap bounding box coordinates
-        let x0 = Number.POSITIVE_INFINITY;
-        let x1 = Number.NEGATIVE_INFINITY;
-        let y0 = Number.POSITIVE_INFINITY;
-        let y1 = Number.NEGATIVE_INFINITY;
-        // Create a mask to restrict the star detection to the overlapping area and previewArea
-        
-        const size = boundingBox.area;
-        let refBuffer = [];
-        let tgtBuffer = [];
-        for (let c=0; c<self.nChannels; c++){
-            refBuffer[c] = new Float32Array(size);
-            tgtBuffer[c] = new Float32Array(size);
-            refImage.getSamples(refBuffer[c], boundingBox, c);
-            tgtImage.getSamples(tgtBuffer[c], boundingBox, c);
-        }
-        let maskBuffer = new Float32Array(size);
-        
-        for (let i=0; i<size; i++){
-            let isOverlap = true;
-            for (let c = self.nChannels - 1; c > -1; c--) {
-                if (tgtBuffer[c][i] === 0 || refBuffer[c][i] === 0) {
-                    isOverlap = false;
-                    break;
-                }
-            }
-            if (isOverlap) {
-                maskBuffer[i] = 1;
-                // Determine bounding box
-                let y = Math.floor(i/width);
-                let x = i % width;
-                x0 = Math.min(x0, x);
-                x1 = Math.max(x1, x);
-                y0 = Math.min(y0, y);
-                y1 = Math.max(y1, y);
-            }
-        }
-        mask.setSamples(maskBuffer, boundingBox);
-        
-        x0 += boundingBox.x0;
-        x1 += boundingBox.x0;
-        y0 += boundingBox.y0;
-        y1 += boundingBox.y0;
-        if (x0 !== Number.POSITIVE_INFINITY){
-            starCache.setOverlapBox(new Rect(x0, y0, x1+1, y1+1));
-        } else {
-            starCache.setOverlapBox(null);
-        }
-        starCache.refBox = refBox;
-        starCache.tgtBox = targetBox;
-        starCache.overlapMask = mask;
-        console.writeln(getElapsedTime(startTime) + "\n");
-    };
     
     /**
      * Private
@@ -675,7 +571,8 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
         return g;
     };
     
-    let overlapBox = detectedStars.overlapBox;
+    const overlapBox = data.cache.overlap.overlapBox;
+    const overlapMask = data.cache.overlap.overlapMask;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
     let color = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // red, green, blue
@@ -719,7 +616,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
-    createDiagnosticImage(refView, overlapBox, detectedStars.overlapMask, bmp, title, keywords, 1);
+    createDiagnosticImage(refView, overlapBox, overlapMask, bmp, title, keywords, 1);
 }
 
 /**
@@ -735,7 +632,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
  */
 function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPercent, 
         postfix, data) {
-    let overlapBox = detectedStars.overlapBox;
+    const overlapBox = data.cache.overlap.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
     let bmp = new Bitmap(overlapBox.width, overlapBox.height);
@@ -767,7 +664,8 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
 
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createDiagnosticImage(refView, overlapBox, detectedStars.overlapMask, bmp, title, keywords, 1);
+    createDiagnosticImage(refView, overlapBox, data.cache.overlap.overlapMask, 
+            bmp, title, keywords, 1);
 }
 
 /**
@@ -777,15 +675,11 @@ function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPe
  * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars
  * @param {String} targetId Used to create ImageWindow title
- * @param {Number} limitMaskStarsPercent
- * @param {Number} radiusMult
- * @param {Number} radiusAdd
  * @param {Boolean} antialias
  * @param {String} postfix Used to create ImageWindow title
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayMaskStars(refView, joinArea, detectedStars, targetId, limitMaskStarsPercent, 
-        radiusMult, radiusAdd, antialias, postfix, data) {
+function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias, postfix, data) {
     let offsetX = -joinArea.x0;
     let offsetY = -joinArea.y0;
     let bmp = new Bitmap(joinArea.width, joinArea.height);
@@ -796,8 +690,8 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, limitMaskS
     
     let allStars = detectedStars.allStars;
     let firstNstars;
-    if (limitMaskStarsPercent < 100){
-        firstNstars = Math.floor(allStars.length * limitMaskStarsPercent / 100);
+    if (data.limitMaskStarsPercent < 100){
+        firstNstars = Math.floor(allStars.length * data.limitMaskStarsPercent / 100);
     } else {
         firstNstars = allStars.length;
     }
@@ -808,7 +702,7 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, limitMaskS
         let radius = Math.sqrt(star.size)/2;
         let x = star.pos.x + offsetX;
         let y = star.pos.y + offsetY;
-        G.strokeCircle(x, y, radius * radiusMult + radiusAdd);
+        G.strokeCircle(x, y, radius * data.radiusMult + data.radiusAdd);
     }
     G.end();
 
@@ -818,11 +712,11 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, limitMaskS
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + radiusAdd));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + data.radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + data.radiusAdd));
     
-    createDiagnosticImage(refView, joinArea, detectedStars.overlapMask, bmp, title, keywords, 1);
+    createDiagnosticImage(refView, joinArea, data.cache.overlap.overlapMask, bmp, title, keywords, 1);
 }
 
 /**
@@ -844,20 +738,17 @@ function createJoinMask(overlapMask, joinRect){
  * @param {View} tgtView
  * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars
- * @param {Number} limitMaskStarsPercent
- * @param {Number} radiusMult
- * @param {Number} radiusAdd
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayMask(tgtView, joinArea, detectedStars, limitMaskStarsPercent, radiusMult, radiusAdd, data){
+function displayMask(tgtView, joinArea, detectedStars, data){
     let postfix = "Mask";
-    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + limitMaskStarsPercent + "_" + postfix;
+    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + data.limitMaskStarsPercent + "_" + postfix;
     let bmp = new Bitmap(tgtView.image.width, tgtView.image.height);
     bmp.fill(0xffffffff);
     
     let firstNstars;
-    if (limitMaskStarsPercent < 100){
-        firstNstars = Math.floor(detectedStars.allStars.length * limitMaskStarsPercent / 100);
+    if (data.limitMaskStarsPercent < 100){
+        firstNstars = Math.floor(detectedStars.allStars.length * data.limitMaskStarsPercent / 100);
     } else {
         firstNstars = detectedStars.allStars.length;
     }
@@ -872,7 +763,7 @@ function displayMask(tgtView, joinArea, detectedStars, limitMaskStarsPercent, ra
     for (let i = 0; i < firstNstars; ++i){
         let star = detectedStars.allStars[i];
         // size is the area. sqrt gives box side length. Half gives circle radius
-        let radius = (Math.sqrt(star.size)/2) * radiusMult + radiusAdd;
+        let radius = (Math.sqrt(star.size)/2) * data.radiusMult + data.radiusAdd;
         G.fillCircle(star.pos, radius);
     }
     G.end();
@@ -896,7 +787,7 @@ function displayMask(tgtView, joinArea, detectedStars, limitMaskStarsPercent, ra
     P.executeOn(w.mainView, false);
     
     // Make sure the star mask circles do not include pixels beyond the overlap.
-    let overlapMask = detectedStars.overlapMask;
+    let overlapMask = data.cache.overlap.overlapMask;
     let minX = Math.max(0, joinArea.x0 - 10);
     let minY = Math.max(0, joinArea.y0 - 10);
     let maxX = Math.min(bmp.width, joinArea.x1 + 10);
@@ -913,9 +804,9 @@ function displayMask(tgtView, joinArea, detectedStars, limitMaskStarsPercent, ra
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + data.referenceView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + radiusAdd));
+    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + data.radiusMult));
+    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + data.radiusAdd));
     
     w.keywords = keywords;
     view.endProcess();

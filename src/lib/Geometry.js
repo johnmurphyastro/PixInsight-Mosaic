@@ -177,3 +177,101 @@ function extendSubRect(subRect, superRect, isHorizontal){
     }
     return new Rect(subRect.x0, superRect.y0, subRect.x1, superRect.y1);
 }
+
+/**
+ * 
+ * @param {Image} refImage
+ * @param {Image} tgtImage
+ */
+function Overlap(refImage, tgtImage){
+    this.free = function(){
+        this.hasOverlap = false;
+        this.refBox = null;
+        this.tgtBox = null;
+        this.overlapBox = null;
+        if (this.overlapMask !== null){
+            this.overlapMask.free();
+            this.overlapMask = null;
+        }
+    };
+    
+    // Please treat as read only outside this class
+    /** {Rect} overlapMask bounding box */
+    this.overlapBox = null;
+    /** {Image} bitmap indicates were ref & tgt images overlap */
+    this.overlapMask = null;
+    /** True if refBox and TgtBox intersect */
+    this.hasOverlap = false;
+    /** {Rect} refBox Reference image bounding box */
+    this.refBox = getBoundingBox(refImage);
+    /** {Rect} tgtBox Target image bounding box */
+    this.tgtBox = getBoundingBox(tgtImage);
+    
+    if (!this.refBox.intersects(this.tgtBox)){
+        this.free();
+        return;
+    }
+    this.hasOverlap = true;
+
+    // intersectBox will be equal to or larger than the overlap region.
+    // For example, if the images are fatter outside the overlap
+    const intersectBox = this.refBox.intersection(this.tgtBox);
+    const xMin = intersectBox.x0;
+    const xMax = intersectBox.x1;
+    const yMin = intersectBox.y0;
+    const yMax = intersectBox.y1;  
+    const width = intersectBox.width;
+
+    // Overlap bounding box coordinates
+    let x0 = Number.POSITIVE_INFINITY;
+    let x1 = Number.NEGATIVE_INFINITY;
+    let y0 = Number.POSITIVE_INFINITY;
+    let y1 = Number.NEGATIVE_INFINITY;
+
+    // Create a mask to restrict the star detection to the overlapping area and previewArea
+    const bufLen = intersectBox.area;
+    let refBuffer = [];
+    let tgtBuffer = [];
+    const nChannels = refImage.isColor ? 3 : 1;
+    for (let c=0; c<nChannels; c++){
+        refBuffer[c] = new Float32Array(bufLen);
+        tgtBuffer[c] = new Float32Array(bufLen);
+        refImage.getSamples(refBuffer[c], intersectBox, c);
+        tgtImage.getSamples(tgtBuffer[c], intersectBox, c);
+    }
+    let maskBuffer = new Float32Array(bufLen);
+
+    for (let i=0; i<bufLen; i++){
+        let isOverlap = true;
+        for (let c = nChannels - 1; c > -1; c--) {
+            if (tgtBuffer[c][i] === 0 || refBuffer[c][i] === 0) {
+                isOverlap = false;
+                break;
+            }
+        }
+        if (isOverlap) {
+            maskBuffer[i] = 1;
+            // Determine bounding box
+            let y = Math.floor(i/width);
+            let x = i % width;
+            x0 = Math.min(x0, x);
+            x1 = Math.max(x1, x);
+            y0 = Math.min(y0, y);
+            y1 = Math.max(y1, y);
+        }
+    }
+
+    this.overlapMask = new Image(refImage.width, refImage.height, 1);
+//        mask.fill(0);     // I assume this is not necessary
+    this.overlapMask.setSamples(maskBuffer, intersectBox);
+
+    x0 += intersectBox.x0;
+    x1 += intersectBox.x0;
+    y0 += intersectBox.y0;
+    y1 += intersectBox.y0;
+    if (x0 !== Number.POSITIVE_INFINITY){
+        this.overlapBox = new Rect(x0, y0, x1+1, y1+1);
+    } else {
+        this.overlapBox = null;
+    }
+}
