@@ -18,7 +18,8 @@
 #feature-id Mosaic > PhotometricMosaic
 
 #feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
-Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
+Copyright &copy; 2019-2020 John Murphy, GNU General Public License v3<br/> \
+StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights Reserved.<br/>
 
 #include <pjsr/UndoFlag.jsh>
 #include "lib/PhotometricMosaicDialog.js"
@@ -35,7 +36,7 @@ Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
 function VERSION(){return  "2.0";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
-function TRIM_NAME(){return "TrimImage";}
+function TRIM_NAME(){return "TrimMosaicTile";}
 function HORIZONTAL(){return 0;}
 function VERTICAL(){return 1;}
 function AUTO(){return 2;}
@@ -73,10 +74,10 @@ function PhotometricMosaic(data)
         // Add trim warning check here so it is only displayed once
         console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
         if (!searchFitsHistory(referenceView, TRIM_NAME())){
-            console.warningln("Warning: '" + referenceView.fullId +"' has not been trimmed by the MosaicTrimImage script");
+            console.warningln("Warning: '" + referenceView.fullId +"' has not been trimmed by the " + TRIM_NAME() + " script");
         }
         if (!searchFitsHistory(targetView, TRIM_NAME())){
-            console.warningln("Warning: '" + targetView.fullId +"' has not been trimmed by the MosaicTrimImage script");
+            console.warningln("Warning: '" + targetView.fullId +"' has not been trimmed by the " + TRIM_NAME() + " script");
         }
         
         console.writeln("<b><u>Calculating overlap</u></b>");
