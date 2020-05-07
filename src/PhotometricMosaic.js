@@ -32,7 +32,7 @@ Copyright &copy; 2019-2020 John Murphy, GNU General Public License.<br/>
 #include "lib/Geometry.js"
 
 // To stop my IDE from generating warnings...
-function VERSION(){return  "1.1.01";}
+function VERSION(){return  "2.0";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimImage";}
@@ -341,7 +341,7 @@ function PhotometricMosaic(data)
         let y0 = Math.max(0, joinRect.y0 - 50);
         let y1 = Math.min(mosaicView.image.height, joinRect.y1 + 50);
         let previewRect = new Rect(x0, y0, x1, y1);
-        w.createPreview(previewRect, "InspectJoin");
+        w.createPreview(previewRect, "Inspect_Join");
         // But show the main mosaic view.
         w.currentView = mosaicView;
         w.zoomToFit();

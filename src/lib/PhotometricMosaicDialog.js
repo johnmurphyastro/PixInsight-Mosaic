@@ -866,18 +866,6 @@ function PhotometricMosaicDialog(data) {
         data.orientation = this.currentItem;
     };
     
-    let joinMaskButton = new PushButton();
-    joinMaskButton.text = "Join Mask";
-    joinMaskButton.toolTip = 
-            "<p>Create a mask of the mosaic join. " +
-            "This mask indicates the pixels used to create the mosaic join.</p>" +
-            "<p>If a 'Gradient Sample Area' has not been defined, this is simply the overlapping pixels. " +
-            "Otherwise, the 'Gradient Sample Area' limits the join area to the thickness of this area.</p>";
-    joinMaskButton.onClick = function () {
-        data.viewFlag = CREATE_JOIN_MASK();
-        this.dialog.ok();
-    };
-    
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample Grid";
     displaySamplesButton.toolTip = 
@@ -897,7 +885,6 @@ function PhotometricMosaicDialog(data) {
     orientationSizer.add(directionLabel);
     orientationSizer.add(this.orientationCombo);
     orientationSizer.addStretch();
-    orientationSizer.add(joinMaskButton);
     orientationSizer.add(displaySamplesButton);
     
     let sampleGenerationGroupBox = createGroupBox(this, "Gradient Sample Generation");
@@ -1275,6 +1262,20 @@ function PhotometricMosaicDialog(data) {
         mosaicSection.enabled = checked;
     };
     
+    let joinMaskButton = new PushButton();
+    joinMaskButton.text = "Join Mask";
+    joinMaskButton.toolTip = 
+            "<p>Create a mask of the mosaic join. " +
+            "This mask indicates the pixels used to create the mosaic join.</p>" +
+            "<p>If a 'Limit Gradient Sample Area' has not been defined, the join area is " +
+            "simply the overlapping pixels. However, if it has been specified, " +
+            "the join still extends along the full length of the join but it is " +
+            "otherwise limited to the 'Limit Gradient Sample Area'.</p>";
+    joinMaskButton.onClick = function () {
+        data.viewFlag = CREATE_JOIN_MASK();
+        this.dialog.ok();
+    };
+    
     let mosaicSection = new Control(this);
     mosaicSection.sizer = new HorizontalSizer;
     mosaicSection.sizer.spacing = 10;
@@ -1284,6 +1285,7 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer.add(this.mosaicRandomControl);
     mosaicSection.sizer.add(this.mosaicAverageControl);
     mosaicSection.sizer.addStretch();
+    mosaicSection.sizer.add(joinMaskButton);
     this.mosaicBar = new SectionBar(this, "Create Mosaic");
     this.mosaicBar.setSection(mosaicSection);
     this.mosaicBar.enableCheckBox();
