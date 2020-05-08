@@ -19,7 +19,7 @@
 #feature-id Mosaic > TrimMosaicTile
 
 #feature-info Erodes the non zero area of an image to remove rough edges.<br/>\
-Copyright &copy; 2019-2020 John Murphy. GNU General Public License v3<br/>
+Copyright &copy; 2019-2020 John Murphy.<br/>
 
 #include <pjsr/UndoFlag.jsh>
 //#include <pjsr/DataType.jsh>
@@ -338,7 +338,7 @@ function trimImageDialog(data) {
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() + 
             "</b> &mdash; Erodes the non zero area of an image to remove rough edges.<br />" +
-            "Copyright &copy; 2019-2020 John Murphy. GNU General Public License v3");
+            "Copyright &copy; 2019-2020 John Murphy.");
 
     // Create the target image field
     let targetImage_Label = new Label(this);
@@ -445,7 +445,7 @@ function main() {
         trimImage(data);
 
         // Quit after successful execution.
-        break;
+        // break;
     }
 
     return;

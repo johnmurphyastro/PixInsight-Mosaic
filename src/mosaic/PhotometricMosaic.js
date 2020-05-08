@@ -18,7 +18,7 @@
 #feature-id Mosaic > PhotometricMosaic
 
 #feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
-Copyright &copy; 2019-2020 John Murphy, GNU General Public License v3<br/> \
+Copyright &copy; 2019-2020 John Murphy.<br/> \
 StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights Reserved.<br/>
 
 #include <pjsr/UndoFlag.jsh>

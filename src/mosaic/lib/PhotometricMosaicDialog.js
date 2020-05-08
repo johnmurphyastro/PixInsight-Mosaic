@@ -361,7 +361,7 @@ function PhotometricMosaicDialog(data) {
             "(3) Join these strips to create the final mosaic.<br />" +
             "Detected stars are cached so consider generating all output " +
             "(graphs, stars, sample grid) before exiting.<br />" +
-            "Copyright &copy; 2019-2020 John Murphy, GNU General Public License v3");
+            "Copyright &copy; 2019-2020 John Murphy.");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
