@@ -1,3 +1,5 @@
+/* global HORIZONTAL, TITLE, ImageWindow, UndoFlag_NoSwapFile, Parameters, View, VERTICAL, Dialog, VERSION, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok */
+
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -17,8 +19,9 @@
 #feature-id Mosaic > SplitMosaicTile
 
 #feature-info Splits an image into two overlapping images.<br/>\
-Copyright &copy; 2019-2020 John Murphy. GNU General Public License v3<br/>
+Copyright &copy; 2019-2020 John Murphy.<br/>
 
+#include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
 
 #define VERSION  "1.0"
@@ -44,68 +47,62 @@ function splitImage(data)
         isHorizontal = false;
     }
 
-    createSplitImages(targetView, data.coordinate, data.overlap, isHorizontal);
+    createSplitImages(targetView, data, isHorizontal);
     
-    // Images created by PixelMath, so nothing to add to history
-    //data.saveParameters();
     console.writeln("\n" + TITLE + ": Total time ", getElapsedTime(startTime));
 }
 
 /**
  * Create two overlapping images from the supplied target image
- * @param {View} targetView Contains the image to be split into two
- * @param {Number} coord Split is centered at this coordinage
- * @param {Number} overlap Number of pixels of overlap
+ * @param {View} tgtView Contains the image to be split into two
+ * @param {SplitData} data Values from user interface
  * @param {Boolean} isHorizontal True if left / right split
  * @returns {undefined}
  */
-function createSplitImages(targetView, coord, overlap, isHorizontal) {
-    let expression1;
-    let expression2;
-    let imageId1;
-    let imageId2;
-
+function createSplitImages(tgtView, data, isHorizontal) {
+    const coord = data.coordinate;
+    const overlap = data.overlap;
+    const width = tgtView.image.width;
+    const height = tgtView.image.height;
+    
+    // Clone the target view and image
     if (isHorizontal){
-        // left and right
-        imageId1 = "left";
-        expression1 = "iif(x() < coord + overlap, $T, 0)";
-        imageId2 = "right";
-        expression2 = "iif(x() > coord - overlap, $T, 0)";
+        let eraseRect2 = new Rect(0, 0, coord - overlap, height);
+        CopyImageEraseArea(tgtView, data, eraseRect2, "_Right");
+        let eraseRect1 = new Rect(coord + overlap, 0, width, height);
+        CopyImageEraseArea(tgtView, data, eraseRect1, "_Left");
     } else {
-        // top and bottom
-        imageId1 = "top";
-        expression1 = "iif(y() < coord + overlap, $T, 0)";
-        imageId2 = "bottom";
-        expression2 = "iif(y() > coord - overlap, $T, 0)";
+        let eraseRect2 = new Rect(0, 0, width, coord - overlap);
+        CopyImageEraseArea(tgtView, data, eraseRect2, "_Bottom");
+        let eraseRect1 = new Rect(0, coord + overlap, width, height);
+        CopyImageEraseArea(tgtView, data, eraseRect1, "_Top");
     }
+}
 
-    let P = new PixelMath;
-    P.expression = expression1;
-    P.useSingleExpression = true;
-    P.symbols = "coord = " + coord + ", overlap = " + overlap;
-    P.generateOutput = true;
-    P.singleThreaded = false;
-    P.use64BitWorkingImage = false;
-    P.rescale = false;
-    P.truncate = false;
-    P.createNewImage = true;
-    P.showNewImage = true;
-    P.newImageId = imageId1;
-    P.newImageWidth = 0;
-    P.newImageHeight = 0;
-    P.newImageAlpha = false;
-    P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
-    P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
-    P.executeOn(targetView, true);
-
-    P.expression = expression2;
-    P.newImageId = imageId2;
-    P.newImageWidth = 0;
-    P.newImageHeight = 0;
-    P.newImageAlpha = false;
-    P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
-    P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
-    P.executeOn(targetView, true);
+/**
+ * Copy the target image, erase specified rectangle, display new window
+ * @param {View} tgtView
+ * @param {SplitData} data
+ * @param {Rect} eraseRect
+ * @param {String} titlePostfix
+ */
+function CopyImageEraseArea(tgtView, data, eraseRect, titlePostfix){
+    const width = tgtView.image.width;
+    const height = tgtView.image.height;
+    const nChannels = tgtView.image.isColor ? 3 : 1;
+    let keywords = tgtView.window.keywords;
+    let w = tgtView.window;
+    let imgWindow = new ImageWindow(width, height, nChannels, w.bitsPerSample, 
+            w.isFloatSample, nChannels > 1, tgtView.fullId + titlePostfix);    
+    imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+    let view = imgWindow.mainView;
+    view.image.assign(tgtView.image);
+    view.image.fill(0, eraseRect, 0, nChannels - 1);
+    view.window.keywords = keywords;
+    data.saveParameters(); // History only gets saved to the last view this is called for
+    view.endProcess();
+    view.stf = tgtView.stf;
+    view.window.show();
 }
 
 // -----------------------------------------------------------------------------
@@ -141,7 +138,7 @@ function SplitData() {
     // Initialise the scripts data
     this.setParameters = function () {
         this.orientation = VERTICAL;
-        this.overlap = 100;
+        this.overlap = 50;
         this.coordinate = 500;
     };
 
@@ -176,7 +173,7 @@ function SplitDialog(data) {
     //-------------------------------------------------------
     let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + 
             "</b> &mdash; Splits an image into two overlapping images.<br />" +
-            "Copyright &copy; 2019-2020 John Murphy. GNU General Public License v3");
+            "Copyright &copy; 2019-2020 John Murphy.");
 
     //-------------------------------------------------------
     // Create the reference image field
@@ -217,7 +214,8 @@ function SplitDialog(data) {
 
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
-    this.orientationCombo.toolTip = "<p>Vertical to split into top and bottom. Horizontal to split into left and right</p>";
+    this.orientationCombo.toolTip = 
+            "<p>Vertical to split into top and bottom. Horizontal to split into left and right</p>";
     this.orientationCombo.minWidth = this.font.width("Horizontal");
     this.orientationCombo.addItem("Horizontal");
     this.orientationCombo.addItem("Vertical");
@@ -246,7 +244,8 @@ function SplitDialog(data) {
     this.coordinate_Control.real = false;
     this.coordinate_Control.label.text = "Split Coordinate:";
     this.coordinate_Control.label.minWidth = labelWidth1;
-    this.coordinate_Control.toolTip = "<p>Split the image at this x (Horizontal split) or y (Vertical split) coordinate.</p>";
+    this.coordinate_Control.toolTip = 
+            "<p>Split the image at this x (Horizontal split) or y (Vertical split) coordinate.</p>";
     this.coordinate_Control.onValueUpdated = function (value) {
         data.coordinate = value;
     };
@@ -270,7 +269,8 @@ function SplitDialog(data) {
     this.overlap_Control.real = false;
     this.overlap_Control.label.text = "Overlap:";
     this.overlap_Control.label.minWidth = labelWidth1;
-    this.overlap_Control.toolTip = "<p>Amount of overlap between the two new images.</p>";
+    this.overlap_Control.toolTip = "<p>Amount of overlap between the two new images.</p>" +
+            "<p>Each image extends this overlap distance beyond the 'Split Coordinate'.</p>";
     this.overlap_Control.onValueUpdated = function (value) {
         data.overlap = value;
     };
@@ -347,7 +347,7 @@ function main() {
         console.hide();
 
         // Quit after successful execution.
-        break;
+        // break;
     }
 
     return;
