@@ -217,6 +217,28 @@ function Graph(xMin, yMin, xMax, yMax) {
     };
     
     /**
+     * Draw straigth lines between the points in the supplied array
+     * @param {Number[]} difArray Index is x-coordinate, value is y-coordinate
+     * @param {Number} color Hex color value
+     * @param {Boolean} antiAlias If true draw an antialiased line
+     */
+    this.drawDifArray = function(difArray, color, antiAlias){
+        let g = new Graphics(this.bitmap);
+        g.clipRect = new Rect(this.xOrigin, this.yOrigin - this.yAxisLength, this.xOrigin + this.xAxisLength, this.yOrigin);
+        g.transparentBackground = true;
+        g.antialiasing = antiAlias;
+        g.pen = new Pen(color);
+        for (let x=1; x < difArray.length; x++){
+            let x0 = x - 1;
+            let x1 = x;
+            let y0 = difArray[x0];
+            let y1 = difArray[x1];
+            g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
+        }
+        g.end();
+    };
+    
+    /**
      * Draw a point on the graph. If the point is outside the graph's data range,
      * a error is reported on the Console.
      * @param {Number} xWorld
