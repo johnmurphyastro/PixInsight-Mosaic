@@ -432,7 +432,7 @@ function main() {
     for (; ; ) {
         if (!trimDialog.execute())
             break;
-
+        console.show();
         console.writeln("\n<b>", TITLE()," ", VERSION(), "</b>:");
 
         // User must select a target view
@@ -443,7 +443,7 @@ function main() {
 
         // Trim the image.
         trimImage(data);
-
+        console.hide();
         // Quit after successful execution.
         // break;
     }
