@@ -253,7 +253,7 @@ function PhotometricMosaicData() {
         
         // Gradient Tapered Correction
         this.taperFlag = true;
-        this.nTaperBestFitLines = 25;
+        this.nTaperBestFitLines = 10;
         this.taperLength = 100;
         
         // Mosaic Star Mask
@@ -918,7 +918,7 @@ function PhotometricMosaicDialog(data) {
         data.nGradientBestFitLines = value;
     };
     this.propagateBestFitLines_Control.setRange(1, 25);
-    this.propagateBestFitLines_Control.slider.setRange(1, 13);
+    this.propagateBestFitLines_Control.slider.setRange(1, 25);
     this.propagateBestFitLines_Control.slider.minWidth = 200;
     this.propagateBestFitLines_Control.setValue(data.nGradientBestFitLines);
     
@@ -976,7 +976,7 @@ function PhotometricMosaicDialog(data) {
     // Taper Gradient controls
     this.taperBestFitLines_Control = new NumericControl(this);
     this.taperBestFitLines_Control.real = false;
-    this.taperBestFitLines_Control.label.text = "Best Fit Lines:";
+    this.taperBestFitLines_Control.label.text = "Rolling Average:";
     this.taperBestFitLines_Control.label.minWidth = joinDirectionStrLen;
     this.taperBestFitLines_Control.toolTip = 
             "<p>This mode applies a tapered correction to the gradient between " +
@@ -985,13 +985,13 @@ function PhotometricMosaicDialog(data) {
             "<p>A tapered correction is ideal for correcting local difference, for " +
             "example, due to scattered light surrounding bright stars. This mode also " +
             "prevents the reference tile's gradient propagating across the mosaic.</p>" +
-            "<p>Experiment with the number of best fit lines to find a good fit to the data " +
-            "without fitting the noise.</p>";
+            "<p>The Rolling Average is the number of sample 'columns' to average together " +
+            "to produce a smoother fit to the data.</p>";
     this.taperBestFitLines_Control.onValueUpdated = function (value) {
         data.nTaperBestFitLines = value;
     };
-    this.taperBestFitLines_Control.setRange(1, 99);
-    this.taperBestFitLines_Control.slider.setRange(1, 50);
+    this.taperBestFitLines_Control.setRange(1, 25);
+    this.taperBestFitLines_Control.slider.setRange(1, 25);
     this.taperBestFitLines_Control.slider.minWidth = 200;
     this.taperBestFitLines_Control.setValue(data.nTaperBestFitLines);
     
@@ -1045,7 +1045,7 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
     this.taperLength_Control.label.text = "Taper Length:";
-    this.taperLength_Control.label.minWidth = this.font.width("Best Fit Lines:") + 11;
+    this.taperLength_Control.label.minWidth = this.font.width("Rolling Average:") + 9;
     this.taperLength_Control.toolTip = taperTooltip;
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
