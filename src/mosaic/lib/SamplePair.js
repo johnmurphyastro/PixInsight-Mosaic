@@ -79,10 +79,11 @@ function SamplePairs(samplePairArray, sampleSize, overlapBox){
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Rect} sampleRect Reject samples outside this area (overlap bounding box)
  * @param {PhotometricMosaicData} data User settings
+ * @param {Boolean} isHorizontal Determines sort order for SamplePair
  * @returns {SamplePairs[]} Returns SamplePairs for each color
  */
 function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
-        stars, sampleRect, data) {
+        stars, sampleRect, data, isHorizontal) {
 
     let firstNstars;
     if (data.limitSampleStarsPercent < 100){
@@ -103,7 +104,8 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
     let colorSamplePairs = [];
     for (let c=0; c<nChannels; c++){
         let scale = scaleFactors[c].m;
-        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage, scale, c);
+        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage,
+                scale, c, isHorizontal);
         colorSamplePairs.push(new SamplePairs(samplePairArray, data.sampleSize, sampleRect));
     }
     return colorSamplePairs;
@@ -321,14 +323,21 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Image} refImage
      * @param {Number} scale Scale factor for target image samples
      * @param {Number} channel 0 for B&W, 0,1,2 for RGB
-     * @returns {Array|SampleBinMap.createSamplePairArray.samplePairArray}
+     * @param {Boolean} isHorizontal Determines sort order
+     * @returns {SamplePair[]} SamplePair array, sorted by distance along join
      */
-    this.createSamplePairArray = function(tgtImage, refImage, scale, channel){
+    this.createSamplePairArray = function(tgtImage, refImage, scale, channel, isHorizontal){
         let samplePairArray = [];
         for (let binRect of this.binRectMapArray[channel].values()) {
             let tgtMedian = tgtImage.median(binRect, channel, channel) * scale;
             let refMedian = refImage.median(binRect, channel, channel);
             samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
+        }
+        // Sort by distance along join
+        if (isHorizontal){
+            samplePairArray.sort((a, b) => a.rect.x0 - b.rect.x0);
+        } else {
+            samplePairArray.sort((a, b) => a.rect.y0 - b.rect.y0);
         }
         return samplePairArray;
     };

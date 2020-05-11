@@ -223,7 +223,7 @@ function PhotometricMosaic(data)
     }
     
     const colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
-            scaleFactors, detectedStars.allStars, sampleRect, data);
+            scaleFactors, detectedStars.allStars, sampleRect, data, isHorizontal);
     let samplePairs = colorSamplePairs[0];
     if (samplePairs.samplePairArray.length < 2) {
         new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -242,12 +242,11 @@ function PhotometricMosaic(data)
     let propagateGradient;
     if (data.gradientFlag) {
         propagateGradient = [];
-        let nGradientBestFitLines = Math.floor((data.nGradientBestFitLines + 1) / 2);
         for (let c = 0; c < nChannels; c++) {
             samplePairs = colorSamplePairs[c];
-            propagateGradient[c] = new Gradient(samplePairs, nGradientBestFitLines, targetView.image,
-                    sampleRect, isHorizontal, null);
-            if (!propagateGradient[c].isValid) {
+            propagateGradient[c] = calcSmoothDifArray(targetView.image,
+                    sampleRect, samplePairs, data.nGradientBestFitLines, isHorizontal);        
+            if (null === propagateGradient[c]) {
                 new MessageBox(gradientErrMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
                 return;
             }
@@ -258,16 +257,11 @@ function PhotometricMosaic(data)
     let taperGradient;
     if (data.taperFlag) {
         taperGradient = [];
-        let nTaperBestFitLines = Math.floor((data.nTaperBestFitLines + 1) / 2);
         for (let c = 0; c < nChannels; c++) {
-            let propogateGradientData = data.gradientFlag ? propagateGradient[c].getGradientData() : null;
-            samplePairs = colorSamplePairs[c];
-            taperGradient[c] = new Gradient(samplePairs, nTaperBestFitLines, targetView.image,
-                    sampleRect, isHorizontal, propogateGradientData);
-            if (!taperGradient[c].isValid) {
-                new MessageBox(gradientErrMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
-                return;
-            }
+            let smoothDifArray = data.gradientFlag ? propagateGradient[c] : null;
+            samplePairs = colorSamplePairs[c];   
+            taperGradient[c] = calcMovingAverageDifArray(targetView.image, sampleRect,
+                    samplePairs, smoothDifArray, data.nTaperBestFitLines, isHorizontal);
         }
     } else {
         taperGradient = null;
@@ -374,8 +368,8 @@ function calculateScale(starPairs) {
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
- * @param {Gradient[]} propagateGradient Gradient for each color channel, propogated
- * @param {Gradient[]} taperGradient Gradient for each color channel, tapered
+ * @param {Number[][]} propagateGradient difArray for each color channel, propogated
+ * @param {Number[][]} taperGradient difArray for each color channel, tapered
  * @param {Rect} joinRect Bounding box of join region
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {View} Clone of tgtView, with corrections applied
@@ -403,11 +397,11 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
         let scale = scaleFactors[channel].m;
         let propagateDifArray = null;
         if (data.gradientFlag){
-            propagateDifArray = propagateGradient[channel].getGradientData().difArray;
+            propagateDifArray = propagateGradient[channel];
         }
         let taperDifArray = null;
         if (data.taperFlag){
-            taperDifArray = taperGradient[channel].getGradientData().difArray;
+            taperDifArray = taperGradient[channel];
         }
         tgtCorrector.applyAllCorrections(view, scale, propagateDifArray, taperDifArray, tgtBox, channel);
     }
