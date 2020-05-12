@@ -723,11 +723,14 @@ function createJoinMask(overlap, joinRect){
     let maskSamples = new Float32Array(joinRect.area);
     overlapMask.getSamples(maskSamples, joinRect);
     overlapMask.free();
-    
+    for (let i = 0; i < maskSamples.length; i++){
+        maskSamples[i] *= 0.2;
+    }
     let w = new ImageWindow(width, height, 1, 8, false, false, "JoinMask");
     let view = w.mainView;
     view.beginProcess(UndoFlag_NoSwapFile);
     view.image.setSamples(maskSamples, joinRect);
+    view.image.invert();
     view.endProcess();
     w.show();
 }
