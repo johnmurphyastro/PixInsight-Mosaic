@@ -92,6 +92,65 @@ function LeastSquareFitAlgorithm() {
     };
 }
 
+/**
+ * @param {Number} m gradient
+ * @param {Number} b y axis intercept
+ * @param {Number} x0 Line valid from this x coordinate
+ * @param {Number} x1 Line valid upto this x coordinate
+ * @returns {EquationOfLine}
+ */
+function EquationOfLine(m, b, x0, x1){
+    this.m = m;
+    this.b = b;
+    this.x0 = x0;
+    this.x1 = x1;
+    this.y0 = eqnOfLineCalcY(x0, m, b);
+    this.y1 = eqnOfLineCalcY(x1, m, b);
+    
+    /**
+     * y = mx + b
+     * @param {Number} x coordinate
+     * @returns {Number} y coordinate
+     */
+    this.calcYFromX = function (x){
+        return this.m * x + this.b;
+    };
+}
+/**
+ * y = mx + b
+ * @param {Number} x coordinate
+ * @param {Number} m gradient
+ * @param {Number} b y-axis intercept
+ * @returns {Number} y coordinate
+ */
+function eqnOfLineCalcY(x, m, b) {
+    return m * x + b;
+}
+/**
+ * m = (y1 - y0) / (x1 - x0)
+ * @param {Number} x0 point0 x-coordinate
+ * @param {Number} y0 point0 y-coordinate
+ * @param {Number} x1 point1 x-coordinate
+ * @param {Number} y1 point1 y-coordinate
+ * @returns {Number} Gradient
+ */
+function eqnOfLineCalcGradient(x0, y0, x1, y1) {
+    return (y1 - y0) / (x1 - x0);
+}   
+/**
+ * y = mx + b
+ * Hence
+ * b = y - mx
+ * @param {Number} x0 x-coordinate
+ * @param {Number} y0 y-coordinate
+ * @param {Number} m Gradient
+ * @returns {Number} Y Intercept (b)
+ */
+function eqnOfLineCalcYIntercept(x0, y0, m) {
+    return y0 - m * x0;
+}
+
+
 //function testLeastSquareFitAlgorithm() {
 //    let points = [
 //        [2, 4], [3, 5], [5, 7], [7, 10], [9, 15]
