@@ -116,6 +116,20 @@ function Graph(xMin, yMin, xMax, yMax) {
     };
     
     /**
+     * Converts screen (x,y) into graph coordinates.
+     * @param {Number} x Screen x coordinate
+     * @param {Number} y Screen y coordinate
+     * @returns {String} Output string in format "( x, y )"
+     */
+    this.screenToWorld = function( x, y ){
+        let wx = (x - self.xOrigin) / self.xScale + xMin;
+        let wy = (self.yOrigin - y) / self.yScale + yMin;
+        let xText = wx < 1000 ? wx.toPrecision(3) : wx.toPrecision(4);
+        let yText = wy < 1000 ? wy.toPrecision(3) : wy.toPrecision(4);
+        return "( " + xText + ", " + yText + " )";
+    };
+    
+    /**
      * Create the graph with fully drawn X-axis and Y-axis.
      * At this stage the graph contains no data.
      * @param {String} xLabel Text to display beneath the X-axis
@@ -145,13 +159,12 @@ function Graph(xMin, yMin, xMax, yMax) {
         let graphics = new Graphics(this.bitmap);
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
-        graphics.pen = new Pen(this.axisColor);
         graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
-        drawXAxis(graphics, tickLength, minDistBetweenTicks);
-        drawYAxis(graphics, tickLength, minDistBetweenTicks);
-        drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel);
+        drawXAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
+        drawYAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
+        drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel, this.axisColor);
         graphics.end();
-        drawYAxisLabel(font, imageHeight, yLabel);
+        drawYAxisLabel(font, imageHeight, yLabel, this.axisColor);
     };
     
     /**
@@ -283,16 +296,28 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Graphics} g
      * @param {Number} tickLength
      * @param {Number} minDistBetweenTicks
+     * @param {Number} axisColor
      * @returns {undefined}
      */
-    let drawXAxis = function (g, tickLength, minDistBetweenTicks){
-        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin + self.xAxisLength, self.yOrigin);
-        let fontHeight = g.font.ascent + g.font.descent;
-        let xTickInterval = calculateTickIncrement(self.xMax - self.xMin, self.xAxisLength / minDistBetweenTicks);
-        let firstTickX = calculateFirstTick(self.xMin, xTickInterval);
+    let drawXAxis = function (g, tickLength, minDistBetweenTicks, axisColor){
+        const y1 = self.yOrigin;
+        const xTickInterval = calculateTickIncrement(self.xMax - self.xMin, self.xAxisLength / minDistBetweenTicks);
+        const firstTickX = calculateFirstTick(self.xMin, xTickInterval);
+        
+        const yAxisEnd = self.yOrigin - self.yAxisLength;
+        g.pen = new Pen(0xFF222222);
         for (let x = firstTickX; x <= self.xMax; x += xTickInterval){
             let x1 = xToScreenX(x);
-            let y1 = self.yOrigin;
+            if (x1 > self.xOrigin){
+                g.drawLine(x1, y1 - 1, x1, yAxisEnd);
+            }
+        }
+        
+        g.pen = new Pen(axisColor);
+        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin + self.xAxisLength, self.yOrigin);
+        let fontHeight = g.font.ascent + g.font.descent;
+        for (let x = firstTickX; x <= self.xMax; x += xTickInterval){
+            let x1 = xToScreenX(x);
             g.drawLine(x1, y1, x1, y1 + tickLength);
             if (xTickInterval < 1){
                 let n = Math.abs(x) > 1e-15 ? x : 0;
@@ -312,14 +337,26 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Graphics} g
      * @param {Number} tickLength
      * @param {Number} minDistBetweenTicks
+     * @param {Number} axisColor
      * @returns {undefined}
      */
-    let drawYAxis = function (g, tickLength, minDistBetweenTicks){
-        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin, self.yOrigin - self.yAxisLength);
-        let yTickInterval = calculateTickIncrement(self.yMax - self.yMin, self.yAxisLength / minDistBetweenTicks);
-        let firstTickY = calculateFirstTick(self.yMin, yTickInterval);
+    let drawYAxis = function (g, tickLength, minDistBetweenTicks, axisColor){
+        const x1 = self.xOrigin;
+        const yTickInterval = calculateTickIncrement(self.yMax - self.yMin, self.yAxisLength / minDistBetweenTicks);
+        const firstTickY = calculateFirstTick(self.yMin, yTickInterval);
+        
+        const xAxisEnd = self.xOrigin + self.xAxisLength;
+        g.pen = new Pen(0xFF222222);
         for (let y = firstTickY; y <= self.yMax; y += yTickInterval){
-            let x1 = self.xOrigin;
+            let y1 = yToScreenY(y);
+            if (y1 < self.yOrigin){
+                g.drawLine(x1 + 1, y1, xAxisEnd, y1);
+            }
+        }
+        
+        g.pen = new Pen(axisColor);
+        g.drawLine(self.xOrigin, self.yOrigin, self.xOrigin, self.yOrigin - self.yAxisLength);
+        for (let y = firstTickY; y <= self.yMax; y += yTickInterval){
             let y1 = yToScreenY(y);
             g.drawLine(x1, y1, x1 - tickLength, y1);
             if (yTickInterval < 1){
@@ -341,11 +378,13 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Number} imageWidth
      * @param {Number} imageHeight
      * @param {String} text
+     * @param {Number} axisColor
      * @returns {undefined}
      */
-    let drawXAxisLabel = function (g, imageWidth, imageHeight, text){
+    let drawXAxisLabel = function (g, imageWidth, imageHeight, text, axisColor){
         let x = imageWidth/2 - g.font.width(text)/2;
         let y = imageHeight - 5;
+        g.pen = new Pen(axisColor);
         g.drawText(x, y, text);
     };
     
@@ -354,21 +393,22 @@ function Graph(xMin, yMin, xMax, yMax) {
      * @param {Font} font
      * @param {Number} imageHeight
      * @param {String} text
+     * @param {Number} axisColor
      * @returns {undefined}
      */
-    let drawYAxisLabel = function (font, imageHeight, text){
+    let drawYAxisLabel = function (font, imageHeight, text, axisColor){
         // draw into a small bitmap
         // rotate the bit map by 90 degrees
         // copy bitmap into graph right hand margin
         let w = Math.min(imageHeight, font.width(text));
         let h = font.ascent + font.descent;
         let textBitmap = new Bitmap(w, h);
-        textBitmap.fill(0x00000000);    // AARRGGBB
+        textBitmap.fill(0xFF000000);    // AARRGGBB
         let graphics = new Graphics(textBitmap);
         graphics.clipRect = new Rect(0, 0, w, h);
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
-        graphics.pen = new Pen(self.axisColor);
+        graphics.pen = new Pen(axisColor);
         graphics.drawText(0, h - font.descent, text);
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
@@ -418,62 +458,4 @@ function Graph(xMin, yMin, xMax, yMax) {
     this.xAxisLength = 700;
     this.yAxisLength = 700;
     this.setAxisLength(this.xAxisLength, this.yAxisLength);
-}
-
-/**
- * @param {Number} m gradient
- * @param {Number} b y axis intercept
- * @param {Number} x0 Line valid from this x coordinate
- * @param {Number} x1 Line valid upto this x coordinate
- * @returns {EquationOfLine}
- */
-function EquationOfLine(m, b, x0, x1){
-    this.m = m;
-    this.b = b;
-    this.x0 = x0;
-    this.x1 = x1;
-    this.y0 = eqnOfLineCalcY(x0, m, b);
-    this.y1 = eqnOfLineCalcY(x1, m, b);
-    
-    /**
-     * y = mx + b
-     * @param {Number} x coordinate
-     * @returns {Number} y coordinate
-     */
-    this.calcYFromX = function (x){
-        return this.m * x + this.b;
-    };
-}
-/**
- * y = mx + b
- * @param {Number} x coordinate
- * @param {Number} m gradient
- * @param {Number} b y-axis intercept
- * @returns {Number} y coordinate
- */
-function eqnOfLineCalcY(x, m, b) {
-    return m * x + b;
-}
-/**
- * m = (y1 - y0) / (x1 - x0)
- * @param {Number} x0 point0 x-coordinate
- * @param {Number} y0 point0 y-coordinate
- * @param {Number} x1 point1 x-coordinate
- * @param {Number} y1 point1 y-coordinate
- * @returns {Number} Gradient
- */
-function eqnOfLineCalcGradient(x0, y0, x1, y1) {
-    return (y1 - y0) / (x1 - x0);
-}   
-/**
- * y = mx + b
- * Hence
- * b = y - mx
- * @param {Number} x0 x-coordinate
- * @param {Number} y0 y-coordinate
- * @param {Number} m Gradient
- * @returns {Number} Y Intercept (b)
- */
-function eqnOfLineCalcYIntercept(x0, y0, m) {
-    return y0 - m * x0;
 }

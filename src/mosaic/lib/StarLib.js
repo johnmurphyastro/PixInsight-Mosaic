@@ -1,4 +1,4 @@
-/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform */
+/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -477,8 +477,6 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     
     let targetName = tgtView.fullId;
     let referenceName = refView.fullId;
-    let imageWindow = null;
-    let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
     let targetLabel = "Target (" + targetName + ")";
     let referenceLabel = "Reference (" + referenceName + ")";
     
@@ -508,7 +506,6 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     // Now add the data to the graph...
     if (colorStarPairs.length === 1){ // B&W
         drawStarLineAndPoints(graphWithAxis, 0xFF777777, colorStarPairs[0], 0xFFFFFFFF);
-        imageWindow = graphWithAxis.createWindow(windowTitle, false);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
@@ -519,11 +516,19 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
             drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
-        imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs, data);
-    imageWindow.show();
-    imageWindow.zoomToFit();
+    // Display graph in script dialog
+    GraphDialog.prototype = new Dialog;
+    let graph = new GraphDialog(graphWithAxis.bitmap, "Photometry Graph", graphWithAxis.screenToWorld);
+    if (graph.execute() === StdButton_Yes){
+        // User requested graph saved to PixInsight View
+        let isColor = refView.image.isColor;
+        let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
+        let imageWindow = graphWithAxis.createWindow(windowTitle, isColor);
+        starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs, data);
+        imageWindow.show();
+        imageWindow.zoomToFit();
+    }
     return true;
 }
 

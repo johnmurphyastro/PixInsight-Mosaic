@@ -105,7 +105,7 @@ function calcMovingAverages(samplePairs, smoothDifArray, nColumns, isHorizontal)
             }
         }
         
-        if (ma.length > 25){
+        if (ma.length > 5){
             // Apply some smoothing by fitting a line to 5 points
             // Then only keep two points from the line. These will be used by
             // Akima Interpolation to create a smooth curve.
@@ -793,8 +793,6 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     
     let axisWidth;
     let maxCoordinate;
-    let imageWindow = null;
-    let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
     let xLabel;
     if (isHorizontal){
         xLabel = "Mosaic tile join X-coordinate";
@@ -825,7 +823,6 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         let difArray = gradients[0];
         drawLineAndPoints(graphWithAxis, isHorizontal, initialDifArray,
             difArray, 0xFFFFFFFF, colorSamplePairs[0], 0xFFFFFFFF);
-        imageWindow = graphWithAxis.createWindow(windowTitle, false);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
@@ -839,8 +836,16 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
                 difArray, lineColors[c], colorSamplePairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
-        imageWindow = graphWithAxis.createWindow(windowTitle, true);
     }
-    gradientGraphFitsHeader(referenceView, targetView, imageWindow, data);
-    imageWindow.show();
+    // Display graph in script dialog
+    GraphDialog.prototype = new Dialog;
+    let graph = new GraphDialog(graphWithAxis.bitmap, "Gradient Graph", graphWithAxis.screenToWorld);
+    if (graph.execute() === StdButton_Yes){
+        // User requested graph saved to PixInsight View
+        let isColor = targetView.image.isColor;
+        let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
+        let imageWindow = graphWithAxis.createWindow(windowTitle, isColor);
+        gradientGraphFitsHeader(referenceView, targetView, imageWindow, data);
+        imageWindow.show();
+    }
 }

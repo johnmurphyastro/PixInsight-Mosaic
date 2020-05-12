@@ -1,4 +1,4 @@
-/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog */
+/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog, StdButton_Yes, StdIcon_Question, StdButton_No, StdButton_Cancel */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -359,13 +359,11 @@ function PhotometricMosaicDialog(data) {
             "(1) Each join must be approximately vertical or horizontal.<br />" +
             "(2) Join frames into either columns or rows.<br />" +
             "(3) Join these strips to create the final mosaic.<br />" +
-            "Detected stars are cached so consider generating all output " +
-            "(graphs, stars, sample grid) before exiting.<br />" +
             "Copyright &copy; 2019-2020 John Murphy.");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
-    titleSection.setMinSize(650, 90);
+    titleSection.setMinSize(650, 60);
     let titleBar = new SectionBar(this, "Quick Start Guide");
     titleBar.setSection(titleSection);
     titleBar.onToggleSection = this.onToggleSection;
@@ -1424,4 +1422,65 @@ function main() {
     }
     
     return;
+}
+
+/**
+ * Create a dialog that displays the supplied bitmap
+ * @param {Bitmap} bitmap Bitmap to display (e.g. graph bitmap)
+ * @param {String} title Window title
+ * @param {String Function(x, y)} screenToWorld Translates bitmap (x,y) to graph (x,y)
+ * @returns {GraphDialog}
+ */
+function GraphDialog(bitmap, title, screenToWorld)
+{
+    this.__base__ = Dialog;
+    this.__base__();
+    let self = this;
+    
+    /**
+     * Converts bitmap (x,y) into graph coordinates.
+     * @param {Number} x Bitmap x coordinate
+     * @param {Number} y Bitmap y coordinate
+     * @returns {String} Output string in format "( x, y )"
+     */
+    this.displayXY = function (x, y){
+        self.windowTitle = title + "  " + screenToWorld(x, y);
+    };
+    
+    // Draw bitmap into this component
+    this.bitmapControl = new Control(this);
+    this.bitmapControl.setScaledMinSize(bitmap.width, bitmap.height);
+    this.bitmapControl.onPaint = function (){
+        let g = new Graphics(this);
+        g.drawBitmap(0, 0, bitmap);
+        g.end();
+    };
+    this.bitmapControl.onMousePress = function ( x, y, button, buttonState, modifiers ){
+        if (button === 2){
+            // Right mouse button -> MessageBox -> Close dialog and save graph to PixInsight View
+            let messageBox = new MessageBox( "Save Graph (create Image Window)?\n",
+                    "Save and Close Graph", 
+                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Cancel);
+            let reply = messageBox.execute();
+            if (reply === StdButton_Yes){
+                self.done(StdButton_Yes);
+            } else if (reply === StdButton_No){
+                self.done(StdButton_No);
+            }
+        } else {
+            // Any other button. Display graph coordinates in title bar
+            self.displayXY(x, y);
+        }
+    };
+    this.bitmapControl.onMouseMove = function ( x, y, buttonState, modifiers ){
+        // When dragging mouse, display graph coordinates in title bar
+        self.displayXY(x, y);
+    };
+
+    this.sizer = new HorizontalSizer(this);
+    this.sizer.margin = 2;
+    this.sizer.add(this.bitmapControl, 100);
+    this.adjustToContents();
+    this.dialog.setFixedSize();
+    this.windowTitle = title + "  (Esc: Close,  Left click: (x,y),  Right click: Save)";
 }
