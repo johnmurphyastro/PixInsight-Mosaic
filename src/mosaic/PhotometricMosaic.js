@@ -331,8 +331,8 @@ function calculateScale(starPairs) {
 
 /**
  * Appy scale and subtract the detected gradient from the target view
- * @param {View} refView Apply the gradient correction to a clone of this view
- * @param {View} tgtView Apply the gradient correction to a clone of this view
+ * @param {View} refView Used to create mosaic. Read only.
+ * @param {View} tgtView Apply scale and gradient correction to a clone of this view
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
@@ -517,72 +517,5 @@ function createPreview(targetView, rect, previewName){
         overlapPreview = preview;
     }
 }
-
-/**
- * Create a viewId that does not already exist.
- * If viewId is already unique, return it.
- * If viewId is not unique, add a postfix number to make it unique.
- * PixInsight would do this automatically when a new ImageWindow is created, but
- * this routine can useful if we need to know the id of the new view
- * @param {String} viewId
- * @returns {String} unique viewId
- */
-//function getUniqueViewId(viewId) {
-//    let name = viewId;
-//    if (!View.viewById(name).isNull) {
-//        // The view name is aready in use.
-//        // find a unique name for the new view
-//        let nameBase = name;
-//        for (let i = 1; ; i++) {
-//            if (View.viewById(nameBase + i).isNull) {
-//                name = nameBase + i;
-//                break;
-//            }
-//        }
-//    }
-//    return name;
-//}
-
-//function GradientTest(){
-//    let x0 = 300;
-//    let x1 = 500;
-//    let y0 = 600;
-//    let y1 = 700;
-//    let average = 50;
-//    let feather = 100;
-//    let isHorizontal = true;
-//    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
-//    console.writeln("y = 0, offset = 50? ", gradOffset.getOffset(0, 250));
-//    console.writeln("y = 499, offset = 50? ", gradOffset.getOffset(499, 250));
-//    console.writeln("y = 525, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(525, 250));
-//    console.writeln("y = 550, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(550, 250));
-//    console.writeln("y = 575, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(575, 250));
-//    console.writeln("y = 600, offset = 250? ", gradOffset.getOffset(600, 250));
-//    console.writeln("y = 650, offset = 250? ", gradOffset.getOffset(650, 250));
-//    console.writeln("y = 699, offset = 250? ", gradOffset.getOffset(699, 250));
-//    console.writeln("y = 725, offset = 50 + (250-50)*3/4 = 200? ", gradOffset.getOffset(725, 250));
-//    console.writeln("y = 750, offset = 50 + (250-50)/2 = 150? ", gradOffset.getOffset(750, 250));
-//    console.writeln("y = 775, offset = 50 + (250-50)/4 = 100? ", gradOffset.getOffset(775, 250));
-//    console.writeln("y = 800, offset = 50? ", gradOffset.getOffset(800, 250));
-//    console.writeln("y = 999, offset = 50? ", gradOffset.getOffset(999, 250));
-//    
-//    let average = -50;
-//    let feather = 200;
-//    let isHorizontal = false;
-//    let gradOffset = new GradientOffset(1000, 1000, average, new Rect(x0, y0, x1, y1), feather, isHorizontal);
-//    console.writeln("x = 0, offset = -50? ", gradOffset.getOffset(0, 350));
-//    console.writeln("x = 99, offset = -50? ", gradOffset.getOffset(99, 350));
-//    console.writeln("x = 150, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(150, 350));
-//    console.writeln("x = 200, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(200, 350));
-//    console.writeln("x = 250, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(250, 350));
-//    console.writeln("x = 300, offset = 350? ", gradOffset.getOffset(300, 350));
-//    console.writeln("x = 400, offset = 350? ", gradOffset.getOffset(400, 350));
-//    console.writeln("x = 499, offset = 350? ", gradOffset.getOffset(499, 350));
-//    console.writeln("x = 550, offset = -50 + (350+50)*3/4 = 250? ", gradOffset.getOffset(550, 350));
-//    console.writeln("x = 600, offset = -50 + (350+50)/2 = 150? ", gradOffset.getOffset(600, 350));
-//    console.writeln("x = 650, offset = -50 + (350+50)/4 = 50? ", gradOffset.getOffset(650, 350));
-//    console.writeln("x = 700, offset = -50? ", gradOffset.getOffset(700, 350));
-//    console.writeln("x = 999, offset = -50? ", gradOffset.getOffset(999, 350));
-//}
 
 main();
