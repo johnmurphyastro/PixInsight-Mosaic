@@ -1411,13 +1411,14 @@ function main() {
             (new MessageBox("ERROR: Target and  Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.targetView.window.maskEnabled && !data.targetView.window.mask.isNull) {
-            (new MessageBox("ERROR: Target view mask detected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
-            continue;
-        }
+//        if (data.targetView.window.maskEnabled && !data.targetView.window.mask.isNull) {
+//            (new MessageBox("ERROR: Target view mask detected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+//            continue;
+//        }
 
         // Calculate and apply the linear fit
         PhotometricMosaic(data);
+        data.saveParameters();  // Want to save script parameters to the newly created mosaic window. This does not work...
         console.hide();
     }
     
