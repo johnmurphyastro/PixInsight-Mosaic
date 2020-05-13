@@ -18,11 +18,10 @@
 /**
  * Copy Astrometric solution from source view to target view
  * @param {View} sourceView Copy astrometric solution from this header
- * @param {View} targetView Append astrometric solution to this header
+ * @param {FITSKeyword} keywords Append astrometric solution to this header
  */
-function copyFitsAstrometricSolution(sourceView, targetView) {
+function copyFitsAstrometricSolution(sourceView, keywords) {
     let found = false;
-    let keywords = targetView.window.keywords;
     for (let fitsKeyword of sourceView.window.keywords) {
         if (fitsKeyword.name === "COMMENT" &&
                 fitsKeyword.comment.toLowerCase().contains("astrometric")) {
@@ -52,21 +51,17 @@ function copyFitsAstrometricSolution(sourceView, targetView) {
             found = true;
         }
     }
-    if (found){
-        targetView.window.keywords = keywords;
-    }
-    return;
+    return found;
 }
 
 /**
  * Copy known observaton keywords from source to target fits headers.
  * The RA and DEC are not copied since these will probably be invalid.
  * @param {View} sourceView Copy observation data from this view
- * @param {View} targetView Append observation data to this view
+ * @param {FITSKeyword} keywords Append observation data to this view
  */
-function copyFitsObservation(sourceView, targetView){
+function copyFitsObservation(sourceView, keywords){
     let found = false;
-    let keywords = targetView.window.keywords;
     for (let fitsKeyword of sourceView.window.keywords) {
         if (fitsKeyword.name === "OBSERVER" ||
                 fitsKeyword.name === "INSTRUME" ||
@@ -87,32 +82,25 @@ function copyFitsObservation(sourceView, targetView){
             found = true;
         }
     }
-    if (found){
-        targetView.window.keywords = keywords;
-    }
-    return;
+    return found;
 }
 
 /**
  * @param {View} view Read FITS header from this view.
- * @param {View} mosaicView Append FITS header to this view.
+ * @param {FITSKeyword} keywords Append FITS header to this view.
  * @param {String} startsWith Copy all FITS comments that start with this.
  * @param {String} orStartsWith Copy all FITS comments that start with this.
  */
-function copyFitsKeywords(view, mosaicView, startsWith, orStartsWith){
-    let modified = false;
-    let keywords = view.window.keywords;
-    let mosaicKeywords = mosaicView.window.keywords;
-    for (let keyword of keywords){
+function copyFitsKeywords(view, keywords, startsWith, orStartsWith){
+    let found = false;
+    for (let keyword of view.window.keywords){
         if (keyword.comment.startsWith(startsWith) || 
                 keyword.comment.startsWith(orStartsWith)){
-            mosaicKeywords.push(keyword);
-            modified = true;
+            keywords.push(keyword);
+            found = true;
         }
     }
-    if (modified){
-        mosaicView.window.keywords = mosaicKeywords;
-    }
+    return found;
 }
 
 /**

@@ -353,34 +353,40 @@ function getSampleSections (samplePairs, nSections, isHorizontal){
  * @param {Number} imageWidth
  * @param {Number} imageHeight
  * @param {Rect} joinRect The specified join area (a subset of the actual overlap)
- * @param {Boolean} taperFlag If true, taper the gradient correction
- * @param {Number} taperLength Taper (or feather) length
  * @param {Boolean} isHorizontal If true, one image is above the other
+ * @param {PhotometricMosaicData} data 
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @returns {ScaleAndGradientApplier}
  */
-function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect, 
-        taperFlag, taperLength, isHorizontal, isTargetAfterRef) {
-    this.taperFlag = taperFlag;
-    this.taperLength = taperLength;
+function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect, isHorizontal, 
+        data, isTargetAfterRef) {
+    this.createMosaic = data.createMosaicFlag;
+    this.mosaicRandomFlag = data.mosaicRandomFlag;
+    this.mosaicAverageFlag = data.mosaicAverageFlag;
+    this.mosaicOverlayRefFlag = data.mosaicOverlayRefFlag;
+    this.mosaicOverlayTgtFlag = data.mosaicOverlayTgtFlag;
+    this.taperFlag = data.taperFlag;
+    this.taperLength = data.taperFlag ? data.taperLength : 0;
     this.isTargetAfterRef = isTargetAfterRef;
     this.isHorizontal = isHorizontal;
     if (isHorizontal){
-        this.firstTaperStart = Math.max(0, joinRect.y0 - taperLength); // joinStart - taperLength
+        this.firstTaperStart = Math.max(0, joinRect.y0 - this.taperLength); // joinStart - taperLength
         this.joinStart = joinRect.y0;
         this.joinEnd = joinRect.y1;
-        this.secondTaperEnd = Math.min(imageHeight, joinRect.y1 + taperLength); // joinEnd + taperLength
+        this.secondTaperEnd = Math.min(imageHeight, joinRect.y1 + this.taperLength); // joinEnd + taperLength
     } else {
-        this.firstTaperStart = Math.max(0, joinRect.x0 - taperLength);
+        this.firstTaperStart = Math.max(0, joinRect.x0 - this.taperLength);
         this.joinStart = joinRect.x0;
         this.joinEnd = joinRect.x1;
-        this.secondTaperEnd = Math.min(imageWidth, joinRect.x1 + taperLength);
+        this.secondTaperEnd = Math.min(imageWidth, joinRect.x1 + this.taperLength);
     }
     
     /**
      * Applies the scale and gradient correction to the supplied view.
      * 
-     * @param {View} view
+     * @param {Image} refImage Read access only
+     * @param {Image} tgtImage Read access only
+     * @param {View} view Blank image, will become mosaic image or corrected target image
      * @param {Number} scale
      * @param {Number[]} propagateDifArray
      * @param {Number[]} taperDifArray
@@ -388,13 +394,17 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
      * @param {Number} channel
      * @returns {undefined}
      */
-    this.applyAllCorrections = function (view, scale, propagateDifArray, taperDifArray, tgtBox, channel){
+    this.applyAllCorrections = function (refImage, tgtImage, view, scale,
+            propagateDifArray, taperDifArray, tgtBox, channel){
+                
         processEvents();
+        
+        let bgDif;
+        let fullDif;
         
         if (this.taperFlag) {
             const length = taperDifArray.length;
-            let bgDif;
-            let fullDif;
+            
             if (propagateDifArray !== null){
                 // Apply propagateDifArray + taperDifArray to the join area
                 // Apply propagateDifArray + taperDifArray * taperFraction in taper area
@@ -416,126 +426,308 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
                 fullDif = taperDifArray;
                 console.writeln("Channel[", channel, "] average offset ", average.toPrecision(5));
             }
-            
-            if (this.isHorizontal) {
-                if (this.isTargetAfterRef) {
-                    // Full correction from start of target up to end of the join region
-                    this.applyScaleAndGradient(view, scale, fullDif,
-                            tgtBox.x0, tgtBox.y0, tgtBox.x1, this.joinEnd, channel);
+        } else {
+            // Propagate gradient. Apply full dif over whole of target image
+            bgDif = propagateDifArray;
+            fullDif = propagateDifArray;
+        }
 
+        if (this.isHorizontal) {
+            if (this.isTargetAfterRef) {
+                // Reference side of join
+                // Full correction from start of target up to start of the join region
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDif,
+                        tgtBox.x0, tgtBox.y0, tgtBox.x1, this.joinStart, channel, false);
+
+                // Full correction from start of join up to end of the join region
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, fullDif,
+                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel);
+
+                if (this.taperFlag) {
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(view, scale, fullDif, bgDif,
+                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDif, bgDif,
                             tgtBox.x0, this.joinEnd, tgtBox.x1, this.secondTaperEnd, channel);
+                }
 
-                    // Taper has finished. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, bgDif,
-                            tgtBox.x0, this.secondTaperEnd, tgtBox.x1, tgtBox.y1, channel);
-                } else {
-                    // Taper has not yet started. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, bgDif,
-                            tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel);
+                // Target side of join
+                // If taper: Taper has finished. Only apply scale and average offset
+                // No taper: bgDif === fullDif. Apply full correction.
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDif,
+                        tgtBox.x0, this.secondTaperEnd, tgtBox.x1, tgtBox.y1, channel, true);
+            } else {
+                // Target side of join
+                // If taper: Taper has not yet started. Only apply scale and average offset
+                // No taper: bgDif === fullDif. Apply full correction.
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDif,
+                        tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel, true);
 
+                if (this.taperFlag) {
                     // Taper up region. Apply full scale correction and 
                     // gradually increase the gradient correction from zero to full
-                    this.applyScaleAndGradientTaperUp(view, scale, fullDif, bgDif,
+                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDif, bgDif,
                             tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.joinStart, channel);
-
-                    // Full correction from start of the join region to the end of the target image 
-                    this.applyScaleAndGradient(view, scale, fullDif,
-                            tgtBox.x0, this.joinStart, tgtBox.x1, tgtBox.y1,  channel);
                 }
-            } else {    // vertical join
-                if (isTargetAfterRef) {
-                    // Full correction from start of target up to end of the join region
-                    this.applyScaleAndGradient(view, scale, fullDif,
-                            tgtBox.x0, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
 
-                    // Taper down region. Apply full scale correction but 
-                    // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(view, scale, fullDif, bgDif,
-                            this.joinEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
+                // Full correction from start of the join region to the end of join region 
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, fullDif,
+                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel);
 
-                    // Taper has finished. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, bgDif,
-                            this.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
-                } else {
-                    // Taper has not yet started. Only apply scale and average offset
-                    this.applyScaleAndAverageGradient(view, scale, bgDif,
-                            tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel);
-
-                    // Taper down region. Apply full scale correction but 
-                    // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperUp(view, scale, fullDif, bgDif,
-                            this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
-
-                    // Full correction from start of the join region to the end of the target image 
-                    this.applyScaleAndGradient(view, scale, fullDif,
-                            this.joinStart, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
-                }
+                // Reference side of join
+                // Full correction from end of the join region to the end of the target image 
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDif,
+                        tgtBox.x0, this.joinEnd, tgtBox.x1, tgtBox.y1, channel, false);
             }
-        } else if (propagateDifArray !== null){
-            // No taper. Propogate full correction from start to end of target image
-            this.applyScaleAndGradient(view, scale, propagateDifArray,
-                    tgtBox.x0, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel);
-        } else {
-            console.criticalln("No gradient specified!");
+        } else {    // vertical join
+            if (isTargetAfterRef) {
+                // Reference side of join
+                // Full correction from start of target up to start of the join region
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDif,
+                        tgtBox.x0, tgtBox.y0, this.joinStart, tgtBox.y1, channel, false);
+
+                // Full correction from start of join up to end of the join region
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, fullDif,
+                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+
+                if (this.taperFlag) {
+                    // Taper down region. Apply full scale correction but 
+                    // gradually reduce the gradient correction
+                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDif, bgDif,
+                            this.joinEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
+                }
+                
+                // Target side of join
+                // If taper: Taper has finished. Only apply scale and average offset
+                // No taper: bgDif === fullDif. Apply full correction.
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDif,
+                        this.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel, true);
+            } else {
+                // Target side of join
+                // If taper: Taper has not yet started. Only apply scale and average offset
+                // No taper: bgDif === fullDif. Apply full correction.
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDif,
+                        tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel, true);
+
+                if (this.taperFlag) {
+                    // Taper down region. Apply full scale correction but 
+                    // gradually reduce the gradient correction
+                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDif, bgDif,
+                            this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
+                }
+
+                // Full correction from start of the join region to the end of join 
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, fullDif,
+                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+
+                // Reference side of join
+                // Full correction from end of the join region to the end of the target image 
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDif,
+                        this.joinEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel, false);
+            }
         }
         
     };
     
     /**
-     * @param {View} tgtView
-     * @param {Number} scale
-     * @param {Number[]} difArray
+     * @param {Image} refImage Read Only
+     * @param {Image} tgtImage Read Only
+     * @param {View} mosaicView Scale and gradient will be applied. No taper.
+     * @param {Number} scale Scale to apply
+     * @param {Number[]} difArray Gradient to apply
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     * @param {Number} channel
+     * @param {Boolean} isTargetSide True if x0,x1,y0,y1 bounding box is on target side of join
+     */
+    this.applyScaleAndGradient = function (refImage, tgtImage, mosaicView,
+            scale, difArray, x0, y0, x1, y1, channel, isTargetSide){
+                
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        
+        const self = this;
+        let row;
+        let difArrayStart;
+
+        /**
+         * Create row from reference and target row, applying scale and gradient.
+         * If only creating a corrected target image, the reference row must only contain zeros.
+         * @param {Float64Array} refSamples Row used to read reference samples, or zeros if not creating mosaic
+         * @param {Float64Array} tgtSamples Row used to read target samples
+         * @param {Float64Array} samples Output stored in this row
+         */
+        let apply = function(refSamples, tgtSamples, samples){
+            tgtImage.getSamples(tgtSamples, row, channel);
+            if (self.createMosaic){
+                refImage.getSamples(refSamples, row, channel);
+            }
+            for (let i = 0; i < samples.length; i++) {
+                if (isTargetSide){
+                    // Target overlays reference
+                    if (tgtSamples[i]){
+                        samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                    } else if (refSamples[i]){
+                        samples[i] = refSamples[i];
+                    } else {
+                        samples[i] = 0;
+                    }
+                } else {
+                    // Reference overlays target
+                    if (refSamples[i]){
+                        samples[i] = refSamples[i];
+                    } else if (tgtSamples[i]){
+                        samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                    } else {
+                        samples[i] = 0;
+                    }
+                }
+            }
+            mosaicView.image.setSamples(samples, row, channel);
+        };
+        
+        if (this.isHorizontal){
+            row = new Rect(x0, y0, x1, y0 + 1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
+            let samples = new Float64Array(row.area);
+            difArrayStart = x0;
+            for (let y = y0; y < y1; y++) {
+                row.moveTo(x0, y);
+                apply(refSamples, tgtSamples, samples);
+            }
+        } else {
+            row = new Rect(x0, y0, x0 + 1, y1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
+            let samples = new Float64Array(row.area);
+            difArrayStart = y0;
+            for (let x = x0; x < x1; x++) {
+                row.moveTo(x, y0);
+                apply(refSamples, tgtSamples, samples);
+            }
+        }
+    };
+    
+    /**
+     * @param {Image} refImage Read Only
+     * @param {Image} tgtImage Read Only
+     * @param {View} mosaicView Uses ref overlay, tgt overlay, random or average combien.
+     * @param {Number} scale Scale to apply
+     * @param {Number[]} difArray Gradient to apply
      * @param {Number} x0
      * @param {Number} y0
      * @param {Number} x1
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndGradient = function (tgtView, scale, difArray, 
-            x0, y0, x1, y1, channel){
+    this.applyScaleAndGradientToJoin = function (refImage, tgtImage, mosaicView,
+            scale, difArray, x0, y0, x1, y1, channel){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
         
+        const self = this;
         let row;
         let difArrayStart;
 
-        let apply = function(samples){
-            tgtView.image.getSamples(samples, row, channel);
+        /**
+         * Create row from reference and target row, applying scale and gradient
+         * and using the mosaic join mode (overlayRef, overlayTgt, random or average)
+         * If only creating a corrected target image, the reference row must only 
+         * contain zeros (all join modes then effectively become target overlay).
+         * @param {Float64Array} refSamples Row used to read reference samples, or zeros if not creating mosaic
+         * @param {Float64Array} tgtSamples Row used to read target samples
+         * @param {Float64Array} samples Output stored in this row
+         */
+        let apply = function(refSamples, tgtSamples, samples){
+            tgtImage.getSamples(tgtSamples, row, channel);
+            if (self.createMosaic){
+                refImage.getSamples(refSamples, row, channel);
+            }
             for (let i = 0; i < samples.length; i++) {
-                if (samples[i]){ // do not modify black pixels
-                    samples[i] = samples[i] * scale - difArray[difArrayStart + i];
+                if (self.mosaicRandomFlag){
+                    if (tgtSamples[i]){
+                        if (!refSamples[i] || Math.random() < 0.5){
+                            // tgt exists. Either ref did not (target overlay) or tgt won random contest
+                            samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                        } else {
+                            // tgt exists. ref exists. ref won random contest.
+                            samples[i] = refSamples[i];
+                        }
+                    } else {
+                        // tgt does not exist. Set to ref (which may be zero or non zero)
+                        samples[i] = refSamples[i];
+                    }
+                } else if (self.mosaicOverlayRefFlag){
+                    if (refSamples[i]){
+                        // ref exists
+                        samples[i] = refSamples[i];
+                    } else if (tgtSamples[i]){
+                        // ref did not exist but tgt does, so use tgt.
+                        samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                    } else {
+                        // Both ref and tgt did not exist
+                        samples[i] = 0;
+                    }
+                } else if (self.mosaicOverlayTgtFlag){
+                    if (tgtSamples[i]){
+                        // tgt exists
+                        samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                    } else {
+                        // tgt did not exist. Use ref (which may be zero or non zero)
+                        samples[i] = refSamples[i];
+                    }
+                } else if (self.mosaicAverageFlag){
+                    if (tgtSamples[i]){
+                        // tgt exists
+                        const tgt = tgtSamples[i] * scale - difArray[difArrayStart + i];
+                        if (refSamples[i]){
+                            // tgt and ref exists. Use average
+                            samples[i] = (tgt + refSamples[i]) / 2;
+                        } else {
+                            // Only tgt exists
+                            samples[i] = tgt;
+                        }
+                    } else {
+                        // tgt does not exist. Use ref (which may be zero or non zero)
+                        samples[i] = refSamples[i];
+                    }
                 }
             }
-            tgtView.image.setSamples(samples, row, channel);
+            mosaicView.image.setSamples(samples, row, channel);
         };
         
         if (this.isHorizontal){
             row = new Rect(x0, y0, x1, y0 + 1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply(samples);
+                apply(refSamples, tgtSamples, samples);
             }
         } else {
             row = new Rect(x0, y0, x0 + 1, y1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply(samples);
+                apply(refSamples, tgtSamples, samples);
             }
         }
     };
     
     /**
-     * @param {View} tgtView
-     * @param {Number} scale
-     * @param {Number[]} difArray Apply to join
+     * @param {Image} refImage Read Only
+     * @param {Image} tgtImage Read Only
+     * @param {View} mosaicView
+     * @param {Number} scale Scale to apply
+     * @param {Number[]} difArray 100% at join edge and then taper down
      * @param {Number[]} bgDif Apply outside join and taper areas
      * @param {Number} x0
      * @param {Number} y0
@@ -543,8 +735,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndGradientTaperDown = function (tgtView, scale, difArray, bgDif,
-            x0, y0, x1, y1, channel){
+    this.applyScaleAndGradientTaperDown = function (refImage, tgtImage, mosaicView,
+            scale, difArray, bgDif, x0, y0, x1, y1, channel){
         
         if (x0 >= x1 || y0 >= y1)
             return;
@@ -553,44 +745,66 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         let row;
         let difArrayStart;
         
-        let apply = function(coord, taperStart, samples){
-            tgtView.image.getSamples(samples, row, channel);
+        /**
+         * Create row from reference and target row, applying scale, gradient and taper.
+         * If only creating a corrected target image, the reference row must only contain zeros.
+         * @param {Number} coord X or Y coordinate of current row
+         * @param {Number} taperStart X or Y coordinate of taper start (i.e. at join edge)
+         * @param {Float64Array} refSamples Row used to read reference samples, or zeros if not creating mosaic
+         * @param {Float64Array} tgtSamples Row used to read target samples
+         * @param {Float64Array} samples Output stored in this row
+         */
+        let apply = function(coord, taperStart, refSamples, tgtSamples, samples){
+            tgtImage.getSamples(tgtSamples, row, channel);
+            if (self.createMosaic){
+                refImage.getSamples(refSamples, row, channel);
+            }
             for (let i = 0; i < samples.length; i++) {
-                if (samples[i]){ // do not modify black pixels
+                if (tgtSamples[i]){
+                    // tgt sample exists. We only taper tgt samples
                     const idx = difArrayStart + i;
                     const bg = bgDif[idx];
                     const delta = difArray[idx] - bg;
                     const fraction = 1 - (coord - taperStart) / self.taperLength;
                     const taper = bg + delta * fraction;
-                    samples[i] = samples[i] * scale - taper;
+                    samples[i] = tgtSamples[i] * scale - taper;
+                } else {
+                    // No tgt sample. Use ref (which may be zero or non zero)
+                    samples[i] = refSamples[i];
                 }
             }
-            tgtView.image.setSamples(samples, row, channel);
+            mosaicView.image.setSamples(samples, row, channel);
         };
         
         if (this.isHorizontal){
             row = new Rect(x0, y0, x1, y0 + 1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply(y, y0, samples);
+                apply(y, y0, refSamples, tgtSamples, samples);
             }
         } else {
             row = new Rect(x0, y0, x0 + 1, y1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply(x, x0, samples);
+                apply(x, x0, refSamples, tgtSamples, samples);
             }
         }
     };
     
     /**
-     * @param {View} tgtView
-     * @param {Number} scale
-     * @param {Number[]} difArray Apply to join
+     * @param {Image} refImage Read Only
+     * @param {Image} tgtImage Read Only
+     * @param {View} mosaicView
+     * @param {Number} scale Scale to apply
+     * @param {Number[]} difArray Taper up to 100% at join edge
      * @param {Number[]} bgDif Apply outside join and taper areas
      * @param {Number} x0
      * @param {Number} y0
@@ -598,8 +812,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
      * @param {Number} y1
      * @param {Number} channel
      */
-    this.applyScaleAndGradientTaperUp = function (tgtView, scale, difArray, bgDif, 
-            x0, y0, x1, y1, channel){
+    this.applyScaleAndGradientTaperUp = function (refImage, tgtImage, mosaicView,
+            scale, difArray, bgDif, x0, y0, x1, y1, channel){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
@@ -609,88 +823,61 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, joinRect,
         let difArrayStart;
         let taperEnd;
         
-        let apply = function(coord, samples){
-            tgtView.image.getSamples(samples, row, channel);
+        /**
+         * Create row from reference and target row, applying scale, gradient and taper.
+         * If only creating a corrected target image, the reference row must only contain zeros.
+         * @param {Number} coord X or Y coordinate of current row
+         * @param {Float64Array} refSamples Row used to read reference samples, or zeros if not creating mosaic
+         * @param {Float64Array} tgtSamples Row used to read target samples
+         * @param {Float64Array} samples Output stored in this row
+         */
+        let apply = function(coord, refSamples, tgtSamples, samples){
+            tgtImage.getSamples(tgtSamples, row, channel);
+            if (self.createMosaic){
+                refImage.getSamples(refSamples, row, channel);
+            }
             for (let i = 0; i < samples.length; i++) {
-                if (samples[i]){ // do not modify black pixels
+                if (tgtSamples[i]){
+                    // tgt sample exists. We only taper tgt samples
                     const idx = difArrayStart + i;
                     const bg = bgDif[idx];
                     const delta = difArray[idx] - bg;
                     let fraction = 1 - (taperEnd - coord) / self.taperLength;
                     const taper = bg + delta * fraction;
-                    samples[i] = samples[i] * scale - taper;
+                    samples[i] = tgtSamples[i] * scale - taper;
+                } else {
+                    // No tgt sample. Use ref (which may be zero or non zero)
+                    samples[i] = refSamples[i];
                 }
             }
-            tgtView.image.setSamples(samples, row, channel);
+            mosaicView.image.setSamples(samples, row, channel);
         };
         
-        if (this.isHorizontal){
+        if (this.isHorizontal) {
             taperEnd = y1 - 1;
             row = new Rect(x0, y0, x1, y0 + 1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = x0;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
-                apply(y, samples);
+                apply(y, refSamples, tgtSamples, samples);
             }
         } else {
             taperEnd = x1 - 1;
             row = new Rect(x0, y0, x0 + 1, y1);
+            let refSamples = new Float64Array(row.area);
+            let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             difArrayStart = y0;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
-                apply(x, samples);
+                apply(x, refSamples, tgtSamples, samples);
             }
         }
     };
     
-    /**
-     * @param {View} tgtView
-     * @param {Number} scale
-     * @param {Number[]} bgDif Apply outside join and taper areas
-     * @param {Number} x0
-     * @param {Number} y0
-     * @param {Number} x1
-     * @param {Number} y1
-     * @param {Number} channel
-     */
-    this.applyScaleAndAverageGradient = function (tgtView, scale, bgDif, 
-            x0, y0, x1, y1, channel){
-                
-        if (x0 >= x1 || y0 >= y1)
-            return;
-        
-        let row;
-        let difArrayStart;
-        let apply = function(samples){
-            tgtView.image.getSamples(samples, row, channel);
-            for (let i = 0; i < samples.length; i++) {
-                if (samples[i]){ // do not modify black pixels
-                    samples[i] = samples[i] * scale - bgDif[difArrayStart + i];
-                }
-            }
-            tgtView.image.setSamples(samples, row, channel);
-        };
-
-        if (this.isHorizontal) {
-            row = new Rect(x0, y0, x1, y0 + 1);
-            let samples = new Float64Array(row.area);
-            difArrayStart = x0;
-            for (let y = y0; y < y1; y++) {
-                row.moveTo(x0, y);
-                apply(samples);
-            }
-        } else {
-            row = new Rect(x0, y0, x0 + 1, y1);
-            let samples = new Float64Array(row.area);
-            difArrayStart = y0;
-            for (let x = x0; x < x1; x++) {
-                row.moveTo(x, y0);
-                apply(samples);
-            }
-        }
-    };
 }
 
 /**

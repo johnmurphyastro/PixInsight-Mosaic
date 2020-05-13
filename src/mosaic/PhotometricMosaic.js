@@ -154,6 +154,7 @@ function PhotometricMosaic(data)
         return;
     }
     if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
+        console.hide(); // Allow user to compare with other open windows
         let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
         if (!displayed){
             new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
@@ -268,12 +269,14 @@ function PhotometricMosaic(data)
     }
 
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
+        console.hide(); // Allow user to compare with other open windows
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
                 null, propagateGradient, colorSamplePairs, data);
         return;
     }
 
     if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()) {
+        console.hide(); // Allow user to compare with other open windows
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
                 propagateGradient, taperGradient, colorSamplePairs, data);
         return;
@@ -300,51 +303,15 @@ function PhotometricMosaic(data)
         }
     }
 
-    console.writeln("\n<b><u>Applying scale and gradients</u></b>");
-    let correctedView = applyScaleAndGradient(targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateGradient, taperGradient, joinRect, data);
-
-    processEvents();
-
-    if (data.createMosaicFlag){
-        let mosaicName = getUniqueViewId(MOSAIC_NAME());
-        console.writeln("<b><u>Creating ", mosaicName, "</u></b>");
-
-        processEvents();
-        createMosaic(referenceView, correctedView, mosaicName,
-                 joinRect, isHorizontal, isTargetAfterRef, data);
-
-        let mosaicView = View.viewById(mosaicName);
-
-        // Update Fits Header
-        mosaicView.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-        copyFitsObservation(referenceView, mosaicView);
-        copyFitsAstrometricSolution(referenceView, mosaicView);
-        copyFitsKeywords(referenceView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
-        copyFitsKeywords(correctedView, mosaicView, TRIM_NAME(), SCRIPT_NAME());
-        mosaicView.endProcess();
-
-        // Don't need cloned target view any more
-        correctedView.window.forceClose();
-        
-        let w = mosaicView.window;
-        // Show the join area in a preview
-        w.createPreview(joinRect, "Join");
-        // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
-        let x0 = Math.max(0, joinRect.x0 - 50);
-        let x1 = Math.min(mosaicView.image.width, joinRect.x1 + 50);
-        let y0 = Math.max(0, joinRect.y0 - 50);
-        let y1 = Math.min(mosaicView.image.height, joinRect.y1 + 50);
-        let previewRect = new Rect(x0, y0, x1, y1);
-        w.createPreview(previewRect, "Inspect_Join");
-        // But show the main mosaic view.
-        w.currentView = mosaicView;
-        w.zoomToFit();
-    } else {
-        correctedView.stf = referenceView.stf;
-        correctedView.window.show();
-        correctedView.window.zoomToFit();
+    if (!data.gradientFlag && !data.taperFlag){
+        new MessageBox("No gradient correction to apply!", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
     }
+    console.writeln("\n<b><u>Applying scale and gradients</u></b>");
+    let imageWindow = applyScaleAndGradient(referenceView, targetView, isHorizontal, isTargetAfterRef,
+            scaleFactors, propagateGradient, taperGradient, joinRect, data);
+    imageWindow.show();
+    imageWindow.zoomToFit();
 
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
     processEvents();
@@ -364,6 +331,7 @@ function calculateScale(starPairs) {
 
 /**
  * Appy scale and subtract the detected gradient from the target view
+ * @param {View} refView Apply the gradient correction to a clone of this view
  * @param {View} tgtView Apply the gradient correction to a clone of this view
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
@@ -372,26 +340,30 @@ function calculateScale(starPairs) {
  * @param {Number[][]} taperGradient difArray for each color channel, tapered
  * @param {Rect} joinRect Bounding box of join region
  * @param {PhotometricMosaicData} data User settings for FITS header
- * @returns {View} Clone of tgtView, with corrections applied
+ * @returns {ImageWindow} Cloned image with corrections applied
  */
-function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef, 
+function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef, 
         scaleFactors, propagateGradient, taperGradient, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
     const width = tgtView.image.width;
     const height = tgtView.image.height;
     const nChannels = scaleFactors.length;
     
-    // Clone the target view and image
+    // Create a new view which will become either the mosaic view or the corrected target view
+    let viewId = data.createMosaicFlag ? MOSAIC_NAME() : tgtView.fullId + "_PM";
     let w = tgtView.window;
     let imgWindow = new ImageWindow(width, height, nChannels, w.bitsPerSample, 
-            w.isFloatSample, nChannels > 1, tgtView.fullId + "_PM");    
+            w.isFloatSample, nChannels > 1, viewId);    
     imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
     let view = imgWindow.mainView;
-    view.image.assign(tgtView.image);
+    if (data.createMosaicFlag){
+        // Start with the ref image and add then modify it with the target image
+        view.image.assign(refView.image);
+    } // Leave the image blank for a corrected target view
     
     // Apply scale and gradient to the cloned image
     let tgtCorrector = new ScaleAndGradientApplier(width, height, joinRect,
-            data.taperFlag, data.taperLength, isHorizontal, isTargetAfterRef);
+            isHorizontal, data, isTargetAfterRef);
     const tgtBox = data.cache.overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
@@ -403,11 +375,28 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
         if (data.taperFlag){
             taperDifArray = taperGradient[channel];
         }
-        tgtCorrector.applyAllCorrections(view, scale, propagateDifArray, taperDifArray, tgtBox, channel);
+        tgtCorrector.applyAllCorrections(refView.image, tgtView.image, view, scale, 
+                propagateDifArray, taperDifArray, tgtBox, channel);
+    }
+    
+    let minValue = view.image.minimum();
+    let maxValue = view.image.maximum();
+    if (minValue < 0 || maxValue > 1){
+        view.image.truncate(0, 1);
     }
     
     // FITS Header
-    let keywords = tgtView.window.keywords;
+    let keywords = imgWindow.keywords;
+    if (data.createMosaicFlag){
+        copyFitsObservation(refView, keywords);
+        copyFitsAstrometricSolution(refView, keywords);
+        copyFitsKeywords(refView, keywords, TRIM_NAME(), SCRIPT_NAME());
+    } else {
+        copyFitsObservation(tgtView, keywords);
+        copyFitsAstrometricSolution(tgtView, keywords);
+    }
+    copyFitsKeywords(tgtView, keywords, TRIM_NAME(), SCRIPT_NAME());
+    
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + " " + VERSION()));
     keywords.push(new FITSKeyword("HISTORY", "", 
@@ -442,121 +431,41 @@ function applyScaleAndGradient(tgtView, isHorizontal, isTargetAfterRef,
         keywords.push(new FITSKeyword("HISTORY", "", 
             SCRIPT_NAME() + ".scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
     }
-    console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
     
-    let minValue = view.image.minimum();
-    let maxValue = view.image.maximum();
     if (minValue < 0 || maxValue > 1){
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".truncated" + minMaxValues));
         console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...\n");
-        view.image.truncate(0, 1);
     }
     view.window.keywords = keywords;
     
+    // No need to call data.saveParameters() because this is a new image
+    // data.saveParameters();  
     view.endProcess();
-    return view;
-}
+    view.stf = refView.stf;
+    // Show the join area in a preview
+    imgWindow.createPreview(joinRect, "Join");
 
-/**
- * Create a mosaic by adding two images together.
- * Zero pixels are ignored.
- * 
- * @param {View} referenceView
- * @param {View} targetView
- * @param {String} mosaicImageName
- * @param {Rect} joinRect Bounding box of overlap 
- * @param {Boolean} isHorizontal True if join is horizontal
- * @param {Boolean} isTargetAfterRef True if target is below or right of reference image
- * @param {PhotometricMosaicData} data User settings
- * @returns {undefined}
- */
-function createMosaic(referenceView, targetView, mosaicImageName,
-        joinRect, isHorizontal, isTargetAfterRef, data) {
-    let P = new PixelMath;
-    P.setDescription("Create Mosaic from " + referenceView.fullId + ", " + targetView.fullId);
-    const ref = referenceView.fullId;
-    const tgt = targetView.fullId;
+    if (data.createMosaicFlag){
+        // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
+        let x0 = Math.max(0, joinRect.x0 - 50);
+        let x1 = Math.min(view.image.width, joinRect.x1 + 50);
+        let y0 = Math.max(0, joinRect.y0 - 50);
+        let y1 = Math.min(view.image.height, joinRect.y1 + 50);
+        let previewRect = new Rect(x0, y0, x1, y1);
+        imgWindow.createPreview(previewRect, "Inspect_Join");
+    }
+    // But show the main mosaic view.
+    imgWindow.currentView = view;
+    imgWindow.zoomToFit();
     
-    // Overlay reference: // iif( ref, ref, tgt )
-    const refExp = "iif(" + ref + ", " + ref + ", " + tgt + ")";
-    
-    // Overlay target: iif( tgt, tgt, ref )
-    const tgtExp = "iif(" + tgt + ", " + tgt + ", " + ref + ")";
-    
-    let expression;
-    if (data.mosaicOverlayRefFlag) {
-        expression = refExp;
-    } else if (data.mosaicOverlayTgtFlag){
-        expression = tgtExp;
-    } else if (data.mosaicRandomFlag){
-        // Random: iif( ref && tgt, rndselect( ref, tgt ), ref + tgt )
-        expression = "iif(" + ref + " && " + tgt + ", rndselect(" + ref + ", " + tgt + "), " + ref + " + " + tgt + ")";
+    if (data.createMosaicFlag){
+        console.writeln("Created ", view.fullId, " (", getElapsedTime(applyScaleAndGradientTime), ")\n");
     } else {
-        // Average: iif( ref && tgt, mean( ref, tgt ), ref + tgt )
-        expression = "iif(" + ref + " && " + tgt + ", (" + ref + " + " + tgt + ")/2, " + ref + " + " + tgt + ")";
+        console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
     }
-    
-    if (data.hasSampleAreaPreview) {
-        let outerIf;
-        if (isHorizontal) {
-            outerIf = "iif(y() < " + joinRect.y0 + ", ";
-            if (isTargetAfterRef) {
-                // First region is ref side of join. Overlay reference
-                outerIf += refExp;
-            } else {
-                // First region is tgt side of join. Overlay target
-                outerIf += tgtExp;
-            }
-            outerIf += ", iif(y() >= " + joinRect.y1 + ", ";
-            if (isTargetAfterRef) {
-                // Last region is tgt side of join. Overlay target
-                outerIf += tgtExp;
-            } else {
-                // Last region is ref side of join. Overlay reference
-                outerIf += refExp;
-            }
-        } else {
-            outerIf = "iif(x() < " + joinRect.x0 + ", ";
-            if (isTargetAfterRef) {
-                // First region is ref side of join. Overlay reference
-                outerIf += refExp;
-            } else {
-                // First region is tgt side of join. Overlay target
-                outerIf += tgtExp;
-            }
-            outerIf += ", iif(x() >= " + joinRect.x1 + ", ";
-            if (isTargetAfterRef) {
-                // Last region is tgt side of join. Overlay target
-                outerIf += tgtExp;
-            } else {
-                // Last region is ref side of join. Overlay reference
-                outerIf += refExp;
-            }
-        }
-        expression = outerIf + ", " + expression + "))";
-    }
-    
-    P.expression = expression;
-    P.symbols = "";
-    P.useSingleExpression = true;
-    P.generateOutput = true;
-    P.singleThreaded = false;
-    P.use64BitWorkingImage = true;
-    P.rescale = false;
-    P.truncate = false; // Both input images should be within range
-    P.createNewImage = true;
-    P.showNewImage = true;
-    P.newImageId = mosaicImageName;
-    P.newImageWidth = 0;
-    P.newImageHeight = 0;
-    P.newImageAlpha = false;
-    P.newImageColorSpace = PixelMath.prototype.SameAsTarget;
-    P.newImageSampleFormat = PixelMath.prototype.SameAsTarget;
-    P.executeOn(targetView, true); // used to get sample format and color space
-    let mosaicView = View.viewById(mosaicImageName);
-    mosaicView.stf = referenceView.stf;
+    return imgWindow;
 }
 
 /**
@@ -618,21 +527,21 @@ function createPreview(targetView, rect, previewName){
  * @param {String} viewId
  * @returns {String} unique viewId
  */
-function getUniqueViewId(viewId) {
-    let name = viewId;
-    if (!View.viewById(name).isNull) {
-        // The view name is aready in use.
-        // find a unique name for the new view
-        let nameBase = name;
-        for (let i = 1; ; i++) {
-            if (View.viewById(nameBase + i).isNull) {
-                name = nameBase + i;
-                break;
-            }
-        }
-    }
-    return name;
-}
+//function getUniqueViewId(viewId) {
+//    let name = viewId;
+//    if (!View.viewById(name).isNull) {
+//        // The view name is aready in use.
+//        // find a unique name for the new view
+//        let nameBase = name;
+//        for (let i = 1; ; i++) {
+//            if (View.viewById(nameBase + i).isNull) {
+//                name = nameBase + i;
+//                break;
+//            }
+//        }
+//    }
+//    return name;
+//}
 
 //function GradientTest(){
 //    let x0 = 300;
