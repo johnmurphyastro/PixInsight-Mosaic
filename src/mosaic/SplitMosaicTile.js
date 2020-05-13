@@ -110,8 +110,6 @@ function CopyImageEraseArea(tgtView, data, eraseRect, titlePostfix){
 // -----------------------------------------------------------------------------
 function SplitData() {
     // Used to poplulate the contents of a saved process icon
-    // It would normally also be called at the end of our script to populate the history entry,
-    // but because we use PixelMath to modify the image, the history entry is automatically populated.
     this.saveParameters = function () {
         if (this.targetView.isMainView) {
             Parameters.set("targetView", this.targetView.fullId);
@@ -131,7 +129,7 @@ function SplitData() {
             this.coordinate = Parameters.getInteger("coordinate");
         if (Parameters.has("targetView")) {
             let viewId = Parameters.getString("targetView");
-            this.targetView = View.viewById(viewId)
+            this.targetView = View.viewById(viewId);
         }
     };
 
