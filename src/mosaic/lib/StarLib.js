@@ -713,24 +713,30 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
 }
 
 /**
- * @param {Overlap} overlap
- * @param {Rect} joinRect
+ * @param {Overlap} overlap Specifies the overlapping pixels
+ * @param {Rect} joinRect Restricts the mask to join instead of using all overlap pixels
  */
 function createJoinMask(overlap, joinRect){
     const overlapMask = overlap.getFullImageMask();
     const width = overlapMask.width;
     const height = overlapMask.height;
+    const maskValue = 0.8;
+    // Restrict the mask to the joinRect rather than using the whole overlap
     let maskSamples = new Float32Array(joinRect.area);
     overlapMask.getSamples(maskSamples, joinRect);
     overlapMask.free();
     for (let i = 0; i < maskSamples.length; i++){
-        maskSamples[i] *= 0.2;
+        // When overlapMask is 1, mask will be transparent, which is what we want.
+        if (maskSamples[i] === 0){
+            // When overlapMask is 0, it will be solid red. We want some transparency.
+            maskSamples[i] = maskValue;
+        }
     }
     let w = new ImageWindow(width, height, 1, 8, false, false, "JoinMask");
     let view = w.mainView;
     view.beginProcess(UndoFlag_NoSwapFile);
+    view.image.fill(maskValue);
     view.image.setSamples(maskSamples, joinRect);
-    view.image.invert();
     view.endProcess();
     w.show();
 }

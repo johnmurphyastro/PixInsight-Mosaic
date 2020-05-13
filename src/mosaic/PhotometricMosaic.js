@@ -93,11 +93,6 @@ function PhotometricMosaic(data)
         processEvents();
     }
 
-    const detectedStars = new StarsDetected();
-    detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
-    createPreview(targetView, data.cache.overlap.overlapBox, "Overlap");
-    processEvents();
-    
     // sampleRect is the intersection between SampleAreaPreview and the overlap,
     // or the overlapBox if the preview was not specified
     let sampleRect;
@@ -115,6 +110,18 @@ function PhotometricMosaic(data)
     } else {
         sampleRect = data.cache.overlap.overlapBox;
     }
+
+    if (data.viewFlag === CREATE_JOIN_MASK()){
+        let isHorizontal = isJoinHorizontal(data, sampleRect);
+        let joinRect = extendSubRect(sampleRect, data.cache.overlap.overlapBox, isHorizontal);
+        createJoinMask(data.cache.overlap, joinRect);
+        return;
+    }
+
+    const detectedStars = new StarsDetected();
+    detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
+    createPreview(targetView, data.cache.overlap.overlapBox, "Overlap");
+    processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
         displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
@@ -167,11 +174,6 @@ function PhotometricMosaic(data)
     
     const isHorizontal = isJoinHorizontal(data, sampleRect);
     const joinRect = extendSubRect(sampleRect, data.cache.overlap.overlapBox, isHorizontal);
-    
-    if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(data.cache.overlap, joinRect);
-        return;
-    }
     
     if (data.viewFlag === CREATE_MOSAIC_MASK()){
         displayMask(targetView, joinRect, detectedStars, data);
@@ -312,7 +314,7 @@ function PhotometricMosaic(data)
             scaleFactors, propagateGradient, taperGradient, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
-
+    
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
     processEvents();
 }
@@ -439,9 +441,6 @@ function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef,
         console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...\n");
     }
     view.window.keywords = keywords;
-    
-    // No need to call data.saveParameters() because this is a new image
-    // data.saveParameters();  
     view.endProcess();
     view.stf = refView.stf;
     // Show the join area in a preview
