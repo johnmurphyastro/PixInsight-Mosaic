@@ -217,7 +217,7 @@ function PhotometricMosaic(data)
         processEvents();
     }
     
-    let maxSampleSize = Math.min(sampleRect.height, sampleRect.width);
+    let maxSampleSize = Math.floor(Math.min(sampleRect.height, sampleRect.width)/2);
     if (data.sampleSize > maxSampleSize){
         new MessageBox("Sample Size is too big for the sample area.\n" +
                 "Sample Size must be less than or equal to " + maxSampleSize, 
@@ -239,20 +239,22 @@ function PhotometricMosaic(data)
     }
 
     // Calculate the gradient for each channel
-    const gradientErrMsg = 
-            "At least two samples per line segment are required.\n" +
-            "Try decreasing either the number of line segments or the size of the samples.";
+    
     let propagateGradient;
     if (data.gradientFlag) {
         propagateGradient = [];
-        for (let c = 0; c < nChannels; c++) {
-            samplePairs = colorSamplePairs[c];
-            propagateGradient[c] = calcSmoothDifArray(targetView.image,
-                    sampleRect, samplePairs, data.nGradientBestFitLines, isHorizontal);        
-            if (null === propagateGradient[c]) {
-                new MessageBox(gradientErrMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
-                return;
+        try {
+            let time = new Date().getTime();
+            for (let c = 0; c < nChannels; c++) {
+                samplePairs = colorSamplePairs[c];
+                propagateGradient[c] = calcSurfaceSpline(sampleRect,
+                            samplePairs, data.propagateSmoothness, isHorizontal);        
             }
+            console.writeln("\nPropagate SurfaceSpline calculated from ", samplePairs.samplePairArray.length, " samples. ", getElapsedTime(time));
+        } catch (ex){
+            new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
         }
     } else {
         propagateGradient = null;
@@ -260,11 +262,18 @@ function PhotometricMosaic(data)
     let taperGradient;
     if (data.taperFlag) {
         taperGradient = [];
-        for (let c = 0; c < nChannels; c++) {
-            let smoothDifArray = data.gradientFlag ? propagateGradient[c] : null;
-            samplePairs = colorSamplePairs[c];   
-            taperGradient[c] = calcMovingAverageDifArray(targetView.image, sampleRect,
-                    samplePairs, smoothDifArray, data.nTaperBestFitLines, isHorizontal);
+        try {
+            let time = new Date().getTime();
+            for (let c = 0; c < nChannels; c++) {
+                samplePairs = colorSamplePairs[c];   
+                taperGradient[c] = calcSurfaceSpline(sampleRect,
+                        samplePairs, data.taperSmoothness, isHorizontal /*, targetView, detectedStars, data */);
+            }
+            console.writeln("\nTaper SurfaceSpline calculated from ", samplePairs.samplePairArray.length, " samples. ", getElapsedTime(time));
+        } catch (ex){
+            new MessageBox("Taper Surface Spline error.\n" + ex.message, 
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
         }
     } else {
         taperGradient = null;
@@ -273,14 +282,14 @@ function PhotometricMosaic(data)
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                null, propagateGradient, colorSamplePairs, data);
+                null, propagateGradient, sampleRect, colorSamplePairs, data);
         return;
     }
 
     if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                propagateGradient, taperGradient, colorSamplePairs, data);
+                propagateGradient, taperGradient, sampleRect, colorSamplePairs, data);
         return;
     }
 
@@ -310,8 +319,8 @@ function PhotometricMosaic(data)
         return;
     }
     console.writeln("\n<b><u>Applying scale and gradients</u></b>");
-    let imageWindow = applyScaleAndGradient(referenceView, targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateGradient, taperGradient, joinRect, data);
+    let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
+            scaleFactors, propagateGradient, taperGradient, sampleRect, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
     
@@ -334,18 +343,19 @@ function calculateScale(starPairs) {
 /**
  * Appy scale and subtract the detected gradient from the target view
  * @param {View} refView Used to create mosaic. Read only.
- * @param {View} tgtView Apply scale and gradient correction to a clone of this view
+ * @param {View} tgtView Used to create mosaic or to create corrected tgtView clone. Read only.
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
- * @param {Number[][]} propagateGradient difArray for each color channel, propogated
- * @param {Number[][]} taperGradient difArray for each color channel, tapered
- * @param {Rect} joinRect Bounding box of join region
+ * @param {SurfaceSpline[]} propagateGradient SurfaceSpline for each color channel, propogated
+ * @param {SurfaceSpline[]} taperGradient SurfaceSpline for each color channel, tapered
+ * @param {Rect} sampleRect Bounding box of samples
+ * @param {Rect} joinRect Bounding box of join region (sampleRect extended to overlapBox)
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {ImageWindow} Cloned image with corrections applied
  */
-function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, propagateGradient, taperGradient, joinRect, data) {
+function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
+        scaleFactors, propagateGradient, taperGradient, sampleRect, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
     const width = tgtView.image.width;
     const height = tgtView.image.height;
@@ -364,21 +374,21 @@ function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef,
     } // Leave the image blank for a corrected target view
     
     // Apply scale and gradient to the cloned image
-    let tgtCorrector = new ScaleAndGradientApplier(width, height, joinRect,
+    let tgtCorrector = new ScaleAndGradientApplier(width, height, sampleRect, joinRect,
             isHorizontal, data, isTargetAfterRef);
     const tgtBox = data.cache.overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
-        let propagateDifArray = null;
+        let propagateSurfaceSpline = null;
         if (data.gradientFlag){
-            propagateDifArray = propagateGradient[channel];
+            propagateSurfaceSpline = propagateGradient[channel];
         }
-        let taperDifArray = null;
+        let taperSurfaceSpline = null;
         if (data.taperFlag){
-            taperDifArray = taperGradient[channel];
+            taperSurfaceSpline = taperGradient[channel];
         }
         tgtCorrector.applyAllCorrections(refView.image, tgtView.image, view, scale, 
-                propagateDifArray, taperDifArray, tgtBox, channel);
+                propagateSurfaceSpline, taperSurfaceSpline, tgtBox, channel);
     }
     
     let minValue = view.image.minimum();
@@ -421,11 +431,11 @@ function applyScaleAndGradient(refView, tgtView, isHorizontal, isTargetAfterRef,
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     if (data.gradientFlag){
         keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".nGradientBestFitLines: " + data.nGradientBestFitLines));
+            SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
     }
     if (data.taperFlag) {
         keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".nTaperBestFitLines: " + data.nTaperBestFitLines));
+            SCRIPT_NAME() + ".taperSmoothness: " + data.taperSmoothness));
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".taperLength: " + data.taperLength));
     }

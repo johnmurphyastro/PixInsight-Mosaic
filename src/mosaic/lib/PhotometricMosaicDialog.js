@@ -113,11 +113,11 @@ function PhotometricMosaicData() {
         
         // Gradient Propagated Correction
         Parameters.set("gradientFlag", this.gradientFlag);
-        Parameters.set("nGradientBestFitLines", this.nGradientBestFitLines);
+        Parameters.set("propagateSmoothness", this.propagateSmoothness);
         
         // Gradient Tapered Correction
         Parameters.set("taperFlag", this.taperFlag);
-        Parameters.set("nTaperBestFitLines", this.nTaperBestFitLines);
+        Parameters.set("taperSmoothness", this.taperSmoothness);
         Parameters.set("taperLength", this.taperLength);
         
         // Mosaic Star Mask
@@ -189,14 +189,14 @@ function PhotometricMosaicData() {
         // Gradient Propagated Correction
         if (Parameters.has("gradientFlag"))
             this.gradientFlag = Parameters.getBoolean("gradientFlag");
-        if (Parameters.has("nGradientBestFitLines"))
-            this.nGradientBestFitLines = Parameters.getInteger("nGradientBestFitLines");
+        if (Parameters.has("propagateSmoothness"))
+            this.propagateSmoothness = Parameters.getReal("propagateSmoothness");
         
         // Gradient Tapered Correction
         if (Parameters.has("taperFlag"))
             this.taperFlag = Parameters.getBoolean("taperFlag");
-        if (Parameters.has("nTaperBestFitLines"))
-            this.nTaperBestFitLines = Parameters.getInteger("nTaperBestFitLines");
+        if (Parameters.has("taperSmoothness"))
+            this.taperSmoothness = Parameters.getReal("taperSmoothness");
         if (Parameters.has("taperLength"))
             this.taperLength = Parameters.getInteger("taperLength");
         
@@ -249,11 +249,11 @@ function PhotometricMosaicData() {
         
         // Gradient Propagated Correction
         this.gradientFlag = false;
-        this.nGradientBestFitLines = 3;
+        this.propagateSmoothness = 3;
         
         // Gradient Tapered Correction
         this.taperFlag = true;
-        this.nTaperBestFitLines = 10;
+        this.taperSmoothness = -1.5;
         this.taperLength = 100;
         
         // Mosaic Star Mask
@@ -305,12 +305,12 @@ function PhotometricMosaicData() {
         linearFitDialog.orientationCombo.currentItem = AUTO();
         
         // Gradient Propagated Correction
+        linearFitDialog.propagateSmoothness_Control.setValue(this.propagateSmoothness);
         linearFitDialog.setPropagateGradientFlag(this.gradientFlag);
-        linearFitDialog.propagateBestFitLines_Control.setValue(this.nGradientBestFitLines);
         
         // Gradient Tapered Correction
         linearFitDialog.setTaperGradientFlag(this.taperFlag);
-        linearFitDialog.taperBestFitLines_Control.setValue(this.nTaperBestFitLines);
+        linearFitDialog.taperSmoothness_Control.setValue(this.taperSmoothness);
         linearFitDialog.taperLength_Control.setValue(this.taperLength);
         
         // Mosaic Star Mask
@@ -894,11 +894,11 @@ function PhotometricMosaicDialog(data) {
     // ------------------------------------------
     // GroupBox: "Propagated Gradient Correction"
     // ------------------------------------------
-    this.propagateBestFitLines_Control = new NumericControl(this);
-    this.propagateBestFitLines_Control.real = false;
-    this.propagateBestFitLines_Control.label.text = "Best Fit Lines:";
-    this.propagateBestFitLines_Control.label.minWidth = joinDirectionStrLen;
-    this.propagateBestFitLines_Control.toolTip = 
+    this.propagateSmoothness_Control = new NumericControl(this);
+    this.propagateSmoothness_Control.real = true;
+    this.propagateSmoothness_Control.setPrecision(1);
+    this.propagateSmoothness_Control.label.text = "Smoothness:";
+    this.propagateSmoothness_Control.toolTip = 
             "<p>This mode corrects the horizontal and vertical components of the " +
             "relative gradient between the reference and target image. This is done " +
             "in two stages. One component is corrected when tiles are joined into " +
@@ -912,13 +912,13 @@ function PhotometricMosaicDialog(data) {
             "the 'Tapered Gradient Correction'.</p>" +
             "Since the reference tile's gradient will be propagated across the mosaic, " +
             "consider using DBE as a final correction once the mosaic is complete.</p>";
-    this.propagateBestFitLines_Control.onValueUpdated = function (value) {
-        data.nGradientBestFitLines = value;
+    this.propagateSmoothness_Control.onValueUpdated = function (value) {
+        data.propagateSmoothness = value;
     };
-    this.propagateBestFitLines_Control.setRange(1, 25);
-    this.propagateBestFitLines_Control.slider.setRange(1, 25);
-    this.propagateBestFitLines_Control.slider.minWidth = 200;
-    this.propagateBestFitLines_Control.setValue(data.nGradientBestFitLines);
+    this.propagateSmoothness_Control.setRange(-1, 6);
+    this.propagateSmoothness_Control.slider.setRange(-100, 600);
+    this.propagateSmoothness_Control.slider.minWidth = 140;
+    this.propagateSmoothness_Control.setValue(data.propagateSmoothness);
     
     let gradientGraphButton = new PushButton();
     gradientGraphButton.text = "Gradient Graph";
@@ -948,7 +948,7 @@ function PhotometricMosaicDialog(data) {
     this.setPropagateGradientFlag = function (checked){
         data.gradientFlag = checked;
         self.propagateGradientFlag_Control.checked = checked;
-        self.propagateBestFitLines_Control.enabled = checked;
+        self.propagateSmoothness_Control.enabled = checked;
         gradientGraphButton.enabled = checked;
     };
     
@@ -960,7 +960,7 @@ function PhotometricMosaicDialog(data) {
     let propagateSizer = new HorizontalSizer;
     propagateSizer.spacing = 4;
     propagateSizer.add(this.propagateGradientFlag_Control);
-    propagateSizer.add(this.propagateBestFitLines_Control);
+    propagateSizer.add(this.propagateSmoothness_Control);
     propagateSizer.addSpacing(20);
     propagateSizer.add(gradientGraphButton);
     
@@ -972,26 +972,25 @@ function PhotometricMosaicDialog(data) {
     // GroupBox: "Tapered Gradient Correction"
     // ------------------------------------------
     // Taper Gradient controls
-    this.taperBestFitLines_Control = new NumericControl(this);
-    this.taperBestFitLines_Control.real = false;
-    this.taperBestFitLines_Control.label.text = "Rolling Average:";
-    this.taperBestFitLines_Control.label.minWidth = joinDirectionStrLen;
-    this.taperBestFitLines_Control.toolTip = 
+    this.taperSmoothness_Control = new NumericControl(this);
+    this.taperSmoothness_Control.real = true;
+    this.taperSmoothness_Control.setPrecision(1);
+    this.taperSmoothness_Control.label.text = "Smoothness:";
+    this.taperSmoothness_Control.toolTip = 
             "<p>This mode applies a tapered correction to the gradient between " +
             "the reference and target image. This correction is applied after the " +
             "'Propagated Gradient Correction' (if specified).</p>" +
             "<p>A tapered correction is ideal for correcting local difference, for " +
             "example, due to scattered light surrounding bright stars. This mode also " +
             "prevents the reference tile's gradient propagating across the mosaic.</p>" +
-            "<p>The Rolling Average is the number of sample 'columns' to average together " +
-            "to produce a smoother fit to the data.</p>";
-    this.taperBestFitLines_Control.onValueUpdated = function (value) {
-        data.nTaperBestFitLines = value;
+            "<p>Increase the smoothness to avoid following noise.</p>";
+    this.taperSmoothness_Control.onValueUpdated = function (value) {
+        data.taperSmoothness = value;
     };
-    this.taperBestFitLines_Control.setRange(1, 25);
-    this.taperBestFitLines_Control.slider.setRange(1, 25);
-    this.taperBestFitLines_Control.slider.minWidth = 200;
-    this.taperBestFitLines_Control.setValue(data.nTaperBestFitLines);
+    this.taperSmoothness_Control.setRange(-4, 3);
+    this.taperSmoothness_Control.slider.setRange(-400, 300);
+    this.taperSmoothness_Control.slider.minWidth = 140;
+    this.taperSmoothness_Control.setValue(data.taperSmoothness);
     
     let taperGradientGraphButton = new PushButton();
     taperGradientGraphButton.text = "Gradient Graph";
@@ -1043,7 +1042,7 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
     this.taperLength_Control.label.text = "Taper Length:";
-    this.taperLength_Control.label.minWidth = this.font.width("Rolling Average:") + 9;
+    this.taperLength_Control.label.minWidth = this.font.width("Smoothness:") + 23;
     this.taperLength_Control.toolTip = taperTooltip;
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
@@ -1056,7 +1055,7 @@ function PhotometricMosaicDialog(data) {
     this.setTaperGradientFlag = function (checked){
         data.taperFlag = checked;
         self.taperGradientFlag_Control.checked = checked;
-        self.taperBestFitLines_Control.enabled = checked;
+        self.taperSmoothness_Control.enabled = checked;
         self.taperLength_Control.enabled = checked;
         taperGradientGraphButton.enabled = checked;
     };
@@ -1068,7 +1067,7 @@ function PhotometricMosaicDialog(data) {
     let taperSizer = new HorizontalSizer;
     taperSizer.spacing = 4;
     taperSizer.add(this.taperGradientFlag_Control);
-    taperSizer.add(this.taperBestFitLines_Control);
+    taperSizer.add(this.taperSmoothness_Control);
     taperSizer.addSpacing(20);
     taperSizer.add(taperGradientGraphButton);
     

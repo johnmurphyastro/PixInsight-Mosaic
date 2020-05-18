@@ -28,6 +28,7 @@ function SamplePair(targetMedian, referenceMedian, rect) {
     this.targetMedian = targetMedian;
     this.referenceMedian = referenceMedian;
     this.rect = rect;
+    this.weight = 1;
 }
 
 /**
@@ -390,4 +391,248 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
     
     createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, -2);
+}
+
+/**
+ * Get the width of the grid of unrejected samples in terms of sample width.
+ * Used for a vertical join (long columns, short rows).
+ * @param {Rect} sampleRect
+ * @param {SamplePair[]} samplePairArray
+ * @returns {Number}
+ */
+function getSampleGridWidth(sampleRect, samplePairArray){
+    if (samplePairArray.length === 0){
+        return 0;
+    }
+    let sampleWidth = samplePairArray[0].rect.width;
+    let maxX = samplePairArray[0].rect.x0;
+    let minX = maxX;
+    let nRows = 0;
+    let maximumPossible = Math.floor(sampleRect.width / sampleWidth);
+    for (let samplePair of samplePairArray){
+        maxX = Math.max(maxX, samplePair.rect.x0);
+        minX = Math.min(minX, samplePair.rect.x0);
+        nRows = Math.floor((maxX - minX) / sampleWidth) + 1;
+        if (nRows >= maximumPossible){
+            break;
+        }
+    }
+    return nRows;
+}
+
+/**
+ * Get the height of the grid of unrejected samples in terms of columns.
+ * Used for a horizontal join (short columns, long rows).
+ * @param {Rect} sampleRect
+ * @param {SamplePair[]} samplePairArray
+ * @returns {Number}
+ */
+function getSampleGridHeight(sampleRect, samplePairArray){
+    if (samplePairArray.length === 0){
+        return 0;
+    }
+    let sampleHeight = samplePairArray[0].rect.height;
+    let maxY = samplePairArray[0].rect.y0;
+    let minY = maxY;
+    let nCols = 0;
+    let maximumPossible = Math.floor(sampleRect.height / sampleHeight);
+    for (let samplePair of samplePairArray){
+        maxY = Math.max(maxY, samplePair.rect.y0);
+        minY = Math.min(minY, samplePair.rect.y0);
+        nCols = Math.floor((maxY - minY) / sampleHeight) + 1;
+        if (nCols >= maximumPossible){
+            break;
+        }
+    }
+    return nCols;
+}
+
+/**
+ * Determine x and y binning factor that will reduce the number of samples to
+ * less than maxLength, assuming no samples were rejected (e.g. due to stars).
+ * The shape of the binning (e.g. 2x2 or 4x1) is determined by how thick the join is.
+ * @param {Rect} sampleRect
+ * @param {SamplePair[]} samplePairArray
+ * @param {Number} maxLength Maximum number of samples after binning
+ * @param {Number} minRowsOrColumns Minimum thickness of sample grid after binning
+ * @param {Boolean} isHorizontal
+ * @returns {Point} Stores the x and y binning factors
+ */
+function calcBinningFactor(sampleRect, samplePairArray, maxLength, minRowsOrColumns, isHorizontal){
+    let joinBinning;
+    let perpBinning;
+    let gridThickness = 0;
+    if (isHorizontal){
+        gridThickness = getSampleGridHeight(sampleRect, samplePairArray);
+    } else {
+        gridThickness = getSampleGridWidth(sampleRect, samplePairArray);
+    }
+
+    // what reduction factor is required? 2, 4, 9 or 16?
+    let factor = samplePairArray.length / maxLength;
+    if (factor > 9){
+        // Reduce number of samples by a factor of 16
+        if (gridThickness >= minRowsOrColumns * 4){
+            // 4x4 binning
+            joinBinning = 4;
+            perpBinning = 4;
+        } else if (gridThickness >= minRowsOrColumns * 3){
+            // 5x3 binning
+            joinBinning = 5;
+            perpBinning = 3;
+        } else if (gridThickness >= minRowsOrColumns * 2){
+            // 8x2 binning
+            joinBinning = 8;
+            perpBinning = 2;
+        } else {
+            // 8x1 binning
+            joinBinning = 16;
+            perpBinning = 1;
+        }
+    } else if (factor > 4){
+        // Reduce number of samples by a factor of 8 or 9
+        if (gridThickness >= minRowsOrColumns * 3){
+            // 3x3 binning
+            joinBinning = 3;
+            perpBinning = 3;
+        } else if (gridThickness >= minRowsOrColumns * 2){
+            // 4x2 binning
+            joinBinning = 4;
+            perpBinning = 2;
+        } else {
+            // 8x1 binning
+            joinBinning = 8;
+            perpBinning = 1;
+        }
+    } else if (factor > 2){
+        // Reduce by factor of 4
+        if (gridThickness >= minRowsOrColumns * 2){
+            joinBinning = 2;
+            perpBinning = 2;
+        } else {
+            joinBinning = 4;
+            perpBinning = 1;
+        }
+    } else {
+        // Reduce by factor of 2
+        if (gridThickness >= minRowsOrColumns * 2){
+            joinBinning = 1;
+            perpBinning = 2;
+        } else {
+            joinBinning = 2;
+            perpBinning = 1;
+        }
+    }
+
+    if (isHorizontal){
+        return new Point(joinBinning, perpBinning);
+    }
+    return new Point(perpBinning, joinBinning);
+}
+
+/**
+ * Create a single SamplePair from the supplied array of SamplePair.
+ * The input SamplePair[] must all be the same shape and size and have weight=1
+ * @param {SamplePair[]} insideBin SamplePairs that are inside the bin area
+ * @param {Number} sampleWidth Width of a single input SamplePair
+ * @param {Number} sampleHeight Height of a single input SamplePair
+ * @returns {SamplePair} Binned SamplePair with center based on center of mass
+ */
+function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight){
+    // Weight is the number of input SamplePair that are in the binned area.
+    // Not always the geometricaly expected number due to SamplePair rejection (e.g. stars)
+    const weight = insideBin.length;
+    
+    // binnedSamplePair center: calculated from center of mass
+    // CoM = (m1.x1 + m2.x2 + m3.x3 + ...) / (m1 + m2 + m3 + ...)
+    // But in our case all input samples have weight = 1
+    // So CoM = (x1 + x2 + x3 + ...) / nSamples
+    let xCm = 0;
+    let yCm = 0;
+    let targetMedian = 0;
+    let referenceMedian = 0;
+    for (let sp of insideBin){
+        xCm += sp.rect.center.x;
+        yCm += sp.rect.center.y;
+        targetMedian += sp.targetMedian;
+        referenceMedian += sp.referenceMedian;
+    }
+    let center = new Point(Math.round(xCm/weight), Math.round(yCm/weight));
+    
+    // Use the average value for target and reference median
+    targetMedian /= weight;
+    referenceMedian /= weight;
+    
+    
+    // Area is (weight) * (area of a single input SamplePair)
+    // Create a square binnedSamplePair based on this area and the calculated center
+    let area = weight * sampleWidth * sampleHeight;
+    let halfWidth = Math.round(Math.sqrt(area)/2);
+    let x0 = center.x - halfWidth;
+    let x1 = center.x + halfWidth;
+    let y0 = center.y - halfWidth;
+    let y1 = center.y + halfWidth;
+    let rect = new Rect(x0, y0, x1, y1);
+    let binnedSamplePair = new SamplePair(targetMedian, referenceMedian, rect);
+    binnedSamplePair.weight = weight;
+    return binnedSamplePair;
+}
+
+/**
+ * Create a binned SamplePair array of larger samples to reduce the number of
+ * samples to less then sampleMaxLimit. It assumes no samples were rejected by stars,
+ * so the binned SamplePair array may exceed sampleMaxLimit due to star rejection.
+ * @param {Rect} sampleRect
+ * @param {SamplePair[]} samplePairArray Must all be the same shape and size and have weight=1
+ * @param {Number} sampleMaxLimit Try to reduce the number of samples to below this number 
+ * @param {Number} minRows Limit binning perpendicular to join if the final join thickness is less than this.
+ * @param {Boolean} isHorizontal
+ * @returns {SamplePair[]} Binned SamplePair with center based on center of mass
+ */
+function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal){
+    let factor = calcBinningFactor(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal);
+    console.writeln("Binning samples to reduce SurfaceSpline calculation time\n" +
+                    "Binning factors: (", factor.x, ",", factor.y, ")");
+    processEvents();
+
+    // width and height of single input sample
+    let sampleWidth = samplePairArray[0].rect.width;
+    let sampleHeight = samplePairArray[0].rect.height;
+
+    let binWidth = sampleWidth * factor.x;
+    let binHeight = sampleHeight * factor.y;
+    
+    // Create an empty 3 dimensional array
+    // The x,y dimensions specify the new binned sample positions
+    // Each (x,y) location stores all the input samples within this binned area
+    let xLen = Math.floor(sampleRect.width / binWidth) + 1;
+    let yLen = Math.floor(sampleRect.height / binHeight) + 1;
+    let binnedSampleArrayXY = new Array(xLen);
+    for (let x=0; x<xLen; x++){
+        binnedSampleArrayXY[x] = new Array(yLen);
+        for (let y=0; y<yLen; y++){
+            binnedSampleArrayXY[x][y] = [];
+        }
+    }
+
+    // Populate the (x,y) locations with the input samples that fall into each (x,y) bin
+    for (let samplePair of samplePairArray){
+        let x = Math.floor((samplePair.rect.center.x - sampleRect.x0) / binWidth);
+        let y = Math.floor((samplePair.rect.center.y - sampleRect.y0) / binHeight);
+        binnedSampleArrayXY[x][y].push(samplePair);
+    }
+
+    // For each (x,y) location that stores one or more input samples,
+    // create a binned sample and add it to the binnedSampleArray
+    let binnedSampleArray = [];
+    for (let x=0; x<xLen; x++){
+        for (let y=0; y<yLen; y++){
+            if (binnedSampleArrayXY[x][y].length > 0){
+                binnedSampleArray.push(createBinnedSamplePair(
+                        binnedSampleArrayXY[x][y], sampleWidth, sampleHeight));
+            }
+        }
+    }
+    console.writeln("xLen=",xLen," yLen=",yLen," length=",binnedSampleArray.length);
+    return binnedSampleArray;
 }
