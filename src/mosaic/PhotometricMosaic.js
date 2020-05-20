@@ -239,18 +239,17 @@ function PhotometricMosaic(data)
     }
 
     // Calculate the gradient for each channel
-    
+    console.writeln("\n<b><u>Calculating surface spline</u></b>");
+    let createSurfaceSplineTime = new Date().getTime();
     let propagateGradient;
     if (data.gradientFlag) {
         propagateGradient = [];
         try {
-            let time = new Date().getTime();
             for (let c = 0; c < nChannels; c++) {
                 samplePairs = colorSamplePairs[c];
                 propagateGradient[c] = calcSurfaceSpline(sampleRect,
                             samplePairs, data.propagateSmoothness, isHorizontal);        
             }
-            console.writeln("\nPropagate SurfaceSpline calculated from ", samplePairs.samplePairArray.length, " samples. ", getElapsedTime(time));
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
                     TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -263,13 +262,11 @@ function PhotometricMosaic(data)
     if (data.taperFlag) {
         taperGradient = [];
         try {
-            let time = new Date().getTime();
             for (let c = 0; c < nChannels; c++) {
                 samplePairs = colorSamplePairs[c];   
                 taperGradient[c] = calcSurfaceSpline(sampleRect,
                         samplePairs, data.taperSmoothness, isHorizontal /*, targetView, detectedStars, data */);
             }
-            console.writeln("\nTaper SurfaceSpline calculated from ", samplePairs.samplePairArray.length, " samples. ", getElapsedTime(time));
         } catch (ex){
             new MessageBox("Taper Surface Spline error.\n" + ex.message, 
                     TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -278,6 +275,8 @@ function PhotometricMosaic(data)
     } else {
         taperGradient = null;
     }
+    console.writeln(samplePairs.samplePairArray.length,
+            " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
@@ -318,7 +317,11 @@ function PhotometricMosaic(data)
         new MessageBox("No gradient correction to apply!", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    console.writeln("\n<b><u>Applying scale and gradients</u></b>");
+    if (data.createMosaicFlag){
+        console.writeln("\n<b><u>Creating Mosaic</u></b>");
+    } else {
+        console.writeln("\n<b><u>Applying scale and gradients</u></b>");
+    }
     let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
             scaleFactors, propagateGradient, taperGradient, sampleRect, joinRect, data);
     imageWindow.show();
@@ -448,7 +451,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
         keywords.push(new FITSKeyword("HISTORY", "",
                 SCRIPT_NAME() + ".truncated" + minMaxValues));
-        console.warningln(view.fullId + ": min value = " + minValue + ", max value = " + maxValue + "\nTruncating image...\n");
+        console.warningln("Truncating image (min = " + minValue + ", max = " + maxValue + ")");
     }
     view.window.keywords = keywords;
     view.endProcess();
@@ -469,11 +472,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     imgWindow.currentView = view;
     imgWindow.zoomToFit();
     
-    if (data.createMosaicFlag){
-        console.writeln("Created ", view.fullId, " (", getElapsedTime(applyScaleAndGradientTime), ")\n");
-    } else {
-        console.writeln("Applied scale and gradients (", getElapsedTime(applyScaleAndGradientTime), ")\n");
-    }
+    console.writeln("Created ", view.fullId, " (", getElapsedTime(applyScaleAndGradientTime), ")");
     return imgWindow;
 }
 

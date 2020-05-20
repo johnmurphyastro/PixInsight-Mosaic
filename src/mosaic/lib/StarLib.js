@@ -128,6 +128,27 @@ function StarsDetected(){
      * @returns {Star[]}
      */
     let findStars = function(view, mask, overlapBox, logSensitivity, channel){
+        let lastProgressPc = 0;
+        function progressCallback(count, total){
+            if (count === 0){
+                console.write("<end><cbr>Detecting stars:   0%");
+                lastProgressPc = 0;
+                processEvents();
+            } else{
+                let pc = Math.round(100 * count / total);
+                if (pc > lastProgressPc && (pc > lastProgressPc + 5 || pc === 100)){
+                    if (pc < 100){
+                        console.write(format("\b\b\b\b%3d%%", pc));
+                    } else {
+                        console.write(format("\b\b\b\b"));
+                    }
+                    lastProgressPc = pc;
+                    processEvents();
+                }
+            }
+            return true;
+        }
+
         let starImage;
         // Create grey scale 32bit floating point images
         let width = overlapBox.width;
@@ -141,6 +162,7 @@ function StarsDetected(){
 //        starImage.assign(view.image, new Rect(width, height), channel, channel); // 8% slower
         // Detect stars in target and reference images
         let starDetector = new StarDetector();
+        starDetector.progressCallback = progressCallback;
         starDetector.mask = mask;
         starDetector.sensitivity = Math.pow(10.0, logSensitivity);
         starDetector.upperLimit = 1;
@@ -265,7 +287,7 @@ function StarsDetected(){
             if (starPairArray2.length > 5){
                 let nRemoved = starPairArray.length - starPairArray2.length;
                 if (nRemoved){
-                    console.writeln("[" + channel + "] Removed " + nRemoved +
+                    console.writeln("Channel[" + channel + "] Removed " + nRemoved +
                             " photometry stars with large flux differences");
                 }
                 return new StarPairs(starPairArray2);

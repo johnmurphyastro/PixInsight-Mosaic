@@ -243,7 +243,7 @@ function PhotometricMosaicData() {
         this.sampleAreaPreview_Y1 = 0;
         
         // Gradient Sample Generation
-        this.limitSampleStarsPercent = 25;
+        this.limitSampleStarsPercent = 10;
         this.sampleSize = 20;
         this.orientation = AUTO();
         
@@ -263,9 +263,9 @@ function PhotometricMosaicData() {
         
         // Create Mosaic
         this.createMosaicFlag = true;
-        this.mosaicOverlayRefFlag = false;
+        this.mosaicOverlayRefFlag = true;
         this.mosaicOverlayTgtFlag = false;
-        this.mosaicRandomFlag = true;
+        this.mosaicRandomFlag = false;
         this.mosaicAverageFlag = false;
         
         // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons

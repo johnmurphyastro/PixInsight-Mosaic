@@ -591,9 +591,6 @@ function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight){
  */
 function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal){
     let factor = calcBinningFactor(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal);
-    console.writeln("Binning samples to reduce SurfaceSpline calculation time\n" +
-                    "Binning factors: (", factor.x, ",", factor.y, ")");
-    processEvents();
 
     // width and height of single input sample
     let sampleWidth = samplePairArray[0].rect.width;
@@ -633,6 +630,5 @@ function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit
             }
         }
     }
-    console.writeln("xLen=",xLen," yLen=",yLen," length=",binnedSampleArray.length);
     return binnedSampleArray;
 }

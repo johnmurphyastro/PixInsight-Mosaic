@@ -29,17 +29,27 @@
  * @returns {Number[]} Difference array
  */
 function createDifArrayX(surfaceSpline, y, minX, maxX, maxIndex){
-    let difArray = new Array(maxIndex);
-    let startValue = surfaceSpline.evaluate(minX, y);
+    // calculate the difArray between minY and maxY
+    let points = new Array(maxX - minX);
+    for (let x = minX; x<maxX; x++){
+        points[x - minX] = new Point(x, y);
+    }
+    let splineArray = (surfaceSpline.evaluate(points)).toArray();
+    
+    // From 0 to minY, set value to value at minY
+    let startValue = splineArray[0];
+    let startArray = new Array(minX);
     for (let x = 0; x < minX; x++){
-        difArray[x] = startValue;
+        startArray[x] = startValue;
     }
-    for (let x = minX; x < maxX; x++){
-        difArray[x] = surfaceSpline.evaluate(x, y);
-    }
-    let endValue = surfaceSpline.evaluate(maxX, y);
+    
+    // Create difArray from 0 to maxY
+    let difArray = startArray.concat(splineArray);
+    
+    // From maxY to end, set value to the value at maxY
+    let endValue = splineArray[splineArray.length - 1];
     for (let x = maxX; x < maxIndex; x++){
-        difArray[x] = endValue;
+        difArray.push(endValue);
     }
     return difArray;
 }
@@ -56,17 +66,27 @@ function createDifArrayX(surfaceSpline, y, minX, maxX, maxIndex){
  * @returns {Number[]} Difference array
  */
 function createDifArrayY(surfaceSpline, x, minY, maxY, maxIndex){
-    let difArray = new Array(maxIndex);
-    let startValue = surfaceSpline.evaluate(x, minY);
+    // calculate the difArray between minY and maxY
+    let points = new Array(maxY - minY);
+    for (let y = minY; y<maxY; y++){
+        points[y - minY] = new Point(x, y);
+    }
+    let splineArray = (surfaceSpline.evaluate(points)).toArray();
+    
+    // From 0 to minY, set value to value at minY
+    let startValue = splineArray[0];
+    let startArray = new Array(minY);
     for (let y = 0; y < minY; y++){
-        difArray[y] = startValue;
+        startArray[y] = startValue;
     }
-    for (let y = minY; y < maxY; y++){
-        difArray[y] = surfaceSpline.evaluate(x, y);
-    }
-    let endValue = surfaceSpline.evaluate(x, maxY);
+    
+    // Create difArray from 0 to maxY
+    let difArray = startArray.concat(splineArray);
+    
+    // From maxY to end, set value to the value at maxY
+    let endValue = splineArray[splineArray.length - 1];
     for (let y = maxY; y < maxIndex; y++){
-        difArray[y] = endValue;
+        difArray.push(endValue);
     }
     return difArray;
 }
@@ -116,7 +136,6 @@ function calcSurfaceSpline(sampleRect, samplePairs, logSmoothing, isHorizontal /
         let newSamplePairs = new SamplePairs(binnedSampleArray, 0, samplePairs.overlapBox);
         displaySampleSquares(tgtView, newSamplePairs, detectedStars, "Binned", data);
         */
-        console.writeln("Reduced samples from ", samplePairArray.length, " to ", binnedSampleArray.length);
         samplePairArray = binnedSampleArray;
     }
 
@@ -135,7 +154,6 @@ function calcSurfaceSpline(sampleRect, samplePairs, logSmoothing, isHorizontal /
     
     let ss = new SurfaceSpline();
     ss.smoothing = Math.pow(10.0, logSmoothing);
-    console.writeln("Creating surface spline from ", zVector.length, "samples");
     processEvents();
     ss.initialize(xVector, yVector, zVector, wVector);
     if (!ss.isValid){
@@ -183,6 +201,22 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
         this.secondTaperEnd = Math.min(imageWidth, joinRect.x1 + this.taperLength);
     }
     
+    let lastProgressPc;
+    function progressCallback(count, total){
+        if (count === 0){
+            console.write("<end>   0%");
+            lastProgressPc = 0;
+            processEvents();
+        } else {
+            let pc = Math.round(100 * count / total);
+            if (pc > lastProgressPc && (pc > lastProgressPc + 5 || pc === 100)){
+                console.write(format("\b\b\b\b%3d%%", pc));
+                lastProgressPc = pc;
+                processEvents();
+            }
+        }
+    }
+    
     /**
      * Applies the scale and gradient correction to the supplied view.
      * 
@@ -221,8 +255,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             fullDifBeforeJoin = createDifArrayX(joinSurfaceSpline, this.joinStart, minX, maxX, length);
             fullDifAfterJoin = createDifArrayX(joinSurfaceSpline, this.joinEnd, minX, maxX, length);
             if (this.taperFlag && propagateSurfaceSpline !== null){
-                bgDifBeforeJoin = createDifArrayX(propagateSurfaceSpline, this.joinStart, minX, maxX, length);
-                bgDifAfterJoin = createDifArrayX(propagateSurfaceSpline, this.joinEnd, minX, maxX, length);
+                if (this.isTargetAfterRef){
+                    bgDifAfterJoin = createDifArrayX(propagateSurfaceSpline, this.joinEnd, minX, maxX, length);
+                } else {
+                    bgDifBeforeJoin = createDifArrayX(propagateSurfaceSpline, this.joinStart, minX, maxX, length);
+                }     
             }
         } else {
             let minY = this.sampleRect.y0;
@@ -231,15 +268,21 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             fullDifBeforeJoin = createDifArrayY(joinSurfaceSpline, this.joinStart, minY, maxY, length);
             fullDifAfterJoin = createDifArrayY(joinSurfaceSpline, this.joinEnd, minY, maxY, length);
             if (this.taperFlag && propagateSurfaceSpline !== null){
-                bgDifBeforeJoin = createDifArrayY(propagateSurfaceSpline, this.joinStart, minY, maxY, length);
-                bgDifAfterJoin = createDifArrayY(propagateSurfaceSpline, this.joinEnd, minY, maxY, length);
+                if (this.isTargetAfterRef){
+                    bgDifAfterJoin = createDifArrayY(propagateSurfaceSpline, this.joinEnd, minY, maxY, length);
+                } else {
+                    bgDifBeforeJoin = createDifArrayY(propagateSurfaceSpline, this.joinStart, minY, maxY, length);
+                }
             }
         }
         
         if (this.taperFlag) {            
             if (propagateSurfaceSpline === null){
-                bgDifBeforeJoin = createAvgDifArray(fullDifBeforeJoin);
-                bgDifAfterJoin = createAvgDifArray(fullDifAfterJoin);
+                if (this.isTargetAfterRef){
+                    bgDifAfterJoin = createAvgDifArray(fullDifAfterJoin);
+                } else {
+                    bgDifBeforeJoin = createAvgDifArray(fullDifBeforeJoin);
+                }
             }
         } else {
             // Propagate gradient. Apply full dif over whole of target image
@@ -409,16 +452,18 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             }
             mosaicView.image.setSamples(samples, row, channel);
         };
-        
+        console.write("Processing target[",channel,"]");
         if (this.isHorizontal){
             let row = new Rect(x0, y0, x1, y0 + 1);
             let refSamples = new Float64Array(row.area);
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = x0;
+            let lastRow = y1 - y0 - 1;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
                 apply(refSamples, tgtSamples, samples, row, difArray, difArrayStart);
+                progressCallback(y - y0, lastRow);
             }
         } else {
             let row = new Rect(x0, y0, x0 + 1, y1);
@@ -426,11 +471,14 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = y0;
+            let lastRow = x1 - x0 - 1;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
                 apply(refSamples, tgtSamples, samples, row, difArray, difArrayStart);
+                progressCallback(x - x0, lastRow);
             }
         }
+        console.writeln();
     };
     
     /**
@@ -457,6 +505,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
         
         const self = this;
 
+        let SurfaceSplinePoints = function(){
+            this.indexs = [];
+            this.points = [];
+            this.addPoint = function (i, x, y){
+                this.indexs.push(i);
+                this.points.push(new Point(x, y));
+            };
+        };
+
         /**
          * Create row from reference and target row, applying scale and gradient
          * and using the mosaic join mode (overlayRef, overlayTgt, random or average)
@@ -474,6 +531,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             if (self.createMosaic){
                 refImage.getSamples(refSamples, row, channel);
             }
+            let surfaceSplinePoints = new SurfaceSplinePoints();
             let x = row.x0;
             let y = row.y0;
             for (let i = 0; i < samples.length; i++) {
@@ -486,7 +544,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                     if (tgtSamples[i]){
                         if (!refSamples[i] || Math.random() < 0.5){
                             // tgt exists. Either ref did not (target overlay) or tgt won random contest
-                            samples[i] = tgtSamples[i] * scale - surfaceSpline.evaluate(x, y);
+                            samples[i] = tgtSamples[i] * scale;
+                            surfaceSplinePoints.addPoint(i, x, y); // offset removed later
                         } else {
                             // tgt exists. ref exists. ref won random contest.
                             samples[i] = refSamples[i];
@@ -501,7 +560,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                         samples[i] = refSamples[i];
                     } else if (tgtSamples[i]){
                         // ref did not exist but tgt does, so use tgt.
-                        samples[i] = tgtSamples[i] * scale - surfaceSpline.evaluate(x, y);
+                        samples[i] = tgtSamples[i] * scale;
+                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
                     } else {
                         // Both ref and tgt did not exist
                         samples[i] = 0;
@@ -509,7 +569,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                 } else if (self.mosaicOverlayTgtFlag){
                     if (tgtSamples[i]){
                         // tgt exists
-                        samples[i] = tgtSamples[i] * scale - surfaceSpline.evaluate(x, y);
+                        samples[i] = tgtSamples[i] * scale;
+                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
                     } else {
                         // tgt did not exist. Use ref (which may be zero or non zero)
                         samples[i] = refSamples[i];
@@ -517,42 +578,57 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                 } else if (self.mosaicAverageFlag){
                     if (tgtSamples[i]){
                         // tgt exists
-                        const tgt = tgtSamples[i] * scale - surfaceSpline.evaluate(x, y);
-                        if (refSamples[i]){
-                            // tgt and ref exists. Use average
-                            samples[i] = (tgt + refSamples[i]) / 2;
-                        } else {
-                            // Only tgt exists
-                            samples[i] = tgt;
-                        }
+                        samples[i] = tgtSamples[i] * scale;
+                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
                     } else {
                         // tgt does not exist. Use ref (which may be zero or non zero)
                         samples[i] = refSamples[i];
                     }
                 }
             }
+            
+            // Remove the surfaceSpline offsets
+            if (surfaceSplinePoints.points.length > 0){
+                let length = surfaceSplinePoints.points.length;
+                let offsets = surfaceSpline.evaluate(surfaceSplinePoints.points);
+                for (let i=0; i<length; i++){
+                    let idx = surfaceSplinePoints.indexs[i];
+                    samples[idx] -= offsets.at(i);
+                    if (self.mosaicAverageFlag && refSamples[idx]){
+                        // Average mode. Ref exists so need to calc average
+                        samples[idx] = (samples[idx] + refSamples[idx]) / 2;
+                    }
+                }
+            }
+            
             mosaicView.image.setSamples(samples, row, channel);
         };
         
+        console.write("Processing join  [",channel,"]");
         if (this.isHorizontal){
             let row = new Rect(x0, y0, x1, y0 + 1);
             let refSamples = new Float64Array(row.area);
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
+            let lastRow = y1 - y0 - 1;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
                 apply(refSamples, tgtSamples, samples, row, surfaceSpline, true);
+                progressCallback(y - y0, lastRow);
             }
         } else {
             let row = new Rect(x0, y0, x0 + 1, y1);
             let refSamples = new Float64Array(row.area);
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
+            let lastRow = x1 - x0 - 1;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
                 apply(refSamples, tgtSamples, samples, row, surfaceSpline, false);
+                progressCallback(x - x0, lastRow);
             }
         }
+        console.writeln();
     };
     
     /**
@@ -614,15 +690,18 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             mosaicView.image.setSamples(samples, row, channel);
         };
         
+        console.write("Processing taper [",channel,"]");
         if (this.isHorizontal){
             let row = new Rect(x0, y0, x1, y0 + 1);
             let refSamples = new Float64Array(row.area);
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = x0;
+            let lastRow = y1 - y0 - 1;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
                 apply(y, y0, refSamples, tgtSamples, samples, row, difArray, bgDif, difArrayStart);
+                progressCallback(y - y0, lastRow);
             }
         } else {
             let row = new Rect(x0, y0, x0 + 1, y1);
@@ -630,11 +709,14 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = y0;
+            let lastRow = x1 - x0 - 1;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
                 apply(x, x0, refSamples, tgtSamples, samples, row, difArray, bgDif, difArrayStart);
+                progressCallback(x - x0, lastRow);
             }
         }
+        console.writeln();
     };
     
     /**
@@ -696,6 +778,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             mosaicView.image.setSamples(samples, row, channel);
         };
         
+        console.write("Processing taper [",channel,"]");
         if (this.isHorizontal) {
             let taperEnd = y1 - 1;
             let row = new Rect(x0, y0, x1, y0 + 1);
@@ -703,9 +786,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = x0;
+            let lastRow = y1 - y0 - 1;
             for (let y = y0; y < y1; y++) {
                 row.moveTo(x0, y);
                 apply(y, taperEnd, refSamples, tgtSamples, samples, row, difArray, bgDif, difArrayStart);
+                progressCallback(y - y0, lastRow);
             }
         } else {
             let taperEnd = x1 - 1;
@@ -714,11 +799,14 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
             let tgtSamples = new Float64Array(row.area);
             let samples = new Float64Array(row.area);
             let difArrayStart = y0;
+            let lastRow = x1 - x0 - 1;
             for (let x = x0; x < x1; x++) {
                 row.moveTo(x, y0);
                 apply(x, taperEnd, refSamples, tgtSamples, samples, row, difArray, bgDif, difArrayStart);
+                progressCallback(x - x0, lastRow);
             }
         }
+        console.writeln();
     };
     
 }
@@ -896,7 +984,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         let difArrayTop = getDifArray(initialCorrection, surfaceSplines[0], sampleRect, maxCoordinate, isHorizontal, true);
         let difArrayBottom = getDifArray(initialCorrection, surfaceSplines[0], sampleRect, maxCoordinate, isHorizontal, false);
         drawLineAndPoints(graphWithAxis, isHorizontal, initialCorrection,
-            difArrayTop, difArrayBottom, 0xFFFFFFFF, colorSamplePairs[0], 0xFFFFFFFF);
+            difArrayTop, difArrayBottom, 0xFFFF0000, colorSamplePairs[0], 0xFFFFFFFF);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
