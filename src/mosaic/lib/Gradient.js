@@ -1,4 +1,4 @@
-/* global UndoFlag_NoSwapFile, GraphDialog, StdButton_Yes */
+/* global UndoFlag_NoSwapFile, GraphDialog, StdButton_Yes, OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND, OVERLAY_AVG */
 
 // Version 1.0 (c) John Murphy 17th-Mar-2020
 //
@@ -16,6 +16,11 @@
 // this program.  If not, see <http://www.gnu.org/licenses/>.
 // =================================================================================
 //"use strict";
+
+#define OVERLAY_REF 1
+#define OVERLAY_TGT 2
+#define OVERLAY_RND 3
+#define OVERLAY_AVG 4
 
 /**
  * Create difference array for the horizontal line at y.
@@ -168,37 +173,47 @@ function calcSurfaceSpline(sampleRect, samplePairs, logSmoothing, isHorizontal /
  * This class is used to apply the scale and gradient to the target image
  * @param {Number} imageWidth
  * @param {Number} imageHeight
- * @param {Rect} sampleRect Bounding box of all samples
- * @param {Rect} joinRect The specified join area (sampleRect extended along join to overlapBox)
+ * @param {Rect} overlapBox Bounding box of overlap region
+ * @param {Rect} joinRect The specified join area (preview extended along join to overlapBox)
  * @param {Boolean} isHorizontal If true, the join is horizontal (one image is above the other)
  * @param {PhotometricMosaicData} data 
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @returns {ScaleAndGradientApplier}
  */
-function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, isHorizontal, 
+function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, isHorizontal, 
         data, isTargetAfterRef) {
     this.imageWidth = imageWidth;
     this.imageHeight = imageHeight;
     this.createMosaic = data.createMosaicFlag;
-    this.mosaicRandomFlag = data.mosaicRandomFlag;
-    this.mosaicAverageFlag = data.mosaicAverageFlag;
-    this.mosaicOverlayRefFlag = data.mosaicOverlayRefFlag;
-    this.mosaicOverlayTgtFlag = data.mosaicOverlayTgtFlag;
-    this.sampleRect = sampleRect;
+    this.overlapBox = overlapBox;
     this.taperFlag = data.taperFlag;
     this.taperLength = data.taperFlag ? data.taperLength : 0;
     this.isTargetAfterRef = isTargetAfterRef;
     this.isHorizontal = isHorizontal;
     if (isHorizontal){
-        this.firstTaperStart = Math.max(0, joinRect.y0 - this.taperLength); // joinStart - taperLength
+        this.firstTaperStart = Math.max(0, overlapBox.y0 - this.taperLength); // overlapStart - taperLength
+        this.overlapStart = overlapBox.y0;
         this.joinStart = joinRect.y0;
         this.joinEnd = joinRect.y1;
-        this.secondTaperEnd = Math.min(imageHeight, joinRect.y1 + this.taperLength); // joinEnd + taperLength
+        this.overlapEnd = overlapBox.y1;
+        this.secondTaperEnd = Math.min(imageHeight, overlapBox.y1 + this.taperLength); // overlapEnd + taperLength
     } else {
-        this.firstTaperStart = Math.max(0, joinRect.x0 - this.taperLength);
+        this.firstTaperStart = Math.max(0, overlapBox.x0 - this.taperLength);
+        this.overlapStart = overlapBox.x0;
         this.joinStart = joinRect.x0;
         this.joinEnd = joinRect.x1;
-        this.secondTaperEnd = Math.min(imageWidth, joinRect.x1 + this.taperLength);
+        this.overlapEnd = overlapBox.x1;
+        this.secondTaperEnd = Math.min(imageWidth, overlapBox.x1 + this.taperLength);
+    }
+    this.joinType = 0;
+    if (data.mosaicOverlayRefFlag){
+        this.joinType = OVERLAY_REF;
+    } else if (data.mosaicOverlayTgtFlag){
+        this.joinType = OVERLAY_TGT;
+    } else if (data.mosaicRandomFlag){
+        this.joinType = OVERLAY_RND;
+    } else if (data.mosaicAverageFlag){
+        this.joinType = OVERLAY_AVG;
     }
     
     let lastProgressPc;
@@ -235,10 +250,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                 
         processEvents();
         
-        let fullDifBeforeJoin;
-        let fullDifAfterJoin;
-        let bgDifBeforeJoin;
-        let bgDifAfterJoin;
+        let fullDifBeforeOverlap;
+        let fullDifAfterOverlap;
+        let bgDifBeforeOverlap;
+        let bgDifAfterOverlap;
         let joinSurfaceSpline;
         let length;
         
@@ -249,29 +264,29 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
         }
         
         if (this.isHorizontal){
-            let minX = this.sampleRect.x0;
-            let maxX = this.sampleRect.x1;
+            let minX = this.overlapBox.x0;
+            let maxX = this.overlapBox.x1;
             length = this.imageWidth;
-            fullDifBeforeJoin = createDifArrayX(joinSurfaceSpline, this.joinStart, minX, maxX, length);
-            fullDifAfterJoin = createDifArrayX(joinSurfaceSpline, this.joinEnd, minX, maxX, length);
+            fullDifBeforeOverlap = createDifArrayX(joinSurfaceSpline, this.overlapStart, minX, maxX, length);
+            fullDifAfterOverlap = createDifArrayX(joinSurfaceSpline, this.overlapEnd, minX, maxX, length);
             if (this.taperFlag && propagateSurfaceSpline !== null){
                 if (this.isTargetAfterRef){
-                    bgDifAfterJoin = createDifArrayX(propagateSurfaceSpline, this.joinEnd, minX, maxX, length);
+                    bgDifAfterOverlap = createDifArrayX(propagateSurfaceSpline, this.overlapEnd, minX, maxX, length);
                 } else {
-                    bgDifBeforeJoin = createDifArrayX(propagateSurfaceSpline, this.joinStart, minX, maxX, length);
+                    bgDifBeforeOverlap = createDifArrayX(propagateSurfaceSpline, this.overlapStart, minX, maxX, length);
                 }     
             }
         } else {
-            let minY = this.sampleRect.y0;
-            let maxY = this.sampleRect.y1;
+            let minY = this.overlapBox.y0;
+            let maxY = this.overlapBox.y1;
             length = this.imageHeight;
-            fullDifBeforeJoin = createDifArrayY(joinSurfaceSpline, this.joinStart, minY, maxY, length);
-            fullDifAfterJoin = createDifArrayY(joinSurfaceSpline, this.joinEnd, minY, maxY, length);
+            fullDifBeforeOverlap = createDifArrayY(joinSurfaceSpline, this.overlapStart, minY, maxY, length);
+            fullDifAfterOverlap = createDifArrayY(joinSurfaceSpline, this.overlapEnd, minY, maxY, length);
             if (this.taperFlag && propagateSurfaceSpline !== null){
                 if (this.isTargetAfterRef){
-                    bgDifAfterJoin = createDifArrayY(propagateSurfaceSpline, this.joinEnd, minY, maxY, length);
+                    bgDifAfterOverlap = createDifArrayY(propagateSurfaceSpline, this.overlapEnd, minY, maxY, length);
                 } else {
-                    bgDifBeforeJoin = createDifArrayY(propagateSurfaceSpline, this.joinStart, minY, maxY, length);
+                    bgDifBeforeOverlap = createDifArrayY(propagateSurfaceSpline, this.overlapStart, minY, maxY, length);
                 }
             }
         }
@@ -279,108 +294,140 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
         if (this.taperFlag) {            
             if (propagateSurfaceSpline === null){
                 if (this.isTargetAfterRef){
-                    bgDifAfterJoin = createAvgDifArray(fullDifAfterJoin);
+                    bgDifAfterOverlap = createAvgDifArray(fullDifAfterOverlap);
                 } else {
-                    bgDifBeforeJoin = createAvgDifArray(fullDifBeforeJoin);
+                    bgDifBeforeOverlap = createAvgDifArray(fullDifBeforeOverlap);
                 }
             }
         } else {
             // Propagate gradient. Apply full dif over whole of target image
-            bgDifBeforeJoin = fullDifBeforeJoin;
-            bgDifAfterJoin = fullDifAfterJoin;
+            bgDifBeforeOverlap = fullDifBeforeOverlap;
+            bgDifAfterOverlap = fullDifAfterOverlap;
         }
 
         if (this.isHorizontal) {
             if (this.isTargetAfterRef) {
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifBeforeJoin,
-                        tgtBox.x0, tgtBox.y0, tgtBox.x1, this.joinStart, channel, false);
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifBeforeOverlap,
+                        tgtBox.x0, tgtBox.y0, tgtBox.x1, this.overlapStart, channel, false);
+
+                // Overlap region before join. Reference side so reference overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        tgtBox.x0, this.overlapStart, tgtBox.x1, this.joinStart, channel, OVERLAY_REF);
 
                 // Full correction from start of join up to end of the join region
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
-                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel);
+                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel, this.joinType);
+                        
+                // Overlap region after join. Target side so target overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        tgtBox.x0, this.joinEnd, tgtBox.x1, this.overlapEnd, channel, OVERLAY_TGT);
 
                 if (this.taperFlag) {
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterJoin, bgDifAfterJoin,
-                            tgtBox.x0, this.joinEnd, tgtBox.x1, this.secondTaperEnd, channel);
+                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                            tgtBox.x0, this.overlapEnd, tgtBox.x1, this.secondTaperEnd, channel);
                 }
 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifAfterJoin,
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifAfterOverlap,
                         tgtBox.x0, this.secondTaperEnd, tgtBox.x1, tgtBox.y1, channel, true);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeJoin,
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel, true);
 
                 if (this.taperFlag) {
                     // Taper up region. Apply full scale correction and 
                     // gradually increase the gradient correction from zero to full
-                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeJoin, bgDifBeforeJoin,
-                            tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.joinStart, channel);
+                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                            tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.overlapStart, channel);
                 }
 
+                // Overlap region before join. Target side so target overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        tgtBox.x0, this.overlapStart, tgtBox.x1, this.joinStart, channel, OVERLAY_TGT);
+                        
                 // Full correction from start of the join region to the end of join region 
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
-                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel);
+                        tgtBox.x0, this.joinStart, tgtBox.x1, this.joinEnd, channel, this.joinType);
+                
+                // Overlap region after join. Reference side so reference overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        tgtBox.x0, this.joinEnd, tgtBox.x1, this.overlapEnd, channel, OVERLAY_REF);
 
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifAfterJoin,
-                        tgtBox.x0, this.joinEnd, tgtBox.x1, tgtBox.y1, channel, false);
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifAfterOverlap,
+                        tgtBox.x0, this.overlapEnd, tgtBox.x1, tgtBox.y1, channel, false);
             }
         } else {    // vertical join
             if (isTargetAfterRef) {
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifBeforeJoin,
-                        tgtBox.x0, tgtBox.y0, this.joinStart, tgtBox.y1, channel, false);
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifBeforeOverlap,
+                        tgtBox.x0, tgtBox.y0, this.overlapStart, tgtBox.y1, channel, false);
 
+                // Overlap region before join. Reference side so reference overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        this.overlapStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel, OVERLAY_REF);
+                
                 // Full correction from start of join up to end of the join region
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
-                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel, this.joinType);
 
+                // Overlap region after join. Target side so target overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        this.joinEnd, tgtBox.y0, this.overlapEnd, tgtBox.y1, channel, OVERLAY_TGT);
+                
                 if (this.taperFlag) {
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterJoin, bgDifAfterJoin,
-                            this.joinEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
+                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                            this.overlapEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
                 }
                 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifAfterJoin,
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifAfterOverlap,
                         this.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel, true);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeJoin,
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel, true);
 
                 if (this.taperFlag) {
                     // Taper down region. Apply full scale correction but 
                     // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeJoin, bgDifBeforeJoin,
-                            this.firstTaperStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel);
+                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                            this.firstTaperStart, tgtBox.y0, this.overlapStart, tgtBox.y1, channel);
                 }
-
+                
+                // Overlap region before join. Target side so target overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        this.overlapStart, tgtBox.y0, this.joinStart, tgtBox.y1, channel, OVERLAY_TGT);
+                
                 // Full correction from start of the join region to the end of join 
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
-                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel);
+                        this.joinStart, tgtBox.y0, this.joinEnd, tgtBox.y1, channel, this.joinType);
 
+                // Overlap region after join. Reference side so reference overlay
+                this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                        this.joinEnd, tgtBox.y0, this.overlapEnd, tgtBox.y1, channel, OVERLAY_REF);
+                        
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
-                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifAfterJoin,
-                        this.joinEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel, false);
+                this.applyScaleAndGradient(refImage, tgtImage, view, scale, fullDifAfterOverlap,
+                        this.overlapEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, channel, false);
             }
         }
         
@@ -496,9 +543,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
      * @param {Number} x1 Region's max x
      * @param {Number} y1 Region's max y
      * @param {Number} channel
+     * @param {Number} joinType OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND or OVERLAY_AVG
      */
     this.applyScaleAndGradientToJoin = function (refImage, tgtImage, mosaicView,
-            scale, surfaceSpline, x0, y0, x1, y1, channel){
+            scale, surfaceSpline, x0, y0, x1, y1, channel, joinType){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
@@ -540,50 +588,57 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, sampleRect, joinRect, 
                 } else {
                     y = row.y0 + i;
                 }
-                if (self.mosaicRandomFlag){
-                    if (tgtSamples[i]){
-                        if (!refSamples[i] || Math.random() < 0.5){
-                            // tgt exists. Either ref did not (target overlay) or tgt won random contest
+                switch (joinType){
+                    case OVERLAY_RND:
+                        if (tgtSamples[i]){
+                            if (!refSamples[i] || Math.random() < 0.5){
+                                // tgt exists. Either ref did not (target overlay) or tgt won random contest
+                                samples[i] = tgtSamples[i] * scale;
+                                surfaceSplinePoints.addPoint(i, x, y); // offset removed later
+                            } else {
+                                // tgt exists. ref exists. ref won random contest.
+                                samples[i] = refSamples[i];
+                            }
+                        } else {
+                            // tgt does not exist. Set to ref (which may be zero or non zero)
+                            samples[i] = refSamples[i];
+                        }
+                        break;
+                    case OVERLAY_REF:
+                        if (refSamples[i]){
+                            // ref exists
+                            samples[i] = refSamples[i];
+                        } else if (tgtSamples[i]){
+                            // ref did not exist but tgt does, so use tgt.
                             samples[i] = tgtSamples[i] * scale;
                             surfaceSplinePoints.addPoint(i, x, y); // offset removed later
                         } else {
-                            // tgt exists. ref exists. ref won random contest.
+                            // Both ref and tgt did not exist
+                            samples[i] = 0;
+                        }
+                        break;
+                    case OVERLAY_TGT:
+                        if (tgtSamples[i]){
+                            // tgt exists
+                            samples[i] = tgtSamples[i] * scale;
+                            surfaceSplinePoints.addPoint(i, x, y); // offset removed later
+                        } else {
+                            // tgt did not exist. Use ref (which may be zero or non zero)
                             samples[i] = refSamples[i];
                         }
-                    } else {
-                        // tgt does not exist. Set to ref (which may be zero or non zero)
-                        samples[i] = refSamples[i];
-                    }
-                } else if (self.mosaicOverlayRefFlag){
-                    if (refSamples[i]){
-                        // ref exists
-                        samples[i] = refSamples[i];
-                    } else if (tgtSamples[i]){
-                        // ref did not exist but tgt does, so use tgt.
-                        samples[i] = tgtSamples[i] * scale;
-                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
-                    } else {
-                        // Both ref and tgt did not exist
-                        samples[i] = 0;
-                    }
-                } else if (self.mosaicOverlayTgtFlag){
-                    if (tgtSamples[i]){
-                        // tgt exists
-                        samples[i] = tgtSamples[i] * scale;
-                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
-                    } else {
-                        // tgt did not exist. Use ref (which may be zero or non zero)
-                        samples[i] = refSamples[i];
-                    }
-                } else if (self.mosaicAverageFlag){
-                    if (tgtSamples[i]){
-                        // tgt exists
-                        samples[i] = tgtSamples[i] * scale;
-                        surfaceSplinePoints.addPoint(i, x, y); // offset removed later
-                    } else {
-                        // tgt does not exist. Use ref (which may be zero or non zero)
-                        samples[i] = refSamples[i];
-                    }
+                        break;
+                    case OVERLAY_AVG:
+                        if (tgtSamples[i]){
+                            // tgt exists
+                            samples[i] = tgtSamples[i] * scale;
+                            surfaceSplinePoints.addPoint(i, x, y); // offset removed later
+                        } else {
+                            // tgt does not exist. Use ref (which may be zero or non zero)
+                            samples[i] = refSamples[i];
+                        }
+                        break;
+                    default:
+                        console.criticalln("Unknown join type: " + joinType);
                 }
             }
             
@@ -844,7 +899,7 @@ function SamplePairDifMinMax(colorSamplePairs, initialCorrections) {
  * @param {SurfaceSpline[]} initialCorrections If not null, apply this initial correction
  * before displaying lines and points
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
- * @param {Rect} sampleRect Outside this area, hold difArray constant 
+ * @param {Rect} sampleRect Create dif arrays at either side of this rectangle 
  * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {undefined}
@@ -890,7 +945,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
      * residual correction instead of the full correction.
      * @param {SurfaceSpline} initialCorrection If not null, this is subtracted from the dif array
      * @param {SurfaceSpline} surfaceSpline Used to create the difArray
-     * @param {Rect} sampleRect Outside this rectangle, hold the difArray value constant.
+     * @param {Rect} sampleRect Create dif arrays along side of this rectangle
      * @param {Number} maxCoordinate Length of difArray (width or height of image)
      * @param {Boolean} isHorizontal Join direction
      * @param {Boolean} isTop Determines which side of the join is used to create the difArray 

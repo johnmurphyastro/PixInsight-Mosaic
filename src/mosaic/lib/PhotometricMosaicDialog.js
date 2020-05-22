@@ -99,12 +99,12 @@ function PhotometricMosaicData() {
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
         
-        // Limit Gradient Sample Area
-        Parameters.set("hasSampleAreaPreview", this.hasSampleAreaPreview);
-        Parameters.set("sampleAreaPreview_X0", this.sampleAreaPreview_X0);
-        Parameters.set("sampleAreaPreview_Y0", this.sampleAreaPreview_Y0);
-        Parameters.set("sampleAreaPreview_X1", this.sampleAreaPreview_X1);
-        Parameters.set("sampleAreaPreview_Y1", this.sampleAreaPreview_Y1);
+        // Join Region
+        Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
+        Parameters.set("joinAreaPreview_X0", this.joinAreaPreview_X0);
+        Parameters.set("joinAreaPreview_Y0", this.joinAreaPreview_Y0);
+        Parameters.set("joinAreaPreview_X1", this.joinAreaPreview_X1);
+        Parameters.set("joinAreaPreview_Y1", this.joinAreaPreview_Y1);
         
         // Gradient Sample Generation
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
@@ -162,20 +162,20 @@ function PhotometricMosaicData() {
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         
-        // Limit Gradient Sample Area
-        if (Parameters.has("hasSampleAreaPreview"))
-            this.hasSampleAreaPreview = Parameters.getBoolean("hasSampleAreaPreview");
-        if (Parameters.has("sampleAreaPreview_X0")){
-            this.sampleAreaPreview_X0 = Parameters.getInteger("sampleAreaPreview_X0");
+        // Join Region
+        if (Parameters.has("hasJoinAreaPreview"))
+            this.hasJoinAreaPreview = Parameters.getBoolean("hasJoinAreaPreview");
+        if (Parameters.has("joinAreaPreview_X0")){
+            this.joinAreaPreview_X0 = Parameters.getInteger("joinAreaPreview_X0");
         }
-        if (Parameters.has("sampleAreaPreview_Y0")){
-            this.sampleAreaPreview_Y0 = Parameters.getInteger("sampleAreaPreview_Y0");
+        if (Parameters.has("joinAreaPreview_Y0")){
+            this.joinAreaPreview_Y0 = Parameters.getInteger("joinAreaPreview_Y0");
         }
-        if (Parameters.has("sampleAreaPreview_X1")){
-            this.sampleAreaPreview_X1 = Parameters.getInteger("sampleAreaPreview_X1");
+        if (Parameters.has("joinAreaPreview_X1")){
+            this.joinAreaPreview_X1 = Parameters.getInteger("joinAreaPreview_X1");
         }
-        if (Parameters.has("sampleAreaPreview_Y1")){
-            this.sampleAreaPreview_Y1 = Parameters.getInteger("sampleAreaPreview_Y1");
+        if (Parameters.has("joinAreaPreview_Y1")){
+            this.joinAreaPreview_Y1 = Parameters.getInteger("joinAreaPreview_Y1");
         }
         
         // Gradient Sample Generation
@@ -236,11 +236,11 @@ function PhotometricMosaicData() {
         this.outlierRemoval = 0;
         
         // Limit Gradient Sample Area
-        this.hasSampleAreaPreview = false;
-        this.sampleAreaPreview_X0 = 0;
-        this.sampleAreaPreview_Y0 = 0;
-        this.sampleAreaPreview_X1 = 0;
-        this.sampleAreaPreview_Y1 = 0;
+        this.hasJoinAreaPreview = false;
+        this.joinAreaPreview_X0 = 0;
+        this.joinAreaPreview_Y0 = 0;
+        this.joinAreaPreview_X1 = 0;
+        this.joinAreaPreview_Y1 = 0;
         
         // Gradient Sample Generation
         this.limitSampleStarsPercent = 10;
@@ -292,12 +292,12 @@ function PhotometricMosaicData() {
         linearFitDialog.rejectHigh_Control.setValue(this.linearRange);
         linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
-        // Limit Gradient Sample Area
-        linearFitDialog.rectangleX0_Control.setValue(this.sampleAreaPreview_X0);
-        linearFitDialog.rectangleY0_Control.setValue(this.sampleAreaPreview_Y0);
-        linearFitDialog.rectangleX1_Control.setValue(this.sampleAreaPreview_X1);
-        linearFitDialog.rectangleY1_Control.setValue(this.sampleAreaPreview_Y1);
-        linearFitDialog.setHasSampleAreaPreview(this.hasSampleAreaPreview);
+        // Join Region
+        linearFitDialog.rectangleX0_Control.setValue(this.joinAreaPreview_X0);
+        linearFitDialog.rectangleY0_Control.setValue(this.joinAreaPreview_Y0);
+        linearFitDialog.rectangleX1_Control.setValue(this.joinAreaPreview_X1);
+        linearFitDialog.rectangleY1_Control.setValue(this.joinAreaPreview_Y1);
+        linearFitDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
         
         // Gradient Sample Generation
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
@@ -649,13 +649,13 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Photometric Scale" End
 
     // =======================================
-    // SectionBar: "Limit Gradient Sample Area"
+    // SectionBar: "Join Region"
     // =======================================
     const getAreaFromPreviewStr = "Get area from preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
-    const limitGradientSampleAreaTooltip =
-            "<p>The 'Gradient Sample Area' restricts the area used to calculate the " +
-            "relative gradient between the two images.</p>" +
+    const JoinRegionTooltip =
+            "<p>The 'Join Region' restricts the area used to calculate the " +
+            "join between the two images.</p>" +
             "<p>For best results, use a long narrow rectangle that avoids local differences " +
             "between the images. Local differences can have many causes - e.g. " +
             "scattered light halos around bright stars. Sudden spikes in the 'Gradient Graph' " +
@@ -663,56 +663,56 @@ function PhotometricMosaicDialog(data) {
             "<p>It is not necessary for the selected area to contain any stars. " +
             "The photometry ignores this selection and always uses the whole of the overlapping area.</p>";
             
-    this.rectangleX0_Control = createNumericEdit("Left:", limitGradientSampleAreaTooltip,
-            data.sampleAreaPreview_X0, 50);
+    this.rectangleX0_Control = createNumericEdit("Left:", JoinRegionTooltip,
+            data.joinAreaPreview_X0, 50);
     this.rectangleX0_Control.label.setFixedWidth(
             GET_AREA_FROM_PREVIEW_STRLEN + this.font.width("Left:") + 20);
     this.rectangleX0_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_X0 = value;
+        data.joinAreaPreview_X0 = value;
     };
-    this.rectangleY0_Control = createNumericEdit("Top:", limitGradientSampleAreaTooltip,
-            data.sampleAreaPreview_Y0, 50);
+    this.rectangleY0_Control = createNumericEdit("Top:", JoinRegionTooltip,
+            data.joinAreaPreview_Y0, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_Y0 = value;
+        data.joinAreaPreview_Y0 = value;
     };
-    this.rectangleX1_Control = createNumericEdit("Right:", limitGradientSampleAreaTooltip,
-            data.sampleAreaPreview_X1, 50);
+    this.rectangleX1_Control = createNumericEdit("Right:", JoinRegionTooltip,
+            data.joinAreaPreview_X1, 50);
     this.rectangleX1_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_X1 = value;
+        data.joinAreaPreview_X1 = value;
     };
-    this.rectangleY1_Control = createNumericEdit("Bottom:", limitGradientSampleAreaTooltip,
-            data.sampleAreaPreview_Y1, 50);
+    this.rectangleY1_Control = createNumericEdit("Bottom:", JoinRegionTooltip,
+            data.joinAreaPreview_Y1, 50);
     this.rectangleY1_Control.onValueUpdated = function (value){
-        data.sampleAreaPreview_Y1 = value;
+        data.joinAreaPreview_Y1 = value;
     };
 
-    let limitGradientSampleAreaHorizSizer1 = new HorizontalSizer;  
-    limitGradientSampleAreaHorizSizer1.spacing = 10;
-    limitGradientSampleAreaHorizSizer1.add(this.rectangleX0_Control);
-    limitGradientSampleAreaHorizSizer1.add(this.rectangleY0_Control);
-    limitGradientSampleAreaHorizSizer1.add(this.rectangleX1_Control);
-    limitGradientSampleAreaHorizSizer1.add(this.rectangleY1_Control);
-    limitGradientSampleAreaHorizSizer1.addStretch();
+    let joinAreaHorizSizer1 = new HorizontalSizer;  
+    joinAreaHorizSizer1.spacing = 10;
+    joinAreaHorizSizer1.add(this.rectangleX0_Control);
+    joinAreaHorizSizer1.add(this.rectangleY0_Control);
+    joinAreaHorizSizer1.add(this.rectangleX1_Control);
+    joinAreaHorizSizer1.add(this.rectangleY1_Control);
+    joinAreaHorizSizer1.addStretch();
 
     let previewUpdateActions = function(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
-            dialog.sampleAreaBar.checkBox.checked = data.hasSampleAreaPreview;
+            dialog.joinAreaBar.checkBox.checked = data.hasJoinAreaPreview;
             ///let imageWindow = view.window;
             let rect = view.window.previewRect(view);
-            data.sampleAreaPreview_X0 = rect.x0;
-            data.sampleAreaPreview_Y0 = rect.y0;
-            data.sampleAreaPreview_X1 = rect.x1;
-            data.sampleAreaPreview_Y1 = rect.y1;
+            data.joinAreaPreview_X0 = rect.x0;
+            data.joinAreaPreview_Y0 = rect.y0;
+            data.joinAreaPreview_X1 = rect.x1;
+            data.joinAreaPreview_Y1 = rect.y1;
 
-            dialog.rectangleX0_Control.setValue(data.sampleAreaPreview_X0);
-            dialog.rectangleY0_Control.setValue(data.sampleAreaPreview_Y0);
-            dialog.rectangleX1_Control.setValue(data.sampleAreaPreview_X1);
-            dialog.rectangleY1_Control.setValue(data.sampleAreaPreview_Y1);
+            dialog.rectangleX0_Control.setValue(data.joinAreaPreview_X0);
+            dialog.rectangleY0_Control.setValue(data.joinAreaPreview_Y0);
+            dialog.rectangleX1_Control.setValue(data.joinAreaPreview_X1);
+            dialog.rectangleY1_Control.setValue(data.joinAreaPreview_Y1);
             
-            dialog.setHasSampleAreaPreview(true);
+            dialog.setHasJoinAreaPreview(true);
         } else {
-            dialog.setHasSampleAreaPreview(false);
+            dialog.setHasJoinAreaPreview(false);
         }
     };
 
@@ -724,7 +724,7 @@ function PhotometricMosaicDialog(data) {
     this.previewImage_ViewList = new ViewList(this);
     this.previewImage_ViewList.getPreviews();
     this.previewImage_ViewList.minWidth = 300;
-    this.previewImage_ViewList.toolTip = "<p>Get the 'Gradient Sample Area' from a preview image.</p>";
+    this.previewImage_ViewList.toolTip = "<p>Get the 'Join Region' from a preview image.</p>";
     this.previewImage_ViewList.onViewSelected = function (view) {
         previewUpdateActions(this.dialog);
     };
@@ -740,35 +740,35 @@ function PhotometricMosaicDialog(data) {
         previewUpdateActions(this.dialog);
     };
 
-    let limitGradientSampleAreaHorizSizer2 = new HorizontalSizer;
-    limitGradientSampleAreaHorizSizer2.spacing = 4;
-    limitGradientSampleAreaHorizSizer2.add(previewImage_Label);
-    limitGradientSampleAreaHorizSizer2.add(this.previewImage_ViewList, 100);
-    limitGradientSampleAreaHorizSizer2.addSpacing(10);
-    limitGradientSampleAreaHorizSizer2.add(previewUpdateButton);
+    let joinAreaHorizSizer2 = new HorizontalSizer;
+    joinAreaHorizSizer2.spacing = 4;
+    joinAreaHorizSizer2.add(previewImage_Label);
+    joinAreaHorizSizer2.add(this.previewImage_ViewList, 100);
+    joinAreaHorizSizer2.addSpacing(10);
+    joinAreaHorizSizer2.add(previewUpdateButton);
     
-    this.setHasSampleAreaPreview = function(checked){
-        data.hasSampleAreaPreview = checked;
-        self.sampleAreaBar.checkBox.checked = checked;
+    this.setHasJoinAreaPreview = function(checked){
+        data.hasJoinAreaPreview = checked;
+        self.joinAreaBar.checkBox.checked = checked;
         self.rectangleX0_Control.enabled = checked;
         self.rectangleX1_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
         self.rectangleY1_Control.enabled = checked;
     };
     
-    let sampleAreaSection = new Control(this);
-    sampleAreaSection.sizer = new VerticalSizer;
-    sampleAreaSection.sizer.spacing = 4;
-    sampleAreaSection.sizer.add(limitGradientSampleAreaHorizSizer1);
-    sampleAreaSection.sizer.add(limitGradientSampleAreaHorizSizer2);
-    this.sampleAreaBar = new SectionBar(this, "Limit Gradient Sample Area");
-    this.sampleAreaBar.setSection(sampleAreaSection);
-    this.sampleAreaBar.enableCheckBox();
-    this.sampleAreaBar.checkBox.toolTip = limitGradientSampleAreaTooltip;
-    this.sampleAreaBar.checkBox.onClick = this.setHasSampleAreaPreview;
-    this.sampleAreaBar.onToggleSection = this.onToggleSection;
-    this.setHasSampleAreaPreview(data.hasSampleAreaPreview);
-    // SectionBar "Limit Gradient Sample Area" End
+    let joinAreaSection = new Control(this);
+    joinAreaSection.sizer = new VerticalSizer;
+    joinAreaSection.sizer.spacing = 4;
+    joinAreaSection.sizer.add(joinAreaHorizSizer1);
+    joinAreaSection.sizer.add(joinAreaHorizSizer2);
+    this.joinAreaBar = new SectionBar(this, "Join Region");
+    this.joinAreaBar.setSection(joinAreaSection);
+    this.joinAreaBar.enableCheckBox();
+    this.joinAreaBar.checkBox.toolTip = JoinRegionTooltip;
+    this.joinAreaBar.checkBox.onClick = this.setHasJoinAreaPreview;
+    this.joinAreaBar.onToggleSection = this.onToggleSection;
+    this.setHasJoinAreaPreview(data.hasJoinAreaPreview);
+    // SectionBar "Join Region" End
 
     // =======================================
     // SectionBar: "Gradient"
@@ -1327,8 +1327,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(photometrySearchSection);
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
-    this.sizer.add(this.sampleAreaBar);
-    this.sizer.add(sampleAreaSection);
+    this.sizer.add(this.joinAreaBar);
+    this.sizer.add(joinAreaSection);
     this.sizer.add(gradientBar);
     this.sizer.add(gradientSection);
     this.sizer.add(starMaskBar);
@@ -1340,7 +1340,7 @@ function PhotometricMosaicDialog(data) {
     
     starDetectionSection.hide();
     photometrySearchSection.hide();
-    sampleAreaSection.hide();
+    joinAreaSection.hide();
     starMaskSection.hide();
 
     //-------------------------------------------------------
@@ -1397,10 +1397,10 @@ function main() {
             (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.hasSampleAreaPreview){
-            if (data.sampleAreaPreview_X1 > data.targetView.image.width || 
-                    data.sampleAreaPreview_Y1 > data.referenceView.image.height){
-                (new MessageBox("ERROR: Sample Area Preview extends beyond the edge of the image\n" +
+        if (data.hasJoinAreaPreview){
+            if (data.joinAreaPreview_X1 > data.targetView.image.width || 
+                    data.joinAreaPreview_Y1 > data.referenceView.image.height){
+                (new MessageBox("ERROR: Join Region Preview extends beyond the edge of the image\n" +
                 "Have you selected the wrong preview?", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
                 continue;
             }

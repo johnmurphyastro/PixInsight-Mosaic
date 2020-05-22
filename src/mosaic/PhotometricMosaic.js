@@ -93,34 +93,35 @@ function PhotometricMosaic(data)
         processEvents();
     }
 
-    // sampleRect is the intersection between SampleAreaPreview and the overlap,
+    // joinRect is the intersection between JoinAreaPreview and the overlap,
     // or the overlapBox if the preview was not specified
-    let sampleRect;
-    if (data.hasSampleAreaPreview) {
-        let overlapBox = data.cache.overlap.overlapBox;
-        let sampleAreaPreview = new Rect(data.sampleAreaPreview_X0, data.sampleAreaPreview_Y0, 
-                data.sampleAreaPreview_X1, data.sampleAreaPreview_Y1);
-        if (!sampleAreaPreview.intersects(overlapBox)){
-            let errorMsg = "Error: Sample Area rectangle does not intersect with the image overlap";
+    let isHorizontal;
+    let joinRect;
+    let overlapBox = data.cache.overlap.overlapBox;
+    if (data.hasJoinAreaPreview) {
+        let joinAreaPreview = new Rect(data.joinAreaPreview_X0, data.joinAreaPreview_Y0, 
+                data.joinAreaPreview_X1, data.joinAreaPreview_Y1);
+        if (!joinAreaPreview.intersects(overlapBox)){
+            let errorMsg = "Error: Join Region preview does not intersect with the image overlap";
             new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
             return;
         }
-        sampleRect = sampleAreaPreview.intersection(overlapBox);
-        createPreview(targetView, sampleRect, "SampleArea");
+        let intersectRect = joinAreaPreview.intersection(overlapBox);
+        isHorizontal = isJoinHorizontal(data, intersectRect);
+        joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
     } else {
-        sampleRect = data.cache.overlap.overlapBox;
+        isHorizontal = isJoinHorizontal(data, overlapBox);
+        joinRect = overlapBox;
     }
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
-        let isHorizontal = isJoinHorizontal(data, sampleRect);
-        let joinRect = extendSubRect(sampleRect, data.cache.overlap.overlapBox, isHorizontal);
         createJoinMask(data.cache.overlap, joinRect);
         return;
     }
 
     const detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
-    createPreview(targetView, data.cache.overlap.overlapBox, "Overlap");
+    createPreview(targetView, overlapBox, "Overlap");
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
@@ -172,9 +173,6 @@ function PhotometricMosaic(data)
         return;
     }
     
-    const isHorizontal = isJoinHorizontal(data, sampleRect);
-    const joinRect = extendSubRect(sampleRect, data.cache.overlap.overlapBox, isHorizontal);
-    
     if (data.viewFlag === CREATE_MOSAIC_MASK()){
         displayMask(targetView, joinRect, detectedStars, data);
         return;
@@ -217,19 +215,19 @@ function PhotometricMosaic(data)
         processEvents();
     }
     
-    let maxSampleSize = Math.floor(Math.min(sampleRect.height, sampleRect.width)/2);
+    let maxSampleSize = Math.floor(Math.min(overlapBox.height, overlapBox.width)/2);
     if (data.sampleSize > maxSampleSize){
-        new MessageBox("Sample Size is too big for the sample area.\n" +
+        new MessageBox("Sample Size is too big for the overlap area.\n" +
                 "Sample Size must be less than or equal to " + maxSampleSize, 
                 TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     
     const colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
-            scaleFactors, detectedStars.allStars, sampleRect, data, isHorizontal);
+            scaleFactors, detectedStars.allStars, overlapBox, data, isHorizontal);
     let samplePairs = colorSamplePairs[0];
-    if (samplePairs.samplePairArray.length < 2) {
-        new MessageBox("Error: Too few samples to determine a linear fit.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+    if (samplePairs.samplePairArray.length < 3) {
+        new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
@@ -247,7 +245,7 @@ function PhotometricMosaic(data)
         try {
             for (let c = 0; c < nChannels; c++) {
                 samplePairs = colorSamplePairs[c];
-                propagateGradient[c] = calcSurfaceSpline(sampleRect,
+                propagateGradient[c] = calcSurfaceSpline(overlapBox,
                             samplePairs, data.propagateSmoothness, isHorizontal);        
             }
         } catch (ex){
@@ -264,7 +262,7 @@ function PhotometricMosaic(data)
         try {
             for (let c = 0; c < nChannels; c++) {
                 samplePairs = colorSamplePairs[c];   
-                taperGradient[c] = calcSurfaceSpline(sampleRect,
+                taperGradient[c] = calcSurfaceSpline(overlapBox,
                         samplePairs, data.taperSmoothness, isHorizontal /*, targetView, detectedStars, data */);
             }
         } catch (ex){
@@ -280,22 +278,24 @@ function PhotometricMosaic(data)
 
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
+        // This gradient is important after the edge of the overlap box
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                null, propagateGradient, sampleRect, colorSamplePairs, data);
+                null, propagateGradient, overlapBox, colorSamplePairs, data);
         return;
     }
 
     if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
+        // This gradient is important at the join
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                propagateGradient, taperGradient, sampleRect, colorSamplePairs, data);
+                propagateGradient, taperGradient, joinRect, colorSamplePairs, data);
         return;
     }
 
     let isTargetAfterRef;
     if (isHorizontal){
-        isTargetAfterRef = isImageBelowOverlap(targetView.image, joinRect, nChannels);
-        let isRefAfterTarget = isImageBelowOverlap(referenceView.image, joinRect, nChannels);
+        isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);
+        let isRefAfterTarget = isImageBelowOverlap(referenceView.image, overlapBox, nChannels);
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
             let messageBox = new MessageBox("Is the reference frame above the target frame?",
@@ -303,8 +303,8 @@ function PhotometricMosaic(data)
             isTargetAfterRef = (StdButton_Yes === messageBox.execute());
         }
     } else {
-        isTargetAfterRef = isImageRightOfOverlap(targetView.image, joinRect, nChannels);
-        let isRefAfterTarget = isImageRightOfOverlap(referenceView.image, joinRect, nChannels);
+        isTargetAfterRef = isImageRightOfOverlap(targetView.image, overlapBox, nChannels);
+        let isRefAfterTarget = isImageRightOfOverlap(referenceView.image, overlapBox, nChannels);
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
             let messageBox = new MessageBox("Is the reference frame to the left of the target frame?",
@@ -323,7 +323,7 @@ function PhotometricMosaic(data)
         console.writeln("\n<b><u>Applying scale and gradients</u></b>");
     }
     let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateGradient, taperGradient, sampleRect, joinRect, data);
+            scaleFactors, propagateGradient, taperGradient, overlapBox, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
     
@@ -352,13 +352,13 @@ function calculateScale(starPairs) {
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
  * @param {SurfaceSpline[]} propagateGradient SurfaceSpline for each color channel, propogated
  * @param {SurfaceSpline[]} taperGradient SurfaceSpline for each color channel, tapered
- * @param {Rect} sampleRect Bounding box of samples
- * @param {Rect} joinRect Bounding box of join region (sampleRect extended to overlapBox)
+ * @param {Rect} overlapBox Bounding box of overlap
+ * @param {Rect} joinRect Bounding box of join region (preview extended to overlapBox)
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {ImageWindow} Cloned image with corrections applied
  */
 function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, propagateGradient, taperGradient, sampleRect, joinRect, data) {
+        scaleFactors, propagateGradient, taperGradient, overlapBox, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
     const width = tgtView.image.width;
     const height = tgtView.image.height;
@@ -377,7 +377,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     } // Leave the image blank for a corrected target view
     
     // Apply scale and gradient to the cloned image
-    let tgtCorrector = new ScaleAndGradientApplier(width, height, sampleRect, joinRect,
+    let tgtCorrector = new ScaleAndGradientApplier(width, height, overlapBox, joinRect,
             isHorizontal, data, isTargetAfterRef);
     const tgtBox = data.cache.overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
@@ -457,14 +457,14 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     view.endProcess();
     view.stf = refView.stf;
     // Show the join area in a preview
-    imgWindow.createPreview(joinRect, "Join");
+    //imgWindow.createPreview(joinRect, "Join");
 
     if (data.createMosaicFlag){
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
-        let x0 = Math.max(0, joinRect.x0 - 50);
-        let x1 = Math.min(view.image.width, joinRect.x1 + 50);
-        let y0 = Math.max(0, joinRect.y0 - 50);
-        let y1 = Math.min(view.image.height, joinRect.y1 + 50);
+        let x0 = Math.max(0, joinRect.x0 - 10);
+        let x1 = Math.min(view.image.width, joinRect.x1 + 10);
+        let y0 = Math.max(0, joinRect.y0 - 10);
+        let y1 = Math.min(view.image.height, joinRect.y1 + 10);
         let previewRect = new Rect(x0, y0, x1, y1);
         imgWindow.createPreview(previewRect, "Inspect_Join");
     }
@@ -479,10 +479,10 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
 /**
  *
  * @param {PhotometricMosaicData} data
- * @param {Rect} sampleRect
+ * @param {Rect} joinRect
  * @returns {Boolean} True if the mosaic join is mostly horizontal
  */
-function isJoinHorizontal(data, sampleRect){
+function isJoinHorizontal(data, joinRect){
     if (data.orientation === HORIZONTAL()){
         console.writeln("<b>Mode: Horizontal Gradient</b>");
         return true;
@@ -491,7 +491,7 @@ function isJoinHorizontal(data, sampleRect){
         console.writeln("<b>Mode: Vertical Gradient</b>");
         return false;
     }
-    let isHorizontal = sampleRect.width > sampleRect.height;
+    let isHorizontal = joinRect.width > joinRect.height;
     if (isHorizontal) {
         console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
     } else {
