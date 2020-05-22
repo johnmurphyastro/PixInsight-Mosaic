@@ -1,4 +1,4 @@
-/* global UndoFlag_NoSwapFile, GraphDialog, StdButton_Yes, OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND, OVERLAY_AVG */
+/* global UndoFlag_NoSwapFile, GraphDialog, StdButton_Yes, OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND, OVERLAY_AVG, StdIcon_Error, StdButton_Ok */
 
 // Version 1.0 (c) John Murphy 17th-Mar-2020
 //
@@ -186,6 +186,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
     this.imageHeight = imageHeight;
     this.createMosaic = data.createMosaicFlag;
     this.overlapBox = overlapBox;
+    this.joinRect = joinRect;
     this.taperFlag = data.taperFlag;
     this.taperLength = data.taperFlag ? data.taperLength : 0;
     this.isTargetAfterRef = isTargetAfterRef;
@@ -250,18 +251,28 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
                 
         processEvents();
         
+        if (this.taperFlag){
+            joinSurfaceSpline = taperSurfaceSpline;
+        } else {
+            joinSurfaceSpline = propagateSurfaceSpline;
+        }
+        
+        if (this.isTargetAfterRef === null){
+            // Insert mode
+            // Full correction from start of join up to end of the join region
+            this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
+                    this.joinRect.x0, this.joinRect.y0, this.joinRect.x1, this.joinRect.y1, 
+                    channel, this.joinType);
+            return;
+        }
+        
+        
         let fullDifBeforeOverlap;
         let fullDifAfterOverlap;
         let bgDifBeforeOverlap;
         let bgDifAfterOverlap;
         let joinSurfaceSpline;
         let length;
-        
-        if (this.taperFlag){
-            joinSurfaceSpline = taperSurfaceSpline;
-        } else {
-            joinSurfaceSpline = propagateSurfaceSpline;
-        }
         
         if (this.isHorizontal){
             let minX = this.overlapBox.x0;
@@ -926,7 +937,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()){
             keywords.push(new FITSKeyword("COMMENT", "", "Propagate Smoothness: " + data.propagateSmoothness));
         } else if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()){
-            if (data.gradientFlag){
+            if (data.propagateFlag){
                 keywords.push(new FITSKeyword("COMMENT", "", "Propagate Smoothness: " + data.propagateSmoothness));
             }
             keywords.push(new FITSKeyword("COMMENT", "", "Taper Smoothness: " + data.taperSmoothness));

@@ -39,7 +39,8 @@ function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimMosaicTile";}
 function HORIZONTAL(){return 0;}
 function VERTICAL(){return 1;}
-function AUTO(){return 2;}
+function INSERT(){return 2;}
+function AUTO(){return 3;}
 function MOSAIC_NAME(){return "Mosaic";}
 function WINDOW_ID_PREFIX(){return "PM__";}
 function DISPLAY_DETECTED_STARS(){return 1;}
@@ -240,7 +241,7 @@ function PhotometricMosaic(data)
     console.writeln("\n<b><u>Calculating surface spline</u></b>");
     let createSurfaceSplineTime = new Date().getTime();
     let propagateGradient;
-    if (data.gradientFlag) {
+    if (data.propagateFlag) {
         propagateGradient = [];
         try {
             for (let c = 0; c < nChannels; c++) {
@@ -293,7 +294,9 @@ function PhotometricMosaic(data)
     }
 
     let isTargetAfterRef;
-    if (isHorizontal){
+    if (data.orientation === INSERT()){
+        isTargetAfterRef = null;
+    } else if (isHorizontal){
         isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);
         let isRefAfterTarget = isImageBelowOverlap(referenceView.image, overlapBox, nChannels);
         if (isTargetAfterRef === isRefAfterTarget){
@@ -313,7 +316,7 @@ function PhotometricMosaic(data)
         }
     }
 
-    if (!data.gradientFlag && !data.taperFlag){
+    if (!data.propagateFlag && !data.taperFlag){
         new MessageBox("No gradient correction to apply!", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
@@ -383,7 +386,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
-        if (data.gradientFlag){
+        if (data.propagateFlag){
             propagateSurfaceSpline = propagateGradient[channel];
         }
         let taperSurfaceSpline = null;
@@ -432,7 +435,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
         SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
-    if (data.gradientFlag){
+    if (data.propagateFlag){
         keywords.push(new FITSKeyword("HISTORY", "", 
             SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
     }
@@ -492,10 +495,12 @@ function isJoinHorizontal(data, joinRect){
         return false;
     }
     let isHorizontal = joinRect.width > joinRect.height;
-    if (isHorizontal) {
-        console.writeln("\n<b>Mode auto selected: Horizontal Gradient</b>");
+    if (data.orientation === INSERT()){
+        console.writeln("<b>Mode: Insert target image into reference image</b>");
+    } else if (isHorizontal) {
+        console.writeln("<b>Mode auto selected: Horizontal Gradient</b>");
     } else {
-        console.writeln("\n<b>Mode auto selected: Vertical Gradient</b>");
+        console.writeln("<b>Mode auto selected: Vertical Gradient</b>");
     }
     return isHorizontal;
 }

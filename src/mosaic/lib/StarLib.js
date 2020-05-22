@@ -1,4 +1,4 @@
-/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes */
+/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes, GraphDialog */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //

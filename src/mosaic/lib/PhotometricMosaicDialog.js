@@ -112,7 +112,7 @@ function PhotometricMosaicData() {
         Parameters.set("orientation", this.orientation);
         
         // Gradient Propagated Correction
-        Parameters.set("gradientFlag", this.gradientFlag);
+        Parameters.set("propagateFlag", this.propagateFlag);
         Parameters.set("propagateSmoothness", this.propagateSmoothness);
         
         // Gradient Tapered Correction
@@ -187,8 +187,8 @@ function PhotometricMosaicData() {
             this.orientation = Parameters.getInteger("orientation");
         
         // Gradient Propagated Correction
-        if (Parameters.has("gradientFlag"))
-            this.gradientFlag = Parameters.getBoolean("gradientFlag");
+        if (Parameters.has("propagateFlag"))
+            this.propagateFlag = Parameters.getBoolean("propagateFlag");
         if (Parameters.has("propagateSmoothness"))
             this.propagateSmoothness = Parameters.getReal("propagateSmoothness");
         
@@ -248,7 +248,7 @@ function PhotometricMosaicData() {
         this.orientation = AUTO();
         
         // Gradient Propagated Correction
-        this.gradientFlag = false;
+        this.propagateFlag = false;
         this.propagateSmoothness = 3;
         
         // Gradient Tapered Correction
@@ -306,7 +306,7 @@ function PhotometricMosaicData() {
         
         // Gradient Propagated Correction
         linearFitDialog.propagateSmoothness_Control.setValue(this.propagateSmoothness);
-        linearFitDialog.setPropagateGradientFlag(this.gradientFlag);
+        linearFitDialog.setPropagateGradientFlag(this.propagateFlag);
         
         // Gradient Tapered Correction
         linearFitDialog.setTaperGradientFlag(this.taperFlag);
@@ -858,6 +858,7 @@ function PhotometricMosaicDialog(data) {
     this.orientationCombo.minWidth = this.font.width("Horizontal");
     this.orientationCombo.addItem("Horizontal");
     this.orientationCombo.addItem("Vertical");
+    this.orientationCombo.addItem("Insert");
     this.orientationCombo.addItem("Auto");
     this.orientationCombo.currentItem = data.orientation;
     this.orientationCombo.onItemSelected = function () {
@@ -920,9 +921,9 @@ function PhotometricMosaicDialog(data) {
     this.propagateSmoothness_Control.slider.minWidth = 140;
     this.propagateSmoothness_Control.setValue(data.propagateSmoothness);
     
-    let gradientGraphButton = new PushButton();
-    gradientGraphButton.text = "Gradient Graph";
-    gradientGraphButton.toolTip = 
+    let propagateGradientGraphButton = new PushButton();
+    propagateGradientGraphButton.text = "Gradient Graph";
+    propagateGradientGraphButton.toolTip = 
             "<p>The vertical axis represents the difference between the two images. " +
             "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
             "or Y-Coordinate (vertical join).</p>" +
@@ -940,29 +941,29 @@ function PhotometricMosaicDialog(data) {
             "so that samples that contain bright stars are rejected.</p>" +
             "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
             "or reduce the 'Sample Size'.</p>";
-    gradientGraphButton.onClick = function () {
+    propagateGradientGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_GRADIENT_GRAPH();
         this.dialog.ok();
     };
     
     this.setPropagateGradientFlag = function (checked){
-        data.gradientFlag = checked;
+        data.propagateFlag = checked;
         self.propagateGradientFlag_Control.checked = checked;
         self.propagateSmoothness_Control.enabled = checked;
-        gradientGraphButton.enabled = checked;
+        propagateGradientGraphButton.enabled = checked;
     };
     
     this.propagateGradientFlag_Control = new CheckBox(this);
     this.propagateGradientFlag_Control.toolTip = "<p>Enable 'Propagated Gradient Correction'.</p>";
     this.propagateGradientFlag_Control.onClick = this.setPropagateGradientFlag;
-    this.setPropagateGradientFlag(data.gradientFlag);
+    this.setPropagateGradientFlag(data.propagateFlag);
     
     let propagateSizer = new HorizontalSizer;
     propagateSizer.spacing = 4;
     propagateSizer.add(this.propagateGradientFlag_Control);
     propagateSizer.add(this.propagateSmoothness_Control);
     propagateSizer.addSpacing(20);
-    propagateSizer.add(gradientGraphButton);
+    propagateSizer.add(propagateGradientGraphButton);
     
     let propagateGradientGroupBox = createGroupBox(this, "Propagated Gradient Correction");
     propagateGradientGroupBox.sizer.add(propagateSizer);
@@ -1410,10 +1411,16 @@ function main() {
             (new MessageBox("ERROR: Target and  Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-//        if (data.targetView.window.maskEnabled && !data.targetView.window.mask.isNull) {
-//            (new MessageBox("ERROR: Target view mask detected", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
-//            continue;
-//        }
+        if (data.taperFlag && data.propagateFlag && data.propagateSmoothness < data.taperSmoothness){
+            (new MessageBox("Propagated Smoothness must be less than or equal to Tapered Smoothness", 
+                    TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+            continue;
+        }
+        if (data.createMosaicFlag && data.orientation === INSERT() && (data.mosaicOverlayRefFlag || data.mosaicRandomFlag)){
+            (new MessageBox("Valid mosaic overlay methods for the Insert mode are\nTarget and Average", 
+                    TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+            continue;
+        }
 
         // Calculate and apply the linear fit
         PhotometricMosaic(data);
