@@ -295,7 +295,7 @@ function StarsDetected(){
         }
         return new StarPairs(starPairArray);
     };
-    
+
     /**
      * Combien star arrays removing duplicate stars (keep star with maximum flux)
      * @param {star[][]} refColorStars color array of reference stars
@@ -344,15 +344,14 @@ function StarsDetected(){
             }
             return stars.sort((a, b) => b.flux - a.flux);
         };
-        
+
         // Add all the stars to a map to reject duplicates at the same coordinates
         let starMap = new Map();
         addFirstArray(starMap, refColorStars[0]);
-        const nChannels = refColorStars.length;
-        for (let c = 1; c < nChannels; c++) {
+        for (let c = 1; c < refColorStars.length; c++) {
             addStars(starMap, refColorStars[c]);
         }
-        for (let c = 0; c < nChannels; c++) {
+        for (let c = 0; c < tgtColorStars.length; c++) {
             addStars(starMap, tgtColorStars[c]);
         }
         return getSortedStars(starMap);
@@ -473,9 +472,10 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
         keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
+        keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
         keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
         keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
         keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
         addScaleToFitsHeader(keywords, colorStarPairs, nColors, null);
         graphWindow.keywords = keywords;
@@ -625,9 +625,10 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
     keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
     addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
 
@@ -639,48 +640,70 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
  * Display the detected stars as squares.
  * Each square is the star's photometry background bounding box.
  * The new image is limited to the overlap area.
- * @param {View} refView Used to create background image
- * @param {StarsDetected} detectedStars
- * @param {String} targetId Used to create ImageWindow title
- * @param {Number} limitMaskStarsPercent
+ * @param {View} view Used to create background image
+ * @param {Star[][]} colorStars Color array of star arrays
  * @param {String} postfix Used to create ImageWindow title
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayDetectedStars(refView, detectedStars, targetId, limitMaskStarsPercent, 
-        postfix, data) {
+function displayDetectedStars(view, colorStars, postfix, data) {
+    /** Creates a bitmap
+     * @param {Rect} overlapBox Bitmap area
+     * @returns {Bitmap}
+     */
+    let createBitmap = function(overlapBox){
+        let bmp = new Bitmap(overlapBox.width, overlapBox.height);
+        bmp.fill(0x00000000);
+        return bmp;
+    };
+    
+    /** Create vector graphics context for the specified bitmap. 
+     * Pen is set to color. Anitaliasing is off.
+     * @param {Bitmap} bitmap
+     * @param {Number} color
+     * @returns {VectorGraphics}
+     */
+    let createGraphics = function(bitmap, color){
+        let g = new VectorGraphics(bitmap);
+        g.antialiasing = false;
+        g.pen = new Pen(color);
+        return g;
+    };
+    
     const overlapBox = data.cache.overlap.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
-    let bmp = new Bitmap(overlapBox.width, overlapBox.height);
-    bmp.fill(0x00000000);
-    let G = new VectorGraphics(bmp);
-    G.pen = new Pen(0xffff0000);
-    G.antialiasing = false;
-    
-    let allStars = detectedStars.allStars;
-    let firstNstars;
-    if (limitMaskStarsPercent < 100){
-        firstNstars = Math.floor(allStars.length * limitMaskStarsPercent / 100);
-    } else {
-        firstNstars = allStars.length;
+    let color = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // red, green, blue
+    let bmp = createBitmap(overlapBox);
+    let bmpG = createGraphics(bmp, 0xFF000000); // Used to make non transparent pixels
+    let bitmaps = []; // bitmap for each color
+    for (let c = 0; c < colorStars.length; c++) {
+        let stars = colorStars[c];
+        bitmaps[c] = createBitmap(overlapBox);
+        let G = createGraphics(bitmaps[c], color[c]); // Used to draw color squares
+        for (let i = 0; i < stars.length; ++i){
+            let star = stars[i];
+            let s = Math.sqrt(star.size) + 5; // size is area of the square. s is length of side.
+            let rect = new Rect(s, s);
+            rect.center = new Point(star.pos.x + offsetX, star.pos.y + offsetY);
+            G.strokeRect(rect);
+            bmpG.strokeRect(rect);
+        }
+        G.end();
     }
-    
-    for (let i = 0; i < firstNstars; ++i){
-        let star = allStars[i];
-        let s = Math.sqrt(star.size) + detectedStars.bkgDelta * 2;
-        let rect = new Rect(s, s);
-        rect.center = new Point(star.pos.x + offsetX, star.pos.y + offsetY);
-        G.strokeRect(rect);
+    bmpG.end();
+    // Combien the 3 bitmaps to create color squares.
+    for (let c = 0; c < colorStars.length; c++) {
+        bmp.or(bitmaps[c]);
     }
-    G.end();
 
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
+    keywords.push(new FITSKeyword("COMMENT", "", view.fullId));
     keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
+    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
 
-    let title = WINDOW_ID_PREFIX() + targetId + postfix;
-    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
+    let title = WINDOW_ID_PREFIX() + view.fullId + "__DetectedStars" + postfix;
+    createOverlapImage(view, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**
