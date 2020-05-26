@@ -47,8 +47,8 @@ function DISPLAY_DETECTED_STARS(){return 1;}
 function DISPLAY_PHOTOMETRY_STARS(){return 2;}
 function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
 function DISPLAY_GRADIENT_SAMPLES(){return 8;}
-function DISPLAY_GRADIENT_GRAPH(){return 16;}
-function DISPLAY_GRADIENT_TAPER_GRAPH(){return 32;}
+function DISPLAY_PROPAGATE_GRAPH(){return 16;}
+function DISPLAY_GRADIENT_GRAPH(){return 32;}
 function CREATE_MOSAIC_MASK(){return 64;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 function CREATE_JOIN_MASK(){return 256;}
@@ -109,7 +109,11 @@ function PhotometricMosaic(data)
         }
         let intersectRect = joinAreaPreview.intersection(overlapBox);
         isHorizontal = isJoinHorizontal(data, intersectRect);
-        joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
+        if (data.orientation === INSERT()){
+            joinRect = intersectRect;
+        } else {
+            joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
+        }
     } else {
         isHorizontal = isJoinHorizontal(data, overlapBox);
         joinRect = overlapBox;
@@ -126,8 +130,8 @@ function PhotometricMosaic(data)
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
-        displayDetectedStars(referenceView, detectedStars, targetView.fullId, 
-                100, "__DetectedStars", data);
+        displayDetectedStars(referenceView, detectedStars.refColorStars, "_ref", data);
+        displayDetectedStars(targetView, detectedStars.tgtColorStars, "_tgt", data);
         return;
     }
     
@@ -257,41 +261,20 @@ function PhotometricMosaic(data)
     } else {
         propagateGradient = null;
     }
-    let taperGradient;
-    if (data.taperFlag) {
-        taperGradient = [];
-        try {
-            for (let c = 0; c < nChannels; c++) {
-                samplePairs = colorSamplePairs[c];   
-                taperGradient[c] = calcSurfaceSpline(overlapBox,
-                        samplePairs, data.taperSmoothness, isHorizontal /*, targetView, detectedStars, data */);
-            }
-        } catch (ex){
-            new MessageBox("Taper Surface Spline error.\n" + ex.message, 
-                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
-            return;
+    let taperGradient = [];
+    try {
+        for (let c = 0; c < nChannels; c++) {
+            samplePairs = colorSamplePairs[c];   
+            taperGradient[c] = calcSurfaceSpline(overlapBox,
+                    samplePairs, data.gradientSmoothness, isHorizontal /*, targetView, detectedStars, data */);
         }
-    } else {
-        taperGradient = null;
+    } catch (ex){
+        new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
+                TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
     }
     console.writeln(samplePairs.samplePairArray.length,
             " samples, ", getElapsedTime(createSurfaceSplineTime));
-
-    if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
-        console.hide(); // Allow user to compare with other open windows
-        // This gradient is important after the edge of the overlap box
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                null, propagateGradient, overlapBox, colorSamplePairs, data);
-        return;
-    }
-
-    if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()) {
-        console.hide(); // Allow user to compare with other open windows
-        // This gradient is important at the join
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal,
-                propagateGradient, taperGradient, joinRect, colorSamplePairs, data);
-        return;
-    }
 
     let isTargetAfterRef;
     if (data.orientation === INSERT()){
@@ -315,11 +298,23 @@ function PhotometricMosaic(data)
             isTargetAfterRef = (StdButton_Yes === messageBox.execute());
         }
     }
-
-    if (!data.propagateFlag && !data.taperFlag){
-        new MessageBox("No gradient correction to apply!", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+    
+    if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
+        console.hide(); // Allow user to compare with other open windows
+        // This gradient is important after the edge of the overlap box
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
+                propagateGradient, overlapBox, colorSamplePairs, data, true);
         return;
     }
+
+    if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
+        console.hide(); // Allow user to compare with other open windows
+        // This gradient is important at the join
+        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
+                taperGradient, joinRect, colorSamplePairs, data, false);
+        return;
+    }
+
     if (data.createMosaicFlag){
         console.writeln("\n<b><u>Creating Mosaic</u></b>");
     } else {
@@ -389,10 +384,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
         if (data.propagateFlag){
             propagateSurfaceSpline = propagateGradient[channel];
         }
-        let taperSurfaceSpline = null;
-        if (data.taperFlag){
-            taperSurfaceSpline = taperGradient[channel];
-        }
+        let taperSurfaceSpline = taperGradient[channel];
         tgtCorrector.applyAllCorrections(refView.image, tgtView.image, view, scale, 
                 propagateSurfaceSpline, taperSurfaceSpline, tgtBox, channel);
     }
@@ -423,27 +415,52 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
         SCRIPT_NAME() + ".tgt: " + data.targetView.fullId));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".starDetection: " + data.logStarDetection));
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".starFluxTolerance: " + data.starFluxTolerance));
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".linearRange: " + data.linearRange));
-    keywords.push(new FITSKeyword("HISTORY", "",
-        SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".outlierRemoval: " + data.outlierRemoval));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
+    let orientation;
+    if (isTargetAfterRef === null){
+        orientation = "Insert";
+    } else {
+        orientation = isHorizontal ? "Horizontal" : "Vertical";
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".isTargetAfterRef: " + isTargetAfterRef)); 
+    }
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".orientation: " + orientation));    
     if (data.propagateFlag){
         keywords.push(new FITSKeyword("HISTORY", "", 
             SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
     }
-    if (data.taperFlag) {
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".gradientSmoothness: " + data.gradientSmoothness));
+    keywords.push(new FITSKeyword("HISTORY", "",
+            SCRIPT_NAME() + ".taperLength: " + data.taperLength));
+
+    if (data.createMosaicFlag){
+        let mode = "unknown";
+        if (data.mosaicAverageFlag){
+            mode = "Average";
+        } else if (data.mosaicOverlayRefFlag){
+            mode = "Reference";
+        } else if (data.mosaicOverlayTgtFlag){
+            mode = "Target";
+        } else if (data.mosaicRandomFlag){
+            mode = "Random";
+        }
         keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".taperSmoothness: " + data.taperSmoothness));
-        keywords.push(new FITSKeyword("HISTORY", "",
-                SCRIPT_NAME() + ".taperLength: " + data.taperLength));
+            SCRIPT_NAME() + ".combinationMode: " + mode));
     }
     for (let c=0; c<nChannels; c++){
         keywords.push(new FITSKeyword("HISTORY", "", 
