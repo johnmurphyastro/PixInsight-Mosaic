@@ -197,6 +197,11 @@ function Overlap(refImage, tgtImage){
     this.tgtBox = getBoundingBox(tgtImage);
     this.refImage = refImage;
     this.tgtImage = tgtImage;
+    /** Arrays storing min & max coordinates of non zero pixels */
+    this.minOutlineAtX = null;
+    this.maxOutlineAtX = null;
+    this.minOutlineAtY = null;
+    this.maxOutlineAtY = null;
     
     if (!this.refBox.intersects(this.tgtBox)){
         return;
@@ -294,5 +299,177 @@ function Overlap(refImage, tgtImage){
         let overlapMask = new Image(this.overlapBox.width, this.overlapBox.height, 1);
         overlapMask.setSamples(this.overlapBuf);
         return overlapMask;
+    };
+    
+    /**
+     * Calculates and stores the overlap pixel vertical outline.
+     * this.minOutlineAtX stores points for the left side of the outline.
+     * this.maxOutlineAtX stores points for the right side of the outline.
+     * The stored (x,y) coordinates are image coordinates.
+     * The index of the array is the nth x pixel for the local overlap region
+     * (i.e. index 0 corresponds to the left most point of the overlap bounding box).
+     * For each local value of x, the image x, and minimum, maximum values of y are stored.
+     */
+    this.calculateOutlineAtX = function(){
+        // Get local overlap coordinates of outline
+        let w = this.overlapBox.width;
+        let h = this.overlapBox.height;
+        let x0 = this.overlapBox.x0;
+        let y0 = this.overlapBox.y0;
+        this.minOutlineAtX = new Array(w);
+        this.maxOutlineAtX = new Array(w);
+        for (let x=0; x<w; x++){
+            for (let y=0; y<h; y++){
+                let i = y * w + x;
+                if (this.overlapBuf[i]){
+                    this.minOutlineAtX[x] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+            for (let y = h - 1; y >= 0; y--){
+                let i = y * w + x;
+                if (this.overlapBuf[i]){
+                    this.maxOutlineAtX[x] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+        }
+    };
+    
+    /**
+     * Calculates and stores the overlap pixel horizontal outline.
+     * this.minOutlineAtY stores points for the top side of the outline.
+     * this.maxOutlineAtY stores points for the bottom side of the outline.
+     * The stored (x,y) coordinates are image coordinates.
+     * The index of the array is the nth x pixel for the local overlap region
+     * (i.e. index 0 corresponds to the upper most point of the overlap bounding box).
+     * For each local value of y, the image minimum, maximum values of x, and the image y are stored.
+     */
+    this.calculateOutlineAtY = function(){
+        let w = this.overlapBox.width;
+        let h = this.overlapBox.height;
+        let x0 = this.overlapBox.x0;
+        let y0 = this.overlapBox.y0;
+        this.minOutlineAtY = new Array(h);
+        this.maxOutlineAtY = new Array(h);
+        for (let y=0; y<h; y++){
+            let yXw = y * w;
+            for (let x=0; x<w; x++){
+                let i = yXw + x;
+                if (this.overlapBuf[i]){
+                    this.minOutlineAtY[y] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+            for (let x = w - 1; x >= 0; x--){
+                let i = yXw + x;
+                if (this.overlapBuf[i]){
+                    this.maxOutlineAtY[y] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+        }
+    };
+    
+    /**
+     * Creates array of points for the left side of the overlap outline
+     * @param {Number} minY If part of the outline is above minY, follow the y = minY line
+     * @returns {Point[]} Points that follow the overlap outline (or minY)
+     */
+    this.getMinOutlineAtXArray = function(minY){
+        if (this.minOutlineAtX === null){
+            this.calculateOutlineAtX();
+        }
+        let copy = this.minOutlineAtX.slice();
+        for (let i=0; i<copy.length; i++){
+            if (copy[i].y < minY){
+                copy[i] = new Point(copy[i].x, minY);
+            }
+        }
+        return copy;
+    };
+    
+    /**
+     * Creates array of points for the right side of the overlap outline
+     * @param {Number} maxY If part of the outline is below maxY, follow the y = maxY line
+     * @returns {Point[]} Points that follow the overlap outline (or maxY)
+     */
+    this.getMaxOutlineAtXArray = function(maxY){
+        if (this.maxOutlineAtX === null){
+            this.calculateOutlineAtX();
+        }
+        let copy = this.maxOutlineAtX.slice();
+        for (let i=0; i<copy.length; i++){
+            if (copy[i].y > maxY){
+                copy[i] = new Point(copy[i].x, maxY);
+            }
+        }
+        return copy;
+    };
+    
+    /**
+     * @param {Point[]} minAtXArray
+     * @param {Point[]} maxAtXArray
+     * @returns {Point[]}
+     */
+    this.getMidOutlineAtXArray = function(minAtXArray, maxAtXArray){
+        let length = minAtXArray.length;
+        let midAtX = new Array(length);
+        for (let i=0; i<length; i++){
+            let avgY = (minAtXArray[i].y + maxAtXArray[i].y) / 2;
+            midAtX[i] = new Point(minAtXArray[i].x, avgY);
+        }
+        return midAtX;
+    };
+    
+    /**
+     * Creates array of points for the top side of the overlap outline
+     * @param {Number} minX If part of the outline is left of minX, follow the x = minX line
+     * @returns {Point[]} Points that follow the overlap outline (or minX)
+     */
+    this.getMinOutlineAtYArray = function(minX){
+        if (this.minOutlineAtY === null){
+            this.calculateOutlineAtY();
+        }
+        let copy = this.minOutlineAtY.slice();
+        for (let i=0; i<copy.length; i++){
+            if (copy[i].x < minX){
+                copy[i] = new Point(minX, copy[i].y);
+            }
+        }
+        return copy;
+    };
+    
+    /**
+     * Creates array of points for the bottom side of the overlap outline
+     * @param {Number} maxX If part of the outline is right of maxX, follow the x = maxX line
+     * @returns {Point[]} Points that follow the overlap outline (or maxX)
+     */
+    this.getMaxOutlineAtYArray = function(maxX){
+        if (this.maxOutlineAtY === null){
+            this.calculateOutlineAtY();
+        }
+        let copy = this.maxOutlineAtY.slice();
+        for (let i=0; i<copy.length; i++){
+            if (copy[i].x > maxX){
+                copy[i] = new Point(maxX, copy[i].y);
+            }
+        }
+        return copy;
+    };
+    
+    /**
+     * @param {Point[]} minAtYArray
+     * @param {Point[]} maxAtYArray
+     * @returns {Point[]}
+     */
+    this.getMidOutlineAtYArray = function(minAtYArray, maxAtYArray){
+        let length = minAtYArray.length;
+        let midAtY = new Array(length);
+        for (let i=0; i<length; i++){
+            let avgX = (minAtYArray[i].x + maxAtYArray[i].x) / 2;
+            midAtY[i] = new Point(avgX, minAtYArray[i].y);
+        }
+        return midAtY;
     };
 }

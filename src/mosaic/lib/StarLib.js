@@ -758,10 +758,11 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
 }
 
 /**
+ * @param {View} tgtView Used to access the target view fullId
  * @param {Overlap} overlap Specifies the overlapping pixels
  * @param {Rect} joinRect Restricts the mask to join instead of using all overlap pixels
  */
-function createJoinMask(overlap, joinRect){
+function createJoinMask(tgtView, overlap, joinRect){
     const overlapMask = overlap.getFullImageMask();
     const width = overlapMask.width;
     const height = overlapMask.height;
@@ -777,7 +778,8 @@ function createJoinMask(overlap, joinRect){
             maskSamples[i] = maskValue;
         }
     }
-    let w = new ImageWindow(width, height, 1, 8, false, false, "JoinMask");
+    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinMask";
+    let w = new ImageWindow(width, height, 1, 8, false, false, title);
     let view = w.mainView;
     view.beginProcess(UndoFlag_NoSwapFile);
     view.image.fill(maskValue);

@@ -23,28 +23,54 @@
 #define OVERLAY_AVG 4
 
 /**
- * Create difference array for the horizontal line at y.
- * Between minX and maxX, the difference is calculated from the SurfaceSpline.
- * Outside this range, the values at minX and maxX are propogated to the array ends.
+ * Create difference array for the horizontal line at y from minX to maxX
  * @param {SurfaceSpline} surfaceSpline
  * @param {Number} y Specifies the horizontal line
- * @param {Number} minX Hold difference constant until minX
- * @param {Number} maxX Hold difference constant after maxX
- * @param {Number} maxIndex Length of dif array (width of image)
- * @returns {Number[]} Difference array
+ * @param {Number} minX calculate difference from minX
+ * @param {Number} maxX calculate difference until maxX
+ * @returns {Number[]} Difference array from minX to maxX - 1
  */
-function createDifArrayX(surfaceSpline, y, minX, maxX, maxIndex){
-    // calculate the difArray between minY and maxY
+function createSplineArrayX(surfaceSpline, y, minX, maxX){
     let points = new Array(maxX - minX);
     for (let x = minX; x<maxX; x++){
         points[x - minX] = new Point(x, y);
     }
-    let splineArray = (surfaceSpline.evaluate(points)).toArray();
-    
-    // From 0 to minY, set value to value at minY
+    return (surfaceSpline.evaluate(points)).toArray();
+}
+
+/**
+ * Create difference array for the vertical line at x from minY to maxY
+ * @param {SurfaceSpline} surfaceSpline
+ * @param {Number} x Specifies the vertical line
+ * @param {Number} minY calculate difference from minY
+ * @param {Number} maxY calculate difference until maxY
+ * @returns {Number[]} Difference array from minY to maxY - 1
+ */
+function createSplineArrayY(surfaceSpline, x, minY, maxY){
+    let points = new Array(maxY - minY);
+    for (let y = minY; y<maxY; y++){
+        points[y - minY] = new Point(x, y);
+    }
+    return (surfaceSpline.evaluate(points)).toArray();
+}
+
+/**
+ * Extend a dif array to cover either full image width or height.
+ * Between minCoord and maxCoord, the difference is supplied from splineArray.
+ * Outside this range, the values at minCoord and maxCoord are propogated to the array ends.
+ * @param {Number[]} splineArray Difference array.
+ * @param {Number} minCoord Hold difference constant until minCoord
+ * @param {Number} maxCoord Hold difference constant after maxCoord
+ * @param {Number} maxIndex Length of dif array (width or height of image)
+ * @returns {Number[]} Difference array
+ */
+function extendDifArray(splineArray, minCoord, maxCoord, maxIndex){
+    // calculate the difArray between minCoord and maxCoord
+    // x can be x or y
+    // From 0 to minCoord, set value to that at minCoord
     let startValue = splineArray[0];
-    let startArray = new Array(minX);
-    for (let x = 0; x < minX; x++){
+    let startArray = new Array(minCoord);
+    for (let x = 0; x < minCoord; x++){
         startArray[x] = startValue;
     }
     
@@ -53,44 +79,7 @@ function createDifArrayX(surfaceSpline, y, minX, maxX, maxIndex){
     
     // From maxY to end, set value to the value at maxY
     let endValue = splineArray[splineArray.length - 1];
-    for (let x = maxX; x < maxIndex; x++){
-        difArray.push(endValue);
-    }
-    return difArray;
-}
-
-/**
- * Create difference array for the vertical line at x.
- * Between minY and maxY, the difference is calculated from the SurfaceSpline.
- * Outside this range, the values at minY and maxY are propogated to the array ends.
- * @param {SurfaceSpline} surfaceSpline
- * @param {Number} x Specifies the vertical line
- * @param {Number} minY Hold difference constant until minY
- * @param {Number} maxY Hold difference constant after maxY
- * @param {Number} maxIndex Length of dif array (height of image)
- * @returns {Number[]} Difference array
- */
-function createDifArrayY(surfaceSpline, x, minY, maxY, maxIndex){
-    // calculate the difArray between minY and maxY
-    let points = new Array(maxY - minY);
-    for (let y = minY; y<maxY; y++){
-        points[y - minY] = new Point(x, y);
-    }
-    let splineArray = (surfaceSpline.evaluate(points)).toArray();
-    
-    // From 0 to minY, set value to value at minY
-    let startValue = splineArray[0];
-    let startArray = new Array(minY);
-    for (let y = 0; y < minY; y++){
-        startArray[y] = startValue;
-    }
-    
-    // Create difArray from 0 to maxY
-    let difArray = startArray.concat(splineArray);
-    
-    // From maxY to end, set value to the value at maxY
-    let endValue = splineArray[splineArray.length - 1];
-    for (let y = maxY; y < maxIndex; y++){
+    for (let x = maxCoord; x < maxIndex; x++){
         difArray.push(endValue);
     }
     return difArray;
@@ -187,8 +176,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
     this.createMosaic = data.createMosaicFlag;
     this.overlapBox = overlapBox;
     this.joinRect = joinRect;
-    this.taperFlag = data.taperFlag;
-    this.taperLength = data.taperFlag ? data.taperLength : 0;
+    this.taperLength = data.taperLength;
     this.isTargetAfterRef = isTargetAfterRef;
     this.isHorizontal = isHorizontal;
     if (isHorizontal){
@@ -241,22 +229,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
      * @param {View} view Blank image, will become mosaic image or corrected target image
      * @param {Number} scale
      * @param {SurfaceSpline} propagateSurfaceSpline
-     * @param {SurfaceSpline} taperSurfaceSpline
+     * @param {SurfaceSpline} joinSurfaceSpline
      * @param {Rect} tgtBox Target image bounding box
      * @param {Number} channel
      * @returns {undefined}
      */
     this.applyAllCorrections = function (refImage, tgtImage, view, scale,
-            propagateSurfaceSpline, taperSurfaceSpline, tgtBox, channel){
+            propagateSurfaceSpline, joinSurfaceSpline, tgtBox, channel){
                 
         processEvents();
-        
-        if (this.taperFlag){
-            joinSurfaceSpline = taperSurfaceSpline;
-        } else {
-            joinSurfaceSpline = propagateSurfaceSpline;
-        }
-        
         if (this.isTargetAfterRef === null){
             // Insert mode
             // Full correction from start of join up to end of the join region
@@ -266,56 +247,56 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
             return;
         }
         
-        
         let fullDifBeforeOverlap;
         let fullDifAfterOverlap;
         let bgDifBeforeOverlap;
         let bgDifAfterOverlap;
-        let joinSurfaceSpline;
         let length;
         
         if (this.isHorizontal){
             let minX = this.overlapBox.x0;
             let maxX = this.overlapBox.x1;
             length = this.imageWidth;
-            fullDifBeforeOverlap = createDifArrayX(joinSurfaceSpline, this.overlapStart, minX, maxX, length);
-            fullDifAfterOverlap = createDifArrayX(joinSurfaceSpline, this.overlapEnd, minX, maxX, length);
-            if (this.taperFlag && propagateSurfaceSpline !== null){
+            let splineArray1 = createSplineArrayX(joinSurfaceSpline, this.overlapStart, minX, maxX);
+            fullDifBeforeOverlap = extendDifArray(splineArray1, minX, maxX, length);
+            let splineArray2 = createSplineArrayX(joinSurfaceSpline, this.overlapEnd, minX, maxX);
+            fullDifAfterOverlap = extendDifArray(splineArray2, minX, maxX, length);
+            if (propagateSurfaceSpline !== null){
                 if (this.isTargetAfterRef){
-                    bgDifAfterOverlap = createDifArrayX(propagateSurfaceSpline, this.overlapEnd, minX, maxX, length);
+                    let splineArrayPropagate2 = createSplineArrayX(propagateSurfaceSpline, this.overlapEnd, minX, maxX);
+                    bgDifAfterOverlap = extendDifArray(splineArrayPropagate2, minX, maxX, length);
                 } else {
-                    bgDifBeforeOverlap = createDifArrayX(propagateSurfaceSpline, this.overlapStart, minX, maxX, length);
+                    let splineArrayPropagate1 = createSplineArrayX(propagateSurfaceSpline, this.overlapStart, minX, maxX);
+                    bgDifBeforeOverlap = extendDifArray(splineArrayPropagate1, minX, maxX, length);
                 }     
             }
         } else {
             let minY = this.overlapBox.y0;
             let maxY = this.overlapBox.y1;
             length = this.imageHeight;
-            fullDifBeforeOverlap = createDifArrayY(joinSurfaceSpline, this.overlapStart, minY, maxY, length);
-            fullDifAfterOverlap = createDifArrayY(joinSurfaceSpline, this.overlapEnd, minY, maxY, length);
-            if (this.taperFlag && propagateSurfaceSpline !== null){
+            let splineArray1 = createSplineArrayY(joinSurfaceSpline, this.overlapStart, minY, maxY);
+            fullDifBeforeOverlap = extendDifArray(splineArray1, minY, maxY, length);
+            let splineArray2 = createSplineArrayY(joinSurfaceSpline, this.overlapEnd, minY, maxY);
+            fullDifAfterOverlap = extendDifArray(splineArray2, minY, maxY, length);
+            if (propagateSurfaceSpline !== null){
                 if (this.isTargetAfterRef){
-                    bgDifAfterOverlap = createDifArrayY(propagateSurfaceSpline, this.overlapEnd, minY, maxY, length);
+                    let splineArrayPropagate2 = createSplineArrayY(propagateSurfaceSpline, this.overlapEnd, minY, maxY);
+                    bgDifAfterOverlap = extendDifArray(splineArrayPropagate2, minY, maxY, length);
                 } else {
-                    bgDifBeforeOverlap = createDifArrayY(propagateSurfaceSpline, this.overlapStart, minY, maxY, length);
+                    let splineArrayPropagate1 = createSplineArrayY(propagateSurfaceSpline, this.overlapStart, minY, maxY);
+                    bgDifBeforeOverlap = extendDifArray(splineArrayPropagate1, minY, maxY, length);
                 }
             }
         }
-        
-        if (this.taperFlag) {            
-            if (propagateSurfaceSpline === null){
-                if (this.isTargetAfterRef){
-                    bgDifAfterOverlap = createAvgDifArray(fullDifAfterOverlap);
-                } else {
-                    bgDifBeforeOverlap = createAvgDifArray(fullDifBeforeOverlap);
-                }
+         
+        if (propagateSurfaceSpline === null){
+            if (this.isTargetAfterRef){
+                bgDifAfterOverlap = createAvgDifArray(fullDifAfterOverlap);
+            } else {
+                bgDifBeforeOverlap = createAvgDifArray(fullDifBeforeOverlap);
             }
-        } else {
-            // Propagate gradient. Apply full dif over whole of target image
-            bgDifBeforeOverlap = fullDifBeforeOverlap;
-            bgDifAfterOverlap = fullDifAfterOverlap;
         }
-
+       
         if (this.isHorizontal) {
             if (this.isTargetAfterRef) {
                 // Reference side of join
@@ -335,12 +316,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
                         tgtBox.x0, this.joinEnd, tgtBox.x1, this.overlapEnd, channel, OVERLAY_TGT);
 
-                if (this.taperFlag) {
-                    // Taper down region. Apply full scale correction but 
-                    // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
-                            tgtBox.x0, this.overlapEnd, tgtBox.x1, this.secondTaperEnd, channel);
-                }
+                // Taper down region. Apply full scale correction but 
+                // gradually reduce the gradient correction
+                this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                        tgtBox.x0, this.overlapEnd, tgtBox.x1, this.secondTaperEnd, channel);
 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
@@ -354,12 +333,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
                 this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, tgtBox.x1, this.firstTaperStart, channel, true);
 
-                if (this.taperFlag) {
-                    // Taper up region. Apply full scale correction and 
-                    // gradually increase the gradient correction from zero to full
-                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
-                            tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.overlapStart, channel);
-                }
+                // Taper up region. Apply full scale correction and 
+                // gradually increase the gradient correction from zero to full
+                this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                        tgtBox.x0, this.firstTaperStart, tgtBox.x1, this.overlapStart, channel);
 
                 // Overlap region before join. Target side so target overlay
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
@@ -397,12 +374,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
                         this.joinEnd, tgtBox.y0, this.overlapEnd, tgtBox.y1, channel, OVERLAY_TGT);
                 
-                if (this.taperFlag) {
-                    // Taper down region. Apply full scale correction but 
-                    // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
-                            this.overlapEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
-                }
+                // Taper down region. Apply full scale correction but 
+                // gradually reduce the gradient correction
+                this.applyScaleAndGradientTaperDown(refImage, tgtImage, view, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                        this.overlapEnd, tgtBox.y0, this.secondTaperEnd, tgtBox.y1, channel);
                 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
@@ -416,12 +391,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
                 this.applyScaleAndGradient(refImage, tgtImage, view, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, this.firstTaperStart, tgtBox.y1, channel, true);
 
-                if (this.taperFlag) {
-                    // Taper down region. Apply full scale correction but 
-                    // gradually reduce the gradient correction
-                    this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
-                            this.firstTaperStart, tgtBox.y0, this.overlapStart, tgtBox.y1, channel);
-                }
+                // Taper down region. Apply full scale correction but 
+                // gradually reduce the gradient correction
+                this.applyScaleAndGradientTaperUp(refImage, tgtImage, view, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                        this.firstTaperStart, tgtBox.y0, this.overlapStart, tgtBox.y1, channel);
                 
                 // Overlap region before join. Target side so target overlay
                 this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
@@ -880,21 +853,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
 /**
  * Calculates maximum and minimum values for the sample points
  * @param {SamplePairs[]} colorSamplePairs Contains samplePairArray
- * @param {SurfaceSpline[]} initialCorrections For each color, apply to
- * data points before calculating min max
  * @returns {SamplePairDifMinMax}
  */
-function SamplePairDifMinMax(colorSamplePairs, initialCorrections) {
+function SamplePairDifMinMax(colorSamplePairs) {
     this.minDif = Number.POSITIVE_INFINITY;
     this.maxDif = Number.NEGATIVE_INFINITY;
     for (let c=0; c<colorSamplePairs.length; c++) {
         let samplePairs = colorSamplePairs[c];
         for (let samplePair of samplePairs.samplePairArray) {
             let dif = samplePair.targetMedian - samplePair.referenceMedian;
-            if (initialCorrections !== null) {
-                let p = samplePair.rect.center;
-                dif -= initialCorrections[c].evaluate(p);
-            }
             this.minDif = Math.min(this.minDif, dif);
             this.maxDif = Math.max(this.maxDif, dif);
         }
@@ -907,16 +874,17 @@ function SamplePairDifMinMax(colorSamplePairs, initialCorrections) {
  * @param {View} referenceView Used for view name
  * @param {Number} width Graph width. Limited to target image size (width or height).
  * @param {Boolean} isHorizontal
- * @param {SurfaceSpline[]} initialCorrections If not null, apply this initial correction
- * before displaying lines and points
+ * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
  * @param {Rect} sampleRect Create dif arrays at either side of this rectangle 
  * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
  * @param {PhotometricMosaicData} data User settings used to create FITS header
+ * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
  */
 function displayGradientGraph(targetView, referenceView, width, isHorizontal, 
-        initialCorrections, surfaceSplines, sampleRect, colorSamplePairs, data){
+        isTargetAfterRef, surfaceSplines, sampleRect, colorSamplePairs, data,
+        isPropagateGraph){
     
     /**
      * @param {View} refView
@@ -934,13 +902,10 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
         keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
         keywords.push(new FITSKeyword("COMMENT", "", "Limit Sample Stars Percent: " + data.limitSampleStarsPercent));
-        if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()){
+        if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()){
             keywords.push(new FITSKeyword("COMMENT", "", "Propagate Smoothness: " + data.propagateSmoothness));
-        } else if (data.viewFlag === DISPLAY_GRADIENT_TAPER_GRAPH()){
-            if (data.propagateFlag){
-                keywords.push(new FITSKeyword("COMMENT", "", "Propagate Smoothness: " + data.propagateSmoothness));
-            }
-            keywords.push(new FITSKeyword("COMMENT", "", "Taper Smoothness: " + data.taperSmoothness));
+        } else if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()){
+            keywords.push(new FITSKeyword("COMMENT", "", "Taper Smoothness: " + data.gradientSmoothness));
             keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
         }
         
@@ -949,44 +914,27 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     };
     
     /**
-     * Create a difference array for a line either at the top or bottom of the 
-     * sample bounding box. This dif array is used to draw lines on the graph.
-     * If the initialCorrection SurfaceSpline is not null, this correction is 
-     * subtracted from the difArray. The returned difArray then contains the 
-     * residual correction instead of the full correction.
-     * @param {SurfaceSpline} initialCorrection If not null, this is subtracted from the dif array
+     * Create a difference array for the line specified by points.
+     * This dif array is used to draw lines on the graph.
      * @param {SurfaceSpline} surfaceSpline Used to create the difArray
-     * @param {Rect} sampleRect Create dif arrays along side of this rectangle
-     * @param {Number} maxCoordinate Length of difArray (width or height of image)
+     * @param {Point[]} points Create dif arrays for the line specified by these points
+     * @param {Number} difArrayLength Length of difArray (width or height of image)
      * @param {Boolean} isHorizontal Join direction
-     * @param {Boolean} isTop Determines which side of the join is used to create the difArray 
      * @returns {Number[]} difArray
      */
-    let getDifArray = function(initialCorrection, surfaceSpline, sampleRect, maxCoordinate, isHorizontal, isTop){
+    let getDifArray = function(surfaceSpline, points, difArrayLength, isHorizontal){
         let difArray;
-        let initialDif = null;
+        let minCoord;
+        let maxCoord;
         if (isHorizontal){
-            let y = isTop ? sampleRect.y0 : sampleRect.y1;
-            let minX = sampleRect.x0;
-            let maxX = sampleRect.x1;
-            difArray = createDifArrayX(surfaceSpline, y, minX, maxX, maxCoordinate);
-            if (initialCorrection){
-                initialDif = createDifArrayX(initialCorrection, y, minX, maxX, maxCoordinate);
-            }
+            minCoord = points[0].x;
+            maxCoord = points[points.length - 1].x;
         } else {
-            let x = isTop ? sampleRect.x0 : sampleRect.x1;
-            let minY = sampleRect.y0;
-            let maxY = sampleRect.y1;
-            difArray = createDifArrayY(surfaceSpline, x, minY, maxY, maxCoordinate);
-            if (initialCorrection){
-                initialDif = createDifArrayY(initialCorrection, x, minY, maxY, maxCoordinate);
-            }
+            minCoord = points[0].y;
+            maxCoord = points[points.length - 1].y;
         }
-        if (initialDif){
-            for (let i = 0; i < maxCoordinate; i++){
-                difArray[i] -= initialDif[i];
-            }
-        }
+        let splineArray = surfaceSpline.evaluate(points).toArray();
+        difArray = extendDifArray(splineArray, minCoord, maxCoord, difArrayLength);
         return difArray;
     };
     
@@ -994,28 +942,31 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
      * Draw gradient line and sample points for a single color channel.
      * @param {Graph} graph
      * @param {Boolean} isHorizontal
-     * @param {SurfaceSpline} initialCorrection If not null, apply this to data points before displaying 
-     * @param {Number[]} difArrayTop DifArray at 'top' of sample rectangle
-     * @param {Number[]} difArrayBottom DifArray at 'bottom' of sample rectangle
+     * @param {Number[][]} difArrays Array of DifArray to draw
+     * @param {Number} lineBoldColor
+     * @param {GraphLinePath} line Specifies which line should be bold
      * @param {Number} lineColor
      * @param {SamplePairs} samplePairs
      * @param {Number} pointColor
      * @returns {undefined}
      */
-    let drawLineAndPoints = function(graph, isHorizontal, initialCorrection,
-            difArrayTop, difArrayBottom, lineColor, samplePairs, pointColor) {
+    let drawLineAndPoints = function(graph, isHorizontal,
+            difArrays, lineBoldColor, line, lineColor, samplePairs, pointColor) {
                 
         for (let samplePair of samplePairs.samplePairArray) {
             // Draw the sample points
             let coord = isHorizontal ? samplePair.rect.center.x : samplePair.rect.center.y;
             let dif = samplePair.targetMedian - samplePair.referenceMedian;
-            if (initialCorrection){
-                dif -= initialCorrection.evaluate(samplePair.rect.center);
-            }
             graph.drawPoint(coord, dif, pointColor);
         }
-        graph.drawDifArray(difArrayTop, lineColor, true);
-        graph.drawDifArray(difArrayBottom, lineColor, true);
+        for (let i = 0; i < difArrays.length; i++){
+            let difArray = difArrays[i];
+            if (line.bold[i]){
+                graph.drawDifArray(difArray, lineBoldColor, true);
+            } else {
+                graph.drawDifArray(difArray, lineColor, false);
+            }
+        }
     };
     
     let axisWidth;
@@ -1034,7 +985,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
     const minScaleDif = 2e-4;
-    let minMax = new SamplePairDifMinMax(colorSamplePairs, initialCorrections);
+    let minMax = new SamplePairDifMinMax(colorSamplePairs);
     let maxY = minMax.maxDif;
     let minY = minMax.minDif;
     if (maxY - minY < minScaleDif){
@@ -1044,25 +995,35 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
     graphWithAxis.setAxisLength(axisWidth + 2, 720);
     graphWithAxis.createGraph(xLabel, yLabel);
-
+    
+    let graphLine = new GraphLinePath();
+    if (isPropagateGraph){
+        graphLine.initPropagatePath(data.cache.overlap, isHorizontal, isTargetAfterRef);
+    } else {
+        graphLine.initGradientPaths(data.cache.overlap, sampleRect, isHorizontal, isTargetAfterRef, data);
+    }
+    
     if (colorSamplePairs.length === 1){ // B&W
-        let initialCorrection = initialCorrections !== null ? initialCorrections[0] : null;
-        let difArrayTop = getDifArray(initialCorrection, surfaceSplines[0], sampleRect, maxCoordinate, isHorizontal, true);
-        let difArrayBottom = getDifArray(initialCorrection, surfaceSplines[0], sampleRect, maxCoordinate, isHorizontal, false);
-        drawLineAndPoints(graphWithAxis, isHorizontal, initialCorrection,
-            difArrayTop, difArrayBottom, 0xFFFF0000, colorSamplePairs[0], 0xFFFFFFFF);
+        let difArrays = [];
+        for (let path of graphLine.paths){
+            difArrays.push(getDifArray(surfaceSplines[0], path, maxCoordinate, isHorizontal));
+        }
+        drawLineAndPoints(graphWithAxis, isHorizontal,
+            difArrays, 0xFFFF0000, graphLine, 0xFFBB0000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
-        let lineColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+        let lineBoldColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+        let lineColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
         let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
         for (let c = 0; c < colorSamplePairs.length; c++){
-            let initialCorrection = initialCorrections !== null ? initialCorrections[c] : null;
-            let difArrayTop = getDifArray(initialCorrection, surfaceSplines[c], sampleRect, maxCoordinate, isHorizontal, true);
-            let difArrayBottom = getDifArray(initialCorrection, surfaceSplines[c], sampleRect, maxCoordinate, isHorizontal, false);
+            let difArrays = [];
+            for (let path of graphLine.paths){
+                difArrays.push(getDifArray(surfaceSplines[c], path, maxCoordinate, isHorizontal));
+            }
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawLineAndPoints(graphAreaOnly, isHorizontal, initialCorrection,
-                difArrayTop, difArrayBottom, lineColors[c], colorSamplePairs[c], pointColors[c]);
+            drawLineAndPoints(graphAreaOnly, isHorizontal,
+                difArrays, lineBoldColors[c], graphLine, lineColors[c], colorSamplePairs[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
     }
@@ -1071,10 +1032,121 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     let graph = new GraphDialog(graphWithAxis.bitmap, "Gradient Graph", graphWithAxis.screenToWorld);
     if (graph.execute() === StdButton_Yes){
         // User requested graph saved to PixInsight View
-        let isColor = targetView.image.isColor;
         let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
-        let imageWindow = graphWithAxis.createWindow(windowTitle, isColor);
+        let imageWindow = graphWithAxis.createWindow(windowTitle, true);
         gradientGraphFitsHeader(referenceView, targetView, imageWindow, data);
         imageWindow.show();
     }
+}
+
+
+function GraphLinePath(){
+    /** {Point[][]} paths min, mid and max paths across overlap region */
+    this.paths = [];
+    /** {Boolean} bold Draw nth line bold */
+    this.bold = [];
+    
+    /**
+    * 
+    * @param {Overlap} overlap
+    * @param {Rect} joinRect
+    * @param {Boolean} isHorizontal
+    * @param {Boolean} isTargetAfterRef
+    * @param {PhotometricMosaicData} data
+    * @returns {GraphLinePath}
+    */
+    this.initGradientPaths = function (overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+        let minPath;
+        let midPath;
+        let maxPath;
+        if (isHorizontal){
+            let joinStart = joinRect.y0;
+            let joinEnd = joinRect.y1;
+            minPath = overlap.getMinOutlineAtXArray(joinStart);
+            maxPath = overlap.getMaxOutlineAtXArray(joinEnd);
+            midPath = overlap.getMidOutlineAtXArray(minPath, maxPath);
+        } else {
+            let joinStart = joinRect.x0;
+            let joinEnd = joinRect.x1;
+            minPath = overlap.getMinOutlineAtYArray(joinStart);
+            maxPath = overlap.getMaxOutlineAtYArray(joinEnd);
+            midPath = overlap.getMidOutlineAtYArray(minPath, maxPath);
+        }
+
+        this.paths.push(minPath);
+        this.paths.push(midPath);
+        this.paths.push(maxPath);
+
+        this.bold = new Array(this.paths.length);
+        if (data.mosaicAverageFlag || data.mosaicRandomFlag){
+            // Draw all lines bold
+            for (let i=0; i<this.paths.length; i++){
+                this.bold[i] = true;
+            }
+        } else if (data.mosaicOverlayTgtFlag && isTargetAfterRef ||
+                data.mosaicOverlayRefFlag && !isTargetAfterRef){
+            // First line bold
+            for (let i=0; i<this.paths.length; i++){
+                this.bold[i] = (i === 0);
+            }
+        } else {
+            for (let i=0; i<this.paths.length; i++){
+                this.bold[i] = (i === this.paths.length - 1);
+            }
+        }
+    };
+    
+    /**
+     * Create a straight line path that follows a side of the overlap bounding box
+     * @param {Overlap} overlap
+     * @param {Boolean} isHorizontal
+     * @param {Boolean} isTargetAfterRef
+     */
+    this.initPropagatePath = function (overlap, isHorizontal, isTargetAfterRef){
+        let overlapBox = overlap.overlapBox;
+        let points;
+        
+        if (isTargetAfterRef){
+            // Propagate region is after join
+            if (isHorizontal){
+                let minX = overlapBox.x0;
+                let maxX = overlapBox.x1;
+                points = new Array(maxX - minX);
+                for (let x = minX; x<maxX; x++){
+                    // Below join
+                    points[x - minX] = new Point(x, overlapBox.y1);
+                }
+            } else {
+                let minY = overlapBox.y0;
+                let maxY = overlapBox.y1;
+                points = new Array(maxY - minY);
+                for (let y = minY; y<maxY; y++){
+                    // Right of join
+                    points[y - minY] = new Point(overlapBox.x1, y);
+                }
+            }
+        } else {
+            // Propagate region is before join
+            if (isHorizontal){
+                let minX = overlapBox.x0;
+                let maxX = overlapBox.x1;
+                points = new Array(maxX - minX);
+                for (let x = minX; x<maxX; x++){
+                    // Above join
+                    points[x - minX] = new Point(x, overlapBox.y0);
+                }
+            } else {
+                let minY = overlapBox.y0;
+                let maxY = overlapBox.y1;
+                points = new Array(maxY - minY);
+                for (let y = minY; y<maxY; y++){
+                    // Left of join
+                    points[y - minY] = new Point(overlapBox.x0, y);
+                }
+            }
+        }
+        
+        this.paths.push(points);
+        this.bold.push(true);
+    };
 }

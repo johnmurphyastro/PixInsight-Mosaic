@@ -120,7 +120,7 @@ function PhotometricMosaic(data)
     }
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(data.cache.overlap, joinRect);
+        createJoinMask(targetView, data.cache.overlap, joinRect);
         return;
     }
 
