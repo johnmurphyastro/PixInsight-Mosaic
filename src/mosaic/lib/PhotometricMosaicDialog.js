@@ -111,14 +111,13 @@ function PhotometricMosaicData() {
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("orientation", this.orientation);
         
+        // Gradient Tapered Correction
+        Parameters.set("gradientSmoothness", this.gradientSmoothness);
+        Parameters.set("taperLength", this.taperLength);
+        
         // Gradient Propagated Correction
         Parameters.set("propagateFlag", this.propagateFlag);
         Parameters.set("propagateSmoothness", this.propagateSmoothness);
-        
-        // Gradient Tapered Correction
-        Parameters.set("taperFlag", this.taperFlag);
-        Parameters.set("taperSmoothness", this.taperSmoothness);
-        Parameters.set("taperLength", this.taperLength);
         
         // Mosaic Star Mask
         Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
@@ -186,19 +185,17 @@ function PhotometricMosaicData() {
         if (Parameters.has("orientation"))
             this.orientation = Parameters.getInteger("orientation");
         
+        // Gradient Tapered Correction
+        if (Parameters.has("gradientSmoothness"))
+            this.gradientSmoothness = Parameters.getReal("gradientSmoothness");
+        if (Parameters.has("taperLength"))
+            this.taperLength = Parameters.getInteger("taperLength");
+        
         // Gradient Propagated Correction
         if (Parameters.has("propagateFlag"))
             this.propagateFlag = Parameters.getBoolean("propagateFlag");
         if (Parameters.has("propagateSmoothness"))
             this.propagateSmoothness = Parameters.getReal("propagateSmoothness");
-        
-        // Gradient Tapered Correction
-        if (Parameters.has("taperFlag"))
-            this.taperFlag = Parameters.getBoolean("taperFlag");
-        if (Parameters.has("taperSmoothness"))
-            this.taperSmoothness = Parameters.getReal("taperSmoothness");
-        if (Parameters.has("taperLength"))
-            this.taperLength = Parameters.getInteger("taperLength");
         
         // Mosaic Star Mask
         if (Parameters.has("limitMaskStarsPercent"))
@@ -227,8 +224,8 @@ function PhotometricMosaicData() {
         this.logStarDetection = -1;
         
         // Photometric Star Search
-        this.starFluxTolerance = 1.5;
-        this.starSearchRadius = 3;
+        this.starFluxTolerance = 1.25;
+        this.starSearchRadius = 2.5;
         
         // Photometric Scale
         this.limitPhotoStarsPercent = 90;
@@ -247,14 +244,13 @@ function PhotometricMosaicData() {
         this.sampleSize = 20;
         this.orientation = AUTO();
         
+        // Gradient Tapered Correction
+        this.gradientSmoothness = -1.5;
+        this.taperLength = 500;
+        
         // Gradient Propagated Correction
         this.propagateFlag = false;
         this.propagateSmoothness = 3;
-        
-        // Gradient Tapered Correction
-        this.taperFlag = true;
-        this.taperSmoothness = -1.5;
-        this.taperLength = 100;
         
         // Mosaic Star Mask
         this.limitMaskStarsPercent = 10;
@@ -304,14 +300,13 @@ function PhotometricMosaicData() {
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.orientationCombo.currentItem = AUTO();
         
+        // Gradient Tapered Correction
+        linearFitDialog.gradientSmoothnessControl.setValue(this.gradientSmoothness);
+        linearFitDialog.taperLength_Control.setValue(this.taperLength);
+        
         // Gradient Propagated Correction
         linearFitDialog.propagateSmoothness_Control.setValue(this.propagateSmoothness);
         linearFitDialog.setPropagateGradientFlag(this.propagateFlag);
-        
-        // Gradient Tapered Correction
-        linearFitDialog.setTaperGradientFlag(this.taperFlag);
-        linearFitDialog.taperSmoothness_Control.setValue(this.taperSmoothness);
-        linearFitDialog.taperLength_Control.setValue(this.taperLength);
         
         // Mosaic Star Mask
         linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
@@ -608,7 +603,7 @@ function PhotometricMosaicDialog(data) {
             "<p>The plotted lines indicate the " +
             "best fit lines (least squares fit) that go through the origin. " +
             "The gradient of these lines gives the required scale factors. </p>" +
-            "<p>Useful data is also saved to the graph's FITS header.</p>";
+            "<p>See graph title bar for usage hints.</p>";
     photometryGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_PHOTOMETRY_GRAPH();
         this.dialog.ok();
@@ -654,14 +649,17 @@ function PhotometricMosaicDialog(data) {
     const getAreaFromPreviewStr = "Get area from preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
     const JoinRegionTooltip =
-            "<p>The 'Join Region' restricts the area used to calculate the " +
-            "join between the two images.</p>" +
-            "<p>For best results, use a long narrow rectangle that avoids local differences " +
-            "between the images. Local differences can have many causes - e.g. " +
-            "scattered light halos around bright stars. Sudden spikes in the 'Gradient Graph' " +
-            "indicate significant local differences exist.</p>" +
-            "<p>It is not necessary for the selected area to contain any stars. " +
-            "The photometry ignores this selection and always uses the whole of the overlapping area.</p>";
+            "<p>The 'Join Region' determines the size and position of the join between the two images. " +
+            "If this option is not selected, the whole overlap region is used for the join.</p>" +
+            "<p>For a 'Random' join, use a thin rectangle just thick enough to blend the two sides of the join. " +
+            "Position the rectangle to avoid image corners and bright stars.</p>" +
+            "<p>For a 'Reference' overlay join, the rectangle side closest to the target image determines " +
+            "the join line. For a 'Target' overlay join, it is the side closest to the reference image. " +
+            "The join position should avoid image corners and bright stars.</p>" +
+            "<p>It is not necessary for the selected area to contain any stars. The whole of the " +
+            "overlap region is always used to determine the photometric scale and the background gradient.</p>" +
+            "<p>If the 'Join Direction' mode is 'Auto', 'Horizontal' or 'Vertical', the join " +
+            "rectangle's length is updated to start and finish at the overlap bounding box.</p>";
             
     this.rectangleX0_Control = createNumericEdit("Left:", JoinRegionTooltip,
             data.joinAreaPreview_X0, 50);
@@ -786,9 +784,7 @@ function PhotometricMosaicDialog(data) {
             "OK provided that no star takes up more than half of a sample's area.</p>" +
             "<p>100% implies that all detected stars are used to reject samples.</p>" +
             "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by an error in the calculated scale. " +
-            "Although the photometric strategy has a high level of accuracy, " +
-            "no measurement is perfect.</li>" +
+            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
             "<li>Bright stars can have significantly different profiles between " +
             "the reference and target images. This can effect how many of the " +
             "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
@@ -819,11 +815,13 @@ function PhotometricMosaicDialog(data) {
             "<p>Samples are rejected if they contain one or more zero pixels in " +
             "either image or if they contain a star bright enough to be included " +
             "in the 'Limit Stars %' list.</p>" +
-            "<p>Larger samples are more tolerant to unrejected stars, " +
-            "but smaller samples might be necessary for small overlaps. " +
-            "Aim to ensure that samples are more than 1.5x the size of the largest star in the " +
-            "overlapping region. Rejecting more samples that contain stars by " +
-            "increasing 'Limit Stars %' reduces this requirement.</p>" +
+            "<p>Ideally, the samples should be about 1.5x the size of the largest star.</p>" +
+            "<p>The samples are used to create a surface spline that models the " +
+            "background gradient. The sample size and the number of samples not " +
+            "rejected by stars will determine the maximum resolution of the surface spline. " +
+            "However, very small samples will suffer from noise.</p>" +
+            "<p>For performance reasons, if there are more than 2,000 samples, the " +
+            "samples are binned before creating the surface spline.</p>" +
             "<p>Use the 'Sample Grid' button to visualize the grid of samples.</p>";
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
@@ -842,18 +840,21 @@ function PhotometricMosaicDialog(data) {
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
     this.orientationCombo.toolTip = 
-            "<p>Orientation of the line of intersection. 'Auto' usually works well.</p>" +
-            "<p>The 'Auto' mode first looks at the specified 'Gradient Sample Area' " +
-             "rectangle, or if this is not specified, the calculated overlap region. " +
-            "If this region is wider than it is tall, the line of intersection " +
-            "is assumed to be horizontal. If not, it assumes a vertical join.</p>" +
-            "<p>If the overlap is almost square, you can set this control to " +
-             "the join direction. However, for optimum results specify a " +
-            "'long thin join/sample area in the 'Limit Gradient Sample Area' section.</p>" +
-            "<p>Note that this script is designed to join only one tile side at a time. " +
-            "Adding corner tiles should be avoided by first creating rows or columns, and then " +
-            "joining the resulting strips together. Ad-hoc mosaics should first be split into " +
-             "rows and columns by using the 'MosaicSplitImage script.</p>";
+        "<p>Orientation of the line of intersection. This determines how the " +
+        "background offset is corrected outside of the overlap region: " +
+        "<ul><li>In the direction parallel to the join, the offset is held constant either side of the join</li>" +
+        "<li>In the direction perpendicular to the join, the correction is dependent on the " +
+        "'Propagated Gradient Correction' and 'Tapered Gradient Correction' settings.</li></ul></p>" +
+        "<p>The 'Horizontal' and 'Vertical' modes can be used to force the orientation, " +
+        "but it is usually better to create a  long thin join area in the 'Join Region' section and " +
+        "use 'Auto' instead.</p>" +
+        "<p>The 'Auto' mode usually works well. It first looks at the specified 'Join Region' " +
+         "rectangle, or if this is not specified, the overlap region. " +
+        "If the area is wider than it is tall, the line of intersection " +
+        "is assumed to be horizontal; if not, a vertical join.</p>" +         
+        "<p>The 'Insert' mode is used to insert a target image into the middle of a mosaic. " +
+        "Pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a " +
+        "small area of the mosaic or to add high res images to a wider mosaic.</p>";
 
     this.orientationCombo.minWidth = this.font.width("Horizontal");
     this.orientationCombo.addItem("Horizontal");
@@ -868,7 +869,7 @@ function PhotometricMosaicDialog(data) {
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample Grid";
     displaySamplesButton.toolTip = 
-            "<p>The 'Sample Grid' button displays the grid of samples that will " +
+            "<p>Displays the grid of samples that will " +
             "be used to calculate the background offset and gradient.</p>" +
             "<p>Samples are rejected if they contain one or more zero pixels in " +
             "either image or if they contain a star included in the 'Limit Stars %' list. " +
@@ -900,19 +901,20 @@ function PhotometricMosaicDialog(data) {
     this.propagateSmoothness_Control.setPrecision(1);
     this.propagateSmoothness_Control.label.text = "Smoothness:";
     this.propagateSmoothness_Control.toolTip = 
-            "<p>This mode corrects the horizontal and vertical components of the " +
-            "relative gradient between the reference and target image. This is done " +
-            "in two stages. One component is corrected when tiles are joined into " +
-            "horizontal or vertical strips. The other component is corrected when " +
-            "these strips are joined.</p>" +
-            "<p>Use this mode if the reference tile has less gradient than the target tile.</p>" +
-            "<p>Since the gradient correction is propagated across the mosaic, the " +
-            "correction should be a smooth curve, created from only a few " +
-            "best fit lines. After this correction the residual gradient is likely to be " +
-            "due to local differences and should be corrected using " +
-            "the 'Tapered Gradient Correction'.</p>" +
-            "Since the reference tile's gradient will be propagated across the mosaic, " +
-            "consider using DBE as a final correction once the mosaic is complete.</p>";
+        "<p>This mode can be used to correct the horizontal and vertical components of the " +
+        "relative gradient between the reference and target images. This is done " +
+        "in two stages. One component is corrected when tiles are joined into " +
+        "horizontal or vertical strips. The other component is corrected when " +
+        "these strips are joined.</p>" +
+        "<p>Use this mode if the reference tile has less gradient than the target tile.</p>" +
+        "<p>Since this gradient correction is propagated across the mosaic, the " +
+        "correction should follow the general trend. It should not attempt to " +
+        "correct the local variations due to bright stars and other artifacts.</p>" +
+        "<p>When using this option, you should usually also apply a " +
+        "'Tapered Gradient Correction', to fix the residual gradient " +
+        "due to the stars and artifacts.</p>" +
+        "<p>Since the reference tile's gradient will be propagated across the mosaic, " +
+        "consider using DBE as a final correction once the mosaic is complete.</p>";
     this.propagateSmoothness_Control.onValueUpdated = function (value) {
         data.propagateSmoothness = value;
     };
@@ -924,25 +926,22 @@ function PhotometricMosaicDialog(data) {
     let propagateGradientGraphButton = new PushButton();
     propagateGradientGraphButton.text = "Gradient Graph";
     propagateGradientGraphButton.toolTip = 
-            "<p>The vertical axis represents the difference between the two images. " +
-            "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
+            "<p>The vertical axis represents the difference between the two images, " +
+            "the horizontal axis the join's X-Coordinate (horizontal join) " +
             "or Y-Coordinate (vertical join).</p>" +
-            "<p>Each plotted dot represents the difference between a target and " +
-            "reference sample. The lines drawn represent the best fit line segments. " +
-            "It is these line segments that are used to determine the relative " +
-            "gradient between the two images.</p>" +
+            "<p>The plotted dots represent the difference between each paired target and " +
+            "reference sample within the whole of the overlap bounding box area. " +
+            "These points are scattered vertically. This is partly due to gradients perpendicular to " +
+            "the join, and partly due to noise.<\p>" +
+            "<p>The two curves are calculated from the differences at either side " +
+            "(top and bottom for horizontal join) of the " +
+            "overlap bonding box and indicate the gradient correction that will be " +
+            "propagated from this boundary.</p>" +
             "<p>The graphs produced for color images use red, green and blue dots " +
             "and lines for each channel. The colors add together. " +
-            "For example: red, green and blue add up to white.</p>" +
-            "<p>If the plotted points have excessive scatter this may indicate that " +
-            "the sample size is too small or that samples contain bright stars that " +
-            "occupy more than half the sample area. Either increase the 'Sample Size' " +
-            "to increase the area of each sample, or increase the 'Limit Stars %' " +
-            "so that samples that contain bright stars are rejected.</p>" +
-            "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
-            "or reduce the 'Sample Size'.</p>";
+            "For example: red, green and blue add up to white.</p>";
     propagateGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_GRADIENT_GRAPH();
+        data.viewFlag = DISPLAY_PROPAGATE_GRAPH();
         this.dialog.ok();
     };
     
@@ -970,54 +969,53 @@ function PhotometricMosaicDialog(data) {
     // GroupBox: "Propagated Gradient Correction" End
     
     // ------------------------------------------
-    // GroupBox: "Tapered Gradient Correction"
+    // GroupBox: "Gradient Correction"
     // ------------------------------------------
-    // Taper Gradient controls
-    this.taperSmoothness_Control = new NumericControl(this);
-    this.taperSmoothness_Control.real = true;
-    this.taperSmoothness_Control.setPrecision(1);
-    this.taperSmoothness_Control.label.text = "Smoothness:";
-    this.taperSmoothness_Control.toolTip = 
-            "<p>This mode applies a tapered correction to the gradient between " +
-            "the reference and target image. This correction is applied after the " +
-            "'Propagated Gradient Correction' (if specified).</p>" +
-            "<p>A tapered correction is ideal for correcting local difference, for " +
-            "example, due to scattered light surrounding bright stars. This mode also " +
-            "prevents the reference tile's gradient propagating across the mosaic.</p>" +
-            "<p>Increase the smoothness to avoid following noise.</p>";
-    this.taperSmoothness_Control.onValueUpdated = function (value) {
-        data.taperSmoothness = value;
+    // Gradient controls
+    this.gradientSmoothnessControl = new NumericControl(this);
+    this.gradientSmoothnessControl.real = true;
+    this.gradientSmoothnessControl.setPrecision(1);
+    this.gradientSmoothnessControl.label.text = "Smoothness:";
+    this.gradientSmoothnessControl.label.minWidth = this.font.width("Taper Length:");
+    this.gradientSmoothnessControl.toolTip = 
+        "<p>This mode applies a tapered correction to the gradient between " +
+        "the reference and target image. This correction is applied after the " +
+        "'Propagated Gradient Correction' (if specified).</p>" +
+        "<p>The full correction is applied across the whole of the overlap's " +
+        "bounding box. A taper is applied from the overlap's target side edge " +
+        "to prevent the gradient correction propagating across the mosaic.</p>" +
+        "<p>A tapered correction is ideal for correcting local difference, for " +
+        "example, due to scattered light surrounding bright stars.</p>";
+    this.gradientSmoothnessControl.onValueUpdated = function (value) {
+        data.gradientSmoothness = value;
     };
-    this.taperSmoothness_Control.setRange(-4, 3);
-    this.taperSmoothness_Control.slider.setRange(-400, 300);
-    this.taperSmoothness_Control.slider.minWidth = 140;
-    this.taperSmoothness_Control.setValue(data.taperSmoothness);
+    this.gradientSmoothnessControl.setRange(-4, 3);
+    this.gradientSmoothnessControl.slider.setRange(-400, 300);
+    this.gradientSmoothnessControl.slider.minWidth = 140;
+    this.gradientSmoothnessControl.setValue(data.gradientSmoothness);
     
-    let taperGradientGraphButton = new PushButton();
-    taperGradientGraphButton.text = "Gradient Graph";
-    taperGradientGraphButton.toolTip = 
-            "<p>This graph displays the gradient data after the " +
-            "'Propagated Gradient Correction' has been applied. It therefore " +
-            "displays the residual error that still needs correcting.</p>" +
-            "<p>The vertical axis represents the difference between the two images. " +
-            "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
-            "or Y-Coordinate (vertical join).</p>" +
-            "<p>Each plotted dot represents the difference between a target and " +
-            "reference sample. The lines drawn represent the best fit line segments. " +
-            "It is these line segments that are used to determine the relative " +
-            "gradient between the two images.</p>" +
-            "<p>The graphs produced for color images use red, green and blue dots " +
-            "and lines for each channel. The colors add together. " +
-            "For example: red, green and blue add up to white.</p>" +
-            "<p>If the plotted points have excessive scatter this may indicate that " +
-            "the sample size is too small or that samples contain bright stars that " +
-            "occupy more than half the sample area. Either increase the 'Sample Size' " +
-            "to increase the area of each sample, or increase the 'Limit Stars %' " +
-            "so that samples that contain bright stars are rejected.</p>" +
-            "<p>To increase the number of sample points, decrease 'Limit Stars %' " +
-            "or reduce the 'Sample Size'.</p>";
-    taperGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_GRADIENT_TAPER_GRAPH();
+    let gradientGraphButton = new PushButton();
+    gradientGraphButton.text = "Gradient Graph";
+    gradientGraphButton.toolTip = 
+        "<p>This graph displays the gradient data after the " +
+        "'Propagated Gradient Correction' has been applied. It therefore " +
+        "displays the residual error that still needs correcting.</p>" +
+        "<p>The vertical axis represents the difference between the two images. " +
+        "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
+        "or Y-Coordinate (vertical join).</p>" +
+        "<p>The plotted dots represent the difference between each paired target and " +
+        "reference sample within the whole of the overlap bounding box area. " +
+        "These points are scattered vertically. This is partly due to gradients perpendicular to " +
+        "the join, and partly due to noise.<\p>" +
+        "<p>The two curves are calculated from the differences at either side " +
+        "(top and bottom for horizontal join) of the " +
+        "'Join Region' and indicate the gradient correction that will be " +
+        "applied at the join between the reference and target images.</p>" +
+        "<p>The graphs produced for color images use red, green and blue dots " +
+        "and lines for each channel. The colors add together. " +
+        "For example: red, green and blue add up to white.</p>";
+    gradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_GRADIENT_GRAPH();
         this.dialog.ok();
     };
     
@@ -1043,7 +1041,7 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
     this.taperLength_Control.label.text = "Taper Length:";
-    this.taperLength_Control.label.minWidth = this.font.width("Smoothness:") + 23;
+    this.taperLength_Control.label.minWidth = this.font.width("Taper Length:");
     this.taperLength_Control.toolTip = taperTooltip;
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
@@ -1053,28 +1051,15 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
     
-    this.setTaperGradientFlag = function (checked){
-        data.taperFlag = checked;
-        self.taperGradientFlag_Control.checked = checked;
-        self.taperSmoothness_Control.enabled = checked;
-        self.taperLength_Control.enabled = checked;
-        taperGradientGraphButton.enabled = checked;
-    };
-    this.taperGradientFlag_Control = new CheckBox(this);
-    this.taperGradientFlag_Control.toolTip = "<p>Enable 'Tapered Gradient Correction'.</p>";
-    this.taperGradientFlag_Control.onClick = this.setTaperGradientFlag;
-    this.setTaperGradientFlag(data.taperFlag);
-    
     let taperSizer = new HorizontalSizer;
     taperSizer.spacing = 4;
-    taperSizer.add(this.taperGradientFlag_Control);
-    taperSizer.add(this.taperSmoothness_Control);
+    taperSizer.add(this.gradientSmoothnessControl);
     taperSizer.addSpacing(20);
-    taperSizer.add(taperGradientGraphButton);
+    taperSizer.add(gradientGraphButton);
     
-    let taperGradientGroupBox = createGroupBox(this, "Tapered Gradient Correction");
-    taperGradientGroupBox.sizer.add(taperSizer);
-    taperGradientGroupBox.sizer.add(this.taperLength_Control);
+    let gradientGroupBox = createGroupBox(this, "Gradient Correction");
+    gradientGroupBox.sizer.add(taperSizer);
+    gradientGroupBox.sizer.add(this.taperLength_Control);
     // GroupBox: "Tapered Gradient Correction" End
     
 
@@ -1082,8 +1067,8 @@ function PhotometricMosaicDialog(data) {
     gradientSection.sizer = new VerticalSizer;
     gradientSection.sizer.spacing = 4;
     gradientSection.sizer.add(sampleGenerationGroupBox);
+    gradientSection.sizer.add(gradientGroupBox);
     gradientSection.sizer.add(propagateGradientGroupBox);
-    gradientSection.sizer.add(taperGradientGroupBox);
     let gradientBar = new SectionBar(this, "Gradient");
     gradientBar.setSection(gradientSection);
     gradientBar.onToggleSection = this.onToggleSection;
@@ -1411,7 +1396,7 @@ function main() {
             (new MessageBox("ERROR: Target and  Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.taperFlag && data.propagateFlag && data.propagateSmoothness < data.taperSmoothness){
+        if (data.propagateFlag && data.propagateSmoothness < data.gradientSmoothness){
             (new MessageBox("Propagated Smoothness must be less than or equal to Tapered Smoothness", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
