@@ -34,15 +34,12 @@ function SamplePair(targetMedian, referenceMedian, rect) {
 /**
  * Contains SamplePair[]
  * @param {SamplePair[]} samplePairArray
- * @param {Number} sampleSize
  * @param {Rect} overlapBox overlap bounding box
  * @returns {SamplePairs}
  */
-function SamplePairs(samplePairArray, sampleSize, overlapBox){
+function SamplePairs(samplePairArray, overlapBox){
     /** SamplePair[] */
     this.samplePairArray = samplePairArray;
-    /** Number */
-    this.sampleSize = sampleSize;
     /** Rect */
     this.overlapBox = overlapBox;
     /** Rect, Private */
@@ -107,7 +104,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
         let scale = scaleFactors[c].m;
         let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage,
                 scale, c, isHorizontal);
-        colorSamplePairs.push(new SamplePairs(samplePairArray, data.sampleSize, sampleRect));
+        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleRect));
     }
     return colorSamplePairs;
 }
@@ -357,8 +354,8 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     let offsetY = -overlapBox.y0;
     let bmp = new Bitmap(overlapBox.width, overlapBox.height);
     bmp.fill(0x00000000);
-    let G = new VectorGraphics(bmp);
-    //let G = new Graphics(bmp);  // good for debug
+    //let G = new VectorGraphics(bmp);
+    let G = new Graphics(bmp);  // makes it easier to see which samples have been rejected
     G.pen = new Pen(0xffff0000);
     samplePairs.samplePairArray.forEach(function (samplePair) {
         let rect = new Rect(samplePair.rect);
@@ -390,7 +387,7 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
     keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
     
-    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, -2);
+    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**
@@ -631,4 +628,31 @@ function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit
         }
     }
     return binnedSampleArray;
+}
+
+/**
+ * For performance, if there are more than sampleMaxLimit samples, the samples are binned
+ * into super samples. The binning in x and y directions may differ to ensure that
+ * the 'thickness' of the join is not reduced to less than 5 samples by the binning.
+ * @param {Rect} overlapBox
+ * @param {SamplePairs} samplePairs
+ * @param {Boolean} isHorizontal
+ * @param {Number} sampleMaxLimit
+ * @returns {SamplePairs}
+ */
+function limitNumberOfSamples(overlapBox, samplePairs, isHorizontal, sampleMaxLimit){
+    const minRows = 5;
+    let samplePairArray = samplePairs.samplePairArray;
+    if (samplePairArray.length > sampleMaxLimit){
+        let binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairArray, 
+                sampleMaxLimit, minRows, isHorizontal);
+        if (binnedSampleArray.length > sampleMaxLimit){
+            // This can happen because many samples in grid were rejected due to stars
+            sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
+            binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairArray, 
+                sampleMaxLimit, minRows, isHorizontal);
+        }
+        return new SamplePairs(binnedSampleArray, samplePairs.overlapBox);
+    }
+    return samplePairs;
 }
