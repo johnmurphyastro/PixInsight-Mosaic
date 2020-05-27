@@ -228,53 +228,30 @@ function PhotometricMosaic(data)
         return;
     }
     
-    const colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
+    let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
             scaleFactors, detectedStars.allStars, overlapBox, data, isHorizontal);
-    let samplePairs = colorSamplePairs[0];
-    if (samplePairs.samplePairArray.length < 3) {
+    if (colorSamplePairs[0].samplePairArray.length < 3) {
         new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
         displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, title, data);
+    }
+    
+    for (let c=0; c<nChannels; c++){
+        colorSamplePairs[c] = limitNumberOfSamples(overlapBox, colorSamplePairs[c], 
+                isHorizontal, data.maxSamples);
+    }
+    
+    if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
+        if (data.maxSamples !== 2000){
+            // debug output invoked if maxSamples is set via process icon editor
+            let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Binned_Samples";
+            displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, title, data);
+        }
         return;
     }
-
-    // Calculate the gradient for each channel
-    console.writeln("\n<b><u>Calculating surface spline</u></b>");
-    let createSurfaceSplineTime = new Date().getTime();
-    let propagateGradient;
-    if (data.propagateFlag) {
-        propagateGradient = [];
-        try {
-            for (let c = 0; c < nChannels; c++) {
-                samplePairs = colorSamplePairs[c];
-                propagateGradient[c] = calcSurfaceSpline(overlapBox,
-                            samplePairs, data.propagateSmoothness, isHorizontal);        
-            }
-        } catch (ex){
-            new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
-                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
-            return;
-        }
-    } else {
-        propagateGradient = null;
-    }
-    let taperGradient = [];
-    try {
-        for (let c = 0; c < nChannels; c++) {
-            samplePairs = colorSamplePairs[c];   
-            taperGradient[c] = calcSurfaceSpline(overlapBox,
-                    samplePairs, data.gradientSmoothness, isHorizontal /*, targetView, detectedStars, data */);
-        }
-    } catch (ex){
-        new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
-                TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        return;
-    }
-    console.writeln(samplePairs.samplePairArray.length,
-            " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     let isTargetAfterRef;
     if (data.orientation === INSERT()){
@@ -298,20 +275,54 @@ function PhotometricMosaic(data)
             isTargetAfterRef = (StdButton_Yes === messageBox.execute());
         }
     }
+
+    // Calculate the gradient for each channel
+    console.writeln("\n<b><u>Calculating surface spline</u></b>");
+    let createSurfaceSplineTime = new Date().getTime();
+    let propagateSurfaceSplines;
+    if (data.propagateFlag && data.viewFlag !== DISPLAY_GRADIENT_GRAPH()) {
+        propagateSurfaceSplines = [];
+        try {
+            for (let c = 0; c < nChannels; c++) {
+                let samplePairs = colorSamplePairs[c];
+                propagateSurfaceSplines[c] = calcSurfaceSpline(samplePairs, data.propagateSmoothness);        
+            }
+        } catch (ex){
+            new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
+        }
+        
+        if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
+            console.hide(); // Allow user to compare with other open windows
+            // This gradient is important after the edge of the overlap box
+            displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
+                    propagateSurfaceSplines, overlapBox, colorSamplePairs, data, true);
+            return;
+        }
+    } else {
+        propagateSurfaceSplines = null;
+    }
     
-    if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
-        console.hide(); // Allow user to compare with other open windows
-        // This gradient is important after the edge of the overlap box
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
-                propagateGradient, overlapBox, colorSamplePairs, data, true);
+    let surfaceSplines = [];
+    try {
+        for (let c = 0; c < nChannels; c++) {
+            let samplePairs = colorSamplePairs[c];
+            surfaceSplines[c] = calcSurfaceSpline(samplePairs, data.gradientSmoothness);
+        }
+    } catch (ex){
+        new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
+                TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
+    console.writeln(colorSamplePairs[0].samplePairArray.length,
+            " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
         displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
-                taperGradient, joinRect, colorSamplePairs, data, false);
+                surfaceSplines, joinRect, colorSamplePairs, data, false);
         return;
     }
 
@@ -321,7 +332,7 @@ function PhotometricMosaic(data)
         console.writeln("\n<b><u>Applying scale and gradients</u></b>");
     }
     let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateGradient, taperGradient, overlapBox, joinRect, data);
+            scaleFactors, propagateSurfaceSplines, surfaceSplines, overlapBox, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
     
@@ -348,15 +359,15 @@ function calculateScale(starPairs) {
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
- * @param {SurfaceSpline[]} propagateGradient SurfaceSpline for each color channel, propogated
- * @param {SurfaceSpline[]} taperGradient SurfaceSpline for each color channel, tapered
+ * @param {SurfaceSpline[]} propagateSurfaceSplines SurfaceSpline for each color channel, propogated
+ * @param {SurfaceSpline[]} surfaceSplines SurfaceSpline for each color channel, tapered
  * @param {Rect} overlapBox Bounding box of overlap
  * @param {Rect} joinRect Bounding box of join region (preview extended to overlapBox)
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {ImageWindow} Cloned image with corrections applied
  */
 function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, propagateGradient, taperGradient, overlapBox, joinRect, data) {
+        scaleFactors, propagateSurfaceSplines, surfaceSplines, overlapBox, joinRect, data) {
     const applyScaleAndGradientTime = new Date().getTime();
     const width = tgtView.image.width;
     const height = tgtView.image.height;
@@ -382,11 +393,11 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
         if (data.propagateFlag){
-            propagateSurfaceSpline = propagateGradient[channel];
+            propagateSurfaceSpline = propagateSurfaceSplines[channel];
         }
-        let taperSurfaceSpline = taperGradient[channel];
+        let surfaceSpline = surfaceSplines[channel];
         tgtCorrector.applyAllCorrections(refView.image, tgtView.image, view, scale, 
-                propagateSurfaceSpline, taperSurfaceSpline, tgtBox, channel);
+                propagateSurfaceSpline, surfaceSpline, tgtBox, channel);
     }
     
     let minValue = view.image.minimum();
