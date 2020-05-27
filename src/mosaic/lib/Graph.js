@@ -232,10 +232,11 @@ function Graph(xMin, yMin, xMax, yMax) {
     /**
      * Draw straigth lines between the points in the supplied array
      * @param {Number[]} difArray Index is x-coordinate, value is y-coordinate
+     * @param {Number} firstCoord x or y coordinate for first difArray entry
      * @param {Number} color Hex color value
      * @param {Boolean} antiAlias If true draw an antialiased line
      */
-    this.drawDifArray = function(difArray, color, antiAlias){
+    this.drawDifArray = function(difArray, firstCoord, color, antiAlias){
         let g = new Graphics(this.bitmap);
         g.clipRect = new Rect(this.xOrigin, this.yOrigin - this.yAxisLength, this.xOrigin + this.xAxisLength, this.yOrigin);
         g.transparentBackground = true;
@@ -246,6 +247,8 @@ function Graph(xMin, yMin, xMax, yMax) {
             let x1 = x;
             let y0 = difArray[x0];
             let y1 = difArray[x1];
+            x0 += firstCoord;
+            x1 += firstCoord;
             g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
         }
         g.end();
