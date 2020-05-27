@@ -109,6 +109,7 @@ function PhotometricMosaicData() {
         // Gradient Sample Generation
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
+        Parameters.set("maxSamples", this.maxSamples);
         Parameters.set("orientation", this.orientation);
         
         // Gradient Tapered Correction
@@ -181,7 +182,9 @@ function PhotometricMosaicData() {
         if (Parameters.has("limitSampleStarsPercent"))
             this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
         if (Parameters.has("sampleSize"))
-            this.sampleSize = Parameters.getInteger("sampleSize");   
+            this.sampleSize = Parameters.getInteger("sampleSize");
+        if (Parameters.has("maxSamples"))
+            this.maxSamples = Parameters.getInteger("maxSamples");   
         if (Parameters.has("orientation"))
             this.orientation = Parameters.getInteger("orientation");
         
@@ -241,7 +244,8 @@ function PhotometricMosaicData() {
         
         // Gradient Sample Generation
         this.limitSampleStarsPercent = 10;
-        this.sampleSize = 20;
+        this.sampleSize = 15;
+        this.maxSamples = 2000;
         this.orientation = AUTO();
         
         // Gradient Tapered Correction
@@ -894,81 +898,6 @@ function PhotometricMosaicDialog(data) {
     // GroupBox: "Gradient Sample Generation" End
     
     // ------------------------------------------
-    // GroupBox: "Propagated Gradient Correction"
-    // ------------------------------------------
-    this.propagateSmoothness_Control = new NumericControl(this);
-    this.propagateSmoothness_Control.real = true;
-    this.propagateSmoothness_Control.setPrecision(1);
-    this.propagateSmoothness_Control.label.text = "Smoothness:";
-    this.propagateSmoothness_Control.toolTip = 
-        "<p>This mode can be used to correct the horizontal and vertical components of the " +
-        "relative gradient between the reference and target images. This is done " +
-        "in two stages. One component is corrected when tiles are joined into " +
-        "horizontal or vertical strips. The other component is corrected when " +
-        "these strips are joined.</p>" +
-        "<p>Use this mode if the reference tile has less gradient than the target tile.</p>" +
-        "<p>Since this gradient correction is propagated across the mosaic, the " +
-        "correction should follow the general trend. It should not attempt to " +
-        "correct the local variations due to bright stars and other artifacts.</p>" +
-        "<p>When using this option, you should usually also apply a " +
-        "'Tapered Gradient Correction', to fix the residual gradient " +
-        "due to the stars and artifacts.</p>" +
-        "<p>Since the reference tile's gradient will be propagated across the mosaic, " +
-        "consider using DBE as a final correction once the mosaic is complete.</p>";
-    this.propagateSmoothness_Control.onValueUpdated = function (value) {
-        data.propagateSmoothness = value;
-    };
-    this.propagateSmoothness_Control.setRange(-1, 6);
-    this.propagateSmoothness_Control.slider.setRange(-100, 600);
-    this.propagateSmoothness_Control.slider.minWidth = 140;
-    this.propagateSmoothness_Control.setValue(data.propagateSmoothness);
-    
-    let propagateGradientGraphButton = new PushButton();
-    propagateGradientGraphButton.text = "Gradient Graph";
-    propagateGradientGraphButton.toolTip = 
-            "<p>The vertical axis represents the difference between the two images, " +
-            "the horizontal axis the join's X-Coordinate (horizontal join) " +
-            "or Y-Coordinate (vertical join).</p>" +
-            "<p>The plotted dots represent the difference between each paired target and " +
-            "reference sample within the whole of the overlap bounding box area. " +
-            "These points are scattered vertically. This is partly due to gradients perpendicular to " +
-            "the join, and partly due to noise.<\p>" +
-            "<p>The two curves are calculated from the differences at either side " +
-            "(top and bottom for horizontal join) of the " +
-            "overlap bonding box and indicate the gradient correction that will be " +
-            "propagated from this boundary.</p>" +
-            "<p>The graphs produced for color images use red, green and blue dots " +
-            "and lines for each channel. The colors add together. " +
-            "For example: red, green and blue add up to white.</p>";
-    propagateGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_PROPAGATE_GRAPH();
-        this.dialog.ok();
-    };
-    
-    this.setPropagateGradientFlag = function (checked){
-        data.propagateFlag = checked;
-        self.propagateGradientFlag_Control.checked = checked;
-        self.propagateSmoothness_Control.enabled = checked;
-        propagateGradientGraphButton.enabled = checked;
-    };
-    
-    this.propagateGradientFlag_Control = new CheckBox(this);
-    this.propagateGradientFlag_Control.toolTip = "<p>Enable 'Propagated Gradient Correction'.</p>";
-    this.propagateGradientFlag_Control.onClick = this.setPropagateGradientFlag;
-    this.setPropagateGradientFlag(data.propagateFlag);
-    
-    let propagateSizer = new HorizontalSizer;
-    propagateSizer.spacing = 4;
-    propagateSizer.add(this.propagateGradientFlag_Control);
-    propagateSizer.add(this.propagateSmoothness_Control);
-    propagateSizer.addSpacing(20);
-    propagateSizer.add(propagateGradientGraphButton);
-    
-    let propagateGradientGroupBox = createGroupBox(this, "Propagated Gradient Correction");
-    propagateGradientGroupBox.sizer.add(propagateSizer);
-    // GroupBox: "Propagated Gradient Correction" End
-    
-    // ------------------------------------------
     // GroupBox: "Gradient Correction"
     // ------------------------------------------
     // Gradient controls
@@ -1068,11 +997,84 @@ function PhotometricMosaicDialog(data) {
     gradientSection.sizer.spacing = 4;
     gradientSection.sizer.add(sampleGenerationGroupBox);
     gradientSection.sizer.add(gradientGroupBox);
-    gradientSection.sizer.add(propagateGradientGroupBox);
     let gradientBar = new SectionBar(this, "Gradient");
     gradientBar.setSection(gradientSection);
     gradientBar.onToggleSection = this.onToggleSection;
     //SectionBar: "Gradient" End
+    
+    // =======================================
+    // SectionBar: "Propagated Gradient Correction"
+    // =======================================
+    this.propagateSmoothness_Control = new NumericControl(this);
+    this.propagateSmoothness_Control.real = true;
+    this.propagateSmoothness_Control.setPrecision(1);
+    this.propagateSmoothness_Control.label.text = "Smoothness:";
+    this.propagateSmoothness_Control.toolTip = 
+        "<p>This mode can be used to correct the horizontal and vertical components of the " +
+        "relative gradient between the reference and target images. This is done " +
+        "in two stages. One component is corrected when tiles are joined into " +
+        "horizontal or vertical strips. The other component is corrected when " +
+        "these strips are joined.</p>" +
+        "<p>Use this mode if the reference tile has less gradient than the target tile.</p>" +
+        "<p>Since this gradient correction is propagated across the mosaic, the " +
+        "correction should follow the general trend. It should not attempt to " +
+        "correct the local variations due to bright stars and other artifacts.</p>" +
+        "<p>When using this option, you should usually also apply a " +
+        "'Tapered Gradient Correction', to fix the residual gradient " +
+        "due to the stars and artifacts.</p>" +
+        "<p>Since the reference tile's gradient will be propagated across the mosaic, " +
+        "consider using DBE as a final correction once the mosaic is complete.</p>";
+    this.propagateSmoothness_Control.onValueUpdated = function (value) {
+        data.propagateSmoothness = value;
+    };
+    this.propagateSmoothness_Control.setRange(-1, 6);
+    this.propagateSmoothness_Control.slider.setRange(-100, 600);
+    this.propagateSmoothness_Control.slider.minWidth = 140;
+    this.propagateSmoothness_Control.setValue(data.propagateSmoothness);
+    
+    let propagateGradientGraphButton = new PushButton();
+    propagateGradientGraphButton.text = "Gradient Graph";
+    propagateGradientGraphButton.toolTip = 
+            "<p>The vertical axis represents the difference between the two images, " +
+            "the horizontal axis the join's X-Coordinate (horizontal join) " +
+            "or Y-Coordinate (vertical join).</p>" +
+            "<p>The plotted dots represent the difference between each paired target and " +
+            "reference sample within the whole of the overlap bounding box area. " +
+            "These points are scattered vertically. This is partly due to gradients perpendicular to " +
+            "the join, and partly due to noise.<\p>" +
+            "<p>The two curves are calculated from the differences at either side " +
+            "(top and bottom for horizontal join) of the " +
+            "overlap bonding box and indicate the gradient correction that will be " +
+            "propagated from this boundary.</p>" +
+            "<p>The graphs produced for color images use red, green and blue dots " +
+            "and lines for each channel. The colors add together. " +
+            "For example: red, green and blue add up to white.</p>";
+    propagateGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_PROPAGATE_GRAPH();
+        this.dialog.ok();
+    };
+    
+    this.setPropagateGradientFlag = function (checked){
+        data.propagateFlag = checked;
+        self.propagateGradientBar.checkBox.checked = checked;
+        self.propagateSmoothness_Control.enabled = checked;
+        propagateGradientGraphButton.enabled = checked;
+    };
+    
+    let propagateGradientSection = new Control(this);
+    propagateGradientSection.sizer = new HorizontalSizer;
+    propagateGradientSection.sizer.spacing = 10;
+    propagateGradientSection.sizer.add(this.propagateSmoothness_Control);
+    propagateGradientSection.sizer.addSpacing(20);
+    propagateGradientSection.sizer.add(propagateGradientGraphButton);
+    this.propagateGradientBar = new SectionBar(this, "Propagated Gradient Correction");
+    this.propagateGradientBar.setSection(propagateGradientSection);
+    this.propagateGradientBar.enableCheckBox();
+    this.propagateGradientBar.toolTip = "<p>Enable 'Propagated Gradient Correction'.</p>";
+    this.propagateGradientBar.checkBox.onClick = this.setPropagateGradientFlag;
+    this.propagateGradientBar.onToggleSection = this.onToggleSection;
+    this.setPropagateGradientFlag(data.propagateFlag);
+    // SectionBar: "Propagated Gradient Correction" End
     
     // =======================================
     // SectionBar: "Mosaic Star Mask"
@@ -1317,6 +1319,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(joinAreaSection);
     this.sizer.add(gradientBar);
     this.sizer.add(gradientSection);
+    this.sizer.add(this.propagateGradientBar);
+    this.sizer.add(propagateGradientSection);
     this.sizer.add(starMaskBar);
     this.sizer.add(starMaskSection);
     this.sizer.add(this.mosaicBar);
@@ -1327,6 +1331,7 @@ function PhotometricMosaicDialog(data) {
     starDetectionSection.hide();
     photometrySearchSection.hide();
     joinAreaSection.hide();
+    propagateGradientSection.hide();
     starMaskSection.hide();
 
     //-------------------------------------------------------
@@ -1468,6 +1473,7 @@ function GraphDialog(bitmap, title, screenToWorld)
         // When dragging mouse, display graph coordinates in title bar
         self.displayXY(x, y);
     };
+    this.bitmapControl.toolTip = "(Esc: Close,  Left click: (x,y),  Right click: Save)";
 
     this.sizer = new HorizontalSizer(this);
     this.sizer.margin = 2;
