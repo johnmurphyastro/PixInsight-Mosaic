@@ -249,7 +249,7 @@ function PhotometricMosaicData() {
         this.orientation = AUTO();
         
         // Gradient Tapered Correction
-        this.gradientSmoothness = -1.5;
+        this.gradientSmoothness = -1;
         this.taperLength = 500;
         
         // Gradient Propagated Correction

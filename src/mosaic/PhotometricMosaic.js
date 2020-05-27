@@ -239,9 +239,13 @@ function PhotometricMosaic(data)
         displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, title, data);
     }
     
+    let unBinnedSamples = 0;
+    let binnedSamples = 0;
     for (let c=0; c<nChannels; c++){
+        unBinnedSamples = Math.max(unBinnedSamples, colorSamplePairs[c].samplePairArray.length);
         colorSamplePairs[c] = limitNumberOfSamples(overlapBox, colorSamplePairs[c], 
                 isHorizontal, data.maxSamples);
+        binnedSamples = Math.max(binnedSamples, colorSamplePairs[c].samplePairArray.length);
     }
     
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
@@ -278,6 +282,9 @@ function PhotometricMosaic(data)
 
     // Calculate the gradient for each channel
     console.writeln("\n<b><u>Calculating surface spline</u></b>");
+    if (binnedSamples < unBinnedSamples){
+        console.writeln("Reduced number of samples from ", unBinnedSamples, " to ", binnedSamples);
+    }
     let createSurfaceSplineTime = new Date().getTime();
     let propagateSurfaceSplines;
     if (data.propagateFlag && data.viewFlag !== DISPLAY_GRADIENT_GRAPH()) {
@@ -418,66 +425,14 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     }
     copyFitsKeywords(tgtView, keywords, TRIM_NAME(), SCRIPT_NAME());
     
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + " " + VERSION()));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".ref: " + data.referenceView.fullId));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".tgt: " + data.targetView.fullId));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".starDetection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("HISTORY", "",
-        SCRIPT_NAME() + ".starFluxTolerance: " + data.starFluxTolerance));
-    keywords.push(new FITSKeyword("HISTORY", "",
-        SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".linearRange: " + data.linearRange));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".outlierRemoval: " + data.outlierRemoval));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
-    let orientation;
-    if (isTargetAfterRef === null){
-        orientation = "Insert";
-    } else {
-        orientation = isHorizontal ? "Horizontal" : "Vertical";
-        keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".isTargetAfterRef: " + isTargetAfterRef)); 
-    }
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".orientation: " + orientation));    
-    if (data.propagateFlag){
-        keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
-    }
-    keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".gradientSmoothness: " + data.gradientSmoothness));
-    keywords.push(new FITSKeyword("HISTORY", "",
-            SCRIPT_NAME() + ".taperLength: " + data.taperLength));
-
-    if (data.createMosaicFlag){
-        let mode = "unknown";
-        if (data.mosaicAverageFlag){
-            mode = "Average";
-        } else if (data.mosaicOverlayRefFlag){
-            mode = "Reference";
-        } else if (data.mosaicOverlayTgtFlag){
-            mode = "Target";
-        } else if (data.mosaicRandomFlag){
-            mode = "Random";
-        }
-        keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".combinationMode: " + mode));
-    }
-    for (let c=0; c<nChannels; c++){
-        keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
-    }
-    
+    keywords.push(new FITSKeyword("HISTORY", "", SCRIPT_NAME() + " " + VERSION()));
+    fitsHeaderImages(keywords, data);
+    fitsHeaderStarDetection(keywords, data);
+    fitsHeaderPhotometry(keywords, data);
+    fitsHeaderGradient(keywords, data, true, true);
+    fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
+    fitsHeaderMosaic(keywords, data);
+    fitsHeaderScale(keywords, scaleFactors);
     if (minValue < 0 || maxValue > 1){
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
         keywords.push(new FITSKeyword("HISTORY", "",

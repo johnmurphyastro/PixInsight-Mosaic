@@ -116,3 +116,128 @@ function searchFitsHistory(view, word){
     }
     return false;
 }
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderImages(keywords, data){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".ref: " + data.referenceView.fullId));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".tgt: " + data.targetView.fullId));
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderStarDetection(keywords, data){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".starDetection: " + data.logStarDetection));
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderPhotometry(keywords, data){
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".starFluxTolerance: " + data.starFluxTolerance));
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".linearRange: " + data.linearRange));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".outlierRemoval: " + data.outlierRemoval));
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ * @param {Boolean} includeGradient 
+ * @param {Boolean} includePropagate 
+ */
+function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
+    if (includePropagate){
+        if (data.propagateFlag){
+            keywords.push(new FITSKeyword("HISTORY", "", 
+                SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
+        }
+    }
+    if (includeGradient){
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".gradientSmoothness: " + data.gradientSmoothness));
+        keywords.push(new FITSKeyword("HISTORY", "",
+            SCRIPT_NAME() + ".taperLength: " + data.taperLength));
+    }
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {Boolean} isHorizontal
+ * @param {Boolean} isTargetAfterRef 
+ */
+function fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef){
+    let orientation;
+    if (isTargetAfterRef === null){
+        orientation = "Insert";
+    } else {
+        orientation = isHorizontal ? "Horizontal" : "Vertical";
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".isTargetAfterRef: " + isTargetAfterRef)); 
+    }
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".orientation: " + orientation)); 
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderMosaic(keywords, data){
+    if (data.createMosaicFlag){
+        let mode = "unknown";
+        if (data.mosaicAverageFlag){
+            mode = "Average";
+        } else if (data.mosaicOverlayRefFlag){
+            mode = "Reference";
+        } else if (data.mosaicOverlayTgtFlag){
+            mode = "Target";
+        } else if (data.mosaicRandomFlag){
+            mode = "Random";
+        }
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".combinationMode: " + mode));
+    }
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {LinearFitData[]} scaleFactors
+ */
+function fitsHeaderScale(keywords, scaleFactors){
+    for (let c = 0; c < scaleFactors.length; c++){
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".scale[" + c + "]: " + scaleFactors[c].m.toPrecision(5)));
+    }
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderMask(keywords, data){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".limitMaskStarsPercent: " + data.limitMaskStarsPercent));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".multiplyStarRadius: " + data.radiusMult));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".addStarRadius: " + data.radiusAdd));
+}

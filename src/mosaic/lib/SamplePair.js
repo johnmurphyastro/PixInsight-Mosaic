@@ -42,30 +42,6 @@ function SamplePairs(samplePairArray, overlapBox){
     this.samplePairArray = samplePairArray;
     /** Rect */
     this.overlapBox = overlapBox;
-    /** Rect, Private */
-    this.sampleArea = null;                             // Private
-
-    /**
-     * @returns {Rect} Bounding rectangle of all samplePair centers
-     */
-    this.getSampleArea = function(){
-        if (this.sampleArea === null) {
-            let minX = Number.POSITIVE_INFINITY;
-            let minY = Number.POSITIVE_INFINITY;
-            let maxX = 0;
-            let maxY = 0;
-            for (let samplePair of samplePairArray) {
-                let centerX = samplePair.rect.center.x;
-                let centerY = samplePair.rect.center.y;
-                minX = Math.min(minX, centerX);
-                maxX = Math.max(maxX, centerX);
-                minY = Math.min(minY, centerY);
-                maxY = Math.max(maxY, centerY);
-            }
-            this.sampleArea = new Rect(minX, minY, maxX, maxY);
-        }
-        return this.sampleArea;
-    };
 }
 
 // ============ Algorithms ============
@@ -381,11 +357,9 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     G.end();
     
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + data.targetView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitSampleStarsPercent));
+    fitsHeaderImages(keywords, data);
+    fitsHeaderStarDetection(keywords, data);
+    fitsHeaderGradient(keywords, data, false, false);
     
     createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
 }
@@ -467,7 +441,11 @@ function calcBinningFactor(sampleRect, samplePairArray, maxLength, minRowsOrColu
 
     // what reduction factor is required? 2, 4, 9 or 16?
     let factor = samplePairArray.length / maxLength;
-    if (factor > 9){
+    if (factor > 16){
+        let bining = Math.ceil(Math.sqrt(factor));
+        joinBinning = bining;
+        perpBinning = bining;
+    } else if (factor > 9){
         // Reduce number of samples by a factor of 16
         if (gridThickness >= minRowsOrColumns * 4){
             // 4x4 binning
@@ -533,9 +511,11 @@ function calcBinningFactor(sampleRect, samplePairArray, maxLength, minRowsOrColu
  * @param {SamplePair[]} insideBin SamplePairs that are inside the bin area
  * @param {Number} sampleWidth Width of a single input SamplePair
  * @param {Number} sampleHeight Height of a single input SamplePair
+ * @param {Number} binWidth Width of fully populated bin in pixels
+ * @param {Number} binHeight height of fully populated bin in pixels
  * @returns {SamplePair} Binned SamplePair with center based on center of mass
  */
-function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight){
+function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight, binWidth, binHeight){
     // Weight is the number of input SamplePair that are in the binned area.
     // Not always the geometricaly expected number due to SamplePair rejection (e.g. stars)
     const weight = insideBin.length;
@@ -564,11 +544,20 @@ function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight){
     // Area is (weight) * (area of a single input SamplePair)
     // Create a square binnedSamplePair based on this area and the calculated center
     let area = weight * sampleWidth * sampleHeight;
-    let halfWidth = Math.round(Math.sqrt(area)/2);
+    let halfWidth;
+    let halfHeight;
+    if (area === binWidth * binHeight){
+        // fully populated bin
+        halfWidth = Math.round(binWidth / 2);
+        halfHeight = Math.round(binHeight / 2);
+    } else {
+        halfWidth = Math.round(Math.sqrt(area)/2);
+        halfHeight = halfWidth;
+    }
     let x0 = center.x - halfWidth;
     let x1 = center.x + halfWidth;
-    let y0 = center.y - halfWidth;
-    let y1 = center.y + halfWidth;
+    let y0 = center.y - halfHeight;
+    let y1 = center.y + halfHeight;
     let rect = new Rect(x0, y0, x1, y1);
     let binnedSamplePair = new SamplePair(targetMedian, referenceMedian, rect);
     binnedSamplePair.weight = weight;
@@ -622,8 +611,8 @@ function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit
     for (let x=0; x<xLen; x++){
         for (let y=0; y<yLen; y++){
             if (binnedSampleArrayXY[x][y].length > 0){
-                binnedSampleArray.push(createBinnedSamplePair(
-                        binnedSampleArrayXY[x][y], sampleWidth, sampleHeight));
+                binnedSampleArray.push(createBinnedSamplePair(binnedSampleArrayXY[x][y],
+                        sampleWidth, sampleHeight, binWidth, binHeight));
             }
         }
     }

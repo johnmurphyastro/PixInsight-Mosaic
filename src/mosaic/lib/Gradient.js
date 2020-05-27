@@ -863,28 +863,22 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         isPropagateGraph){
     
     /**
-     * @param {View} refView
-     * @param {View} tgtView
      * @param {ImageWindow} graphWindow Graph window
      * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let gradientGraphFitsHeader = function(refView, tgtView, graphWindow, data){
+    let gradientGraphFitsHeader = function(graphWindow, data){
         let view = graphWindow.mainView;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
-        keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-        keywords.push(new FITSKeyword("COMMENT", "", "Sample Size: " + data.sampleSize));
-        keywords.push(new FITSKeyword("COMMENT", "", "Limit Sample Stars Percent: " + data.limitSampleStarsPercent));
-        if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()){
-            keywords.push(new FITSKeyword("COMMENT", "", "Propagate Smoothness: " + data.propagateSmoothness));
-        } else if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()){
-            keywords.push(new FITSKeyword("COMMENT", "", "Taper Smoothness: " + data.gradientSmoothness));
-            keywords.push(new FITSKeyword("COMMENT", "", "Taper Length: " + data.taperLength));
-        }
-        
+        fitsHeaderImages(keywords, data);
+        fitsHeaderStarDetection(keywords, data);
+        fitsHeaderPhotometry(keywords, data);
+        let includeGradient = (data.viewFlag === DISPLAY_GRADIENT_GRAPH());
+        let includePropagate = (data.viewFlag === DISPLAY_PROPAGATE_GRAPH());
+        fitsHeaderGradient(keywords, data, includeGradient, includePropagate);
+        fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
+        fitsHeaderMosaic(keywords, data);
         graphWindow.keywords = keywords;
         view.endProcess();
     };
@@ -895,7 +889,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
      * @param {Boolean} isHorizontal
      * @param {Number[][]} difArrays Array of DifArray to draw
      * @param {Number} lineBoldColor
-     * @param {GraphLinePath} line Specifies which line should be bold
+     * @param {GraphLinePath} graphLinePath Specifies which line should be bold
      * @param {Number} lineColor
      * @param {SamplePairs} samplePairs
      * @param {Number} pointColor
@@ -987,7 +981,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         // User requested graph saved to PixInsight View
         let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
         let imageWindow = graphWithAxis.createWindow(windowTitle, true);
-        gradientGraphFitsHeader(referenceView, targetView, imageWindow, data);
+        gradientGraphFitsHeader(imageWindow, data);
         imageWindow.show();
     }
 }

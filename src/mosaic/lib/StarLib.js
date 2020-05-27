@@ -421,7 +421,7 @@ function addScaleToFitsHeader(keywords, colorStarPairs, nColors, rect){
     for (let c = 0; c < nColors; c++) {
         let starPairs = colorStarPairs[c];
         let linearFit = starPairs.linearFitData;
-        let comment = "Scale[" + c + "]: " + linearFit.m.toPrecision(5) +
+        let comment = "scale[" + c + "]: " + linearFit.m.toPrecision(5) +
                 " (" + starPairs.starPairArray.length + " stars)";
         keywords.push(new FITSKeyword("COMMENT", "", comment));
 
@@ -457,26 +457,19 @@ function addScaleToFitsHeader(keywords, colorStarPairs, nColors, rect){
  */
 function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     /**
-     * @param {View} refView
-     * @param {View} tgtView
      * @param {ImageWindow} graphWindow Graph window
      * @param {StarPairs[]} colorStarPairs StarPairs for each color channel
      * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let starGraphFitsHeader = function (refView, tgtView, graphWindow, colorStarPairs, data){
+    let starGraphFitsHeader = function (graphWindow, colorStarPairs, data){
         let view = graphWindow.mainView;
         let nColors = colorStarPairs.length;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
-        keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
-        keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
-        keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
-        keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
-        keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
+        fitsHeaderImages(keywords, data);
+        fitsHeaderStarDetection(keywords, data);
+        fitsHeaderPhotometry(keywords, data);
         addScaleToFitsHeader(keywords, colorStarPairs, nColors, null);
         graphWindow.keywords = keywords;
         view.endProcess();
@@ -547,7 +540,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         let isColor = refView.image.isColor;
         let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
         let imageWindow = graphWithAxis.createWindow(windowTitle, isColor);
-        starGraphFitsHeader(refView, tgtView, imageWindow, colorStarPairs, data);
+        starGraphFitsHeader(imageWindow, colorStarPairs, data);
         imageWindow.show();
         imageWindow.zoomToFit();
     }
@@ -622,14 +615,9 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     }
 
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Photometric Stars Percent: " + data.limitPhotoStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Linear Range: " + data.linearRange));
-    keywords.push(new FITSKeyword("COMMENT", "", "Outlier Removal: " + data.outlierRemoval));
+    fitsHeaderImages(keywords, data);
+    fitsHeaderStarDetection(keywords, data);
+    fitsHeaderPhotometry(keywords, data);
     addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
@@ -697,10 +685,8 @@ function displayDetectedStars(view, colorStars, postfix, data) {
     }
 
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", view.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Flux Tolerance: " + data.starFluxTolerance));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Search Radius: " + data.starSearchRadius));
+    keywords.push(new FITSKeyword("HISTORY", "", view.fullId));
+    fitsHeaderStarDetection(keywords, data);
 
     let title = WINDOW_ID_PREFIX() + view.fullId + "__DetectedStars" + postfix;
     createOverlapImage(view, data.cache.overlap, bmp, title, keywords, 1);
@@ -747,12 +733,9 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
     let title = WINDOW_ID_PREFIX() + targetId + postfix;
     
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + refView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + targetId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + data.radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + data.radiusAdd));
+    fitsHeaderImages(keywords, data);
+    fitsHeaderStarDetection(keywords, data);
+    fitsHeaderMask(keywords, data);
     
     createJoinImage(refView, joinArea, data.cache.overlap, bmp, title, keywords, 1);
 }
@@ -856,12 +839,9 @@ function displayMask(tgtView, joinArea, detectedStars, data){
     overlapMask.free();
 
     let keywords = [];
-    keywords.push(new FITSKeyword("COMMENT", "", "Ref: " + data.referenceView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Tgt: " + tgtView.fullId));
-    keywords.push(new FITSKeyword("COMMENT", "", "Star Detection: " + data.logStarDetection));
-    keywords.push(new FITSKeyword("COMMENT", "", "Limit Stars Percent: " + data.limitMaskStarsPercent));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Multiply: " + data.radiusMult));
-    keywords.push(new FITSKeyword("COMMENT", "", "Radius Add: " + data.radiusAdd));
+    fitsHeaderImages(keywords, data);
+    fitsHeaderStarDetection(keywords, data);
+    fitsHeaderMask(keywords, data);
     
     w.keywords = keywords;
     view.endProcess();
