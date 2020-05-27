@@ -103,36 +103,12 @@ function createAvgDifArray(difArray){
 /**
  * Calculates a surface spline representing the difference between reference and target samples.
  * Represents the gradient in a single channel. (use 3 instances  for color images.)
- * For performance, if there are more than 2000 samples, the samples are binned
- * into super samples. The binning in x and y directions may differ to ensure that
- * the 'thickness' of the join is not reduced to less than 5 samples by the binning.
- * @param {Rect} sampleRect The bounding box of all samples
- * @param {SamplePair[]} samplePairs median values from ref and tgt samples
+ * @param {SamplePairs} samplePairs median values from ref and tgt samples
  * @param {Number} logSmoothing Logrithmic value; larger values smooth more
- * @param {Boolean} isHorizontal Join direction. 
  * @returns {SurfaceSpline}
  */
-function calcSurfaceSpline(sampleRect, samplePairs, logSmoothing, isHorizontal /*, tgtView, detectedStars, data*/){
-    const minRows = 5;
-    let sampleMaxLimit = 2000;
+function calcSurfaceSpline(samplePairs, logSmoothing){
     let samplePairArray = samplePairs.samplePairArray;
-    if (samplePairArray.length > sampleMaxLimit){
-        let binnedSampleArray = createBinnedSamplePairArray(sampleRect, samplePairArray, 
-                sampleMaxLimit, minRows, isHorizontal);
-        if (binnedSampleArray.length > sampleMaxLimit){
-            // This can happen because many samples in grid were rejected due to stars
-            sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
-            binnedSampleArray = createBinnedSamplePairArray(sampleRect, samplePairArray, 
-                sampleMaxLimit, minRows, isHorizontal);
-        }
-        /* Test displays
-        displaySampleSquares(tgtView, samplePairs, detectedStars, "Unbinned", data);
-        let newSamplePairs = new SamplePairs(binnedSampleArray, 0, samplePairs.overlapBox);
-        displaySampleSquares(tgtView, newSamplePairs, detectedStars, "Binned", data);
-        */
-        samplePairArray = binnedSampleArray;
-    }
-
     const length = samplePairArray.length;
     let xVector = new Vector(length);
     let yVector = new Vector(length);
@@ -914,31 +890,6 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     };
     
     /**
-     * Create a difference array for the line specified by points.
-     * This dif array is used to draw lines on the graph.
-     * @param {SurfaceSpline} surfaceSpline Used to create the difArray
-     * @param {Point[]} points Create dif arrays for the line specified by these points
-     * @param {Number} difArrayLength Length of difArray (width or height of image)
-     * @param {Boolean} isHorizontal Join direction
-     * @returns {Number[]} difArray
-     */
-    let getDifArray = function(surfaceSpline, points, difArrayLength, isHorizontal){
-        let difArray;
-        let minCoord;
-        let maxCoord;
-        if (isHorizontal){
-            minCoord = points[0].x;
-            maxCoord = points[points.length - 1].x;
-        } else {
-            minCoord = points[0].y;
-            maxCoord = points[points.length - 1].y;
-        }
-        let splineArray = surfaceSpline.evaluate(points).toArray();
-        difArray = extendDifArray(splineArray, minCoord, maxCoord, difArrayLength);
-        return difArray;
-    };
-    
-    /**
      * Draw gradient line and sample points for a single color channel.
      * @param {Graph} graph
      * @param {Boolean} isHorizontal
@@ -951,7 +902,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
      * @returns {undefined}
      */
     let drawLineAndPoints = function(graph, isHorizontal,
-            difArrays, lineBoldColor, line, lineColor, samplePairs, pointColor) {
+            difArrays, lineBoldColor, graphLinePath, lineColor, samplePairs, pointColor) {
                 
         for (let samplePair of samplePairs.samplePairArray) {
             // Draw the sample points
@@ -961,10 +912,12 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         }
         for (let i = 0; i < difArrays.length; i++){
             let difArray = difArrays[i];
-            if (line.bold[i]){
-                graph.drawDifArray(difArray, lineBoldColor, true);
+            let path = graphLinePath.paths[i];
+            let firstCoord = isHorizontal ? path[0].x : path[0].y;
+            if (graphLinePath.bold[i]){
+                graph.drawDifArray(difArray, firstCoord, lineBoldColor, true);
             } else {
-                graph.drawDifArray(difArray, lineColor, false);
+                graph.drawDifArray(difArray, firstCoord, lineColor, false);
             }
         }
     };
@@ -984,7 +937,7 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     // Graph scale
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
-    const minScaleDif = 2e-4;
+    const minScaleDif = 1e-4;
     let minMax = new SamplePairDifMinMax(colorSamplePairs);
     let maxY = minMax.maxDif;
     let minY = minMax.minDif;
@@ -1006,20 +959,20 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
     if (colorSamplePairs.length === 1){ // B&W
         let difArrays = [];
         for (let path of graphLine.paths){
-            difArrays.push(getDifArray(surfaceSplines[0], path, maxCoordinate, isHorizontal));
+            difArrays.push(surfaceSplines[0].evaluate(path).toArray());
         }
         drawLineAndPoints(graphWithAxis, isHorizontal,
-            difArrays, 0xFFFF0000, graphLine, 0xFFBB0000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
+            difArrays, 0xFFFF0000, graphLine, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
         let lineBoldColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        let lineColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
+        let lineColors = [0xFF990000, 0xFF009900, 0xFF000099]; // r, g, b
         let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
         for (let c = 0; c < colorSamplePairs.length; c++){
             let difArrays = [];
             for (let path of graphLine.paths){
-                difArrays.push(getDifArray(surfaceSplines[c], path, maxCoordinate, isHorizontal));
+                difArrays.push(surfaceSplines[c].evaluate(path).toArray());
             }
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
             drawLineAndPoints(graphAreaOnly, isHorizontal,
@@ -1078,8 +1031,8 @@ function GraphLinePath(){
         this.paths.push(maxPath);
 
         this.bold = new Array(this.paths.length);
-        if (data.mosaicAverageFlag || data.mosaicRandomFlag){
-            // Draw all lines bold
+        if (data.mosaicAverageFlag || data.mosaicRandomFlag || isTargetAfterRef === null){
+            // Draw all lines bold for average, random and insert modes
             for (let i=0; i<this.paths.length; i++){
                 this.bold[i] = true;
             }
