@@ -831,36 +831,44 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
  * @param {SamplePairs[]} colorSamplePairs Contains samplePairArray
  * @returns {SamplePairDifMinMax}
  */
-function SamplePairDifMinMax(colorSamplePairs) {
+function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
     this.minDif = Number.POSITIVE_INFINITY;
     this.maxDif = Number.NEGATIVE_INFINITY;
+    this.avgDif = 0;
+    let total = 0;
     for (let c=0; c<colorSamplePairs.length; c++) {
         let samplePairs = colorSamplePairs[c];
+        total += samplePairs.samplePairArray.length;
         for (let samplePair of samplePairs.samplePairArray) {
             let dif = samplePair.targetMedian - samplePair.referenceMedian;
             this.minDif = Math.min(this.minDif, dif);
             this.maxDif = Math.max(this.maxDif, dif);
+            this.avgDif += dif;
         }
+    }
+    this.avgDif /= total;
+    
+    if (this.maxDif - this.avgDif < minScaleDif ||
+            this.avgDif - this.minDif < minScaleDif){
+        this.maxDif = this.avgDif + minScaleDif;
+        this.minDif = this.avgDif - minScaleDif;
     }
 }
 
 /**
  * Display graph of (difference between images) / (pixel distance across image)
- * @param {View} targetView Used for view name
- * @param {View} referenceView Used for view name
  * @param {Number} width Graph width. Limited to target image size (width or height).
  * @param {Boolean} isHorizontal
  * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
- * @param {Rect} sampleRect Create dif arrays at either side of this rectangle 
+ * @param {Rect} joinRect Create dif arrays at either side of this rectangle 
  * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
  */
-function displayGradientGraph(targetView, referenceView, width, isHorizontal, 
-        isTargetAfterRef, surfaceSplines, sampleRect, colorSamplePairs, data,
-        isPropagateGraph){
+function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
+        joinRect, colorSamplePairs, data, isPropagateGraph){
     
     /**
      * @param {ImageWindow} graphWindow Graph window
@@ -916,70 +924,73 @@ function displayGradientGraph(targetView, referenceView, width, isHorizontal,
         }
     };
     
-    let axisWidth;
     let maxCoordinate;
     let xLabel;
     if (isHorizontal){
         xLabel = "Mosaic tile join X-coordinate";
-        maxCoordinate = targetView.image.width;
+        maxCoordinate = data.targetView.image.width;
     } else {
         xLabel = "Mosaic tile join Y-coordinate";
-        maxCoordinate = targetView.image.height;
+        maxCoordinate = data.targetView.image.height;
     }
-    let yLabel = "(" + targetView.fullId + ") - (" + referenceView.fullId + ")";
-    axisWidth = Math.min(width, maxCoordinate);
+    let yLabel = "(" + data.targetView.fullId + ") - (" + data.referenceView.fullId + ")";
+    let axisWidth = Math.min(width, maxCoordinate);
     // Graph scale
     // gradientArray stores min / max of fitted lines.
     // also need min / max of sample points.
-    const minScaleDif = 1e-4;
-    let minMax = new SamplePairDifMinMax(colorSamplePairs);
-    let maxY = minMax.maxDif;
-    let minY = minMax.minDif;
-    if (maxY - minY < minScaleDif){
-        maxY += minScaleDif / 2;
-        minY -= minScaleDif / 2;
-    }
-    let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
-    graphWithAxis.setAxisLength(axisWidth + 2, 720);
-    graphWithAxis.createGraph(xLabel, yLabel);
+    const minScaleDif = 5e-5;
+    let minMax = new SamplePairDifMinMax(colorSamplePairs, minScaleDif);
     
-    let graphLine = new GraphLinePath();
-    if (isPropagateGraph){
-        graphLine.initPropagatePath(data.cache.overlap, isHorizontal, isTargetAfterRef);
-    } else {
-        graphLine.initGradientPaths(data.cache.overlap, sampleRect, isHorizontal, isTargetAfterRef, data);
-    }
-    
-    if (colorSamplePairs.length === 1){ // B&W
-        let difArrays = [];
-        for (let path of graphLine.paths){
-            difArrays.push(surfaceSplines[0].evaluate(path).toArray());
+    let createGraph = function(zoomFactor){
+        let maxY = minMax.maxDif;
+        let minY = minMax.minDif;
+        
+        let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
+        graphWithAxis.setAxisLength(axisWidth + 2, 720);
+        graphWithAxis.createGraph(xLabel, yLabel);
+
+        let graphLine = new GraphLinePath();
+        if (isPropagateGraph){
+            graphLine.initPropagatePath(data.cache.overlap, isHorizontal, isTargetAfterRef);
+        } else {
+            graphLine.initGradientPaths(data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         }
-        drawLineAndPoints(graphWithAxis, isHorizontal,
-            difArrays, 0xFFFF0000, graphLine, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
-    } else {
-        // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
-        // if three samples are on the same pixel we get white and not the last color drawn
-        let lineBoldColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        let lineColors = [0xFF990000, 0xFF009900, 0xFF000099]; // r, g, b
-        let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
-        for (let c = 0; c < colorSamplePairs.length; c++){
+
+        if (colorSamplePairs.length === 1){ // B&W
             let difArrays = [];
             for (let path of graphLine.paths){
-                difArrays.push(surfaceSplines[c].evaluate(path).toArray());
+                difArrays.push(surfaceSplines[0].evaluate(path).toArray());
             }
-            let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawLineAndPoints(graphAreaOnly, isHorizontal,
-                difArrays, lineBoldColors[c], graphLine, lineColors[c], colorSamplePairs[c], pointColors[c]);
-            graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+            drawLineAndPoints(graphWithAxis, isHorizontal,
+                difArrays, 0xFFFF0000, graphLine, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
+        } else {
+            // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
+            // if three samples are on the same pixel we get white and not the last color drawn
+            let lineBoldColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+            let lineColors = [0xFF990000, 0xFF009900, 0xFF000099]; // r, g, b
+            let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
+            for (let c = 0; c < colorSamplePairs.length; c++){
+                let difArrays = [];
+                for (let path of graphLine.paths){
+                    difArrays.push(surfaceSplines[c].evaluate(path).toArray());
+                }
+                let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+                drawLineAndPoints(graphAreaOnly, isHorizontal,
+                    difArrays, lineBoldColors[c], graphLine, lineColors[c], colorSamplePairs[c], pointColors[c]);
+                graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+            }
         }
-    }
+        return graphWithAxis;
+    };
+    
+    let graphWithAxis = createGraph(1);
+    
     // Display graph in script dialog
     GraphDialog.prototype = new Dialog;
     let graph = new GraphDialog(graphWithAxis.bitmap, "Gradient Graph", graphWithAxis.screenToWorld);
     if (graph.execute() === StdButton_Yes){
         // User requested graph saved to PixInsight View
-        let windowTitle = WINDOW_ID_PREFIX() + targetView.fullId + "__Gradient";
+        let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
         let imageWindow = graphWithAxis.createWindow(windowTitle, true);
         gradientGraphFitsHeader(imageWindow, data);
         imageWindow.show();

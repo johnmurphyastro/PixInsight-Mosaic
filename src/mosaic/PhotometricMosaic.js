@@ -303,7 +303,7 @@ function PhotometricMosaic(data)
         if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
             console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
-            displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
+            GradientGraph(1000, isHorizontal, isTargetAfterRef,
                     propagateSurfaceSplines, overlapBox, colorSamplePairs, data, true);
             return;
         }
@@ -328,7 +328,7 @@ function PhotometricMosaic(data)
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
-        displayGradientGraph(targetView, referenceView, 1000, isHorizontal, isTargetAfterRef,
+        GradientGraph(1000, isHorizontal, isTargetAfterRef,
                 surfaceSplines, joinRect, colorSamplePairs, data, false);
         return;
     }
