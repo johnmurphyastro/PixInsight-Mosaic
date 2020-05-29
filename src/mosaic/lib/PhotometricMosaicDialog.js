@@ -56,7 +56,7 @@ function getDefaultReferenceView() {
  * @returns {View} default target view
  */
 function getDefaultTargetView(referenceView){
-    let isGoodChoice = function(view){
+    function isGoodChoice(view){
         return !view.fullId.startsWith(WINDOW_ID_PREFIX()) &&
         (referenceView === null || referenceView.fullId !== view.fullId);
     };
@@ -696,7 +696,7 @@ function PhotometricMosaicDialog(data) {
     joinAreaHorizSizer1.add(this.rectangleY1_Control);
     joinAreaHorizSizer1.addStretch();
 
-    let previewUpdateActions = function(dialog){
+    function previewUpdateActions(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
             dialog.joinAreaBar.checkBox.checked = data.hasJoinAreaPreview;
@@ -1348,7 +1348,7 @@ PhotometricMosaicDialog.prototype = new Dialog;
 // Photometric Mosaic main process
 function main() {
 //    GradientTest();
-    
+
     if (ImageWindow.openWindows.length < 2) {
         (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;

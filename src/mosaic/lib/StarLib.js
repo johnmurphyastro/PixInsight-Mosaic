@@ -127,7 +127,7 @@ function StarsDetected(){
      * @param {Number} channel
      * @returns {Star[]}
      */
-    let findStars = function(view, mask, overlapBox, logSensitivity, channel){
+    function findStars(view, mask, overlapBox, logSensitivity, channel){
         let lastProgressPc = 0;
         function progressCallback(count, total){
             if (count === 0){
@@ -187,7 +187,7 @@ function StarsDetected(){
      * @param {PhotometricMosaicData} data Values from user interface
      * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
      */
-    let findMatchingStars = function (channel, data) {
+    function findMatchingStars(channel, data) {
         let searchRadius = data.starSearchRadius;
         let rSqr = searchRadius * searchRadius;
 
@@ -197,7 +197,7 @@ function StarsDetected(){
          * @param {Star} b
          * @returns {Number}
          */
-        let sortOnFlux = function (a, b) {
+        function sortOnFlux(a, b) {
             return a.flux - b.flux;
         };
 
@@ -211,7 +211,7 @@ function StarsDetected(){
          * @param {PhotometricMosaicData} data Values from user interface
          * @returns {Star[]} The filtered stars
          */
-        let filterStars = function (stars, data){
+        function filterStars(stars, data){
             let peakUpperLimit = data.linearRange;
             let limitStarsPercent = data.limitPhotoStarsPercent;
             let filteredStars = [];
@@ -240,7 +240,7 @@ function StarsDetected(){
          * @param {Number} maxGradient Maximum allowed (ref flux / target flux) 
          * @returns {StarPair[]} Array of matched stars
          */
-        let matchStars = function (tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient){
+        function matchStars(tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient){
             let starPairArray = [];
             let r = refStars.length;
             while (r--) {
@@ -302,19 +302,19 @@ function StarsDetected(){
      * @param {star[][]} tgtColorStars color array of target stars
      * @returns {Star[]} All stars, sorted by brightness (brightest first)
      */
-    let combienStarArrays = function (refColorStars, tgtColorStars){
+    function combienStarArrays(refColorStars, tgtColorStars){
         /**
          * @param {Star} star
          * @returns {String}
          */
-        let starToKey = function(star){
+        function starToKey(star){
             return "" + star.pos.x + "," + star.pos.y;
         };
         /**
          * @param {Map} starMap
          * @param {Star[]} stars
          */
-        let addFirstArray = function (starMap, stars) {
+        function addFirstArray(starMap, stars) {
             for (let star of stars) {
                 starMap.set(starToKey(star), star);
             }
@@ -323,7 +323,7 @@ function StarsDetected(){
          * @param {Map} starMap
          * @param {Star[]} stars
          */
-        let addStars = function(starMap, stars){
+        function addStars(starMap, stars){
             for (let star of stars){
                 // keep star with maximum flux
                 let key = starToKey(star);
@@ -337,7 +337,7 @@ function StarsDetected(){
          * @param {Map} starMap
          * @returns {Star[]} All stars, sorted by brightness (brightest first)
          */
-        let getSortedStars = function(starMap){
+        function getSortedStars(starMap){
             let stars = [];
             for (let star of starMap.values()){
                 stars.push(star);
@@ -462,7 +462,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
      * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let starGraphFitsHeader = function (graphWindow, colorStarPairs, data){
+    function starGraphFitsHeader(graphWindow, colorStarPairs, data){
         let view = graphWindow.mainView;
         let nColors = colorStarPairs.length;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
@@ -482,7 +482,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
      * @param {Number} pointColor e.g. 0xAARRGGBB
      * @returns {undefined}
      */
-    let drawStarLineAndPoints = function (graph, lineColor, starPairs, pointColor){
+    function drawStarLineAndPoints(graph, lineColor, starPairs, pointColor){
         let linearFit = starPairs.linearFitData;
         graph.drawLine(linearFit.m, linearFit.b, lineColor);
         for (let starPair of starPairs.starPairArray){
@@ -562,7 +562,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
      * @param {Rect} overlapBox Bitmap area
      * @returns {Bitmap}
      */
-    let createBitmap = function(overlapBox){
+    function createBitmap(overlapBox){
         let bmp = new Bitmap(overlapBox.width, overlapBox.height);
         bmp.fill(0x00000000);
         return bmp;
@@ -574,7 +574,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
      * @param {Number} color
      * @returns {VectorGraphics}
      */
-    let createGraphics = function(bitmap, color){
+    function createGraphics(bitmap, color){
         let g = new VectorGraphics(bitmap);
         g.antialiasing = false;
         g.pen = new Pen(color);
@@ -638,7 +638,7 @@ function displayDetectedStars(view, colorStars, postfix, data) {
      * @param {Rect} overlapBox Bitmap area
      * @returns {Bitmap}
      */
-    let createBitmap = function(overlapBox){
+    function createBitmap(overlapBox){
         let bmp = new Bitmap(overlapBox.width, overlapBox.height);
         bmp.fill(0x00000000);
         return bmp;
@@ -650,7 +650,7 @@ function displayDetectedStars(view, colorStars, postfix, data) {
      * @param {Number} color
      * @returns {VectorGraphics}
      */
-    let createGraphics = function(bitmap, color){
+    function createGraphics(bitmap, color){
         let g = new VectorGraphics(bitmap);
         g.antialiasing = false;
         g.pen = new Pen(color);
@@ -867,7 +867,7 @@ function createImageFromRefAndBitmap(refView, imageRect, maskSamples, bmp, title
      * @param {Float32Array} refSamples Overlap area from refView (modified)
      * @param {Float32Array} mask If mask is zero, set refSamples to zero
      */
-    let applyMask = function (refSamples, mask) {
+    function applyMask(refSamples, mask) {
         for (let i = mask.length - 1; i > -1; i--) {
             if (mask[i] === 0) {
                 refSamples[i] = 0;

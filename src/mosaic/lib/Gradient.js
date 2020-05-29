@@ -431,7 +431,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
          * along a horizontal or vertical line
          * @param {Number} difArrayStart The difArray index corresponding to row start
          */
-        let apply = function(refSamples, tgtSamples, samples, row, difArray, difArrayStart){
+        function apply(refSamples, tgtSamples, samples, row, difArray, difArrayStart){
             tgtImage.getSamples(tgtSamples, row, channel);
             if (self.createMosaic){
                 refImage.getSamples(refSamples, row, channel);
@@ -513,7 +513,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
         
         const self = this;
 
-        let SurfaceSplinePoints = function(){
+        function SurfaceSplinePoints(){
             this.indexs = [];
             this.points = [];
             this.addPoint = function (i, x, y){
@@ -534,7 +534,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
          * @param {SurfaceSpline} surfaceSpline gradient correction to apply
          * @param {Boolean} isHorizontal True if this row is horizontal
          */
-        let apply = function(refSamples, tgtSamples, samples, row, surfaceSpline, isHorizontal){
+        function apply(refSamples, tgtSamples, samples, row, surfaceSpline, isHorizontal){
             tgtImage.getSamples(tgtSamples, row, channel);
             if (self.createMosaic){
                 refImage.getSamples(refSamples, row, channel);
@@ -682,7 +682,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
          * along a horizontal or vertical line, valid after taper has finished
          * @param {Number} difArrayStart The difArray index corresponding to row start
          */
-        let apply = function(coord, taperStart, refSamples, tgtSamples, samples, 
+        function apply(coord, taperStart, refSamples, tgtSamples, samples, 
                 row, difArray, bgDif, difArrayStart){
             tgtImage.getSamples(tgtSamples, row, channel);
             if (self.createMosaic){
@@ -770,7 +770,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
          * along a horizontal or vertical line, valid after taper has finished
          * @param {Number} difArrayStart The difArray index corresponding to row start
          */
-        let apply = function(coord, taperEnd, refSamples, tgtSamples, samples, 
+        function apply(coord, taperEnd, refSamples, tgtSamples, samples, 
                 row, difArray, bgDif, difArrayStart){
             tgtImage.getSamples(tgtSamples, row, channel);
             if (self.createMosaic){
@@ -875,7 +875,7 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
-    let gradientGraphFitsHeader = function(graphWindow, data){
+    function gradientGraphFitsHeader(graphWindow, data){
         let view = graphWindow.mainView;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
@@ -903,7 +903,7 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Number} pointColor
      * @returns {undefined}
      */
-    let drawLineAndPoints = function(graph, isHorizontal,
+    function drawLineAndPoints(graph, isHorizontal,
             difArrays, lineBoldColor, graphLinePath, lineColor, samplePairs, pointColor) {
                 
         for (let samplePair of samplePairs.samplePairArray) {
@@ -941,7 +941,7 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
     const minScaleDif = 5e-5;
     let minMax = new SamplePairDifMinMax(colorSamplePairs, minScaleDif);
     
-    let createGraph = function(zoomFactor){
+    function createGraph(zoomFactor){
         let maxY = minMax.maxDif;
         let minY = minMax.minDif;
         

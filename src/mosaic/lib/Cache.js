@@ -22,7 +22,7 @@ function MosaicCache() {
     * @param {String} tgtId
     * @param {Number} logSensitivity
     */
-    let UserInputData = function(refId, tgtId, logSensitivity){
+    function UserInputData (refId, tgtId, logSensitivity){
         this.refId = refId;
         this.tgtId = tgtId;
         this.logSensitivity = logSensitivity;

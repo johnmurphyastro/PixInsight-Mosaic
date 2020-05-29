@@ -118,48 +118,48 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Number} yKey Nth bin in y direction (starting at zero)
      * @returns {Point} The (x,y) coordinate of the bin's center
      */
-    let getBinCenter = function(xKey, yKey){
+    function getBinCenter(xKey, yKey){
         return new Point(getX(xKey) + self.binSize/2, getY(yKey) + self.binSize/2);
     };
     /**
      * @returns {Number}
      */
-    let getNumberOfColumns = function(){
+    function getNumberOfColumns(){
         return Math.floor((self.x1 - self.x0) / self.binSize);
     };
     /**
      * 
      * @returns {Number}
      */
-    let getNumberOfRows = function(){
+    function getNumberOfRows(){
         return Math.floor((self.y1 - self.y0) / self.binSize);
     };
     /**
      * @param {Number} x Any X-Coordinate within a bin, including left edge
      * @returns {Number} Nth sample in x direction (starting at zero)
      */
-    let getXKey = function(x){
+    function getXKey(x){
         return Math.floor((x - self.x0) / self.binSize);
     };
     /**
      * @param {Number} y Any Y-Coordinate within a bin, including top edge
      * @returns {Number} Nth sample in y direction (starting at zero)
      */
-    let getYKey = function(y){
+    function getYKey(y){
         return Math.floor((y - self.y0) / self.binSize);
     };
     /**
      * @param {Number} xKey Nth bin in x direction (starting at zero)
      * @returns {Number} X-Coordinate of bin's left edge
      */
-    let getX = function (xKey){
+    function getX(xKey){
         return self.x0 + xKey * self.binSize;
     };
     /**
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      * @returns {Number} Y-Coordinate of bin's top edge
      */
-    let getY = function (yKey){
+    function getY(yKey){
         return self.y0 + yKey * self.binSize;
     };
     /**
@@ -167,7 +167,7 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Number} yKey Nth bin in y direction (starting at zero)
      * @returns {String} Key has format "xKey,yKey" e.g. "3,28"
      */
-    let createKey = function(xKey, yKey){
+    function createKey(xKey, yKey){
         return "" + xKey + "," + yKey;
     };
     
@@ -201,7 +201,7 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
      */
-    let addBinRect = function(tgtImage, refImage, xKey, yKey, rejectHigh){
+    function addBinRect(tgtImage, refImage, xKey, yKey, rejectHigh){
         let nChannels = self.binRectMapArray.length;
         let binRect = new Rect(self.binSize, self.binSize);
         binRect.moveTo(getX(xKey), getY(yKey));
@@ -255,7 +255,7 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Point} p
      * @param {Number} starRadius
      */
-    let removeBinsInCircle = function (p, starRadius) {
+    function removeBinsInCircle(p, starRadius) {
         let starToCenter = starRadius + binSize/2;
         let starXKey = getXKey(p.x);
         let starYKey = getYKey(p.y);
@@ -282,7 +282,7 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      * @param {Number} xKey Nth sample in x direction (starting at zero)
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      */
-    let removeBinRect = function(xKey, yKey){
+    function removeBinRect(xKey, yKey){
         let key = createKey(xKey, yKey);
         for (let c=0; c < self.binRectMapArray.length; c++){
             self.binRectMapArray[c].delete(key);

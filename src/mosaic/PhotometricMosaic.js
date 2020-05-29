@@ -59,10 +59,10 @@ function CREATE_JOIN_MASK(){return 256;}
  */
 function PhotometricMosaic(data)
 {
-    const startTime = new Date().getTime();
-    const targetView = data.targetView;
-    const referenceView = data.referenceView;
-    const nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
+    let startTime = new Date().getTime();
+    let targetView = data.targetView;
+    let referenceView = data.referenceView;
+    let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
     
     // let the MosaicCache know about any relevant input parameter changes
     // If any of these inputs have changed, the cache will be invalidated
@@ -71,7 +71,7 @@ function PhotometricMosaic(data)
     // Overlap bounding box and overlap bitmap
     if (data.cache.overlap === null){
         // Create ref/tgt overlap bitmap (overlapMask) and its bounding box (ovelapBox)
-        const overlapTime = new Date().getTime();
+        let overlapTime = new Date().getTime();
         // Add trim warning check here so it is only displayed once
         console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
         if (!searchFitsHistory(referenceView, TRIM_NAME())){
@@ -124,7 +124,7 @@ function PhotometricMosaic(data)
         return;
     }
 
-    const detectedStars = new StarsDetected();
+    let detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
     createPreview(targetView, overlapBox, "Overlap");
     processEvents();
@@ -136,7 +136,7 @@ function PhotometricMosaic(data)
     }
     
     // Photometry stars
-    const colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
            
     // Remove photometric star outliers and calculate the scale
     console.writeln("\n<b><u>Calculating scale</u></b>");
@@ -375,10 +375,10 @@ function calculateScale(starPairs) {
  */
 function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
         scaleFactors, propagateSurfaceSplines, surfaceSplines, overlapBox, joinRect, data) {
-    const applyScaleAndGradientTime = new Date().getTime();
-    const width = tgtView.image.width;
-    const height = tgtView.image.height;
-    const nChannels = scaleFactors.length;
+    let applyScaleAndGradientTime = new Date().getTime();
+    let width = tgtView.image.width;
+    let height = tgtView.image.height;
+    let nChannels = scaleFactors.length;
     
     // Create a new view which will become either the mosaic view or the corrected target view
     let viewId = data.createMosaicFlag ? MOSAIC_NAME() : tgtView.fullId + "_PM";
@@ -395,7 +395,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     // Apply scale and gradient to the cloned image
     let tgtCorrector = new ScaleAndGradientApplier(width, height, overlapBox, joinRect,
             isHorizontal, data, isTargetAfterRef);
-    const tgtBox = data.cache.overlap.tgtBox;                
+    let tgtBox = data.cache.overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
