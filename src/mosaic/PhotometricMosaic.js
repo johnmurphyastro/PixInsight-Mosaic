@@ -63,6 +63,7 @@ function PhotometricMosaic(data)
     let targetView = data.targetView;
     let referenceView = data.referenceView;
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
+    let overlap;
     
     // let the MosaicCache know about any relevant input parameter changes
     // If any of these inputs have changed, the cache will be invalidated
@@ -83,8 +84,8 @@ function PhotometricMosaic(data)
         
         console.writeln("<b><u>Calculating overlap</u></b>");
         processEvents();
-        let overlap = new Overlap(referenceView.image, targetView.image);
-        if (!overlap.hasOverlap){
+        overlap = new Overlap(referenceView.image, targetView.image);
+        if (!overlap.hasOverlap()){
             let errorMsg = "Error: '" + referenceView.fullId + "' and '" + targetView.fullId + "' do not overlap.";
             new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
             return;
@@ -92,13 +93,15 @@ function PhotometricMosaic(data)
         data.cache.setOverlap(overlap);
         console.writeln(getElapsedTime(overlapTime) + "\n");
         processEvents();
+    } else {
+        overlap = data.cache.overlap;
     }
 
     // joinRect is the intersection between JoinAreaPreview and the overlap,
     // or the overlapBox if the preview was not specified
     let isHorizontal;
     let joinRect;
-    let overlapBox = data.cache.overlap.overlapBox;
+    let overlapBox = overlap.overlapBox;
     if (data.hasJoinAreaPreview) {
         let joinAreaPreview = new Rect(data.joinAreaPreview_X0, data.joinAreaPreview_Y0, 
                 data.joinAreaPreview_X1, data.joinAreaPreview_Y1);
@@ -120,7 +123,7 @@ function PhotometricMosaic(data)
     }
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(targetView, data.cache.overlap, joinRect);
+        createJoinMask(targetView, overlap, joinRect);
         return;
     }
 
@@ -228,31 +231,31 @@ function PhotometricMosaic(data)
         return;
     }
     
-    let colorSamplePairs = createColorSamplePairs(targetView.image, referenceView.image,
+    let colorSamplePairs = createSampleGrid(targetView.image, referenceView.image,
             scaleFactors, detectedStars.allStars, overlapBox, data, isHorizontal);
-    if (colorSamplePairs[0].samplePairArray.length < 3) {
+    if (colorSamplePairs[0].length < 3) {
         new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
-        displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, title, data);
+        displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
     }
     
     let unBinnedSamples = 0;
     let binnedSamples = 0;
     for (let c=0; c<nChannels; c++){
-        unBinnedSamples = Math.max(unBinnedSamples, colorSamplePairs[c].samplePairArray.length);
-        colorSamplePairs[c] = limitNumberOfSamples(overlapBox, colorSamplePairs[c], 
+        unBinnedSamples = Math.max(unBinnedSamples, colorSamplePairs[c].length);
+        colorSamplePairs[c] = createBinnedSampleGrid(overlapBox, colorSamplePairs[c], 
                 isHorizontal, data.maxSamples);
-        binnedSamples = Math.max(binnedSamples, colorSamplePairs[c].samplePairArray.length);
+        binnedSamples = Math.max(binnedSamples, colorSamplePairs[c].length);
     }
     
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         if (data.maxSamples !== 2000){
             // debug output invoked if maxSamples is set via process icon editor
             let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Binned_Samples";
-            displaySampleSquares(referenceView, colorSamplePairs[0], detectedStars, title, data);
+            displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
         }
         return;
     }
@@ -322,7 +325,7 @@ function PhotometricMosaic(data)
                 TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    console.writeln(colorSamplePairs[0].samplePairArray.length,
+    console.writeln(colorSamplePairs[0].length,
             " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
@@ -395,7 +398,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     // Apply scale and gradient to the cloned image
     let tgtCorrector = new ScaleAndGradientApplier(width, height, overlapBox, joinRect,
             isHorizontal, data, isTargetAfterRef);
-    let tgtBox = data.cache.overlap.tgtBox;                
+    let tgtBox = overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;

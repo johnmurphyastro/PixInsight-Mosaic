@@ -29,24 +29,17 @@ function SamplePair(targetMedian, referenceMedian, rect) {
     this.referenceMedian = referenceMedian;
     this.rect = rect;
     this.weight = 1;
-}
-
-/**
- * Contains SamplePair[]
- * @param {SamplePair[]} samplePairArray
- * @param {Rect} overlapBox overlap bounding box
- * @returns {SamplePairs}
- */
-function SamplePairs(samplePairArray, overlapBox){
-    /** SamplePair[] */
-    this.samplePairArray = samplePairArray;
-    /** Rect */
-    this.overlapBox = overlapBox;
+    /**
+     * @returns {Number} targetMedian - referenceMedian
+     */
+    this.getDifference = function(){
+        return this.targetMedian - this.referenceMedian;
+    };
 }
 
 // ============ Algorithms ============
 /**
- * Create SamplePairs for each color channel
+ * Create SamplePair[] for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
  * @param {LinearFitData[]} scaleFactors
@@ -54,9 +47,9 @@ function SamplePairs(samplePairArray, overlapBox){
  * @param {Rect} sampleRect Reject samples outside this area (overlap bounding box)
  * @param {PhotometricMosaicData} data User settings
  * @param {Boolean} isHorizontal Determines sort order for SamplePair
- * @returns {SamplePairs[]} Returns SamplePairs for each color
+ * @returns {SamplePair[][]} Returns SamplePair[] for each color
  */
-function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
+function createSampleGrid(targetImage, referenceImage, scaleFactors,
         stars, sampleRect, data, isHorizontal) {
 
     let firstNstars;
@@ -68,7 +61,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
                 
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
-    let bins = new SampleBinMap(sampleRect, data.sampleSize, nChannels);
+    let bins = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
     bins.addSampleBins(targetImage, referenceImage, data.linearRange);
     bins.removeBinRectWithStars(stars, firstNstars);
     
@@ -80,7 +73,7 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
         let scale = scaleFactors[c].m;
         let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage,
                 scale, c, isHorizontal);
-        colorSamplePairs.push(new SamplePairs(samplePairArray, sampleRect));
+        colorSamplePairs.push(samplePairArray);
     }
     return colorSamplePairs;
 }
@@ -90,89 +83,35 @@ function createColorSamplePairs(targetImage, referenceImage, scaleFactors,
  * SamplePair[] are used to model the background level and gradient
  * Samples are discarded if they include black pixels or stars
  * @param {Rect} overlapBox overlap bounding box
- * @param {Number} binSize bin size (SamplePair size)
+ * @param {Number} sampleSize Bin size (SamplePair size)
  * @param {Number} nChannels 1 for B&W, 3 for color
- * @returns {SampleBinMap} 
+ * @returns {SampleGridMap} 
  */
-function SampleBinMap(overlapBox, binSize, nChannels){
-    const self = this;
+function SampleGridMap(overlapBox, sampleSize, nChannels){
+    // Private class variables
+
     //Sample size
-    this.binSize = binSize;
+    let binSize = sampleSize;
     // Coordinate of top left bin
-    this.x0 = overlapBox.x0;
-    this.y0 = overlapBox.y0;
+    let x0 = overlapBox.x0;
+    let y0 = overlapBox.y0;
     // Coordinate of the first bin that is beyond the selected area
-    this.x1 = overlapBox.x1;
-    this.y1 = overlapBox.y1;
+    let x1 = overlapBox.x1;
+    let y1 = overlapBox.y1;
+    // binRect maps for all colors
+    let binRectMapArray = [];
+    
     // For stars too bright to have been detected by StarDetector
 //    this.tooBrightMap = new Map();
-
-    // binRect maps for all colors
-    this.binRectMapArray = [];
+    // Private class variables end
+    
+    // Constructor
     for (let c=0; c<nChannels; c++){
-        this.binRectMapArray.push(new Map());
+        binRectMapArray.push(new Map());
     }
     
     /**
-     * @param {Number} xKey Nth bin in x direction (starting at zero)
-     * @param {Number} yKey Nth bin in y direction (starting at zero)
-     * @returns {Point} The (x,y) coordinate of the bin's center
-     */
-    function getBinCenter(xKey, yKey){
-        return new Point(getX(xKey) + self.binSize/2, getY(yKey) + self.binSize/2);
-    };
-    /**
-     * @returns {Number}
-     */
-    function getNumberOfColumns(){
-        return Math.floor((self.x1 - self.x0) / self.binSize);
-    };
-    /**
-     * 
-     * @returns {Number}
-     */
-    function getNumberOfRows(){
-        return Math.floor((self.y1 - self.y0) / self.binSize);
-    };
-    /**
-     * @param {Number} x Any X-Coordinate within a bin, including left edge
-     * @returns {Number} Nth sample in x direction (starting at zero)
-     */
-    function getXKey(x){
-        return Math.floor((x - self.x0) / self.binSize);
-    };
-    /**
-     * @param {Number} y Any Y-Coordinate within a bin, including top edge
-     * @returns {Number} Nth sample in y direction (starting at zero)
-     */
-    function getYKey(y){
-        return Math.floor((y - self.y0) / self.binSize);
-    };
-    /**
-     * @param {Number} xKey Nth bin in x direction (starting at zero)
-     * @returns {Number} X-Coordinate of bin's left edge
-     */
-    function getX(xKey){
-        return self.x0 + xKey * self.binSize;
-    };
-    /**
-     * @param {Number} yKey Nth sample in y direction (starting at zero)
-     * @returns {Number} Y-Coordinate of bin's top edge
-     */
-    function getY(yKey){
-        return self.y0 + yKey * self.binSize;
-    };
-    /**
-     * @param {Number} xKey Nth bin in x direction (starting at zero)
-     * @param {Number} yKey Nth bin in y direction (starting at zero)
-     * @returns {String} Key has format "xKey,yKey" e.g. "3,28"
-     */
-    function createKey(xKey, yKey){
-        return "" + xKey + "," + yKey;
-    };
-    
-    /**
-     * Add all bins within the selected area.
+     * Add all bins within the overlap area.
      * Reject bins with one or more zero pixels.
      * @param {Image} targetImage
      * @param {Image} referenceImage
@@ -186,37 +125,6 @@ function SampleBinMap(overlapBox, binSize, nChannels){
             for (let yKey = 0; yKey < yMax; yKey++){
                 addBinRect(targetImage, referenceImage, xKey, yKey, rejectHigh);
             }
-        }
-    };
-    
-    /** TODO rejectHigh not currently used
-     * If the specified bin does not contain pixels that are zero or > rejectHigh
-     * add an entry to our binRect map. If the sample contains a 
-     * pixel > rejectHigh save it to a 'too bright' map, with the coordinate of 
-     * the brightest pixel. This will probably be a star that was too bright to
-     * be picked up by StarDetector.
-     * @param {Image} tgtImage
-     * @param {Image} refImage
-     * @param {Number} xKey Nth sample in x direction (starting at zero)
-     * @param {Number} yKey Nth sample in y direction (starting at zero)
-     * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
-     */
-    function addBinRect(tgtImage, refImage, xKey, yKey, rejectHigh){
-        let nChannels = self.binRectMapArray.length;
-        let binRect = new Rect(self.binSize, self.binSize);
-        binRect.moveTo(getX(xKey), getY(yKey));
-        for (let c=0; c < nChannels; c++){
-            // Dont add sample if it contains 1 or more pixels that are black
-            if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
-                // exclude this sample from this channel.
-                continue;
-            }
-//            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
-//                // Star will not be in star array, so deal with it seperately
-//                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
-//                return;
-//            }
-            self.binRectMapArray[c].set(createKey(xKey, yKey), binRect);
         }
     };
     
@@ -234,6 +142,124 @@ function SampleBinMap(overlapBox, binSize, nChannels){
             removeBinsInCircle(star.pos, starRadius);
         }
     };
+    
+    /**
+     * Calculates SamplePair[] for specified channel.
+     * Calculates median of each bin for both target and reference images,
+     * creates a SamplePair and adds it to the SamplePair[] array
+     * @param {Image} tgtImage
+     * @param {Image} refImage
+     * @param {Number} scale Scale factor for target image samples
+     * @param {Number} channel 0 for B&W, 0,1,2 for RGB
+     * @param {Boolean} isHorizontal Determines sort order
+     * @returns {SamplePair[]} SamplePair array, sorted by distance along join
+     */
+    this.createSamplePairArray = function(tgtImage, refImage, scale, channel, isHorizontal){
+        let samplePairArray = [];
+        for (let binRect of binRectMapArray[channel].values()) {
+            let tgtMedian = tgtImage.median(binRect, channel, channel) * scale;
+            let refMedian = refImage.median(binRect, channel, channel);
+            samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
+        }
+        // Sort by distance along join
+        if (isHorizontal){
+            samplePairArray.sort((a, b) => a.rect.x0 - b.rect.x0);
+        } else {
+            samplePairArray.sort((a, b) => a.rect.y0 - b.rect.y0);
+        }
+        return samplePairArray;
+    };
+    
+    // Private methods
+    
+    /**
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @param {Number} yKey Nth bin in y direction (starting at zero)
+     * @returns {Point} The (x,y) coordinate of the bin's center
+     */
+    function getBinCenter(xKey, yKey){
+        return new Point(getX(xKey) + binSize/2, getY(yKey) + binSize/2);
+    }
+    /**
+     * @returns {Number}
+     */
+    function getNumberOfColumns(){
+        return Math.floor((x1 - x0) / binSize);
+    }
+    /**
+     * 
+     * @returns {Number}
+     */
+    function getNumberOfRows(){
+        return Math.floor((y1 - y0) / binSize);
+    }
+    /**
+     * @param {Number} x Any X-Coordinate within a bin, including left edge
+     * @returns {Number} Nth sample in x direction (starting at zero)
+     */
+    function getXKey(x){
+        return Math.floor((x - x0) / binSize);
+    }
+    /**
+     * @param {Number} y Any Y-Coordinate within a bin, including top edge
+     * @returns {Number} Nth sample in y direction (starting at zero)
+     */
+    function getYKey(y){
+        return Math.floor((y - y0) / binSize);
+    }
+    /**
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @returns {Number} X-Coordinate of bin's left edge
+     */
+    function getX(xKey){
+        return x0 + xKey * binSize;
+    }
+    /**
+     * @param {Number} yKey Nth sample in y direction (starting at zero)
+     * @returns {Number} Y-Coordinate of bin's top edge
+     */
+    function getY(yKey){
+        return y0 + yKey * binSize;
+    }
+    /**
+     * @param {Number} xKey Nth bin in x direction (starting at zero)
+     * @param {Number} yKey Nth bin in y direction (starting at zero)
+     * @returns {String} Key has format "xKey,yKey" e.g. "3,28"
+     */
+    function createKey(xKey, yKey){
+        return "" + xKey + "," + yKey;
+    }
+    
+    /** TODO rejectHigh not currently used
+     * If the specified bin does not contain pixels that are zero or > rejectHigh
+     * add an entry to our binRect map. If the sample contains a 
+     * pixel > rejectHigh save it to a 'too bright' map, with the coordinate of 
+     * the brightest pixel. This will probably be a star that was too bright to
+     * be picked up by StarDetector.
+     * @param {Image} tgtImage
+     * @param {Image} refImage
+     * @param {Number} xKey Nth sample in x direction (starting at zero)
+     * @param {Number} yKey Nth sample in y direction (starting at zero)
+     * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
+     */
+    function addBinRect(tgtImage, refImage, xKey, yKey, rejectHigh){
+        let nChannels = binRectMapArray.length;
+        let binRect = new Rect(binSize, binSize);
+        binRect.moveTo(getX(xKey), getY(yKey));
+        for (let c=0; c < nChannels; c++){
+            // Dont add sample if it contains 1 or more pixels that are black
+            if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
+                // exclude this sample from this channel.
+                continue;
+            }
+//            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
+//                // Star will not be in star array, so deal with it seperately
+//                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
+//                return;
+//            }
+            binRectMapArray[c].set(createKey(xKey, yKey), binRect);
+        }
+    }
     
 //    /**
 //     * Remove all bin entries that are fully or partially covered by a saturated star
@@ -275,7 +301,7 @@ function SampleBinMap(overlapBox, binSize, nChannels){
                 }
             }
         }
-    };
+    }
     
     /**
      * Remove specified binRect from the map
@@ -284,47 +310,20 @@ function SampleBinMap(overlapBox, binSize, nChannels){
      */
     function removeBinRect(xKey, yKey){
         let key = createKey(xKey, yKey);
-        for (let c=0; c < self.binRectMapArray.length; c++){
-            self.binRectMapArray[c].delete(key);
+        for (let c=0; c < binRectMapArray.length; c++){
+            binRectMapArray[c].delete(key);
         }
-    };
-    
-    /**
-     * Calculates SamplePair[] for specified channel.
-     * Calculates median of each bin for both target and reference images,
-     * creates a SamplePair and adds it to the SamplePair[] array
-     * @param {Image} tgtImage
-     * @param {Image} refImage
-     * @param {Number} scale Scale factor for target image samples
-     * @param {Number} channel 0 for B&W, 0,1,2 for RGB
-     * @param {Boolean} isHorizontal Determines sort order
-     * @returns {SamplePair[]} SamplePair array, sorted by distance along join
-     */
-    this.createSamplePairArray = function(tgtImage, refImage, scale, channel, isHorizontal){
-        let samplePairArray = [];
-        for (let binRect of this.binRectMapArray[channel].values()) {
-            let tgtMedian = tgtImage.median(binRect, channel, channel) * scale;
-            let refMedian = refImage.median(binRect, channel, channel);
-            samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
-        }
-        // Sort by distance along join
-        if (isHorizontal){
-            samplePairArray.sort((a, b) => a.rect.x0 - b.rect.x0);
-        } else {
-            samplePairArray.sort((a, b) => a.rect.y0 - b.rect.y0);
-        }
-        return samplePairArray;
-    };
+    }
 }
 
 /** Display the SamplePair squares
  * @param {Image} refView Copy image and STF from this view.
- * @param {SamplePairs} samplePairs The samplePairs to be displayed.
+ * @param {SamplePair[]} samplePairs The samplePairs to be displayed.
  * @param {StarsDetected} detectedStars
  * @param {String} title Window title
  * @param {PhotometricMosaicData} data User settings
  */
-function displaySampleSquares(refView, samplePairs, detectedStars, title, data) {
+function displaySampleGrid(refView, samplePairs, detectedStars, title, data) {
     const overlapBox = data.cache.overlap.overlapBox;
     let offsetX = -overlapBox.x0;
     let offsetY = -overlapBox.y0;
@@ -333,7 +332,7 @@ function displaySampleSquares(refView, samplePairs, detectedStars, title, data) 
     //let G = new VectorGraphics(bmp);
     let G = new Graphics(bmp);  // makes it easier to see which samples have been rejected
     G.pen = new Pen(0xffff0000);
-    samplePairs.samplePairArray.forEach(function (samplePair) {
+    samplePairs.forEach(function (samplePair) {
         let rect = new Rect(samplePair.rect);
         rect.translateBy(offsetX, offsetY);
         G.drawRect(rect);
@@ -419,229 +418,232 @@ function getSampleGridHeight(sampleRect, samplePairArray){
 }
 
 /**
- * Determine x and y binning factor that will reduce the number of samples to
- * less than maxLength, assuming no samples were rejected (e.g. due to stars).
- * The shape of the binning (e.g. 2x2 or 4x1) is determined by how thick the join is.
- * @param {Rect} sampleRect
- * @param {SamplePair[]} samplePairArray
- * @param {Number} maxLength Maximum number of samples after binning
- * @param {Number} minRowsOrColumns Minimum thickness of sample grid after binning
- * @param {Boolean} isHorizontal
- * @returns {Point} Stores the x and y binning factors
- */
-function calcBinningFactor(sampleRect, samplePairArray, maxLength, minRowsOrColumns, isHorizontal){
-    let joinBinning;
-    let perpBinning;
-    let gridThickness = 0;
-    if (isHorizontal){
-        gridThickness = getSampleGridHeight(sampleRect, samplePairArray);
-    } else {
-        gridThickness = getSampleGridWidth(sampleRect, samplePairArray);
-    }
-
-    // what reduction factor is required? 2, 4, 9 or 16?
-    let factor = samplePairArray.length / maxLength;
-    if (factor > 16){
-        let bining = Math.ceil(Math.sqrt(factor));
-        joinBinning = bining;
-        perpBinning = bining;
-    } else if (factor > 9){
-        // Reduce number of samples by a factor of 16
-        if (gridThickness >= minRowsOrColumns * 4){
-            // 4x4 binning
-            joinBinning = 4;
-            perpBinning = 4;
-        } else if (gridThickness >= minRowsOrColumns * 3){
-            // 5x3 binning
-            joinBinning = 5;
-            perpBinning = 3;
-        } else if (gridThickness >= minRowsOrColumns * 2){
-            // 8x2 binning
-            joinBinning = 8;
-            perpBinning = 2;
-        } else {
-            // 8x1 binning
-            joinBinning = 16;
-            perpBinning = 1;
-        }
-    } else if (factor > 4){
-        // Reduce number of samples by a factor of 8 or 9
-        if (gridThickness >= minRowsOrColumns * 3){
-            // 3x3 binning
-            joinBinning = 3;
-            perpBinning = 3;
-        } else if (gridThickness >= minRowsOrColumns * 2){
-            // 4x2 binning
-            joinBinning = 4;
-            perpBinning = 2;
-        } else {
-            // 8x1 binning
-            joinBinning = 8;
-            perpBinning = 1;
-        }
-    } else if (factor > 2){
-        // Reduce by factor of 4
-        if (gridThickness >= minRowsOrColumns * 2){
-            joinBinning = 2;
-            perpBinning = 2;
-        } else {
-            joinBinning = 4;
-            perpBinning = 1;
-        }
-    } else {
-        // Reduce by factor of 2
-        if (gridThickness >= minRowsOrColumns * 2){
-            joinBinning = 1;
-            perpBinning = 2;
-        } else {
-            joinBinning = 2;
-            perpBinning = 1;
-        }
-    }
-
-    if (isHorizontal){
-        return new Point(joinBinning, perpBinning);
-    }
-    return new Point(perpBinning, joinBinning);
-}
-
-/**
- * Create a single SamplePair from the supplied array of SamplePair.
- * The input SamplePair[] must all be the same shape and size and have weight=1
- * @param {SamplePair[]} insideBin SamplePairs that are inside the bin area
- * @param {Number} sampleWidth Width of a single input SamplePair
- * @param {Number} sampleHeight Height of a single input SamplePair
- * @param {Number} binWidth Width of fully populated bin in pixels
- * @param {Number} binHeight height of fully populated bin in pixels
- * @returns {SamplePair} Binned SamplePair with center based on center of mass
- */
-function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight, binWidth, binHeight){
-    // Weight is the number of input SamplePair that are in the binned area.
-    // Not always the geometricaly expected number due to SamplePair rejection (e.g. stars)
-    const weight = insideBin.length;
-    
-    // binnedSamplePair center: calculated from center of mass
-    // CoM = (m1.x1 + m2.x2 + m3.x3 + ...) / (m1 + m2 + m3 + ...)
-    // But in our case all input samples have weight = 1
-    // So CoM = (x1 + x2 + x3 + ...) / nSamples
-    let xCm = 0;
-    let yCm = 0;
-    let targetMedian = 0;
-    let referenceMedian = 0;
-    for (let sp of insideBin){
-        xCm += sp.rect.center.x;
-        yCm += sp.rect.center.y;
-        targetMedian += sp.targetMedian;
-        referenceMedian += sp.referenceMedian;
-    }
-    let center = new Point(Math.round(xCm/weight), Math.round(yCm/weight));
-    
-    // Use the average value for target and reference median
-    targetMedian /= weight;
-    referenceMedian /= weight;
-    
-    
-    // Area is (weight) * (area of a single input SamplePair)
-    // Create a square binnedSamplePair based on this area and the calculated center
-    let area = weight * sampleWidth * sampleHeight;
-    let halfWidth;
-    let halfHeight;
-    if (area === binWidth * binHeight){
-        // fully populated bin
-        halfWidth = Math.round(binWidth / 2);
-        halfHeight = Math.round(binHeight / 2);
-    } else {
-        halfWidth = Math.round(Math.sqrt(area)/2);
-        halfHeight = halfWidth;
-    }
-    let x0 = center.x - halfWidth;
-    let x1 = center.x + halfWidth;
-    let y0 = center.y - halfHeight;
-    let y1 = center.y + halfHeight;
-    let rect = new Rect(x0, y0, x1, y1);
-    let binnedSamplePair = new SamplePair(targetMedian, referenceMedian, rect);
-    binnedSamplePair.weight = weight;
-    return binnedSamplePair;
-}
-
-/**
- * Create a binned SamplePair array of larger samples to reduce the number of
- * samples to less then sampleMaxLimit. It assumes no samples were rejected by stars,
- * so the binned SamplePair array may exceed sampleMaxLimit due to star rejection.
- * @param {Rect} sampleRect
- * @param {SamplePair[]} samplePairArray Must all be the same shape and size and have weight=1
- * @param {Number} sampleMaxLimit Try to reduce the number of samples to below this number 
- * @param {Number} minRows Limit binning perpendicular to join if the final join thickness is less than this.
- * @param {Boolean} isHorizontal
- * @returns {SamplePair[]} Binned SamplePair with center based on center of mass
- */
-function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal){
-    let factor = calcBinningFactor(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal);
-
-    // width and height of single input sample
-    let sampleWidth = samplePairArray[0].rect.width;
-    let sampleHeight = samplePairArray[0].rect.height;
-
-    let binWidth = sampleWidth * factor.x;
-    let binHeight = sampleHeight * factor.y;
-    
-    // Create an empty 3 dimensional array
-    // The x,y dimensions specify the new binned sample positions
-    // Each (x,y) location stores all the input samples within this binned area
-    let xLen = Math.floor(sampleRect.width / binWidth) + 1;
-    let yLen = Math.floor(sampleRect.height / binHeight) + 1;
-    let binnedSampleArrayXY = new Array(xLen);
-    for (let x=0; x<xLen; x++){
-        binnedSampleArrayXY[x] = new Array(yLen);
-        for (let y=0; y<yLen; y++){
-            binnedSampleArrayXY[x][y] = [];
-        }
-    }
-
-    // Populate the (x,y) locations with the input samples that fall into each (x,y) bin
-    for (let samplePair of samplePairArray){
-        let x = Math.floor((samplePair.rect.center.x - sampleRect.x0) / binWidth);
-        let y = Math.floor((samplePair.rect.center.y - sampleRect.y0) / binHeight);
-        binnedSampleArrayXY[x][y].push(samplePair);
-    }
-
-    // For each (x,y) location that stores one or more input samples,
-    // create a binned sample and add it to the binnedSampleArray
-    let binnedSampleArray = [];
-    for (let x=0; x<xLen; x++){
-        for (let y=0; y<yLen; y++){
-            if (binnedSampleArrayXY[x][y].length > 0){
-                binnedSampleArray.push(createBinnedSamplePair(binnedSampleArrayXY[x][y],
-                        sampleWidth, sampleHeight, binWidth, binHeight));
-            }
-        }
-    }
-    return binnedSampleArray;
-}
-
-/**
  * For performance, if there are more than sampleMaxLimit samples, the samples are binned
  * into super samples. The binning in x and y directions may differ to ensure that
  * the 'thickness' of the join is not reduced to less than 5 samples by the binning.
  * @param {Rect} overlapBox
- * @param {SamplePairs} samplePairs
+ * @param {SamplePair[]} samplePairs
  * @param {Boolean} isHorizontal
  * @param {Number} sampleMaxLimit
- * @returns {SamplePairs}
+ * @returns {SamplePair[]}
  */
-function limitNumberOfSamples(overlapBox, samplePairs, isHorizontal, sampleMaxLimit){
-    const minRows = 5;
-    let samplePairArray = samplePairs.samplePairArray;
-    if (samplePairArray.length > sampleMaxLimit){
-        let binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairArray, 
-                sampleMaxLimit, minRows, isHorizontal);
-        if (binnedSampleArray.length > sampleMaxLimit){
-            // This can happen because many samples in grid were rejected due to stars
-            sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
-            binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairArray, 
-                sampleMaxLimit, minRows, isHorizontal);
+function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMaxLimit){
+    {
+        const minRows = 5;
+        if (samplePairs.length > sampleMaxLimit){
+            let binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
+                    sampleMaxLimit, minRows, isHorizontal);
+            if (binnedSampleArray.length > sampleMaxLimit){
+                // This can happen because many samples in grid were rejected due to stars
+                sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
+                binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
+                    sampleMaxLimit, minRows, isHorizontal);
+            }
+            return new binnedSampleArray;
         }
-        return new SamplePairs(binnedSampleArray, samplePairs.overlapBox);
+        return samplePairs;
     }
-    return samplePairs;
+    
+    // Private functions
+
+    /**
+     * Determine x and y binning factor that will reduce the number of samples to
+     * less than maxLength, assuming no samples were rejected (e.g. due to stars).
+     * The shape of the binning (e.g. 2x2 or 4x1) is determined by how thick the join is.
+     * @param {Rect} sampleRect
+     * @param {SamplePair[]} samplePairArray
+     * @param {Number} maxLength Maximum number of samples after binning
+     * @param {Number} minRowsOrColumns Minimum thickness of sample grid after binning
+     * @param {Boolean} isHorizontal
+     * @returns {Point} Stores the x and y binning factors
+     */
+    function calcBinningFactor(sampleRect, samplePairArray, maxLength, minRowsOrColumns, isHorizontal){
+        let joinBinning;
+        let perpBinning;
+        let gridThickness = 0;
+        if (isHorizontal){
+            gridThickness = getSampleGridHeight(sampleRect, samplePairArray);
+        } else {
+            gridThickness = getSampleGridWidth(sampleRect, samplePairArray);
+        }
+
+        // what reduction factor is required? 2, 4, 9 or 16?
+        let factor = samplePairArray.length / maxLength;
+        if (factor > 16){
+            let bining = Math.ceil(Math.sqrt(factor));
+            joinBinning = bining;
+            perpBinning = bining;
+        } else if (factor > 9){
+            // Reduce number of samples by a factor of 16
+            if (gridThickness >= minRowsOrColumns * 4){
+                // 4x4 binning
+                joinBinning = 4;
+                perpBinning = 4;
+            } else if (gridThickness >= minRowsOrColumns * 3){
+                // 5x3 binning
+                joinBinning = 5;
+                perpBinning = 3;
+            } else if (gridThickness >= minRowsOrColumns * 2){
+                // 8x2 binning
+                joinBinning = 8;
+                perpBinning = 2;
+            } else {
+                // 8x1 binning
+                joinBinning = 16;
+                perpBinning = 1;
+            }
+        } else if (factor > 4){
+            // Reduce number of samples by a factor of 8 or 9
+            if (gridThickness >= minRowsOrColumns * 3){
+                // 3x3 binning
+                joinBinning = 3;
+                perpBinning = 3;
+            } else if (gridThickness >= minRowsOrColumns * 2){
+                // 4x2 binning
+                joinBinning = 4;
+                perpBinning = 2;
+            } else {
+                // 8x1 binning
+                joinBinning = 8;
+                perpBinning = 1;
+            }
+        } else if (factor > 2){
+            // Reduce by factor of 4
+            if (gridThickness >= minRowsOrColumns * 2){
+                joinBinning = 2;
+                perpBinning = 2;
+            } else {
+                joinBinning = 4;
+                perpBinning = 1;
+            }
+        } else {
+            // Reduce by factor of 2
+            if (gridThickness >= minRowsOrColumns * 2){
+                joinBinning = 1;
+                perpBinning = 2;
+            } else {
+                joinBinning = 2;
+                perpBinning = 1;
+            }
+        }
+
+        if (isHorizontal){
+            return new Point(joinBinning, perpBinning);
+        }
+        return new Point(perpBinning, joinBinning);
+    }
+
+    /**
+     * Create a single SamplePair from the supplied array of SamplePair.
+     * The input SamplePair[] must all be the same shape and size and have weight=1
+     * @param {SamplePair[]} insideBin SamplePairs that are inside the bin area
+     * @param {Number} sampleWidth Width of a single input SamplePair
+     * @param {Number} sampleHeight Height of a single input SamplePair
+     * @param {Number} binWidth Width of fully populated bin in pixels
+     * @param {Number} binHeight height of fully populated bin in pixels
+     * @returns {SamplePair} Binned SamplePair with center based on center of mass
+     */
+    function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight, binWidth, binHeight){
+        // Weight is the number of input SamplePair that are in the binned area.
+        // Not always the geometricaly expected number due to SamplePair rejection (e.g. stars)
+        const weight = insideBin.length;
+
+        // binnedSamplePair center: calculated from center of mass
+        // CoM = (m1.x1 + m2.x2 + m3.x3 + ...) / (m1 + m2 + m3 + ...)
+        // But in our case all input samples have weight = 1
+        // So CoM = (x1 + x2 + x3 + ...) / nSamples
+        let xCm = 0;
+        let yCm = 0;
+        let targetMedian = 0;
+        let referenceMedian = 0;
+        for (let sp of insideBin){
+            xCm += sp.rect.center.x;
+            yCm += sp.rect.center.y;
+            targetMedian += sp.targetMedian;
+            referenceMedian += sp.referenceMedian;
+        }
+        let center = new Point(Math.round(xCm/weight), Math.round(yCm/weight));
+
+        // Use the average value for target and reference median
+        targetMedian /= weight;
+        referenceMedian /= weight;
+
+
+        // Area is (weight) * (area of a single input SamplePair)
+        // Create a square binnedSamplePair based on this area and the calculated center
+        let area = weight * sampleWidth * sampleHeight;
+        let halfWidth;
+        let halfHeight;
+        if (area === binWidth * binHeight){
+            // fully populated bin
+            halfWidth = Math.round(binWidth / 2);
+            halfHeight = Math.round(binHeight / 2);
+        } else {
+            halfWidth = Math.round(Math.sqrt(area)/2);
+            halfHeight = halfWidth;
+        }
+        let x0 = center.x - halfWidth;
+        let x1 = center.x + halfWidth;
+        let y0 = center.y - halfHeight;
+        let y1 = center.y + halfHeight;
+        let rect = new Rect(x0, y0, x1, y1);
+        let binnedSamplePair = new SamplePair(targetMedian, referenceMedian, rect);
+        binnedSamplePair.weight = weight;
+        return binnedSamplePair;
+    }
+
+    /**
+     * Create a binned SamplePair array of larger samples to reduce the number of
+     * samples to less then sampleMaxLimit. It assumes no samples were rejected by stars,
+     * so the binned SamplePair array may exceed sampleMaxLimit due to star rejection.
+     * @param {Rect} sampleRect
+     * @param {SamplePair[]} samplePairArray Must all be the same shape and size and have weight=1
+     * @param {Number} sampleMaxLimit Try to reduce the number of samples to below this number 
+     * @param {Number} minRows Limit binning perpendicular to join if the final join thickness is less than this.
+     * @param {Boolean} isHorizontal
+     * @returns {SamplePair[]} Binned SamplePair with center based on center of mass
+     */
+    function createBinnedSamplePairArray(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal){
+        let factor = calcBinningFactor(sampleRect, samplePairArray, sampleMaxLimit, minRows, isHorizontal);
+
+        // width and height of single input sample
+        let sampleWidth = samplePairArray[0].rect.width;
+        let sampleHeight = samplePairArray[0].rect.height;
+
+        let binWidth = sampleWidth * factor.x;
+        let binHeight = sampleHeight * factor.y;
+
+        // Create an empty 3 dimensional array
+        // The x,y dimensions specify the new binned sample positions
+        // Each (x,y) location stores all the input samples within this binned area
+        let xLen = Math.floor(sampleRect.width / binWidth) + 1;
+        let yLen = Math.floor(sampleRect.height / binHeight) + 1;
+        let binnedSampleArrayXY = new Array(xLen);
+        for (let x=0; x<xLen; x++){
+            binnedSampleArrayXY[x] = new Array(yLen);
+            for (let y=0; y<yLen; y++){
+                binnedSampleArrayXY[x][y] = [];
+            }
+        }
+
+        // Populate the (x,y) locations with the input samples that fall into each (x,y) bin
+        for (let samplePair of samplePairArray){
+            let x = Math.floor((samplePair.rect.center.x - sampleRect.x0) / binWidth);
+            let y = Math.floor((samplePair.rect.center.y - sampleRect.y0) / binHeight);
+            binnedSampleArrayXY[x][y].push(samplePair);
+        }
+
+        // For each (x,y) location that stores one or more input samples,
+        // create a binned sample and add it to the binnedSampleArray
+        let binnedSampleArray = [];
+        for (let x=0; x<xLen; x++){
+            for (let y=0; y<yLen; y++){
+                if (binnedSampleArrayXY[x][y].length > 0){
+                    binnedSampleArray.push(createBinnedSamplePair(binnedSampleArrayXY[x][y],
+                            sampleWidth, sampleHeight, binWidth, binHeight));
+                }
+            }
+        }
+        return binnedSampleArray;
+    }
 }

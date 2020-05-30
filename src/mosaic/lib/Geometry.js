@@ -89,7 +89,7 @@ function getBoundingBox(image){
             break;
         }
     }
-    return new Rect(x0, y0, x1, y1);
+    return new Rect(x0, y0, x1, y1); 
 }
 
 /**
@@ -100,12 +100,18 @@ function getBoundingBox(image){
  * @returns {Boolean} Return true if all pixels in rect are black
  */
 function isBlack(image, buffer, rect, nChannels){
-    image.getSamples(buffer, rect);
+    image.getSamples(buffer, rect, 0);
+    // fast check
     for (let i=0; i<buffer.length; i+=100){
         if (buffer[i])
             return false;
     }
-    for (let c=0; c<nChannels; c++){
+    // Now check every sample
+    for (let i=0; i<buffer.length; i++){
+        if (buffer[i])
+            return false;
+    }
+    for (let c=1; c<nChannels; c++){
         image.getSamples(buffer, rect, c);
         for (let i=0; i<buffer.length; i++){
             if (buffer[i])
@@ -187,105 +193,57 @@ function Overlap(refImage, tgtImage){
     // Please treat as read only outside this class
     /** {Rect} overlapMask bounding box */
     this.overlapBox = null;
-    /** {TypedArray} bitmap array from overlapBox. A value of 1 indicates were ref & tgt images overlap */
-    this.overlapBuf = null;
-    /** True if refBox and TgtBox intersect */
-    this.hasOverlap = false;
     /** {Rect} refBox Reference image bounding box */
     this.refBox = getBoundingBox(refImage);
     /** {Rect} tgtBox Target image bounding box */
     this.tgtBox = getBoundingBox(tgtImage);
-    this.refImage = refImage;
-    this.tgtImage = tgtImage;
+    
+    /** {TypedArray} bitmap array from overlapBox. A value of 1 indicates were ref & tgt images overlap */
+    let overlapByteArray;
+    /** True if refBox and TgtBox intersect */
+    let hasOverlapFlag = false;
     /** Arrays storing min & max coordinates of non zero pixels */
-    this.minOutlineAtX = null;
-    this.maxOutlineAtX = null;
-    this.minOutlineAtY = null;
-    this.maxOutlineAtY = null;
+    let minOutlineAtX = null;
+    let maxOutlineAtX = null;
+    let minOutlineAtY = null;
+    let maxOutlineAtY = null;
     
-    if (!this.refBox.intersects(this.tgtBox)){
-        return;
-    }
-    this.hasOverlap = true;
-
-    // intersectBox will be equal to or larger than the overlap region.
-    // For example, if the images are fatter outside the overlap
-    const intersectBox = this.refBox.intersection(this.tgtBox);
-    const xMin = intersectBox.x0;
-    const xMax = intersectBox.x1;
-    const yMin = intersectBox.y0;
-    const yMax = intersectBox.y1;  
-    const width = intersectBox.width;
-
-    // Overlap bounding box coordinates
-    let x0 = Number.POSITIVE_INFINITY;
-    let x1 = Number.NEGATIVE_INFINITY;
-    let y0 = Number.POSITIVE_INFINITY;
-    let y1 = Number.NEGATIVE_INFINITY;
-
-    // Create a mask to restrict the star detection to the overlapping area and previewArea
-    const bufLen = intersectBox.area;
-    let refBuffer = [];
-    let tgtBuffer = [];
-    const nChannels = refImage.isColor ? 3 : 1;
-    for (let c=0; c<nChannels; c++){
-        refBuffer[c] = new Float32Array(bufLen);
-        tgtBuffer[c] = new Float32Array(bufLen);
-        refImage.getSamples(refBuffer[c], intersectBox, c);
-        tgtImage.getSamples(tgtBuffer[c], intersectBox, c);
-    }
-    let maskBuffer = new Float32Array(bufLen);
-
-    for (let i=0; i<bufLen; i++){
-        let isOverlap = true;
-        for (let c = nChannels - 1; c > -1; c--) {
-            if (tgtBuffer[c][i] === 0 || refBuffer[c][i] === 0) {
-                isOverlap = false;
-                break;
-            }
+    {   // Constructor
+        if (!this.refBox.intersects(this.tgtBox)){
+            return;
         }
-        if (isOverlap) {
-            maskBuffer[i] = 1;
-            // Determine bounding box
-            let y = Math.floor(i/width);
-            let x = i % width;
-            x0 = Math.min(x0, x);
-            x1 = Math.max(x1, x);
-            y0 = Math.min(y0, y);
-            y1 = Math.max(y1, y);
-        }
-    }
-    // x1 and y1 both need to be just after the last pixel (x1 - x0 = width)
-    x1++;
-    y1++;
-    
-    // We have the mask buffer in terms of the intersection box.
-    // We need it in terms of the overlapBox
-    this.overlapBuf = new Float32Array((x1 - x0) * (y1 - y0));
-    let i = 0;
-    for (let y = y0; y < y1; y++){
-        let yXwidth = y * width;
-        for (let x = x0; x < x1; x++){
-            this.overlapBuf[i++] = maskBuffer[yXwidth + x];
-        }
+        hasOverlapFlag = true;
+        let result = calculateOverlapBox(refImage, tgtImage, this.refBox, this.tgtBox);
+        this.overlapBox = result.overlapBox;
+        overlapByteArray = result.overlapByteArray;
     }
     
-    x0 += intersectBox.x0;
-    x1 += intersectBox.x0;
-    y0 += intersectBox.y0;
-    y1 += intersectBox.y0;
-    this.overlapBox = new Rect(x0, y0, x1, y1);
+    /**
+     * @returns {Boolean} True if the reference and target images overlap
+     */
+    this.hasOverlap = function(){
+        return hasOverlapFlag;
+    };
+    
+    /**
+     * @returns {ByteArray}
+     */
+    this.getOverlapByteArray = function(){
+        return overlapByteArray;
+    };
     
     /**
      * Create a mask image that is the same size as the reference image
      * Only the pixels within the overlapBox will be non zero.
      * Call Image.free() when the image is no longer needed.
+     * @param {Number} imageWidth
+     * @param {Number} imageHeight  
      * @returns {Image}
      */
-    this.getFullImageMask = function(){
-        let imageMask = new Image(this.refImage.width, this.refImage.height, 1);
+    this.getFullImageMask = function(imageWidth, imageHeight){
+        let imageMask = new Image(imageWidth, imageHeight, 1);
 //        mask.fill(0);     // I assume this is not necessary
-        imageMask.setSamples(this.overlapBuf, this.overlapBox);
+        imageMask.setSamples(new Float32Array(this.getOverlapByteArray()), this.overlapBox);
         return imageMask;
     };
     
@@ -297,78 +255,8 @@ function Overlap(refImage, tgtImage){
      */
     this.getOverlapMask = function(){
         let overlapMask = new Image(this.overlapBox.width, this.overlapBox.height, 1);
-        overlapMask.setSamples(this.overlapBuf);
+        overlapMask.setSamples(new Float32Array(this.getOverlapByteArray()));
         return overlapMask;
-    };
-    
-    /**
-     * Calculates and stores the overlap pixel vertical outline.
-     * this.minOutlineAtX stores points for the left side of the outline.
-     * this.maxOutlineAtX stores points for the right side of the outline.
-     * The stored (x,y) coordinates are image coordinates.
-     * The index of the array is the nth x pixel for the local overlap region
-     * (i.e. index 0 corresponds to the left most point of the overlap bounding box).
-     * For each local value of x, the image x, and minimum, maximum values of y are stored.
-     */
-    this.calculateOutlineAtX = function(){
-        // Get local overlap coordinates of outline
-        let w = this.overlapBox.width;
-        let h = this.overlapBox.height;
-        let x0 = this.overlapBox.x0;
-        let y0 = this.overlapBox.y0;
-        this.minOutlineAtX = new Array(w);
-        this.maxOutlineAtX = new Array(w);
-        for (let x=0; x<w; x++){
-            for (let y=0; y<h; y++){
-                let i = y * w + x;
-                if (this.overlapBuf[i]){
-                    this.minOutlineAtX[x] = new Point(x + x0, y + y0);
-                    break;
-                }
-            }
-            for (let y = h - 1; y >= 0; y--){
-                let i = y * w + x;
-                if (this.overlapBuf[i]){
-                    this.maxOutlineAtX[x] = new Point(x + x0, y + y0);
-                    break;
-                }
-            }
-        }
-    };
-    
-    /**
-     * Calculates and stores the overlap pixel horizontal outline.
-     * this.minOutlineAtY stores points for the top side of the outline.
-     * this.maxOutlineAtY stores points for the bottom side of the outline.
-     * The stored (x,y) coordinates are image coordinates.
-     * The index of the array is the nth x pixel for the local overlap region
-     * (i.e. index 0 corresponds to the upper most point of the overlap bounding box).
-     * For each local value of y, the image minimum, maximum values of x, and the image y are stored.
-     */
-    this.calculateOutlineAtY = function(){
-        let w = this.overlapBox.width;
-        let h = this.overlapBox.height;
-        let x0 = this.overlapBox.x0;
-        let y0 = this.overlapBox.y0;
-        this.minOutlineAtY = new Array(h);
-        this.maxOutlineAtY = new Array(h);
-        for (let y=0; y<h; y++){
-            let yXw = y * w;
-            for (let x=0; x<w; x++){
-                let i = yXw + x;
-                if (this.overlapBuf[i]){
-                    this.minOutlineAtY[y] = new Point(x + x0, y + y0);
-                    break;
-                }
-            }
-            for (let x = w - 1; x >= 0; x--){
-                let i = yXw + x;
-                if (this.overlapBuf[i]){
-                    this.maxOutlineAtY[y] = new Point(x + x0, y + y0);
-                    break;
-                }
-            }
-        }
     };
     
     /**
@@ -377,10 +265,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or minY)
      */
     this.getMinOutlineAtXArray = function(minY){
-        if (this.minOutlineAtX === null){
-            this.calculateOutlineAtX();
+        if (minOutlineAtX === null){
+            calculateOutlineAtX(this.overlapBox, this.getOverlapByteArray());
         }
-        let copy = this.minOutlineAtX.slice();
+        let copy = minOutlineAtX.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].y < minY){
                 copy[i] = new Point(copy[i].x, minY);
@@ -395,10 +283,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or maxY)
      */
     this.getMaxOutlineAtXArray = function(maxY){
-        if (this.maxOutlineAtX === null){
-            this.calculateOutlineAtX();
+        if (maxOutlineAtX === null){
+            calculateOutlineAtX(this.overlapBox, this.getOverlapByteArray);
         }
-        let copy = this.maxOutlineAtX.slice();
+        let copy = maxOutlineAtX.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].y > maxY){
                 copy[i] = new Point(copy[i].x, maxY);
@@ -428,10 +316,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or minX)
      */
     this.getMinOutlineAtYArray = function(minX){
-        if (this.minOutlineAtY === null){
-            this.calculateOutlineAtY();
+        if (minOutlineAtY === null){
+            calculateOutlineAtY(this.overlapBox, this.getOverlapByteArray());
         }
-        let copy = this.minOutlineAtY.slice();
+        let copy = minOutlineAtY.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].x < minX){
                 copy[i] = new Point(minX, copy[i].y);
@@ -446,10 +334,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or maxX)
      */
     this.getMaxOutlineAtYArray = function(maxX){
-        if (this.maxOutlineAtY === null){
-            this.calculateOutlineAtY();
+        if (maxOutlineAtY === null){
+            calculateOutlineAtY(this.overlapBox, this.getOverlapByteArray());
         }
-        let copy = this.maxOutlineAtY.slice();
+        let copy = maxOutlineAtY.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].x > maxX){
                 copy[i] = new Point(maxX, copy[i].y);
@@ -472,4 +360,156 @@ function Overlap(refImage, tgtImage){
         }
         return midAtY;
     };
+    
+    /**
+     * @param {Image} refImage
+     * @param {Image} tgtImage
+     * @param {Rect} refBox Bounding box of non zero area
+     * @param {Rect} tgtBox Bounding box of non zero area
+     * @returns {overlapBox: overlapBox, overlapByteArray: overlapByteArray}
+     */
+    function calculateOverlapBox(refImage, tgtImage, refBox, tgtBox){
+        // intersectBox will be equal to or larger than the overlap region.
+        // For example, if the images are fatter outside the overlap
+        const intersectBox = refBox.intersection(tgtBox);
+        const xMin = intersectBox.x0;
+        const xMax = intersectBox.x1;
+        const yMin = intersectBox.y0;
+        const yMax = intersectBox.y1;  
+        const width = intersectBox.width;
+
+        // Overlap bounding box coordinates
+        let x0 = Number.POSITIVE_INFINITY;
+        let x1 = Number.NEGATIVE_INFINITY;
+        let y0 = Number.POSITIVE_INFINITY;
+        let y1 = Number.NEGATIVE_INFINITY;
+
+        // Create a mask to restrict the star detection to the overlapping area and previewArea
+        const bufLen = intersectBox.area;
+        let refBuffer = [];
+        let tgtBuffer = [];
+        const nChannels = refImage.isColor ? 3 : 1;
+        for (let c=0; c<nChannels; c++){
+            refBuffer[c] = new Float32Array(bufLen);
+            tgtBuffer[c] = new Float32Array(bufLen);
+            refImage.getSamples(refBuffer[c], intersectBox, c);
+            tgtImage.getSamples(tgtBuffer[c], intersectBox, c);
+        }
+        let maskBuffer = new ByteArray(bufLen);
+
+        for (let i=0; i<bufLen; i++){
+            let isOverlap = true;
+            for (let c = nChannels - 1; c > -1; c--) {
+                if (tgtBuffer[c][i] === 0 || refBuffer[c][i] === 0) {
+                    isOverlap = false;
+                    break;
+                }
+            }
+            if (isOverlap) {
+                maskBuffer[i] = 1;
+                // Determine bounding box
+                let y = Math.floor(i/width);
+                let x = i % width;
+                x0 = Math.min(x0, x);
+                x1 = Math.max(x1, x);
+                y0 = Math.min(y0, y);
+                y1 = Math.max(y1, y);
+            }
+        }
+        // x1 and y1 both need to be just after the last pixel (x1 - x0 = width)
+        x1++;
+        y1++;
+
+        // We have the mask buffer in terms of the intersection box.
+        // We need it in terms of the overlapBox
+        let overlapByteArray = new ByteArray((x1 - x0) * (y1 - y0));
+        let i = 0;
+        for (let y = y0; y < y1; y++){
+            let yXwidth = y * width;
+            for (let x = x0; x < x1; x++){
+                overlapByteArray[i++] = maskBuffer[yXwidth + x];
+            }
+        }
+
+        x0 += intersectBox.x0;
+        x1 += intersectBox.x0;
+        y0 += intersectBox.y0;
+        y1 += intersectBox.y0;
+        let overlapBox = new Rect(x0, y0, x1, y1);
+        return {overlapBox: overlapBox, overlapByteArray: overlapByteArray};
+    }
+    
+    /**
+     * Calculates and stores the overlap pixel vertical outline.
+     * minOutlineAtX stores points for the left side of the outline.
+     * maxOutlineAtX stores points for the right side of the outline.
+     * The stored (x,y) coordinates are image coordinates.
+     * The index of the array is the nth x pixel for the local overlap region
+     * (i.e. index 0 corresponds to the left most point of the overlap bounding box).
+     * For each local value of x, the image x, and minimum, maximum values of y are stored.
+     * @param {Rect} overlapBox (input)
+     * @param {ByteArray[]} overlapByteArray Zero where there is no overlap (input)
+     */
+    function calculateOutlineAtX(overlapBox, overlapByteArray){
+        // Get local overlap coordinates of outline
+        let w = overlapBox.width;
+        let h = overlapBox.height;
+        let x0 = overlapBox.x0;
+        let y0 = overlapBox.y0;
+        minOutlineAtX = new Array(w);
+        maxOutlineAtX = new Array(w);
+        for (let x=0; x<w; x++){
+            for (let y=0; y<h; y++){
+                let i = y * w + x;
+                if (overlapByteArray[i]){
+                    minOutlineAtX[x] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+            for (let y = h - 1; y >= 0; y--){
+                let i = y * w + x;
+                if (overlapByteArray[i]){
+                    maxOutlineAtX[x] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Calculates and stores the overlap pixel horizontal outline.
+     * minOutlineAtY stores points for the top side of the outline.
+     * maxOutlineAtY stores points for the bottom side of the outline.
+     * The stored (x,y) coordinates are image coordinates.
+     * The index of the array is the nth x pixel for the local overlap region
+     * (i.e. index 0 corresponds to the upper most point of the overlap bounding box).
+     * For each local value of y, the image minimum, maximum values of x, and the image y are stored.
+     * @param {Rect} overlapBox (input)
+     * @param {ByteArray[]} overlapByteArray Zero where there is no overlap (input)
+     */
+    function calculateOutlineAtY(overlapBox, overlapByteArray){
+        let w = overlapBox.width;
+        let h = overlapBox.height;
+        let x0 = overlapBox.x0;
+        let y0 = overlapBox.y0;
+        minOutlineAtY = new Array(h);
+        maxOutlineAtY = new Array(h);
+        for (let y=0; y<h; y++){
+            let yXw = y * w;
+            for (let x=0; x<w; x++){
+                let i = yXw + x;
+                if (overlapByteArray[i]){
+                    minOutlineAtY[y] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+            for (let x = w - 1; x >= 0; x--){
+                let i = yXw + x;
+                if (overlapByteArray[i]){
+                    maxOutlineAtY[y] = new Point(x + x0, y + y0);
+                    break;
+                }
+            }
+        }
+    }
 }

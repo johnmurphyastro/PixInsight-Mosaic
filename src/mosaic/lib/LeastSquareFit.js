@@ -15,8 +15,6 @@
 // =================================================================================
 //"use strict";
 
-// Some of these functions require the calling script to #include SamplePair
-
 /**
  * y = mx + b
  * @param {Number} m
@@ -37,22 +35,22 @@ function LinearFitData(m, b) {
  */
 function LeastSquareFitAlgorithm() {
     // y = reference, x = target
-    this.sumX = 0.0;
-    this.sumY = 0.0;
-    this.sumSquaredX = 0.0;
-    this.sumXY = 0.0;
-    this.n = 0;
+    let sumX = 0.0;
+    let sumY = 0.0;
+    let sumSquaredX = 0.0;
+    let sumXY = 0.0;
+    let n = 0;
 
     /**
      * @param {Number} x
      * @param {Number} y
      */
     this.addValue = function (x, y) {
-        this.sumX += x;
-        this.sumY += y;
-        this.sumSquaredX += x * x;
-        this.sumXY += x * y;
-        this.n++;
+        sumX += x;
+        sumY += y;
+        sumSquaredX += x * x;
+        sumXY += x * y;
+        n++;
     };
 
     /**
@@ -60,15 +58,15 @@ function LeastSquareFitAlgorithm() {
      * @return {LinearFitData} Fitted line (y = mx + b)
      */
     this.getLinearFit = function () {
-        if (this.n > 1) {
-            let m = ((this.n * this.sumXY) - (this.sumX * this.sumY)) /
-                    ((this.n * this.sumSquaredX) - (this.sumX * this.sumX));
+        if (n > 1) {
+            let m = ((n * sumXY) - (sumX * sumY)) /
+                    ((n * sumSquaredX) - (sumX * sumX));
 
-            let b = (this.sumY - (m * this.sumX)) / this.n;
+            let b = (sumY - (m * sumX)) / n;
             return new LinearFitData(m, b);
-        } else if (this.n === 1){
+        } else if (n === 1){
             console.warningln("WARNING: Least Squares Fit only has one point. Assuming origin as second point.");
-            return new LinearFitData(this.sumY / this.sumX, 0);
+            return new LinearFitData(sumY / sumX, 0);
         } else {
             console.criticalln("ERROR: Least Squares Fit has no points to fit...");
             return new LinearFitData(1, 0);
@@ -82,8 +80,8 @@ function LeastSquareFitAlgorithm() {
      * @returns {LinearFitData}
      */
     this.getOriginFit = function () {
-        if (this.n > 0) {
-            let m = this.sumXY / this.sumSquaredX;
+        if (n > 0) {
+            let m = sumXY / sumSquaredX;
             return new LinearFitData(m, 0);
         } else {
             console.criticalln("ERROR: Least Squares Origin Fit has no points to fit...");
@@ -92,30 +90,6 @@ function LeastSquareFitAlgorithm() {
     };
 }
 
-/**
- * @param {Number} m gradient
- * @param {Number} b y axis intercept
- * @param {Number} x0 Line valid from this x coordinate
- * @param {Number} x1 Line valid upto this x coordinate
- * @returns {EquationOfLine}
- */
-function EquationOfLine(m, b, x0, x1){
-    this.m = m;
-    this.b = b;
-    this.x0 = x0;
-    this.x1 = x1;
-    this.y0 = eqnOfLineCalcY(x0, m, b);
-    this.y1 = eqnOfLineCalcY(x1, m, b);
-    
-    /**
-     * y = mx + b
-     * @param {Number} x coordinate
-     * @returns {Number} y coordinate
-     */
-    this.calcYFromX = function (x){
-        return this.m * x + this.b;
-    };
-}
 /**
  * y = mx + b
  * @param {Number} x coordinate

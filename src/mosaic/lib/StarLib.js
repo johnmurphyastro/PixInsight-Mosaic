@@ -478,7 +478,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
      * Draw graph lines and points for a single color
      * @param {Graph} graph
      * @param {Number} lineColor e.g. 0xAARRGGBB
-     * @param {StarPairs} starPairs Contains the array of SamplePair
+     * @param {StarPairs} starPairs Contains LinearFitData and array of StarPair
      * @param {Number} pointColor e.g. 0xAARRGGBB
      * @returns {undefined}
      */
@@ -534,7 +534,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     }
     // Display graph in script dialog
     GraphDialog.prototype = new Dialog;
-    let graph = new GraphDialog(graphWithAxis.bitmap, "Photometry Graph", graphWithAxis.screenToWorld);
+    let graph = new GraphDialog(graphWithAxis.getGraphBitmap(), "Photometry Graph", graphWithAxis.screenToWorld);
     if (graph.execute() === StdButton_Yes){
         // User requested graph saved to PixInsight View
         let isColor = refView.image.isColor;
@@ -746,9 +746,9 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
  * @param {Rect} joinRect Restricts the mask to join instead of using all overlap pixels
  */
 function createJoinMask(tgtView, overlap, joinRect){
-    const overlapMask = overlap.getFullImageMask();
-    const width = overlapMask.width;
-    const height = overlapMask.height;
+    const width = tgtView.image.width;
+    const height = tgtView.image.height;
+    const overlapMask = overlap.getFullImageMask(width, height);
     const maskValue = 0.8;
     // Restrict the mask to the joinRect rather than using the whole overlap
     let maskSamples = new Float32Array(joinRect.area);
@@ -780,7 +780,9 @@ function createJoinMask(tgtView, overlap, joinRect){
 function displayMask(tgtView, joinArea, detectedStars, data){
     let postfix = "Mask";
     let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + data.limitMaskStarsPercent + "_" + postfix;
-    let bmp = new Bitmap(tgtView.image.width, tgtView.image.height);
+    let imageWidth = tgtView.image.width;
+    let imageHeight = tgtView.image.height;
+    let bmp = new Bitmap(imageWidth, imageHeight);
     bmp.fill(0xffffffff);
     
     let firstNstars;
@@ -808,7 +810,7 @@ function displayMask(tgtView, joinArea, detectedStars, data){
 
     // Create new window and copy bitmap to its image.
     // width, height, nChannels, bitsPerSample, floatSample, color, title
-    let w = new ImageWindow(bmp.width, bmp.height, 1, 8, false, false, title);
+    let w = new ImageWindow(imageWidth, imageHeight, 1, 8, false, false, title);
     let view = w.mainView;
     view.beginProcess(UndoFlag_NoSwapFile);
     view.image.blend(bmp);
@@ -824,7 +826,7 @@ function displayMask(tgtView, joinArea, detectedStars, data){
     P.executeOn(w.mainView, false);
     
     // Make sure the star mask circles do not include pixels beyond the overlap.
-    let overlapMask = data.cache.overlap.getFullImageMask();
+    let overlapMask = data.cache.overlap.getFullImageMask(imageWidth, imageHeight);
     let minX = Math.max(0, joinArea.x0 - 10);
     let minY = Math.max(0, joinArea.y0 - 10);
     let maxX = Math.min(bmp.width, joinArea.x1 + 10);
@@ -935,7 +937,7 @@ function createImageFromRefAndBitmap(refView, imageRect, maskSamples, bmp, title
  */
 function createOverlapImage(refView, overlap, bmp, title, fitsKeyWords, minZoom) {
     // Create the new image and copy the samples from refView to it
-    createImageFromRefAndBitmap(refView, overlap.overlapBox, overlap.overlapBuf,
+    createImageFromRefAndBitmap(refView, overlap.overlapBox, overlap.getOverlapByteArray(),
             bmp, title, fitsKeyWords, minZoom);
 }
 
@@ -956,7 +958,7 @@ function createJoinImage(refView, joinRect, overlap, bmp, title, fitsKeyWords, m
 
     // Create the new image and copy the samples from refView to it
     let maskSamples = new Float32Array(joinRect.area);
-    let overlapMask = overlap.getFullImageMask();
+    let overlapMask = overlap.getFullImageMask(refView.image.width, refView.image.height);
     overlapMask.getSamples(maskSamples, joinRect);
     overlapMask.free();
     

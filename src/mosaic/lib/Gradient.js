@@ -103,22 +103,21 @@ function createAvgDifArray(difArray){
 /**
  * Calculates a surface spline representing the difference between reference and target samples.
  * Represents the gradient in a single channel. (use 3 instances  for color images.)
- * @param {SamplePairs} samplePairs median values from ref and tgt samples
+ * @param {SamplePair[]} samplePairs median values from ref and tgt samples
  * @param {Number} logSmoothing Logrithmic value; larger values smooth more
  * @returns {SurfaceSpline}
  */
 function calcSurfaceSpline(samplePairs, logSmoothing){
-    let samplePairArray = samplePairs.samplePairArray;
-    const length = samplePairArray.length;
+    const length = samplePairs.length;
     let xVector = new Vector(length);
     let yVector = new Vector(length);
     let zVector = new Vector(length);
     let wVector = new Vector(length);
     for (let i=0; i<length; i++){
-        let samplePair = samplePairArray[i];
+        let samplePair = samplePairs[i];
         xVector.at(i, samplePair.rect.center.x);
         yVector.at(i, samplePair.rect.center.y);
-        zVector.at(i, samplePair.targetMedian - samplePair.referenceMedian);
+        zVector.at(i, samplePair.getDifference());
         wVector.at(i, samplePair.weight);
     }
     
@@ -828,7 +827,8 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlapBox, joinRect, 
 
 /**
  * Calculates maximum and minimum values for the sample points
- * @param {SamplePairs[]} colorSamplePairs Contains samplePairArray
+ * @param {SamplePair[][]} colorSamplePairs SamplePair[] for each channel
+ * @param {Number} minScaleDif Range will be at least +/- this value from the average value
  * @returns {SamplePairDifMinMax}
  */
 function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
@@ -838,9 +838,9 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
     let total = 0;
     for (let c=0; c<colorSamplePairs.length; c++) {
         let samplePairs = colorSamplePairs[c];
-        total += samplePairs.samplePairArray.length;
-        for (let samplePair of samplePairs.samplePairArray) {
-            let dif = samplePair.targetMedian - samplePair.referenceMedian;
+        total += samplePairs.length;
+        for (let samplePair of samplePairs) {
+            let dif = samplePair.getDifference();
             this.minDif = Math.min(this.minDif, dif);
             this.maxDif = Math.max(this.maxDif, dif);
             this.avgDif += dif;
@@ -862,7 +862,7 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
  * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
  * @param {Rect} joinRect Create dif arrays at either side of this rectangle 
- * @param {SamplePairs[]} colorSamplePairs The SamplePair points to be displayed (array contains color channels)
+ * @param {SamplePair[][]} colorSamplePairs The SamplePair points to be displayed for each channel
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
@@ -870,12 +870,66 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
 function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
         joinRect, colorSamplePairs, data, isPropagateGraph){
     
+    {   // Constructor
+        let graph = createGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
+                joinRect, colorSamplePairs, data, isPropagateGraph);
+
+        // Display graph in script dialog
+        GraphDialog.prototype = new Dialog;
+        let graphDialog = new GraphDialog(graph.getGraphBitmap(), "Gradient Graph", graph.screenToWorld);
+        if (graphDialog.execute() === StdButton_Yes){
+            // User requested graph saved to PixInsight View
+            let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
+            let imageWindow = graph.createWindow(windowTitle, true);
+            gradientGraphFitsHeader(imageWindow, data, isHorizontal, isTargetAfterRef);
+            imageWindow.show();
+        }
+    }
+    
     /**
+     * 
+     * @param {Number} width
+     * @param {Boolean} isHorizontal
+     * @param {Boolean} isTargetAfterRef
+     * @param {SurfaceSpline[]} surfaceSplines
+     * @param {Rect} joinRect
+     * @param {SamplePair[][]} colorSamplePairs
+     * @param {type} data
+     * @param {PhotometricMosaicData} isPropagateGraph
+     * @returns {Graph}
+     */
+    function createGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
+                joinRect, colorSamplePairs, data, isPropagateGraph){
+        let xMaxCoordinate;
+        let xLabel;
+        if (isHorizontal){
+            xLabel = "Mosaic tile join X-coordinate";
+            xMaxCoordinate = data.targetView.image.width;
+        } else {
+            xLabel = "Mosaic tile join Y-coordinate";
+            xMaxCoordinate = data.targetView.image.height;
+        }
+        let yLabel = "(" + data.targetView.fullId + ") - (" + data.referenceView.fullId + ")";
+        let axisWidth = Math.min(width, xMaxCoordinate);
+        // Graph scale
+        // gradientArray stores min / max of fitted lines.
+        // also need min / max of sample points.
+        const minScaleDif = 5e-5;
+        let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif);
+
+        return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange, axisWidth,
+                isHorizontal, isTargetAfterRef, surfaceSplines, 
+                joinRect, colorSamplePairs, data, isPropagateGraph, 1);
+    }
+    
+    /**
+     * 
      * @param {ImageWindow} graphWindow Graph window
      * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @return {undefined}
+     * @param {Boolean} isHorizontal
+     * @param {Boolean} isTargetAfterRef
      */
-    function gradientGraphFitsHeader(graphWindow, data){
+    function gradientGraphFitsHeader(graphWindow, data, isHorizontal, isTargetAfterRef){
         let view = graphWindow.mainView;
         view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
         let keywords = graphWindow.keywords;
@@ -899,18 +953,17 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Number} lineBoldColor
      * @param {GraphLinePath} graphLinePath Specifies which line should be bold
      * @param {Number} lineColor
-     * @param {SamplePairs} samplePairs
+     * @param {SamplePair[]} samplePairs
      * @param {Number} pointColor
      * @returns {undefined}
      */
     function drawLineAndPoints(graph, isHorizontal,
             difArrays, lineBoldColor, graphLinePath, lineColor, samplePairs, pointColor) {
                 
-        for (let samplePair of samplePairs.samplePairArray) {
+        for (let samplePair of samplePairs) {
             // Draw the sample points
             let coord = isHorizontal ? samplePair.rect.center.x : samplePair.rect.center.y;
-            let dif = samplePair.targetMedian - samplePair.referenceMedian;
-            graph.drawPoint(coord, dif, pointColor);
+            graph.drawPoint(coord, samplePair.getDifference(), pointColor);
         }
         for (let i = 0; i < difArrays.length; i++){
             let difArray = difArrays[i];
@@ -924,30 +977,32 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
         }
     };
     
-    let maxCoordinate;
-    let xLabel;
-    if (isHorizontal){
-        xLabel = "Mosaic tile join X-coordinate";
-        maxCoordinate = data.targetView.image.width;
-    } else {
-        xLabel = "Mosaic tile join Y-coordinate";
-        maxCoordinate = data.targetView.image.height;
-    }
-    let yLabel = "(" + data.targetView.fullId + ") - (" + data.referenceView.fullId + ")";
-    let axisWidth = Math.min(width, maxCoordinate);
-    // Graph scale
-    // gradientArray stores min / max of fitted lines.
-    // also need min / max of sample points.
-    const minScaleDif = 5e-5;
-    let minMax = new SamplePairDifMinMax(colorSamplePairs, minScaleDif);
-    
-    function createGraph(zoomFactor){
-        let maxY = minMax.maxDif;
-        let minY = minMax.minDif;
+    /**
+     * 
+     * @param {String} xLabel
+     * @param {String} yLabel
+     * @param {Number} xMaxCoordinate
+     * @param {SamplePairDifMinMax} yCoordinateRange
+     * @param {Number} axisWidth
+     * @param {Boolean} isHorizontal
+     * @param {Boolean} isTargetAfterRef
+     * @param {SurfaceSpline[]} surfaceSplines
+     * @param {Rect} joinRect
+     * @param {SamplePair[][]} colorSamplePairs
+     * @param {PhotometricMosaicData} data
+     * @param {Boolean} isPropagateGraph
+     * @param {Number} zoomFactor
+     * @returns {Graph}
+     */
+    function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange, axisWidth,
+            isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
+            data, isPropagateGraph, zoomFactor){
+        let maxY = yCoordinateRange.maxDif;
+        let minY = yCoordinateRange.minDif;
         
-        let graphWithAxis = new Graph(0, minY, maxCoordinate, maxY);
-        graphWithAxis.setAxisLength(axisWidth + 2, 720);
-        graphWithAxis.createGraph(xLabel, yLabel);
+        let graph = new Graph(0, minY, xMaxCoordinate, maxY);
+        graph.setAxisLength(axisWidth + 2, 720);
+        graph.createGraph(xLabel, yLabel);
 
         let graphLine = new GraphLinePath();
         if (isPropagateGraph){
@@ -961,7 +1016,7 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
             for (let path of graphLine.paths){
                 difArrays.push(surfaceSplines[0].evaluate(path).toArray());
             }
-            drawLineAndPoints(graphWithAxis, isHorizontal,
+            drawLineAndPoints(graph, isHorizontal,
                 difArrays, 0xFFFF0000, graphLine, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
         } else {
             // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
@@ -974,34 +1029,21 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
                 for (let path of graphLine.paths){
                     difArrays.push(surfaceSplines[c].evaluate(path).toArray());
                 }
-                let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+                let graphAreaOnly = graph.createGraphAreaOnly();
                 drawLineAndPoints(graphAreaOnly, isHorizontal,
                     difArrays, lineBoldColors[c], graphLine, lineColors[c], colorSamplePairs[c], pointColors[c]);
-                graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+                graph.mergeWithGraphAreaOnly(graphAreaOnly);
             }
         }
-        return graphWithAxis;
+        return graph;
     };
-    
-    let graphWithAxis = createGraph(1);
-    
-    // Display graph in script dialog
-    GraphDialog.prototype = new Dialog;
-    let graph = new GraphDialog(graphWithAxis.bitmap, "Gradient Graph", graphWithAxis.screenToWorld);
-    if (graph.execute() === StdButton_Yes){
-        // User requested graph saved to PixInsight View
-        let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
-        let imageWindow = graphWithAxis.createWindow(windowTitle, true);
-        gradientGraphFitsHeader(imageWindow, data);
-        imageWindow.show();
-    }
 }
 
 
 function GraphLinePath(){
     /** {Point[][]} paths min, mid and max paths across overlap region */
     this.paths = [];
-    /** {Boolean} bold Draw nth line bold */
+    /** {Boolean[]} bold Draw nth line bold */
     this.bold = [];
     
     /**
