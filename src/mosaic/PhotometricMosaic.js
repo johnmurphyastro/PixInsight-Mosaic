@@ -23,7 +23,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 
 #include <pjsr/UndoFlag.jsh>
 #include "lib/PhotometricMosaicDialog.js"
-#include "lib/SamplePair.js"
+#include "lib/SampleGrid.js"
 #include "lib/LeastSquareFit.js"
 #include "lib/Graph.js"
 #include "lib/Cache.js"
