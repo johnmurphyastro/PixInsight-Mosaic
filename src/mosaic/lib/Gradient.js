@@ -357,9 +357,9 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
         if (isTargetAfterRef_ === null){
             // Insert mode
             // Full correction from start of join up to end of the join region
-            this.applyScaleAndGradientToJoin(refImage, tgtImage, view, scale, joinSurfaceSpline,
-                    joinRect_.x0, joinRect_.y0, joinRect_.x1, joinRect_.y1, 
-                    channel, joinType_);
+            let imageRowItr = new ImageRowsIterator(refImage, tgtImage, view, channel, createMosaic_, isHorizontal_);
+            applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
+                    joinRect_.x0, joinRect_.y0, joinRect_.x1, joinRect_.y1, joinType_);
             return;
         }
         
