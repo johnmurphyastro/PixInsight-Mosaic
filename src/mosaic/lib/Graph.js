@@ -29,22 +29,22 @@
 function Graph(x0, y0, x1, y1) {
     this.axisColor = 0xFF888888;
     
-    // private class data
-    let xMin = x0;
-    let yMin = y0;
-    let xMax = x1;
-    let yMax = y1;
+    // module data
+    let xMin_ = x0;
+    let yMin_ = y0;
+    let xMax_ = x1;
+    let yMax_ = y1;
     
-    let bitmap;
-    let xOrigin;
-    let yOrigin;
+    let bitmap_;
+    let xOrigin_;
+    let yOrigin_;
     
-    let xAxisLength;
-    let yAxisLength;
+    let xAxisLength_;
+    let yAxisLength_;
     
-    let xScale;
-    let yScale;
-    // End of private class data
+    let xScale_;
+    let yScale_;
+    // End of module data
     
     /**
      * Sets the x & y axis lengths and calculates the scales for both axis
@@ -53,10 +53,10 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     this.setAxisLength = function(xLength, yLength){
-        xAxisLength = xLength;
-        yAxisLength = yLength;
-        xScale = calculateScale(xAxisLength, xMax - xMin);
-        yScale = calculateScale(yAxisLength, yMax - yMin);
+        xAxisLength_ = xLength;
+        yAxisLength_ = yLength;
+        xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
+        yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
     };
     
     /**
@@ -66,10 +66,10 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     this.setXAxisLength = function(xLength){
-        xAxisLength = xLength;
-        xScale = calculateScale(xAxisLength, xMax - xMin);
-        yScale = xScale;
-        yAxisLength = calculateAxisLength(yScale, yMax - yMin);
+        xAxisLength_ = xLength;
+        xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
+        yScale_ = xScale_;
+        yAxisLength_ = calculateAxisLength(yScale_, yMax_ - yMin_);
     };
     
     /**
@@ -79,10 +79,10 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     this.setYAxisLength = function(yLength){
-        yAxisLength = yLength;
-        yScale = calculateScale(yAxisLength, yMax - yMin);
-        xScale = yScale;
-        xAxisLength = calculateAxisLength(xScale, xMax - xMin);
+        yAxisLength_ = yLength;
+        yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
+        xScale_ = yScale_;
+        xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
     };
     
     /**
@@ -92,8 +92,8 @@ function Graph(x0, y0, x1, y1) {
      * @returns {String} Output string in format "( x, y )"
      */
     this.screenToWorld = function( x, y ){
-        let wx = (x - xOrigin) / xScale + xMin;
-        let wy = (yOrigin - y) / yScale + yMin;
+        let wx = (x - xOrigin_) / xScale_ + xMin_;
+        let wy = (yOrigin_ - y) / yScale_ + yMin_;
         let xText = wx < 1000 ? wx.toPrecision(3) : wx.toPrecision(4);
         let yText = wy < 1000 ? wy.toPrecision(3) : wy.toPrecision(4);
         return "( " + xText + ", " + yText + " )";
@@ -118,15 +118,15 @@ function Graph(x0, y0, x1, y1) {
         let leftMargin = maxNumberLength + fontHeight + tickLength + 5;
         let rightMargin = maxNumberLength / 2;
         
-        xOrigin = leftMargin;
-        yOrigin = topMargin + yAxisLength - 1;
+        xOrigin_ = leftMargin;
+        yOrigin_ = topMargin + yAxisLength_ - 1;
        
-        let imageWidth = leftMargin + xAxisLength + rightMargin;
-        let imageHeight = topMargin + yAxisLength + bottomMargin;
-        bitmap = new Bitmap(imageWidth, imageHeight);
-        bitmap.fill(0xFF000000);    // AARRGGBB
+        let imageWidth = leftMargin + xAxisLength_ + rightMargin;
+        let imageHeight = topMargin + yAxisLength_ + bottomMargin;
+        bitmap_ = new Bitmap(imageWidth, imageHeight);
+        bitmap_.fill(0xFF000000);    // AARRGGBB
         
-        let graphics = new Graphics(bitmap);
+        let graphics = new Graphics(bitmap_);
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
         graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
@@ -144,8 +144,8 @@ function Graph(x0, y0, x1, y1) {
      * @returns {Graph}
      */
     this.createGraphAreaOnly = function () {
-        let newGraph = new Graph(xMin, yMin, xMax, yMax);
-        newGraph.setToGraphAreaOnlyMode(xAxisLength, yAxisLength, xScale, yScale);
+        let newGraph = new Graph(xMin_, yMin_, xMax_, yMax_);
+        newGraph.setToGraphAreaOnlyMode(xAxisLength_, yAxisLength_, xScale_, yScale_);
         return newGraph;
     };
     
@@ -157,14 +157,14 @@ function Graph(x0, y0, x1, y1) {
      * @param {Number} scaleY Y-Axis scale
      */
     this.setToGraphAreaOnlyMode = function(xLength, yLength, scaleX, scaleY) {
-        xAxisLength = xLength;
-        yAxisLength = yLength;
-        xScale = scaleX;
-        yScale = scaleY;
-        xOrigin = 0;
-        yOrigin = yAxisLength - 1;
-        bitmap = new Bitmap(xAxisLength, yAxisLength);
-        bitmap.fill(0x00000000);    // AARRGGBB
+        xAxisLength_ = xLength;
+        yAxisLength_ = yLength;
+        xScale_ = scaleX;
+        yScale_ = scaleY;
+        xOrigin_ = 0;
+        yOrigin_ = yAxisLength_ - 1;
+        bitmap_ = new Bitmap(xAxisLength_, yAxisLength_);
+        bitmap_.fill(0x00000000);    // AARRGGBB
     };
     
     /**
@@ -176,8 +176,8 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     this.mergeWithGraphAreaOnly = function (graphAreaOnly){
-        let p = new Point(xOrigin, yOrigin - yAxisLength);
-        bitmap.or(p, graphAreaOnly.getGraphBitmap());
+        let p = new Point(xOrigin_, yOrigin_ - yAxisLength_);
+        bitmap_.or(p, graphAreaOnly.getGraphBitmap());
     };
     
     /** Draw a line that traverses the whole data area
@@ -186,7 +186,7 @@ function Graph(x0, y0, x1, y1) {
      * @param {type} color Line color (0xAARRGGBB)
      */
     this.drawLine = function(m, b, color){
-        this.drawLineSegment(m, b, color, false, xMin, xMax);
+        this.drawLineSegment(m, b, color, false, xMin_, xMax_);
     };
     
     /**
@@ -199,8 +199,8 @@ function Graph(x0, y0, x1, y1) {
      * @param {Number} x1 Specifies line's right limit
      */
     this.drawLineSegment = function(m, b, color, antiAlias, x0, x1){
-        let g = new Graphics(bitmap);
-        g.clipRect = new Rect(xOrigin, yOrigin - yAxisLength, xOrigin + xAxisLength, yOrigin);
+        let g = new Graphics(bitmap_);
+        g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
         g.transparentBackground = true;
         g.antialiasing = antiAlias;
         g.pen = new Pen(color);
@@ -218,8 +218,8 @@ function Graph(x0, y0, x1, y1) {
      * @param {Boolean} antiAlias If true draw an antialiased line
      */
     this.drawDifArray = function(difArray, firstCoord, color, antiAlias){
-        let g = new Graphics(bitmap);
-        g.clipRect = new Rect(xOrigin, yOrigin - yAxisLength, xOrigin + xAxisLength, yOrigin);
+        let g = new Graphics(bitmap_);
+        g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
         g.transparentBackground = true;
         g.antialiasing = antiAlias;
         g.pen = new Pen(color);
@@ -245,11 +245,11 @@ function Graph(x0, y0, x1, y1) {
     this.drawPoint = function(xWorld, yWorld, color){
         let x = xToScreenX(xWorld);
         let y = yToScreenY(yWorld);
-        if (x >= 0 && y >= 0 && x < bitmap.width && y < bitmap.height){
-            bitmap.setPixel(x, y, color);
+        if (x >= 0 && y >= 0 && x < bitmap_.width && y < bitmap_.height){
+            bitmap_.setPixel(x, y, color);
         } else {
-            console.criticalln("Out of range: (" + x + "," + y + ") bitmap width: "
-                    + bitmap.width + " heigth: " + bitmap.height);
+            console.criticalln("Out of range: (" + x + "," + y + ") bitmap_ width: "
+                    + bitmap_.width + " heigth: " + bitmap_.height);
         }
     };
     
@@ -257,7 +257,7 @@ function Graph(x0, y0, x1, y1) {
      * @returns {Bitmap} The bitmap the graph has been drawn on
      */
     this.getGraphBitmap = function(){
-        return bitmap;
+        return bitmap_;
     };
     
     /**
@@ -269,14 +269,14 @@ function Graph(x0, y0, x1, y1) {
     this.createWindow = function (title, isColor) {
         let bitsPerSample = 8;
         let nChannels = isColor ? 3 : 1;
-        let imageWindow = new ImageWindow(bitmap.width, bitmap.height,
+        let imageWindow = new ImageWindow(bitmap_.width, bitmap_.height,
                 nChannels, bitsPerSample, false, isColor, title);
 
         let view = imageWindow.mainView;
         let image = view.image;
 
         view.beginProcess(UndoFlag_NoSwapFile);
-        image.blend(bitmap);
+        image.blend(bitmap_);
         view.endProcess();
 
         return imageWindow;
@@ -307,7 +307,7 @@ function Graph(x0, y0, x1, y1) {
      * @returns {Number} Screen X-Coordinate
      */
     function xToScreenX(x){
-        return Math.round(xOrigin + (x - xMin) * xScale);
+        return Math.round(xOrigin_ + (x - xMin_) * xScale_);
     }
     
     /**
@@ -315,7 +315,7 @@ function Graph(x0, y0, x1, y1) {
      * @returns {Number} Screen Y-Coordinate
      */
     function yToScreenY(y){
-        return Math.round(yOrigin - (y - yMin) * yScale);
+        return Math.round(yOrigin_ - (y - yMin_) * yScale_);
     }
     
     /**
@@ -326,23 +326,23 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     function drawXAxis(g, tickLength, minDistBetweenTicks, axisColor){
-        const y1 = yOrigin;
-        const xTickInterval = calculateTickIncrement(xMax - xMin, xAxisLength / minDistBetweenTicks);
-        const firstTickX = calculateFirstTick(xMin, xTickInterval);
+        const y1 = yOrigin_;
+        const xTickInterval = calculateTickIncrement(xMax_ - xMin_, xAxisLength_ / minDistBetweenTicks);
+        const firstTickX = calculateFirstTick(xMin_, xTickInterval);
         
-        const yAxisEnd = yOrigin - yAxisLength;
+        const yAxisEnd = yOrigin_ - yAxisLength_;
         g.pen = new Pen(0xFF222222);
-        for (let x = firstTickX; x <= xMax; x += xTickInterval){
+        for (let x = firstTickX; x <= xMax_; x += xTickInterval){
             let x1 = xToScreenX(x);
-            if (x1 > xOrigin){
+            if (x1 > xOrigin_){
                 g.drawLine(x1, y1 - 1, x1, yAxisEnd);
             }
         }
         
         g.pen = new Pen(axisColor);
-        g.drawLine(xOrigin, yOrigin, xOrigin + xAxisLength, yOrigin);
+        g.drawLine(xOrigin_, yOrigin_, xOrigin_ + xAxisLength_, yOrigin_);
         let fontHeight = g.font.ascent + g.font.descent;
-        for (let x = firstTickX; x <= xMax; x += xTickInterval){
+        for (let x = firstTickX; x <= xMax_; x += xTickInterval){
             let x1 = xToScreenX(x);
             g.drawLine(x1, y1, x1, y1 + tickLength);
             if (xTickInterval < 1){
@@ -366,22 +366,22 @@ function Graph(x0, y0, x1, y1) {
      * @returns {undefined}
      */
     function drawYAxis(g, tickLength, minDistBetweenTicks, axisColor){
-        const x1 = xOrigin;
-        const yTickInterval = calculateTickIncrement(yMax - yMin, yAxisLength / minDistBetweenTicks);
-        const firstTickY = calculateFirstTick(yMin, yTickInterval);
+        const x1 = xOrigin_;
+        const yTickInterval = calculateTickIncrement(yMax_ - yMin_, yAxisLength_ / minDistBetweenTicks);
+        const firstTickY = calculateFirstTick(yMin_, yTickInterval);
         
-        const xAxisEnd = xOrigin + xAxisLength;
+        const xAxisEnd = xOrigin_ + xAxisLength_;
         g.pen = new Pen(0xFF222222);
-        for (let y = firstTickY; y <= yMax; y += yTickInterval){
+        for (let y = firstTickY; y <= yMax_; y += yTickInterval){
             let y1 = yToScreenY(y);
-            if (y1 < yOrigin){
+            if (y1 < yOrigin_){
                 g.drawLine(x1 + 1, y1, xAxisEnd, y1);
             }
         }
         
         g.pen = new Pen(axisColor);
-        g.drawLine(xOrigin, yOrigin, xOrigin, yOrigin - yAxisLength);
-        for (let y = firstTickY; y <= yMax; y += yTickInterval){
+        g.drawLine(xOrigin_, yOrigin_, xOrigin_, yOrigin_ - yAxisLength_);
+        for (let y = firstTickY; y <= yMax_; y += yTickInterval){
             let y1 = yToScreenY(y);
             g.drawLine(x1, y1, x1 - tickLength, y1);
             if (yTickInterval < 1){
@@ -436,11 +436,11 @@ function Graph(x0, y0, x1, y1) {
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
         let y = Math.max(0, imageHeight/2 - w/2);
-        bitmap.copy(new Point(0, y), rotatedBitmap);
+        bitmap_.copy(new Point(0, y), rotatedBitmap);
     }
     
     /**
-     * @param {Number} range xMax - xMin
+     * @param {Number} range xMax_ - xMin_
      * @param {Number} nTargetSteps Maximum number of ticks on axis
      * @returns {Number} tick increment
      */

@@ -30,22 +30,10 @@ function StarPair(refStar, tgtStar){
 }
 
 /**
- * Stores the array of StarPair and the LinearFitData that was calculated from them
- * @param {StarPair[]} starPairArray
- * @returns {StarPairs}
- */
-function StarPairs(starPairArray){
-    this.starPairArray = starPairArray;
-    this.linearFitData = null;
-}
-
-/**
  * 
  * @returns {StarsDetected}
  */
 function StarsDetected(){
-    this.nChannels = 1;
-    
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -64,7 +52,7 @@ function StarsDetected(){
      * @param {MosaicCache} cache
      */
     this.detectStars = function (refView, tgtView, logSensitivity, cache) {
-        this.nChannels = refView.image.isColor ? 3 : 1;
+        let nChannels = refView.image.isColor ? 3 : 1;
         console.writeln("<b><u>Detecting stars</u></b>");
         processEvents();
         const overlapBox = cache.overlap.overlapBox;
@@ -75,7 +63,7 @@ function StarsDetected(){
             cache.refColorStars = [];
             cache.tgtColorStars = [];
             let overlapMask = cache.overlap.getOverlapMask();
-            for (let c = 0; c < this.nChannels; c++) {
+            for (let c = 0; c < nChannels; c++) {
                 let refStars = findStars(refView, overlapMask, overlapBox, logSensitivity, c);
                 cache.refColorStars.push(refStars);
                 console.writeln("Reference[", c, "] detected ", refStars.length, " stars");
@@ -106,7 +94,7 @@ function StarsDetected(){
      * 
      * @param {View} refView
      * @param {PhotometricMosaicData} data Values from user interface
-     * @returns {StarPairs[]} Array of StarPairs for all color channels
+     * @returns {StarPair[][]} Array of StarPair[] for each color channels
      */
     this.getColorStarPairs = function(refView, data){
         let colorStarPairs = [];
@@ -185,7 +173,7 @@ function StarsDetected(){
      * Finds the stars that exist in both images that have no pixel above upperLimit.
      * @param {Number} channel
      * @param {PhotometricMosaicData} data Values from user interface
-     * @returns {StarPairs} Matching star pairs. All star pixels are below the upperLimit.
+     * @returns {StarPair[]} Matching star pairs. All star pixels are below the upperLimit.
      */
     function findMatchingStars(channel, data) {
         let searchRadius = data.starSearchRadius;
@@ -279,7 +267,7 @@ function StarsDetected(){
         let starPairArray = matchStars(tgtStarsClone, refStars, searchRadius, false, 0, 0);
         if (starPairArray.length > 10) {
             // Second pass rejects stars if (refFlux / tgtFlux) is higher or lower than expected
-            let linearFit = calculateScale(new StarPairs(starPairArray));
+            let linearFit = calculateScale(starPairArray);
             const gradient = linearFit.m;
             const tolerance = data.starFluxTolerance;
             let starPairArray2 = matchStars(tgtStars, refStars, searchRadius,
@@ -290,10 +278,10 @@ function StarsDetected(){
                     console.writeln("Channel[" + channel + "] Removed " + nRemoved +
                             " photometry stars with large flux differences");
                 }
-                return new StarPairs(starPairArray2);
+                return starPairArray2;
             }
         }
-        return new StarPairs(starPairArray);
+        return starPairArray;
     };
 
     /**
@@ -360,15 +348,15 @@ function StarsDetected(){
 
 /**
  * Removes the worst outlier from the photometry least squares fit line
- * @param {StarPairs} starPairs A star pair will be removed
+ * @param {StarPair[]} starPairs A star pair will be removed
  * @param {LinearFitData} linearFit
- * @returns {StarPairs}
+ * @returns {StarPair[]}
  */
 function removeStarPairOutlier(starPairs, linearFit){
     let maxErr = Number.NEGATIVE_INFINITY;
     let removeStarPairIdx = -1;
-    for (let i=0; i<starPairs.starPairArray.length; i++){
-        let starPair = starPairs.starPairArray[i];
+    for (let i=0; i<starPairs.length; i++){
+        let starPair = starPairs[i];
         // y = ref; x = tgt
         let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
         let dif = Math.abs(y - starPair.refStar.flux);
@@ -378,7 +366,7 @@ function removeStarPairOutlier(starPairs, linearFit){
         }
     }
     if (removeStarPairIdx !== -1){
-        starPairs.starPairArray.splice(removeStarPairIdx, 1);
+        starPairs.splice(removeStarPairIdx, 1);
     }
     return starPairs;
 }
@@ -411,21 +399,22 @@ function StarMinMax() {
 /**
  * 
  * @param {FITSKeyword} keywords
- * @param {StarPairs[]} colorStarPairs StarPairs for L or R,G,B
- * @param {type} nColors
- * @param {type} rect OverlapBox for photometricStar image, null for photometric graph
+ * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
+ * @param {Number} nColors Number of channels
+ * @param {LinearFitData[]} scaleFactors
+ * @param {Rect} rect OverlapBox for photometricStar image, null for photometric graph
  */
-function addScaleToFitsHeader(keywords, colorStarPairs, nColors, rect){
+function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, rect){
     let maxErr = Number.NEGATIVE_INFINITY;
     let errStar = null;
     for (let c = 0; c < nColors; c++) {
         let starPairs = colorStarPairs[c];
-        let linearFit = starPairs.linearFitData;
+        let linearFit = scaleFactors[c];
         let comment = "scale[" + c + "]: " + linearFit.m.toPrecision(5) +
-                " (" + starPairs.starPairArray.length + " stars)";
+                " (" + starPairs.length + " stars)";
         keywords.push(new FITSKeyword("COMMENT", "", comment));
 
-        for (let starPair of starPairs.starPairArray) {
+        for (let starPair of starPairs) {
             // y = ref; x = tgt
             let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
             let dif = Math.abs(y - starPair.refStar.flux);
@@ -451,14 +440,15 @@ function addScaleToFitsHeader(keywords, colorStarPairs, nColors, rect){
  * @param {String} refView
  * @param {String} tgtView
  * @param {Number} height
- * @param {StarPairs[]} colorStarPairs StarPairs for L or R,G,B
+ * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
+ * @param {LinearFitData[]} scaleFactors
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  * @returns {Boolean} True if graph was displayed
  */
-function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
+function displayStarGraph(refView, tgtView, height, colorStarPairs, scaleFactors, data){
     /**
      * @param {ImageWindow} graphWindow Graph window
-     * @param {StarPairs[]} colorStarPairs StarPairs for each color channel
+     * @param {StarPair[][]} colorStarPairs StarPair[] for each color channel
      * @param {PhotometricMosaicData} data User settings used to create FITS header
      * @return {undefined}
      */
@@ -470,7 +460,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         fitsHeaderImages(keywords, data);
         fitsHeaderStarDetection(keywords, data);
         fitsHeaderPhotometry(keywords, data);
-        addScaleToFitsHeader(keywords, colorStarPairs, nColors, null);
+        addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, null);
         graphWindow.keywords = keywords;
         view.endProcess();
     };
@@ -478,14 +468,14 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
      * Draw graph lines and points for a single color
      * @param {Graph} graph
      * @param {Number} lineColor e.g. 0xAARRGGBB
-     * @param {StarPairs} starPairs Contains LinearFitData and array of StarPair
+     * @param {StarPair[]} starPairs
+     * @param {LinearFitData} linearFit
      * @param {Number} pointColor e.g. 0xAARRGGBB
      * @returns {undefined}
      */
-    function drawStarLineAndPoints(graph, lineColor, starPairs, pointColor){
-        let linearFit = starPairs.linearFitData;
+    function drawStarLineAndPoints(graph, lineColor, starPairs, linearFit, pointColor){
         graph.drawLine(linearFit.m, linearFit.b, lineColor);
-        for (let starPair of starPairs.starPairArray){
+        for (let starPair of starPairs){
             graph.drawPoint(starPair.tgtStar.flux, starPair.refStar.flux, pointColor);
         }
     };
@@ -498,7 +488,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
     // Create the graph axis and annotation.
     let minMax = new StarMinMax();
     colorStarPairs.forEach(function (starPairs) {
-        minMax.calculateMinMax(starPairs.starPairArray);
+        minMax.calculateMinMax(starPairs);
     });
     if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
         // Unable to display graph. No points to display so graph axis min/max range cannot be calculated.
@@ -520,7 +510,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
 
     // Now add the data to the graph...
     if (colorStarPairs.length === 1){ // B&W
-        drawStarLineAndPoints(graphWithAxis, 0xFF777777, colorStarPairs[0], 0xFFFFFFFF);
+        drawStarLineAndPoints(graphWithAxis, 0xFF777777, colorStarPairs[0], scaleFactors[0], 0xFFFFFFFF);
     } else {
         // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
         // if three samples are on the same pixel we get white and not the last color drawn
@@ -528,7 +518,7 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
         let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
         for (let c = 0; c < colorStarPairs.length; c++){
             let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], pointColors[c]);
+            drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], scaleFactors[c], pointColors[c]);
             graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
         }
     }
@@ -552,11 +542,12 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, data){
  * The new image is limited to the overlap area.
  * @param {View} refView Used to create background image
  * @param {StarsDetected} detectedStars
- * @param {StarPairs[]} colorStarPairs Detected star pairs for each color
+ * @param {StarPair[][]} colorStarPairs Detected star pairs for each color
+ * @param {LinearFitData[]} scaleFactors
  * @param {String} targetId Used to create ImageWindow title
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId, data) {
+function displayPhotometryStars(refView, detectedStars, colorStarPairs, scaleFactors, targetId, data) {
     
     /** Creates a bitmap
      * @param {Rect} overlapBox Bitmap area
@@ -589,7 +580,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     let bmpG = createGraphics(bmp, 0xFF000000); // Used to make non transparent pixels
     let bitmaps = []; // bitmap for each color
     for (let c = 0; c < colorStarPairs.length; c++) {
-        let starPairs = colorStarPairs[c].starPairArray;
+        let starPairs = colorStarPairs[c];
         bitmaps[c] = createBitmap(overlapBox);
         let G = createGraphics(bitmaps[c], color[c]); // Used to draw color squares
         for (let i = 0; i < starPairs.length; ++i){
@@ -618,7 +609,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, targetId
     fitsHeaderImages(keywords, data);
     fitsHeaderStarDetection(keywords, data);
     fitsHeaderPhotometry(keywords, data);
-    addScaleToFitsHeader(keywords, colorStarPairs, colorStarPairs.length, overlapBox);
+    addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, colorStarPairs.length, overlapBox);
 
     let title = WINDOW_ID_PREFIX() + targetId + "__PhotometryStars";
     createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);

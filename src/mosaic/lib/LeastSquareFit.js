@@ -35,22 +35,22 @@ function LinearFitData(m, b) {
  */
 function LeastSquareFitAlgorithm() {
     // y = reference, x = target
-    let sumX = 0.0;
-    let sumY = 0.0;
-    let sumSquaredX = 0.0;
-    let sumXY = 0.0;
-    let n = 0;
+    let sumX_ = 0.0;
+    let sumY_ = 0.0;
+    let sumSquaredX_ = 0.0;
+    let sumXY_ = 0.0;
+    let n_ = 0;
 
     /**
      * @param {Number} x
      * @param {Number} y
      */
     this.addValue = function (x, y) {
-        sumX += x;
-        sumY += y;
-        sumSquaredX += x * x;
-        sumXY += x * y;
-        n++;
+        sumX_ += x;
+        sumY_ += y;
+        sumSquaredX_ += x * x;
+        sumXY_ += x * y;
+        n_++;
     };
 
     /**
@@ -58,15 +58,15 @@ function LeastSquareFitAlgorithm() {
      * @return {LinearFitData} Fitted line (y = mx + b)
      */
     this.getLinearFit = function () {
-        if (n > 1) {
-            let m = ((n * sumXY) - (sumX * sumY)) /
-                    ((n * sumSquaredX) - (sumX * sumX));
+        if (n_ > 1) {
+            let m = ((n_ * sumXY_) - (sumX_ * sumY_)) /
+                    ((n_ * sumSquaredX_) - (sumX_ * sumX_));
 
-            let b = (sumY - (m * sumX)) / n;
+            let b = (sumY_ - (m * sumX_)) / n_;
             return new LinearFitData(m, b);
-        } else if (n === 1){
+        } else if (n_ === 1){
             console.warningln("WARNING: Least Squares Fit only has one point. Assuming origin as second point.");
-            return new LinearFitData(sumY / sumX, 0);
+            return new LinearFitData(sumY_ / sumX_, 0);
         } else {
             console.criticalln("ERROR: Least Squares Fit has no points to fit...");
             return new LinearFitData(1, 0);
@@ -80,8 +80,8 @@ function LeastSquareFitAlgorithm() {
      * @returns {LinearFitData}
      */
     this.getOriginFit = function () {
-        if (n > 0) {
-            let m = sumXY / sumSquaredX;
+        if (n_ > 0) {
+            let m = sumXY_ / sumSquaredX_;
             return new LinearFitData(m, 0);
         } else {
             console.criticalln("ERROR: Least Squares Origin Fit has no points to fit...");

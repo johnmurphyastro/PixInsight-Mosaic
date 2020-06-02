@@ -57,7 +57,7 @@ function CREATE_JOIN_MASK(){return 256;}
  * Controller. Processing starts here!
  * @param {PhotometricMosaicData} data Values from user interface
  */
-function PhotometricMosaic(data)
+function photometricMosaic(data)
 {
     let startTime = new Date().getTime();
     let targetView = data.targetView;
@@ -138,49 +138,6 @@ function PhotometricMosaic(data)
         return;
     }
     
-    // Photometry stars
-    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
-           
-    // Remove photometric star outliers and calculate the scale
-    console.writeln("\n<b><u>Calculating scale</u></b>");
-    for (let c = 0; c < nChannels; c++){
-        let starPairs = colorStarPairs[c];
-        starPairs.linearFitData = calculateScale(starPairs);
-        for (let i=0; i<data.outlierRemoval; i++){
-            if (starPairs.starPairArray.length < 4){
-                console.warningln("Channel[", c, "]: Only ", starPairs.starPairArray.length, 
-                    " photometry stars. Keeping outlier.");
-                break;
-            }
-            starPairs = removeStarPairOutlier(starPairs, starPairs.linearFitData);
-            starPairs.linearFitData = calculateScale(starPairs);
-        }
-    }
-    if (targetView.image.isColor){
-        console.writeln("Stars used for photometry: red " + colorStarPairs[0].starPairArray.length + 
-                ", green " + colorStarPairs[1].starPairArray.length + 
-                ", blue " + colorStarPairs[2].starPairArray.length);
-    } else {
-        console.writeln("Stars used for photometry: " + colorStarPairs[0].starPairArray.length);
-    }
-    processEvents();
-    
-    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
-        displayPhotometryStars(referenceView, detectedStars, colorStarPairs, targetView.fullId, data);
-        return;
-    }
-    if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
-        console.hide(); // Allow user to compare with other open windows
-        let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, data);
-        if (!displayed){
-            new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
-                    "Decrease the 'Star Detection' setting to detect more stars " +
-                    "or increase 'Linear Range'.", 
-                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        }
-        return;
-    }
-    
     if (data.viewFlag === CREATE_MOSAIC_MASK()){
         displayMask(targetView, joinRect, detectedStars, data);
         return;
@@ -190,12 +147,39 @@ function PhotometricMosaic(data)
                 false, "__MosaicMaskStars", data);
         return;
     }
-
+    
+    // Photometry stars
+    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
+    let scaleFactors = [];
+    
+    // Remove photometric star outliers and calculate the scale
+    console.writeln("\n<b><u>Calculating scale</u></b>");
+    for (let c = 0; c < nChannels; c++){
+        let starPairs = colorStarPairs[c];
+        let linearFitData = calculateScale(starPairs);
+        for (let i=0; i<data.outlierRemoval; i++){
+            if (starPairs.length < 4){
+                console.warningln("Channel[", c, "]: Only ", starPairs.length, 
+                    " photometry stars. Keeping outlier.");
+                break;
+            }
+            starPairs = removeStarPairOutlier(starPairs, linearFitData);
+            linearFitData = calculateScale(starPairs);
+        }
+        scaleFactors.push(linearFitData);
+    }
+    if (targetView.image.isColor){
+        console.writeln("Stars used for photometry: red " + colorStarPairs[0].length + 
+                ", green " + colorStarPairs[1].length + 
+                ", blue " + colorStarPairs[2].length);
+    } else {
+        console.writeln("Stars used for photometry: " + colorStarPairs[0].length);
+    }
     let noStarsMsg = "";
     for (let c = 0; c < nChannels; c++){
         // For each color
         let starPairs = colorStarPairs[c];
-        if (starPairs.starPairArray.length === 0){
+        if (starPairs.length === 0){
             noStarsMsg += "Channel [" + c + "] has no matching stars. Defaulting scale to 1.0\n";
         }
     }
@@ -207,20 +191,33 @@ function PhotometricMosaic(data)
         }
     }
     
-    // Calculate scale for target image.
-    let scaleFactors = [];
     for (let c = 0; c < nChannels; c++){
         // For each color
-        let starPairs = colorStarPairs[c];
-        scaleFactors.push(starPairs.linearFitData);
         let text = "Calculated scale factor for " + targetView.fullId + " channel[" + c + "] x " + 
-                starPairs.linearFitData.m.toPrecision(5);
-        if (starPairs.starPairArray.length < 4){
-            console.warningln(text + " (Warning: calculated from only " + starPairs.starPairArray.length + " stars)");
+                scaleFactors[c].m.toPrecision(5);
+        let nStarPairs = colorStarPairs[c].length;
+        if (nStarPairs < 4){
+            console.warningln(text + " (Warning: calculated from only " + nStarPairs + " stars)");
         } else {
             console.writeln(text);
         }
         processEvents();
+    }
+    
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
+        displayPhotometryStars(referenceView, detectedStars, colorStarPairs, scaleFactors, targetView.fullId, data);
+        return;
+    }
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
+        console.hide(); // Allow user to compare with other open windows
+        let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, scaleFactors, data);
+        if (!displayed){
+            new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
+                    "Decrease the 'Star Detection' setting to detect more stars " +
+                    "or increase 'Linear Range'.", 
+                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        }
+        return;
     }
     
     let maxSampleSize = Math.floor(Math.min(overlapBox.height, overlapBox.width)/2);
@@ -342,7 +339,7 @@ function PhotometricMosaic(data)
         console.writeln("\n<b><u>Applying scale and gradients</u></b>");
     }
     let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateSurfaceSplines, surfaceSplines, overlapBox, joinRect, data);
+            scaleFactors, propagateSurfaceSplines, surfaceSplines, overlap, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
     
@@ -351,12 +348,12 @@ function PhotometricMosaic(data)
 }
 
 /**
- * @param {StarPairs} starPairs
+ * @param {StarPair[]} starPairs
  * @returns {LinearFitData} Least Square Fit between reference & target star flux
  */
 function calculateScale(starPairs) {
     let leastSquareFit = new LeastSquareFitAlgorithm();
-    for (let starPair of starPairs.starPairArray) {
+    for (let starPair of starPairs) {
         leastSquareFit.addValue(starPair.tgtStar.flux, starPair.refStar.flux);
     }
     return leastSquareFit.getOriginFit();
@@ -371,13 +368,13 @@ function calculateScale(starPairs) {
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
  * @param {SurfaceSpline[]} propagateSurfaceSplines SurfaceSpline for each color channel, propogated
  * @param {SurfaceSpline[]} surfaceSplines SurfaceSpline for each color channel, tapered
- * @param {Rect} overlapBox Bounding box of overlap
+ * @param {Overlap} overlap represents overlap region
  * @param {Rect} joinRect Bounding box of join region (preview extended to overlapBox)
  * @param {PhotometricMosaicData} data User settings for FITS header
  * @returns {ImageWindow} Cloned image with corrections applied
  */
 function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, propagateSurfaceSplines, surfaceSplines, overlapBox, joinRect, data) {
+        scaleFactors, propagateSurfaceSplines, surfaceSplines, overlap, joinRect, data) {
     let applyScaleAndGradientTime = new Date().getTime();
     let width = tgtView.image.width;
     let height = tgtView.image.height;
@@ -396,7 +393,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     } // Leave the image blank for a corrected target view
     
     // Apply scale and gradient to the cloned image
-    let tgtCorrector = new ScaleAndGradientApplier(width, height, overlapBox, joinRect,
+    let tgtCorrector = new ScaleAndGradientApplier(width, height, overlap, joinRect,
             isHorizontal, data, isTargetAfterRef);
     let tgtBox = overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {

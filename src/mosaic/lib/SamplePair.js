@@ -91,15 +91,15 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
     // Private class variables
 
     //Sample size
-    let binSize = sampleSize;
+    let binSize_ = sampleSize;
     // Coordinate of top left bin
-    let x0 = overlapBox.x0;
-    let y0 = overlapBox.y0;
+    let x0_ = overlapBox.x0;
+    let y0_ = overlapBox.y0;
     // Coordinate of the first bin that is beyond the selected area
-    let x1 = overlapBox.x1;
-    let y1 = overlapBox.y1;
+    let x1_ = overlapBox.x1;
+    let y1_ = overlapBox.y1;
     // binRect maps for all colors
-    let binRectMapArray = [];
+    let binRectMapArray_ = [];
     
     // For stars too bright to have been detected by StarDetector
 //    this.tooBrightMap = new Map();
@@ -107,7 +107,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
     
     // Constructor
     for (let c=0; c<nChannels; c++){
-        binRectMapArray.push(new Map());
+        binRectMapArray_.push(new Map());
     }
     
     /**
@@ -156,7 +156,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      */
     this.createSamplePairArray = function(tgtImage, refImage, scale, channel, isHorizontal){
         let samplePairArray = [];
-        for (let binRect of binRectMapArray[channel].values()) {
+        for (let binRect of binRectMapArray_[channel].values()) {
             let tgtMedian = tgtImage.median(binRect, channel, channel) * scale;
             let refMedian = refImage.median(binRect, channel, channel);
             samplePairArray.push(new SamplePair(tgtMedian, refMedian, binRect));
@@ -178,48 +178,48 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @returns {Point} The (x,y) coordinate of the bin's center
      */
     function getBinCenter(xKey, yKey){
-        return new Point(getX(xKey) + binSize/2, getY(yKey) + binSize/2);
+        return new Point(getX(xKey) + binSize_/2, getY(yKey) + binSize_/2);
     }
     /**
      * @returns {Number}
      */
     function getNumberOfColumns(){
-        return Math.floor((x1 - x0) / binSize);
+        return Math.floor((x1_ - x0_) / binSize_);
     }
     /**
      * 
      * @returns {Number}
      */
     function getNumberOfRows(){
-        return Math.floor((y1 - y0) / binSize);
+        return Math.floor((y1_ - y0_) / binSize_);
     }
     /**
      * @param {Number} x Any X-Coordinate within a bin, including left edge
      * @returns {Number} Nth sample in x direction (starting at zero)
      */
     function getXKey(x){
-        return Math.floor((x - x0) / binSize);
+        return Math.floor((x - x0_) / binSize_);
     }
     /**
      * @param {Number} y Any Y-Coordinate within a bin, including top edge
      * @returns {Number} Nth sample in y direction (starting at zero)
      */
     function getYKey(y){
-        return Math.floor((y - y0) / binSize);
+        return Math.floor((y - y0_) / binSize_);
     }
     /**
      * @param {Number} xKey Nth bin in x direction (starting at zero)
      * @returns {Number} X-Coordinate of bin's left edge
      */
     function getX(xKey){
-        return x0 + xKey * binSize;
+        return x0_ + xKey * binSize_;
     }
     /**
      * @param {Number} yKey Nth sample in y direction (starting at zero)
      * @returns {Number} Y-Coordinate of bin's top edge
      */
     function getY(yKey){
-        return y0 + yKey * binSize;
+        return y0_ + yKey * binSize_;
     }
     /**
      * @param {Number} xKey Nth bin in x direction (starting at zero)
@@ -243,8 +243,8 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
      */
     function addBinRect(tgtImage, refImage, xKey, yKey, rejectHigh){
-        let nChannels = binRectMapArray.length;
-        let binRect = new Rect(binSize, binSize);
+        let nChannels = binRectMapArray_.length;
+        let binRect = new Rect(binSize_, binSize_);
         binRect.moveTo(getX(xKey), getY(yKey));
         for (let c=0; c < nChannels; c++){
             // Dont add sample if it contains 1 or more pixels that are black
@@ -257,7 +257,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
 //                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
 //                return;
 //            }
-            binRectMapArray[c].set(createKey(xKey, yKey), binRect);
+            binRectMapArray_[c].set(createKey(xKey, yKey), binRect);
         }
     }
     
@@ -282,7 +282,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @param {Number} starRadius
      */
     function removeBinsInCircle(p, starRadius) {
-        let starToCenter = starRadius + binSize/2;
+        let starToCenter = starRadius + binSize_/2;
         let starXKey = getXKey(p.x);
         let starYKey = getYKey(p.y);
         let minXKey = getXKey(p.x - starRadius);
@@ -310,8 +310,8 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      */
     function removeBinRect(xKey, yKey){
         let key = createKey(xKey, yKey);
-        for (let c=0; c < binRectMapArray.length; c++){
-            binRectMapArray[c].delete(key);
+        for (let c=0; c < binRectMapArray_.length; c++){
+            binRectMapArray_[c].delete(key);
         }
     }
 }
@@ -427,23 +427,7 @@ function getSampleGridHeight(sampleRect, samplePairArray){
  * @param {Number} sampleMaxLimit
  * @returns {SamplePair[]}
  */
-function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMaxLimit){
-    {
-        const minRows = 5;
-        if (samplePairs.length > sampleMaxLimit){
-            let binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
-                    sampleMaxLimit, minRows, isHorizontal);
-            if (binnedSampleArray.length > sampleMaxLimit){
-                // This can happen because many samples in grid were rejected due to stars
-                sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
-                binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
-                    sampleMaxLimit, minRows, isHorizontal);
-            }
-            return new binnedSampleArray;
-        }
-        return samplePairs;
-    }
-    
+function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMaxLimit){ 
     // Private functions
 
     /**
@@ -646,4 +630,20 @@ function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMax
         }
         return binnedSampleArray;
     }
+    
+    {
+        const minRows = 5;
+        if (samplePairs.length > sampleMaxLimit){
+            let binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
+                    sampleMaxLimit, minRows, isHorizontal);
+            if (binnedSampleArray.length > sampleMaxLimit){
+                // This can happen because many samples in grid were rejected due to stars
+                sampleMaxLimit *= sampleMaxLimit / binnedSampleArray.length;
+                binnedSampleArray = createBinnedSamplePairArray(overlapBox, samplePairs, 
+                    sampleMaxLimit, minRows, isHorizontal);
+            }
+            return binnedSampleArray;
+        }
+    }
+    return samplePairs;
 }

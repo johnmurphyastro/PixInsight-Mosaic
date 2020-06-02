@@ -199,37 +199,37 @@ function Overlap(refImage, tgtImage){
     this.tgtBox = getBoundingBox(tgtImage);
     
     /** {TypedArray} bitmap array from overlapBox. A value of 1 indicates were ref & tgt images overlap */
-    let overlapByteArray;
+    let overlapByteArray_;
     /** True if refBox and TgtBox intersect */
-    let hasOverlapFlag = false;
+    let hasOverlapFlag_ = false;
     /** Arrays storing min & max coordinates of non zero pixels */
-    let minOutlineAtX = null;
-    let maxOutlineAtX = null;
-    let minOutlineAtY = null;
-    let maxOutlineAtY = null;
+    let minOutlineAtX_ = null;
+    let maxOutlineAtX_ = null;
+    let minOutlineAtY_ = null;
+    let maxOutlineAtY_ = null;
     
     {   // Constructor
         if (!this.refBox.intersects(this.tgtBox)){
             return;
         }
-        hasOverlapFlag = true;
+        hasOverlapFlag_ = true;
         let result = calculateOverlapBox(refImage, tgtImage, this.refBox, this.tgtBox);
         this.overlapBox = result.overlapBox;
-        overlapByteArray = result.overlapByteArray;
+        overlapByteArray_ = result.overlapByteArray;
     }
     
     /**
      * @returns {Boolean} True if the reference and target images overlap
      */
     this.hasOverlap = function(){
-        return hasOverlapFlag;
+        return hasOverlapFlag_;
     };
     
     /**
      * @returns {ByteArray}
      */
     this.getOverlapByteArray = function(){
-        return overlapByteArray;
+        return overlapByteArray_;
     };
     
     /**
@@ -265,10 +265,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or minY)
      */
     this.getMinOutlineAtXArray = function(minY){
-        if (minOutlineAtX === null){
-            calculateOutlineAtX(this.overlapBox, this.getOverlapByteArray());
+        if (minOutlineAtX_ === null){
+            calculateOutlineAtX(this.overlapBox);
         }
-        let copy = minOutlineAtX.slice();
+        let copy = minOutlineAtX_.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].y < minY){
                 copy[i] = new Point(copy[i].x, minY);
@@ -283,10 +283,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or maxY)
      */
     this.getMaxOutlineAtXArray = function(maxY){
-        if (maxOutlineAtX === null){
-            calculateOutlineAtX(this.overlapBox, this.getOverlapByteArray);
+        if (maxOutlineAtX_ === null){
+            calculateOutlineAtX(this.overlapBox);
         }
-        let copy = maxOutlineAtX.slice();
+        let copy = maxOutlineAtX_.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].y > maxY){
                 copy[i] = new Point(copy[i].x, maxY);
@@ -316,10 +316,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or minX)
      */
     this.getMinOutlineAtYArray = function(minX){
-        if (minOutlineAtY === null){
-            calculateOutlineAtY(this.overlapBox, this.getOverlapByteArray());
+        if (minOutlineAtY_ === null){
+            calculateOutlineAtY(this.overlapBox);
         }
-        let copy = minOutlineAtY.slice();
+        let copy = minOutlineAtY_.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].x < minX){
                 copy[i] = new Point(minX, copy[i].y);
@@ -334,10 +334,10 @@ function Overlap(refImage, tgtImage){
      * @returns {Point[]} Points that follow the overlap outline (or maxX)
      */
     this.getMaxOutlineAtYArray = function(maxX){
-        if (maxOutlineAtY === null){
-            calculateOutlineAtY(this.overlapBox, this.getOverlapByteArray());
+        if (maxOutlineAtY_ === null){
+            calculateOutlineAtY(this.overlapBox);
         }
-        let copy = maxOutlineAtY.slice();
+        let copy = maxOutlineAtY_.slice();
         for (let i=0; i<copy.length; i++){
             if (copy[i].x > maxX){
                 copy[i] = new Point(maxX, copy[i].y);
@@ -441,35 +441,34 @@ function Overlap(refImage, tgtImage){
     
     /**
      * Calculates and stores the overlap pixel vertical outline.
-     * minOutlineAtX stores points for the left side of the outline.
-     * maxOutlineAtX stores points for the right side of the outline.
+     * minOutlineAtX_ stores points for the left side of the outline.
+     * maxOutlineAtX_ stores points for the right side of the outline.
      * The stored (x,y) coordinates are image coordinates.
      * The index of the array is the nth x pixel for the local overlap region
      * (i.e. index 0 corresponds to the left most point of the overlap bounding box).
      * For each local value of x, the image x, and minimum, maximum values of y are stored.
      * @param {Rect} overlapBox (input)
-     * @param {ByteArray[]} overlapByteArray Zero where there is no overlap (input)
      */
-    function calculateOutlineAtX(overlapBox, overlapByteArray){
+    function calculateOutlineAtX(overlapBox){
         // Get local overlap coordinates of outline
         let w = overlapBox.width;
         let h = overlapBox.height;
         let x0 = overlapBox.x0;
         let y0 = overlapBox.y0;
-        minOutlineAtX = new Array(w);
-        maxOutlineAtX = new Array(w);
+        minOutlineAtX_ = new Array(w);
+        maxOutlineAtX_ = new Array(w);
         for (let x=0; x<w; x++){
             for (let y=0; y<h; y++){
                 let i = y * w + x;
-                if (overlapByteArray[i]){
-                    minOutlineAtX[x] = new Point(x + x0, y + y0);
+                if (overlapByteArray_[i]){
+                    minOutlineAtX_[x] = new Point(x + x0, y + y0);
                     break;
                 }
             }
             for (let y = h - 1; y >= 0; y--){
                 let i = y * w + x;
-                if (overlapByteArray[i]){
-                    maxOutlineAtX[x] = new Point(x + x0, y + y0);
+                if (overlapByteArray_[i]){
+                    maxOutlineAtX_[x] = new Point(x + x0, y + y0);
                     break;
                 }
             }
@@ -478,35 +477,34 @@ function Overlap(refImage, tgtImage){
     
     /**
      * Calculates and stores the overlap pixel horizontal outline.
-     * minOutlineAtY stores points for the top side of the outline.
-     * maxOutlineAtY stores points for the bottom side of the outline.
+     * minOutlineAtY_ stores points for the top side of the outline.
+     * maxOutlineAtY_ stores points for the bottom side of the outline.
      * The stored (x,y) coordinates are image coordinates.
      * The index of the array is the nth x pixel for the local overlap region
      * (i.e. index 0 corresponds to the upper most point of the overlap bounding box).
      * For each local value of y, the image minimum, maximum values of x, and the image y are stored.
      * @param {Rect} overlapBox (input)
-     * @param {ByteArray[]} overlapByteArray Zero where there is no overlap (input)
      */
-    function calculateOutlineAtY(overlapBox, overlapByteArray){
+    function calculateOutlineAtY(overlapBox){
         let w = overlapBox.width;
         let h = overlapBox.height;
         let x0 = overlapBox.x0;
         let y0 = overlapBox.y0;
-        minOutlineAtY = new Array(h);
-        maxOutlineAtY = new Array(h);
+        minOutlineAtY_ = new Array(h);
+        maxOutlineAtY_ = new Array(h);
         for (let y=0; y<h; y++){
             let yXw = y * w;
             for (let x=0; x<w; x++){
                 let i = yXw + x;
-                if (overlapByteArray[i]){
-                    minOutlineAtY[y] = new Point(x + x0, y + y0);
+                if (overlapByteArray_[i]){
+                    minOutlineAtY_[y] = new Point(x + x0, y + y0);
                     break;
                 }
             }
             for (let x = w - 1; x >= 0; x--){
                 let i = yXw + x;
-                if (overlapByteArray[i]){
-                    maxOutlineAtY[y] = new Point(x + x0, y + y0);
+                if (overlapByteArray_[i]){
+                    maxOutlineAtY_[y] = new Point(x + x0, y + y0);
                     break;
                 }
             }

@@ -207,61 +207,86 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     }
     
     /**
-     * Reads and writes image samples within the specified area
-     * @param {Image} refImage
-     * @param {Image} tgtImage
-     * @param {View} outputView
-     * @param {Number} channel
-     * @param {Boolean} createMosaic
-     * @param {Boolean} isHorizontal 
-     * @returns {ScaleAndGradientApplier.applyAllCorrections.ImageSamples}
+     * Iterates through the rows (or columns) within the specified image area.
+     * After each interation, provides methods to read the reference and target row,
+     * and write the output row.
+     * @param {Image} refImage Input reference image (not modified)
+     * @param {Image} tgtImage Input target image (not modified)
+     * @param {View} outputView The output image (mosaic or cloned and corrected target)
+     * @param {Number} channel Color channel
+     * @param {Boolean} createMosaic True if creating mosaic, false if only correcting target
+     * @param {Boolean} isHorizontal Orientation of join line
+     * @returns {ScaleAndGradientApplier.applyAllCorrections.ImageRowsIterator}
      */
-    function ImageSamples(refImage, tgtImage, outputView, channel, createMosaic, isHorizontal){
+    function ImageRowsIterator(refImage, tgtImage, outputView, channel, createMosaic, isHorizontal){
         let refImage_ = refImage;
         let tgtImage_ = tgtImage;
         let outputView_ = outputView;
         let channel_ = channel;
         let createMosaic_ = createMosaic;
         let isHorizontal_ = isHorizontal;
+        /** {Rect} current row or column */
         let rect_;
+        /** {Float64Array} Row or column of samples read from ref image */
         let refSamples_;
+        /** {Float64Array} Row or column of samples read from tgt image */
         let tgtSamples_;
+        /** {Float64Array} Row or column buffer for output image */
         let samples_;
 
+        /** Coordinate of first row (or column) in specified area */
         let start_;
-        let end_;
+        /** The current row (or column) is the nth in the specified area */
         let nth_ = 0;
-        let maxN_;
+        /** Number of rows (or columns) in the specified area */
+        let nRows_;
 
+        /**
+         * Specify the area of the images to process.
+         * For example, the whole of the join region or a taper region
+         * This area may include thousands of rows (or columns).
+         * @param {Number} x0
+         * @param {Number} y0
+         * @param {Number} x1
+         * @param {Number} y1
+         */
         this.setArea = function(x0, y0, x1, y1){
+            let end;
             if (isHorizontal_){
                 rect_ = new Rect(x0, y0, x1, y0 + 1);
                 start_ = y0;
-                end_ = y1;
+                end = y1;
             } else {
                 rect_ = new Rect(x0, y0, x0 + 1, y1);
                 start_ = x0;
-                end_ = x1;
+                end = x1;
             }
             let length = rect_.area;
             refSamples_ = new Float64Array(length);
             tgtSamples_ = new Float64Array(length);
             samples_ = new Float64Array(length);
             nth_ = 0;
-            maxN_ = end_ - start_;
+            nRows_ = end - start_;
         };
 
+        /**
+         * @returns {Boolean} True if the current row (or column) is not the last row (or column)
+         */
         this.hasNext = function(){
-            return nth_ < maxN_;
+            return nth_ < nRows_;
         };
 
+        /**
+         * Sets the current row (or column) to the next row (or column).
+         * This should also be called before accessing the first row (or column).
+         */
         this.next = function(){
             if (isHorizontal_){
                 rect_.moveTo(rect_.x0, start_ + nth_);
             } else {
                 rect_.moveTo(start_ + nth_, rect_.y0);
             }
-            progressCallback(nth_, maxN_ - 1);
+            progressCallback(nth_, nRows_ - 1);
             nth_++;
         };
 
@@ -279,7 +304,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
         };
         /**
          * If creating a mosiac, returns the reference image samples.
-         * Otherwise, returns a zero array.
+         * Otherwise, returns an array filled with zeros.
          * Do not modify the returned array.
          * @returns {Float64Array} Reference samples or zero values
          */
@@ -307,7 +332,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
         /**
          * Write the contents of the output buffer to the output image
          */
-        this.write = function(){
+        this.writeRow = function(){
             outputView_.image.setSamples(samples_, rect_, channel_);
         };
     }
@@ -327,7 +352,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      */
     this.applyAllCorrections = function (refImage, tgtImage, view, scale,
             propagateSurfaceSpline, joinSurfaceSpline, tgtBox, channel){
-                
+        console.writeln("Processing channel[", channel, "]");        
         processEvents();
         if (isTargetAfterRef_ === null){
             // Insert mode
@@ -387,123 +412,123 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                 bgDifBeforeOverlap = createAvgDifArray(fullDifBeforeOverlap);
             }
         }
-        
-        let imageSamples = new ImageSamples(refImage, tgtImage, view, channel, createMosaic_, isHorizontal_);
        
         if (isHorizontal_) {
+            let imageRowItr = new ImageRowsIterator(refImage, tgtImage, view, channel, createMosaic_, isHorizontal_);
             if (isTargetAfterRef_) {
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
-                applyScaleAndGradient(imageSamples, scale, fullDifBeforeOverlap,
+                applyScaleAndGradient(imageRowItr, scale, fullDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, tgtBox.x1, overlapStart_, false);
 
                 // Overlap region before join. Reference side so reference overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, overlapStart_, tgtBox.x1, joinStart_, OVERLAY_REF);
 
                 // Full correction from start of join up to end of the join region
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, joinStart_, tgtBox.x1, joinEnd_, joinType_);
                         
                 // Overlap region after join. Target side so target overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, joinEnd_, tgtBox.x1, overlapEnd_, OVERLAY_TGT);
 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
-                applyScaleAndGradientTaperDown(imageSamples, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                applyScaleAndGradientTaperDown(imageRowItr, scale, fullDifAfterOverlap, bgDifAfterOverlap,
                         tgtBox.x0, overlapEnd_, tgtBox.x1, secondTaperEnd_);
 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                applyScaleAndGradient(imageSamples, scale, bgDifAfterOverlap,
+                applyScaleAndGradient(imageRowItr, scale, bgDifAfterOverlap,
                         tgtBox.x0, secondTaperEnd_, tgtBox.x1, tgtBox.y1, true);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                applyScaleAndGradient(imageSamples, scale, bgDifBeforeOverlap,
+                applyScaleAndGradient(imageRowItr, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, tgtBox.x1, firstTaperStart_, true);
 
                 // Taper up region. Apply full scale correction and 
                 // gradually increase the gradient correction from zero to full
-                applyScaleAndGradientTaperUp(imageSamples, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                applyScaleAndGradientTaperUp(imageRowItr, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
                         tgtBox.x0, firstTaperStart_, tgtBox.x1, overlapStart_);
 
                 // Overlap region before join. Target side so target overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, overlapStart_, tgtBox.x1, joinStart_, OVERLAY_TGT);
                         
                 // Full correction from start of the join region to the end of join region 
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, joinStart_, tgtBox.x1, joinEnd_, joinType_);
                 
                 // Overlap region after join. Reference side so reference overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
                         tgtBox.x0, joinEnd_, tgtBox.x1, overlapEnd_, OVERLAY_REF);
 
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
-                applyScaleAndGradient(imageSamples, scale, fullDifAfterOverlap,
+                applyScaleAndGradient(imageRowItr, scale, fullDifAfterOverlap,
                         tgtBox.x0, overlapEnd_, tgtBox.x1, tgtBox.y1, false);
             }
         } else {    // vertical join
+            let imageColItr = new ImageRowsIterator(refImage, tgtImage, view, channel, createMosaic_, isHorizontal_);
             if (isTargetAfterRef_) {
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
-                applyScaleAndGradient(imageSamples, scale, fullDifBeforeOverlap,
+                applyScaleAndGradient(imageColItr, scale, fullDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, overlapStart_, tgtBox.y1, false);
 
                 // Overlap region before join. Reference side so reference overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         overlapStart_, tgtBox.y0, joinStart_, tgtBox.y1, OVERLAY_REF);
                 
                 // Full correction from start of join up to end of the join region
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         joinStart_, tgtBox.y0, joinEnd_, tgtBox.y1, joinType_);
 
                 // Overlap region after join. Target side so target overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         joinEnd_, tgtBox.y0, overlapEnd_, tgtBox.y1, OVERLAY_TGT);
                 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
-                applyScaleAndGradientTaperDown(imageSamples, scale, fullDifAfterOverlap, bgDifAfterOverlap,
+                applyScaleAndGradientTaperDown(imageColItr, scale, fullDifAfterOverlap, bgDifAfterOverlap,
                         overlapEnd_, tgtBox.y0, secondTaperEnd_, tgtBox.y1);
                 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                applyScaleAndGradient(imageSamples, scale, bgDifAfterOverlap,
+                applyScaleAndGradient(imageColItr, scale, bgDifAfterOverlap,
                         secondTaperEnd_, tgtBox.y0, tgtBox.x1, tgtBox.y1, true);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
-                applyScaleAndGradient(imageSamples, scale, bgDifBeforeOverlap,
+                applyScaleAndGradient(imageColItr, scale, bgDifBeforeOverlap,
                         tgtBox.x0, tgtBox.y0, firstTaperStart_, tgtBox.y1, true);
 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
-                applyScaleAndGradientTaperUp(imageSamples, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
+                applyScaleAndGradientTaperUp(imageColItr, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
                         firstTaperStart_, tgtBox.y0, overlapStart_, tgtBox.y1);
                 
                 // Overlap region before join. Target side so target overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         overlapStart_, tgtBox.y0, joinStart_, tgtBox.y1, OVERLAY_TGT);
                 
                 // Full correction from start of the join region to the end of join 
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         joinStart_, tgtBox.y0, joinEnd_, tgtBox.y1, joinType_);
 
                 // Overlap region after join. Reference side so reference overlay
-                applyScaleAndGradientToJoin(imageSamples, scale, joinSurfaceSpline,
+                applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
                         joinEnd_, tgtBox.y0, overlapEnd_, tgtBox.y1, OVERLAY_REF);
                         
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
-                applyScaleAndGradient(imageSamples, scale, fullDifAfterOverlap,
+                applyScaleAndGradient(imageColItr, scale, fullDifAfterOverlap,
                         overlapEnd_, tgtBox.y0, tgtBox.x1, tgtBox.y1, false);
             }
         }
@@ -515,7 +540,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * This is used for regions either before the taper and join or after taper and join.
      * The applied difArray is constant for all rows in this region.
      * If only creating a corrected target image, the reference row must only contain zeros.
-     * @param {ImageSamples} imageSamples 
+     * @param {ImageRowsIterator} imageRowItr 
      * @param {Number} scale Scale to apply
      * @param {Number[]} difArray Gradient to apply
      * @param {Number} x0 Region's min x
@@ -524,28 +549,20 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * @param {Number} y1 Region's max y
      * @param {Boolean} isTargetSide True if x0,x1,y0,y1 bounding box is on target side of join
      */
-    function applyScaleAndGradient(imageSamples,
+    function applyScaleAndGradient(imageRowItr,
             scale, difArray, x0, y0, x1, y1, isTargetSide){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
-        
-        /**
-         * Create row from reference and target row, applying scale and gradient.
-         * This is used for regions either before the taper and join or after taper and join.
-         * The applied difArray is constant for all rows in this region.
-         * If only creating a corrected target image, the reference row must only contain zeros.
-         * @param {ImageSamples} imageSamples
-         * @param {Number} scale Scale to apply
-         * @param {Number[]} difArray Difference between reference and target image
-         * along a horizontal or vertical line
-         * @param {Number} difArrayStart The difArray index corresponding to row start
-         * @param {Boolean} isTargetSide True if x0,x1,y0,y1 bounding box is on target side of join
-         */
-        function apply(imageSamples, scale, difArray, difArrayStart, isTargetSide){
-            let tgtSamples = imageSamples.getTgtSamples();
-            let refSamples = imageSamples.getRefSamples();
-            let samples = imageSamples.getOutputBuffer();
+        console.write("Processing target");
+
+        let difArrayStart = isHorizontal_ ? x0 : y0;
+        imageRowItr.setArea(x0, y0, x1, y1);
+        while(imageRowItr.hasNext()){
+            imageRowItr.next();
+            let tgtSamples = imageRowItr.getTgtSamples();
+            let refSamples = imageRowItr.getRefSamples();
+            let samples = imageRowItr.getOutputBuffer();
             for (let i = 0; i < samples.length; i++) {
                 if (isTargetSide){
                     // Target overlays reference
@@ -567,17 +584,9 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                     }
                 }
             }
-            imageSamples.write();
+            imageRowItr.writeRow();
         }
-//        console.write("Processing target[",channel,"]");
-
-        let difArrayStart = isHorizontal_ ? x0 : y0;
-        imageSamples.setArea(x0, y0, x1, y1);
-        while(imageSamples.hasNext()){
-            imageSamples.next();
-            apply(imageSamples, scale, difArray, difArrayStart, isTargetSide);
-        }
-//        console.writeln();
+        console.writeln();
     }
     
     /**
@@ -585,7 +594,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * and using the mosaic join mode (overlayRef, overlayTgt, random or average)
      * If only creating a corrected target image, the reference row must only 
      * contain zeros (all join modes then effectively become target overlay).
-     * @param {ImageSamples} imageSamples 
+     * @param {ImageRowsIterator} imageRowItr 
      * @param {Number} scale Scale to apply
      * @param {surfaceSpline} surfaceSpline Gradient to apply
      * @param {Number} x0 Region's min x
@@ -594,7 +603,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * @param {Number} y1 Region's max y
      * @param {Number} joinType OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND or OVERLAY_AVG
      */
-    function applyScaleAndGradientToJoin(imageSamples,
+    function applyScaleAndGradientToJoin(imageRowItr,
             scale, surfaceSpline, x0, y0, x1, y1, joinType){
                 
         if (x0 >= x1 || y0 >= y1)
@@ -614,20 +623,76 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
          * and using the mosaic join mode (overlayRef, overlayTgt, random or average)
          * If only creating a corrected target image, the reference row must only 
          * contain zeros (all join modes then effectively become target overlay).
-         * @param {ImageSamples} imageSamples
+         * @param {ImageRowsIterator} imageRowItr
          * @param {SurfaceSpline} surfaceSpline gradient correction to apply
+         * @param {Number} scale 
          * @param {Number} joinType OVERLAY_REF, OVERLAY_TGT, OVERLAY_RND or OVERLAY_AVG
          */
-        function apply(imageSamples, surfaceSpline, joinType){
-            let tgtSamples = imageSamples.getTgtSamples();
-            let refSamples = imageSamples.getRefSamples();
-            let samples = imageSamples.getOutputBuffer();
+        function apply(imageRowItr, surfaceSpline, scale, joinType){
+            let tgtSamples = imageRowItr.getTgtSamples();
+            let refSamples = imageRowItr.getRefSamples();
+            let samples = imageRowItr.getOutputBuffer();
             let surfaceSplinePoints = new SurfaceSplinePoints();
-            let x0 = imageSamples.getX();
-            let y0 = imageSamples.getY();
+            let x0 = imageRowItr.getX();
+            let y0 = imageRowItr.getY();
             let x = x0;
             let y = y0;
-            for (let i = 0; i < samples.length; i++) {
+            
+            // Deal with samples along the join line, 
+            // within the target bounding box but outside the join bounding box.
+            // If the row sample is before or after the join bounding box, 
+            // (or the column sample is above or below the join bounding box)
+            // the background offset is held constant and set to the
+            // surfaceSpline value at the join boundary
+            let minIdx;     // sample index of left (or top) join boundary
+            let maxIdx;     // sample index of right (or bottom) join boundary
+            if (isHorizontal_){
+                // x0 corresponds to sample index 0, target bounding box left edge
+                minIdx = joinRect_.x0 - x0;
+                maxIdx = joinRect_.x1 - x0;
+            } else {
+                // y0 corresponds to sample index 0, target bounding box top edge
+                minIdx = joinRect_.y0 - y0;
+                maxIdx = joinRect_.y1 - y0;
+            }
+            if (minIdx < 0 || maxIdx > samples.length){
+                console.criticalln("applyScaleAndGradientToJoin index out of range: minIdx=",
+                        minIdx, " maxIdx=", maxIdx, " samples.length=", samples.length);
+                return;
+            }
+            if (minIdx > 0){
+                // Hold the offset constant from the target bounding box edge to the join edge
+                // firstOffset is the offset value at the join boundary
+                let firstOffset = isHorizontal_ ? 
+                        surfaceSpline.evaluate(joinRect_.x0, y0) : 
+                        surfaceSpline.evaluate(x0, joinRect_.y0);
+                for (let i = 0; i < minIdx; i++){
+                    // Outside overlap region, so either tgt or ref or both are zero
+                    if (tgtSamples[i]){
+                        samples[i] = tgtSamples[i] * scale - firstOffset;
+                    } else {
+                        samples[i] = refSamples[i];
+                    }
+                }
+            }
+            if (maxIdx < samples.length){
+                // Hold the offset constant after the join until the edge of the target bounding box
+                // lastOffset is the offset value at the join boundary
+                let lastOffset = isHorizontal_ ? 
+                        surfaceSpline.evaluate(joinRect_.x1 - 1, y0) : 
+                        surfaceSpline.evaluate(x0, joinRect_.y1 - 1);
+                for (let i = maxIdx; i < samples.length; i++){
+                    // Outside overlap region, so either tgt or ref or both are zero
+                    if (tgtSamples[i]){
+                        samples[i] = tgtSamples[i] * scale - lastOffset;
+                    } else {
+                        samples[i] = refSamples[i];
+                    }
+                }
+            }
+            
+            for (let i = minIdx; i < maxIdx; i++) {
+                // Inside the join bounding box.
                 if (isHorizontal_){
                     x = x0 + i;
                 } else {
@@ -701,20 +766,22 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                 }
             }
             
-            imageSamples.write();
+            imageRowItr.writeRow();
         }
         
-//        console.write("Processing join  [",channel,"]");
-        imageSamples.setArea(x0, y0, x1, y1);
-        while(imageSamples.hasNext()){
-            imageSamples.next();
-            apply(imageSamples, surfaceSpline, joinType);
+        console.write("Processing join  ");
+        imageRowItr.setArea(x0, y0, x1, y1);
+        while(imageRowItr.hasNext()){
+            imageRowItr.next();
+            apply(imageRowItr, surfaceSpline, scale, joinType);
         }     
-//        console.writeln();
+        console.writeln();
     }
     
     /**
-     * @param {ImageSamples} imageSamples 
+     * Create row from reference and target row, applying scale, gradient and taper.
+     * If only creating a corrected target image, the reference row must only contain zeros.
+     * @param {ImageRowsIterator} imageRowItr 
      * @param {Number} scale Scale to apply
      * @param {Number[]} difArray 100% at join edge and then taper down
      * @param {Number[]} bgDif Apply outside join and taper areas
@@ -723,29 +790,29 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * @param {Number} x1 Region's max x
      * @param {Number} y1 Region's max y
      */
-    function applyScaleAndGradientTaperDown(imageSamples,
+    function applyScaleAndGradientTaperDown(imageRowItr,
             scale, difArray, bgDif, x0, y0, x1, y1){
         
         if (x0 >= x1 || y0 >= y1)
             return;
         
-        /**
-         * Create row from reference and target row, applying scale, gradient and taper.
-         * If only creating a corrected target image, the reference row must only contain zeros.
-         * @param {Number} coord X or Y coordinate of current row
-         * @param {Number} taperStart X or Y coordinate of taper start (i.e. at join edge)
-         * @param {ImageSamples} imageSamples 
-         * @param {Number[]} difArray Difference between reference and target image
-         * along a horizontal or vertical line, valid at the join edge
-         * @param {Number[]} bgDif Difference between reference and target image
-         * along a horizontal or vertical line, valid after taper has finished
-         * @param {Number} difArrayStart The difArray index corresponding to row start
-         */
-        function apply(coord, taperStart, imageSamples, 
-                difArray, bgDif, difArrayStart){
-            let tgtSamples = imageSamples.getTgtSamples();
-            let refSamples = imageSamples.getRefSamples();
-            let samples = imageSamples.getOutputBuffer();
+        console.write("Processing taper ");       
+        let difArrayStart;
+        let taperStart;
+        if (isHorizontal_){
+            difArrayStart = x0;
+            taperStart = y0;
+        } else {
+            difArrayStart = y0;
+            taperStart = x0;
+        }
+        imageRowItr.setArea(x0, y0, x1, y1);
+        while(imageRowItr.hasNext()){
+            imageRowItr.next();
+            let coord = isHorizontal_ ? imageRowItr.getY() : imageRowItr.getX();
+            let tgtSamples = imageRowItr.getTgtSamples();
+            let refSamples = imageRowItr.getRefSamples();
+            let samples = imageRowItr.getOutputBuffer();
             for (let i = 0; i < samples.length; i++) {
                 if (tgtSamples[i]){
                     // tgt sample exists. We only taper tgt samples
@@ -760,30 +827,15 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                     samples[i] = refSamples[i];
                 }
             }
-            imageSamples.write();
-        }
-        
-//        console.write("Processing taper [",channel,"]");       
-        let difArrayStart;
-        let taperStart;
-        if (isHorizontal_){
-            difArrayStart = x0;
-            taperStart = y0;
-        } else {
-            difArrayStart = y0;
-            taperStart = x0;
-        }
-        imageSamples.setArea(x0, y0, x1, y1);
-        while(imageSamples.hasNext()){
-            imageSamples.next();
-            let coord = isHorizontal_ ? imageSamples.getY() : imageSamples.getX();
-            apply(coord, taperStart, imageSamples, difArray, bgDif, difArrayStart);
+            imageRowItr.writeRow();
         }        
-//        console.writeln();
+        console.writeln();
     }
     
     /**
-     * @param {ImageSamples} imageSamples 
+     * Create row from reference and target row, applying scale, gradient and taper.
+     * If only creating a corrected target image, the reference row must only contain zeros.
+     * @param {ImageRowsIterator} imageRowItr 
      * @param {Number} scale Scale to apply
      * @param {Number[]} difArray Taper up to 100% at join edge
      * @param {Number[]} bgDif Apply outside join and taper areas
@@ -792,29 +844,29 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * @param {Number} x1
      * @param {Number} y1
      */
-    function applyScaleAndGradientTaperUp(imageSamples,
+    function applyScaleAndGradientTaperUp(imageRowItr,
             scale, difArray, bgDif, x0, y0, x1, y1){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
         
-        /**
-         * Create row from reference and target row, applying scale, gradient and taper.
-         * If only creating a corrected target image, the reference row must only contain zeros.
-         * @param {Number} coord X or Y coordinate of current row
-         * @param {Number} taperEnd X or Y coordinate of taper end (edge of join)
-         * @param {ImageSamples} imageSamples 
-         * @param {Number[]} difArray Difference between reference and target image
-         * along a horizontal or vertical line, valid at the join edge
-         * @param {Number[]} bgDif Difference between reference and target image
-         * along a horizontal or vertical line, valid after taper has finished
-         * @param {Number} difArrayStart The difArray index corresponding to row start
-         */
-        function apply(coord, taperEnd, imageSamples, 
-                difArray, bgDif, difArrayStart){
-            let tgtSamples = imageSamples.getTgtSamples();
-            let refSamples = imageSamples.getRefSamples();
-            let samples = imageSamples.getOutputBuffer();
+        console.write("Processing taper ");
+        let taperEnd;
+        let difArrayStart;
+        if (isHorizontal_){
+            taperEnd = y1 - 1;
+            difArrayStart = x0;
+        } else {
+            taperEnd = x1 - 1; 
+            difArrayStart = y0;
+        }
+        imageRowItr.setArea(x0, y0, x1, y1);
+        while(imageRowItr.hasNext()){
+            imageRowItr.next();
+            let coord = isHorizontal_ ? imageRowItr.getY() : imageRowItr.getX();
+            let tgtSamples = imageRowItr.getTgtSamples();
+            let refSamples = imageRowItr.getRefSamples();
+            let samples = imageRowItr.getOutputBuffer();
             for (let i = 0; i < samples.length; i++) {
                 if (tgtSamples[i]){
                     // tgt sample exists. We only taper tgt samples
@@ -829,26 +881,9 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                     samples[i] = refSamples[i];
                 }
             }
-            imageSamples.write();
-        }
-        
-//        console.write("Processing taper [",channel,"]");
-        let taperEnd;
-        let difArrayStart;
-        if (isHorizontal_){
-            taperEnd = y1 - 1;
-            difArrayStart = x0;
-        } else {
-            taperEnd = x1 - 1; 
-            difArrayStart = y0;
-        }
-        imageSamples.setArea(x0, y0, x1, y1);
-        while(imageSamples.hasNext()){
-            imageSamples.next();
-            let coord = isHorizontal_ ? imageSamples.getY() : imageSamples.getX();
-            apply(coord, taperEnd, imageSamples, difArray, bgDif, difArrayStart);
+            imageRowItr.writeRow();
         }   
-//        console.writeln();
+        console.writeln();
     }
     
 }
