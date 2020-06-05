@@ -395,7 +395,7 @@ function PhotometricMosaicDialog(data) {
     if (data.referenceView !== null){
         referenceImage_ViewList.currentView = data.referenceView;
     }
-    referenceImage_ViewList.toolTip = 
+    referenceImage_ViewList.toolTip =
             "<p>The reference image. This image will not be modified.</p>";
     referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
@@ -461,7 +461,7 @@ function PhotometricMosaicDialog(data) {
     
     let detectedStarsButton = new PushButton();
     detectedStarsButton.text = "Detected Stars";
-    detectedStarsButton.toolTip = 
+    detectedStarsButton.toolTip =
             "<p>Displays all the stars detected in the reference and target images. " +
             "These stars are cached until either the Photometric Mosaic dialog " +
             "is closed or a modification invalidates the cache.</p>";
@@ -489,7 +489,7 @@ function PhotometricMosaicDialog(data) {
     this.starFluxTolerance_Control = new NumericControl(this);
     this.starFluxTolerance_Control.real = true;
     this.starFluxTolerance_Control.label.text = "Star Flux Tolerance:";
-    this.starFluxTolerance_Control.toolTip = 
+    this.starFluxTolerance_Control.toolTip =
             "<p>Star flux tolerance is used to prevent invalid target star to reference " +
             "star matches. Smaller values reject more matches.</p>" +
             "<p>Star matches are rejected if the difference in star flux " +
@@ -512,7 +512,7 @@ function PhotometricMosaicDialog(data) {
     this.starSearchRadius_Control = new NumericControl(this);
     this.starSearchRadius_Control.real = true;
     this.starSearchRadius_Control.label.text = "Star Search Radius:";
-    this.starSearchRadius_Control.toolTip = 
+    this.starSearchRadius_Control.toolTip =
             "<p>Search radius is used to match the reference and target stars. " +
             "Larger values find more photometric stars but at the risk of matching " +
             "the wrong star or even matching noise.</p>" +
@@ -545,7 +545,7 @@ function PhotometricMosaicDialog(data) {
     this.limitPhotoStarsPercent_Control.real = true;
     this.limitPhotoStarsPercent_Control.label.text = "Limit Stars %:";
     this.limitPhotoStarsPercent_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.limitPhotoStarsPercent_Control.toolTip = 
+    this.limitPhotoStarsPercent_Control.toolTip =
             "<p>Specifies the percentage of detected stars that will be used to " +
             "find photometric stars.</p>" +
             "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
@@ -566,7 +566,7 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.real = true;
     this.rejectHigh_Control.label.text = "Linear Range:";
     this.rejectHigh_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.rejectHigh_Control.toolTip = 
+    this.rejectHigh_Control.toolTip =
             "<p>Restricts the stars used for photometry to those " +
             "that have a peak pixel value less than the specified value. " +
             "This ensures the photometric stars are within the " +
@@ -589,7 +589,7 @@ function PhotometricMosaicDialog(data) {
     this.outlierRemoval_Control.real = false;
     this.outlierRemoval_Control.label.text = "Outlier Removal:";
     this.outlierRemoval_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.outlierRemoval_Control.toolTip = 
+    this.outlierRemoval_Control.toolTip =
             "<p>The photometric measurement of some stars can be suspect. " +
             "For example, a stars size may be underestimated causing some of " +
             "its flux to contribute to the background measurement. " +
@@ -607,7 +607,7 @@ function PhotometricMosaicDialog(data) {
     
     let photometryGraphButton = new PushButton();
     photometryGraphButton.text = "Photometry Graph";
-    photometryGraphButton.toolTip = 
+    photometryGraphButton.toolTip =
             "<p>For each star detected within the overlapping region, " +
             "provided the star meets the photometry criteria, the star's reference flux " +
             "is plotted against its target flux.</p>" +
@@ -623,7 +623,7 @@ function PhotometricMosaicDialog(data) {
     
     let photometryStarsButton = new PushButton();
     photometryStarsButton.text = "Photometry Stars";
-    photometryStarsButton.toolTip = 
+    photometryStarsButton.toolTip =
             "<p>Displays the stars that met the criteria for photometry. " +
             "These stars were within the specified 'Linear Range' and were found " +
             "in both target and reference images and were not rejected by 'Outlier Removal'.</p>" +
@@ -679,7 +679,7 @@ function PhotometricMosaicDialog(data) {
              "<p>It is not necessary for the Join Region to contain any stars. The whole of the " +
             "overlap region is always used to determine the photometric scale and the background gradient.</p>" +
             "<p>Inside the Join Region, the behavior depends on the mosaic combination mode. " +
-            "The behavour outside the region (all modes except 'Insert'):" + 
+            "The behavior outside the region (all modes except 'Insert'):" +
             "<ul><li>Reference side of join: Reference overlay</li>" +
             "<li>Target side of join: Target overlay</li></ul>" +
             "</p>";
@@ -799,7 +799,7 @@ function PhotometricMosaicDialog(data) {
     this.limitSampleStarsPercent_Control.real = true;
     this.limitSampleStarsPercent_Control.label.text = "Limit Stars %:";
     this.limitSampleStarsPercent_Control.label.minWidth = joinDirectionStrLen;
-    this.limitSampleStarsPercent_Control.toolTip = 
+    this.limitSampleStarsPercent_Control.toolTip =
             "<p>Specifies the percentage of detected stars that will be used to reject samples.</p>" +
             "<p>0% implies that no samples are rejected due to stars. This is " +
             "OK provided that no star takes up more than half of a sample's area.</p>" +
@@ -826,7 +826,7 @@ function PhotometricMosaicDialog(data) {
     this.sampleSize_Control.real = true;
     this.sampleSize_Control.label.text = "Sample Size:";
     this.sampleSize_Control.label.minWidth = joinDirectionStrLen;
-    this.sampleSize_Control.toolTip = 
+    this.sampleSize_Control.toolTip =
             "<p>Specifies the size of the sample squares.</p>" +
             "<p>The overlapping region is divided up into a grid of sample squares. " +
             "A sample's value is the median of the pixels it contains. " +
@@ -858,7 +858,7 @@ function PhotometricMosaicDialog(data) {
     
     this.orientationCombo = new ComboBox(this);
     this.orientationCombo.editEnabled = false;
-    this.orientationCombo.toolTip = 
+    this.orientationCombo.toolTip =
         "<p>Orientation of the line of intersection. This determines how the " +
         "background offset is corrected outside of the overlap region. " +
         "You should usually use 'Auto' while creating a mosaic, or " +
@@ -892,7 +892,7 @@ function PhotometricMosaicDialog(data) {
     
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample Grid";
-    displaySamplesButton.toolTip = 
+    displaySamplesButton.toolTip =
             "<p>Displays the grid of samples that will " +
             "be used to calculate the background offset and gradient.</p>" +
             "<p>Samples are rejected if they contain one or more zero pixels in " +
@@ -914,7 +914,7 @@ function PhotometricMosaicDialog(data) {
     this.maxSamples_Control.real = false;
     this.maxSamples_Control.label.text = "Max Samples:";
     this.maxSamples_Control.label.minWidth = joinDirectionStrLen;
-    this.maxSamples_Control.toolTip = 
+    this.maxSamples_Control.toolTip =
             "<p>Limits the number of samples used to create the surface spline. " +
             "If the number of samples exceed this limit, they are combined " +
             "(binned) to create super samples.</p>" +
@@ -923,7 +923,7 @@ function PhotometricMosaicDialog(data) {
             "theoretical maximum resolution of the surface spline. However, " +
             "small unbinned samples can be less accurate. " +
             "The default value is usually a good compromise.</p>" +
-            "<p>The time required to initialise the surface spline approximately " +
+            "<p>The time required to initialize the surface spline approximately " +
             "doubles every 1300 samples.</p>" +
             "<p>Use the 'Binned Grid' button to visualize the binned samples.</p>";
     this.maxSamples_Control.onValueUpdated = function (value) {
@@ -936,7 +936,7 @@ function PhotometricMosaicDialog(data) {
     
     let displayBinnedSamplesButton = new PushButton();
     displayBinnedSamplesButton.text = "Binned Grid ";
-    displayBinnedSamplesButton.toolTip = 
+    displayBinnedSamplesButton.toolTip =
             "<p>Displays the binned samples that will " +
             "be used to calculate the background offset and gradient.</p>" +
             "<p>Samples are binned to improve performance if the number of " +
@@ -985,7 +985,7 @@ function PhotometricMosaicDialog(data) {
     this.gradientSmoothnessControl.setPrecision(1);
     this.gradientSmoothnessControl.label.text = "Smoothness:";
     this.gradientSmoothnessControl.label.minWidth = this.font.width("Taper Length:");
-    this.gradientSmoothnessControl.toolTip = 
+    this.gradientSmoothnessControl.toolTip =
         "<p>Determines the offset and gradient correction that will be " +
         "applied to the overlap region.</p>" +
         "<p>The 'Smoothness' control determines how closely the " +
@@ -1007,7 +1007,7 @@ function PhotometricMosaicDialog(data) {
     
     let gradientGraphButton = new PushButton();
     gradientGraphButton.text = "Gradient Graph";
-    gradientGraphButton.toolTip = 
+    gradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
@@ -1086,7 +1086,7 @@ function PhotometricMosaicDialog(data) {
     this.propagateSmoothness_Control.real = true;
     this.propagateSmoothness_Control.setPrecision(1);
     this.propagateSmoothness_Control.label.text = "Smoothness:";
-    this.propagateSmoothness_Control.toolTip = 
+    this.propagateSmoothness_Control.toolTip =
         "<p>Determines how the gradient correction is applied to the " +
         "target side of the overlap's bounding box. It has no affect within the " +
         "overlap region. Consider using it if the reference image has less gradient " +
@@ -1113,7 +1113,7 @@ function PhotometricMosaicDialog(data) {
     
     let propagateGradientGraphButton = new PushButton();
     propagateGradientGraphButton.text = "Gradient Graph";
-    propagateGradientGraphButton.toolTip = 
+    propagateGradientGraphButton.toolTip =
             "<p>The vertical axis represents the difference between the two images, " +
             "the horizontal axis the join's X-Coordinate (horizontal join) " +
             "or Y-Coordinate (vertical join).</p>" +
@@ -1183,7 +1183,7 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusMultiply_Control = new NumericControl(this);
     this.StarRadiusMultiply_Control.real = true;
     this.StarRadiusMultiply_Control.label.text = "Multiply Star Radius:";
-    this.StarRadiusMultiply_Control.toolTip = 
+    this.StarRadiusMultiply_Control.toolTip =
             "<p>Sets the mask star radius to a multiple of the star's radius.</p>" +
             "<p>This increases the size for large stars more than small ones.</p>";
     this.StarRadiusMultiply_Control.setRange(1, 5);
@@ -1198,7 +1198,7 @@ function PhotometricMosaicDialog(data) {
     this.StarRadiusAdd_Control = new NumericControl(this);
     this.StarRadiusAdd_Control.real = true;
     this.StarRadiusAdd_Control.label.text = "Add to Star Radius:";
-    this.StarRadiusAdd_Control.toolTip = 
+    this.StarRadiusAdd_Control.toolTip =
             "<p>Used to increases or decreases the radius of all mask stars.</p>" +
             "<p>This is applied after the 'Multiply Star Radius'.</p>";
     this.StarRadiusAdd_Control.setRange(-5, 10);
@@ -1219,7 +1219,7 @@ function PhotometricMosaicDialog(data) {
     
     let createMaskButton = new PushButton();
     createMaskButton.text = "Create Mask";
-    createMaskButton.toolTip = 
+    createMaskButton.toolTip =
             "<p>Creates a star mask that reveals bright stars.</p>" +
             "<p>A mosaic join using the 'Random' mode is highly affective, but " +
             "often produces a speckled pattern around bright stars. This " +
@@ -1231,7 +1231,7 @@ function PhotometricMosaicDialog(data) {
     
     let maskStarsButton = new PushButton();
     maskStarsButton.text = "Stars";
-    maskStarsButton.toolTip = 
+    maskStarsButton.toolTip =
             "<p>Displays the stars used to create the mosaic star mask.</p>";
     maskStarsButton.onClick = function () {
         data.viewFlag = DISPLAY_MOSAIC_MASK_STARS();
@@ -1267,7 +1267,7 @@ function PhotometricMosaicDialog(data) {
 
     this.mosaicOverlayRefControl = new RadioButton(this);
     this.mosaicOverlayRefControl.text = "Reference";
-    this.mosaicOverlayRefControl.toolTip = 
+    this.mosaicOverlayRefControl.toolTip =
             "<p>The reference image pixels are drawn on top of the target image.</p>";
     this.mosaicOverlayRefControl.checked = data.mosaicOverlayRefFlag;
     this.mosaicOverlayRefControl.onClick = function (checked) {
@@ -1279,7 +1279,7 @@ function PhotometricMosaicDialog(data) {
     
     this.mosaicOverlayTgtControl = new RadioButton(this);
     this.mosaicOverlayTgtControl.text = "Target";
-    this.mosaicOverlayTgtControl.toolTip = 
+    this.mosaicOverlayTgtControl.toolTip =
             "<p>The target image pixels are drawn on top of the reference image.</p>";
     this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
     this.mosaicOverlayTgtControl.onClick = function (checked) {
@@ -1329,7 +1329,7 @@ function PhotometricMosaicDialog(data) {
     
     let joinMaskButton = new PushButton();
     joinMaskButton.text = "Join Mask";
-    joinMaskButton.toolTip = 
+    joinMaskButton.toolTip =
             "<p>Create a mask of the mosaic join. " +
             "This mask indicates the pixels used to create the mosaic join.</p>" +
             "<p>If a 'Join Region' has not been defined, the join area is " +
@@ -1433,7 +1433,7 @@ function main() {
 //    GradientTest();
 
     if (ImageWindow.openWindows.length < 2) {
-        (new MessageBox("ERROR: there must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+        (new MessageBox("ERROR: There must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;
     }
 
@@ -1463,7 +1463,7 @@ function main() {
             continue;
         }
         if (data.targetView.image.isColor !== data.referenceView.image.isColor) {
-            (new MessageBox("ERROR: Cannot linear fit a B&W image with a colour image", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("ERROR: Cannot linear fit a B&W image with a color image", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
         if (data.targetView.image.width !== data.referenceView.image.width ||
@@ -1481,7 +1481,7 @@ function main() {
         }
         if (data.targetView.fullId === data.referenceView.fullId ||
                 data.targetView.image.height !== data.referenceView.image.height) {
-            (new MessageBox("ERROR: Target and  Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
+            (new MessageBox("ERROR: Target and Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
         if (data.propagateFlag && data.propagateSmoothness < data.gradientSmoothness){
