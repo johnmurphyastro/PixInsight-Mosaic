@@ -437,15 +437,42 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
 }
 
 /**
+ * Display photometry graph of reference flux against target flux
  * @param {String} refView
  * @param {String} tgtView
- * @param {Number} height
  * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
- * @param {LinearFitData[]} scaleFactors
+ * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
  * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @returns {Boolean} True if graph was displayed
  */
-function displayStarGraph(refView, tgtView, height, colorStarPairs, scaleFactors, data){
+function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
+    {   // Constructor
+        // Display graph in script dialog
+        GraphDialog.prototype = new Dialog;
+        let graphDialog = new GraphDialog("Photometry Graph", createZoomedGraph);
+        if (graphDialog.execute() === StdButton_Yes){
+            // User requested graph saved to PixInsight View
+            let isColor = refView.image.isColor;
+            let targetName = tgtView.fullId;
+            let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
+            let zoomedGraph = graphDialog.getGraph();
+            let imageWindow = zoomedGraph.createWindow(windowTitle, isColor);
+            starGraphFitsHeader(imageWindow, colorStarPairs, data);
+            imageWindow.show();
+            imageWindow.zoomToFit();
+        }
+    }
+    
+    /**
+     * Callback function for GraphDialog to provide a zoomed graph.
+     * GraphDialog uses Graph.getGraphBitmap() and the function pointer Graph.screenToWorld
+     * @param {Number} factor
+     * @returns {Graph}
+     */
+    function createZoomedGraph(factor){
+        let graph = createGraph(refView, tgtView, data.graphHeight, colorStarPairs, scaleFactors, factor);
+        return graph;
+    }
+    
     /**
      * @param {ImageWindow} graphWindow Graph window
      * @param {StarPair[][]} colorStarPairs StarPair[] for each color channel
@@ -480,61 +507,69 @@ function displayStarGraph(refView, tgtView, height, colorStarPairs, scaleFactors
         }
     };
     
-    let targetName = tgtView.fullId;
-    let referenceName = refView.fullId;
-    let targetLabel = "Target (" + targetName + ")";
-    let referenceLabel = "Reference (" + referenceName + ")";
-    
-    // Create the graph axis and annotation.
-    let minMax = new StarMinMax();
-    colorStarPairs.forEach(function (starPairs) {
-        minMax.calculateMinMax(starPairs);
-    });
-    if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
-        // Unable to display graph. No points to display so graph axis min/max range cannot be calculated.
-        return false;
-    }
-    let startOffsetX = (minMax.maxTgtFlux - minMax.minTgtFlux) / 100;
-    let startOffsetY = (minMax.maxRefFlux - minMax.minRefFlux) / 100;
-    // If there is only one point, min & max will be equal. Prevent zero length axis.
-    if (startOffsetX === 0){
-        startOffsetX = minMax.minTgtFlux !== 0 ? minMax.minTgtFlux : 0.0001;
-    }
-    if (startOffsetY === 0){
-        startOffsetY = minMax.minRefFlux !== 0 ? minMax.minRefFlux : 0.0001;
-    }
-    let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
-                                  minMax.maxTgtFlux, minMax.maxRefFlux);
-    graphWithAxis.setYAxisLength(height);
-    graphWithAxis.createGraph(targetLabel, referenceLabel);
+    /**
+     * 
+     * @param {View} refView
+     * @param {View} tgtView
+     * @param {Number} height
+     * @param {StarPair[][]} colorStarPairs StarPair[] for each color
+     * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
+     * @param {Number} zoomFactor
+     * @returns {Graph}
+     */
+    function createGraph(refView, tgtView, height, colorStarPairs, scaleFactors, zoomFactor){
+        let targetName = tgtView.fullId;
+        let referenceName = refView.fullId;
+        let targetLabel = "Target (" + targetName + ")";
+        let referenceLabel = "Reference (" + referenceName + ")";
 
-    // Now add the data to the graph...
-    if (colorStarPairs.length === 1){ // B&W
-        drawStarLineAndPoints(graphWithAxis, 0xFF777777, colorStarPairs[0], scaleFactors[0], 0xFFFFFFFF);
-    } else {
-        // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
-        // if three samples are on the same pixel we get white and not the last color drawn
-        let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
-        let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
-        for (let c = 0; c < colorStarPairs.length; c++){
-            let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-            drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], scaleFactors[c], pointColors[c]);
-            graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+        // Create the graph axis and annotation.
+        let minMax = new StarMinMax();
+        colorStarPairs.forEach(function (starPairs) {
+            minMax.calculateMinMax(starPairs);
+        });
+        if (minMax.minRefFlux === Number.POSITIVE_INFINITY || minMax.minTgtFlux === Number.NEGATIVE_INFINITY){
+            // Default scale from 0 to 1
+            minMax.minRefFlux = 0;
+            minMax.minTgtFlux = 0;
+            minMax.maxRefFlux = 1;
+            minMax.maxTgtFlux = 1;
         }
+        if (zoomFactor !== 1){
+            minMax.maxRefFlux = minMax.minRefFlux + (minMax.maxRefFlux - minMax.minRefFlux) / zoomFactor;
+            minMax.maxTgtFlux = minMax.minTgtFlux + (minMax.maxTgtFlux - minMax.minTgtFlux) / zoomFactor;
+        }
+        let startOffsetX = (minMax.maxTgtFlux - minMax.minTgtFlux) / 100;
+        let startOffsetY = (minMax.maxRefFlux - minMax.minRefFlux) / 100;
+        // If there is only one point, min & max will be equal. Prevent zero length axis.
+        if (startOffsetX === 0){
+            startOffsetX = minMax.minTgtFlux !== 0 ? minMax.minTgtFlux : 0.0001;
+        }
+        if (startOffsetY === 0){
+            startOffsetY = minMax.minRefFlux !== 0 ? minMax.minRefFlux : 0.0001;
+        }
+        let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
+                                      minMax.maxTgtFlux, minMax.maxRefFlux);
+        graphWithAxis.setYAxisLength(height);
+        graphWithAxis.createGraph(targetLabel, referenceLabel);
+
+        // Now add the data to the graph...
+        if (colorStarPairs.length === 1){ // B&W
+            drawStarLineAndPoints(graphWithAxis, 0xFF777777, colorStarPairs[0], scaleFactors[0], 0xFFFFFFFF);
+        } else {
+            // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
+            // if three samples are on the same pixel we get white and not the last color drawn
+            let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
+            let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
+            for (let c = 0; c < colorStarPairs.length; c++){
+                let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+                drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], scaleFactors[c], pointColors[c]);
+                graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+            }
+        }
+        
+        return graphWithAxis;
     }
-    // Display graph in script dialog
-    GraphDialog.prototype = new Dialog;
-    let graph = new GraphDialog(graphWithAxis.getGraphBitmap(), "Photometry Graph", graphWithAxis.screenToWorld);
-    if (graph.execute() === StdButton_Yes){
-        // User requested graph saved to PixInsight View
-        let isColor = refView.image.isColor;
-        let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
-        let imageWindow = graphWithAxis.createWindow(windowTitle, isColor);
-        starGraphFitsHeader(imageWindow, colorStarPairs, data);
-        imageWindow.show();
-        imageWindow.zoomToFit();
-    }
-    return true;
 }
 
 /**

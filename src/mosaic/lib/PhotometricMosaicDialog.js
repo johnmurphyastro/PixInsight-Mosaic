@@ -131,6 +131,9 @@ function PhotometricMosaicData() {
         Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
         Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
         Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag); 
+        
+        Parameters.set("graphWidth", this.graphWidth);
+        Parameters.set("graphHeight", this.graphHeight);
     };
 
     // Reload our script's data from a process icon
@@ -184,7 +187,7 @@ function PhotometricMosaicData() {
         if (Parameters.has("sampleSize"))
             this.sampleSize = Parameters.getInteger("sampleSize");
         if (Parameters.has("maxSamples"))
-            this.maxSamples = Parameters.getInteger("maxSamples");   
+            this.maxSamples = Parameters.getInteger("maxSamples");
         if (Parameters.has("orientation"))
             this.orientation = Parameters.getInteger("orientation");
         
@@ -219,6 +222,11 @@ function PhotometricMosaicData() {
             this.mosaicRandomFlag = Parameters.getBoolean("mosaicRandomFlag");
         if (Parameters.has("mosaicAverageFlag"))
             this.mosaicAverageFlag = Parameters.getBoolean("mosaicAverageFlag");
+        
+        if (Parameters.has("graphWidth"))
+            this.graphWidth = Parameters.getInteger("graphWidth");
+        if (Parameters.has("graphHeight"))
+            this.graphHeight = Parameters.getInteger("graphHeight");
     };
 
     // Initialise the scripts data
@@ -268,6 +276,9 @@ function PhotometricMosaicData() {
         this.mosaicRandomFlag = false;
         this.mosaicAverageFlag = false;
         
+        this.graphWidth = 1000; // Gradient graph width
+        this.graphHeight = 800; // Photometric and Gradient graph height
+        
         // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
         this.testFlag = 0;
         
@@ -302,6 +313,7 @@ function PhotometricMosaicData() {
         // Gradient Sample Generation
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
+        linearFitDialog.maxSamples_Control.setValue(this.maxSamples);
         linearFitDialog.orientationCombo.currentItem = AUTO();
         
         // Gradient Tapered Correction
@@ -355,10 +367,10 @@ function PhotometricMosaicDialog(data) {
     // Create the Program Discription at the top
     let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
             " &mdash; Corrects the scale and gradient between two registered images.</b><br />" +
-            "(1) Each join must be approximately vertical or horizontal.<br />" +
-            "(2) Join frames into either columns or rows.<br />" +
+            "(1) Each join should be approximately vertical or horizontal.<br />" +
+            "(2) Join frames into either rows or columns.<br />" +
             "(3) Join these strips to create the final mosaic.<br />" +
-            "Copyright &copy; 2019-2020 John Murphy.");
+            "Copyright &copy; 2019-2020 John Murphy");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
@@ -478,17 +490,15 @@ function PhotometricMosaicDialog(data) {
     this.starFluxTolerance_Control.real = true;
     this.starFluxTolerance_Control.label.text = "Star Flux Tolerance:";
     this.starFluxTolerance_Control.toolTip = 
-            "<p>Although the target and reference images have been registered, the star "  +
-            "centers can still differ by a few pixels and need to be matched.</p>" +
-            "<p>Star flux tolerance is used to prevent invalid star matches. " +
-            "Smaller values reject more matches. " +
-            "You usually don't need to modify this parameter.</p>" +
+            "<p>Star flux tolerance is used to prevent invalid target star to reference " +
+            "star matches. Smaller values reject more matches.</p>" +
             "<p>Star matches are rejected if the difference in star flux " +
             "is larger than expected. The algorithm first calculates the average scale difference, " +
             "and then rejects matches if their brightness ratio is greater than " +
             "(expected ratio * tolerance) or smaller than (expected ratio / tolerance)</p>" +
             "<p>1.0 implies the star flux ratio must exactly match the expected ratio.</p>" +
-            "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>";
+            "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>" +
+            "<p>You usually don't need to modify this parameter.</p>";
     this.starFluxTolerance_Control.label.minWidth = labelWidth;
     this.starFluxTolerance_Control.setRange(1.01, 2);
     this.starFluxTolerance_Control.slider.setRange(100, 200);
@@ -503,13 +513,11 @@ function PhotometricMosaicDialog(data) {
     this.starSearchRadius_Control.real = true;
     this.starSearchRadius_Control.label.text = "Star Search Radius:";
     this.starSearchRadius_Control.toolTip = 
-            "<p>Although the target and reference images have been registered, the star "  +
-            "centers can still differ by a few pixels so it is necessary to match " +
-            "the reference and target stars.</p>" +
             "<p>Search radius is used to match the reference and target stars. " +
             "Larger values find more photometric stars but at the risk of matching " +
-            "the wrong star or even matching noise. " +
-            "You usually don't need to modify this parameter.</p>";
+            "the wrong star or even matching noise.</p>" +
+            "<p>You usually don't need to modify this parameter.</p>";
+
     this.starSearchRadius_Control.label.minWidth = labelWidth;
     this.starSearchRadius_Control.setRange(1, 10);
     this.starSearchRadius_Control.slider.setRange(1, 100);
@@ -559,16 +567,16 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.label.text = "Linear Range:";
     this.rejectHigh_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
     this.rejectHigh_Control.toolTip = 
-            "<p>This control restricts the stars used for photometry to those " +
+            "<p>Restricts the stars used for photometry to those " +
             "that have a peak pixel value less than the specified value. " +
             "This ensures the photometric stars are within the " +
             "camera's linear response range.</p>";
     this.rejectHigh_Control.onValueUpdated = function (value) {
         data.linearRange = value;
     };
-    this.rejectHigh_Control.setRange(0.01, 1.0);
+    this.rejectHigh_Control.setRange(0.001, 1.0);
     this.rejectHigh_Control.slider.setRange(0, 500);
-    this.rejectHigh_Control.setPrecision(2);
+    this.rejectHigh_Control.setPrecision(3);
     this.rejectHigh_Control.slider.minWidth = 206;
     this.rejectHigh_Control.setValue(data.linearRange);
 
@@ -583,8 +591,8 @@ function PhotometricMosaicDialog(data) {
     this.outlierRemoval_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
     this.outlierRemoval_Control.toolTip = 
             "<p>The photometric measurement of some stars can be suspect. " +
-            "For example, the area around the star that's used to calculate " +
-            "the background level may contain too many bright pixels. " +
+            "For example, a stars size may be underestimated causing some of " +
+            "its flux to contribute to the background measurement. " +
             "This control determines the number of outlier stars to remove. " +
             "This can improve accuracy, but don't over do it!</p>" +
             "<p>Use the 'Photometry Graph' button to see the " +
@@ -601,13 +609,13 @@ function PhotometricMosaicDialog(data) {
     photometryGraphButton.text = "Photometry Graph";
     photometryGraphButton.toolTip = 
             "<p>For each star detected within the overlapping region, " +
-            "if the star meets the photometry criteria, the star's reference flux " +
+            "provided the star meets the photometry criteria, the star's reference flux " +
             "is plotted against its target flux.</p>" +
             "<p>Color (red, green and blue) is used to represent the data for each color channel.</p>" +
             "<p>The plotted lines indicate the " +
             "best fit lines (least squares fit) that go through the origin. " +
             "The gradient of these lines gives the required scale factors. </p>" +
-            "<p>See graph title bar for usage hints.</p>";
+            "<p>See graph tooltip for usage instructions.</p>";
     photometryGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_PHOTOMETRY_GRAPH();
         this.dialog.ok();
@@ -618,10 +626,10 @@ function PhotometricMosaicDialog(data) {
     photometryStarsButton.toolTip = 
             "<p>Displays the stars that met the criteria for photometry. " +
             "These stars were within the specified 'Linear Range' and were found " +
-            "in both target and reference images and not rejected by 'Outlier Removal'.</p>" +
+            "in both target and reference images and were not rejected by 'Outlier Removal'.</p>" +
             "<p>The color represents the color channel. " +
             "Hence a white square indicates the star was found in the red, green and blue channels.</p>" +
-            "<p>Useful data is also saved to the graph's FITS header, " +
+            "<p>Useful data is also saved to the FITS header, " +
             "including the position of the star that has the largest error.</p>";
     photometryStarsButton.onClick = function () {
         data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
@@ -653,17 +661,28 @@ function PhotometricMosaicDialog(data) {
     const getAreaFromPreviewStr = "Get area from preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
     const JoinRegionTooltip =
-            "<p>The 'Join Region' determines the size and position of the join between the two images. " +
-            "If this option is not selected, the whole overlap region is used for the join.</p>" +
-            "<p>For a 'Random' join, use a thin rectangle just thick enough to blend the two sides of the join. " +
-            "Position the rectangle to avoid image corners and bright stars.</p>" +
-            "<p>For a 'Reference' overlay join, the rectangle side closest to the target image determines " +
-            "the join line. For a 'Target' overlay join, it is the side closest to the reference image. " +
-            "The join position should avoid image corners and bright stars.</p>" +
-            "<p>It is not necessary for the selected area to contain any stars. The whole of the " +
+            "<p>The 'Join Region' determines the size and position of the join " +
+            "between the two images. The rectangle's long axis should align with the join " +
+            "and should ideally avoid distorted regions such as image corners. " +
+            "For all 'Join Direction' modes except for 'Insert', the " +
+            "Join Region is updated to start and finish at the overlap bounding box. " +
+            "The ideal size and position of the Join Region rectangle depends on the " +
+            "the Mosaic overlay mode:</p>" +
+            "<ul><li>Reference: The edge closest to the target image " +
+            "determines the join line. Ideally, this line should avoids bright stars.</li>" +
+            "<li>Target: The edge closest to the reference image " +
+            "determines the join line. Ideally, this line should avoids bright stars.</li>" +
+            "<li>Random: The rectangle should be thick enough to blend the two " +
+            "sides of the join.</li>" +
+            "<li>Average: The 'Join Region' determines the area that will benefit " +
+            "from the enhanced signal to noise ratio.</li></ul>" +
+             "<p>It is not necessary for the Join Region to contain any stars. The whole of the " +
             "overlap region is always used to determine the photometric scale and the background gradient.</p>" +
-            "<p>If the 'Join Direction' mode is 'Auto', 'Horizontal' or 'Vertical', the join " +
-            "rectangle's length is updated to start and finish at the overlap bounding box.</p>";
+            "<p>Inside the Join Region, the behavior depends on the mosaic combination mode. " +
+            "The behavour outside the region (all modes except 'Insert'):" + 
+            "<ul><li>Reference side of join: Reference overlay</li>" +
+            "<li>Target side of join: Target overlay</li></ul>" +
+            "</p>";
             
     this.rectangleX0_Control = createNumericEdit("Left:", JoinRegionTooltip,
             data.joinAreaPreview_X0, 50);
@@ -766,17 +785,15 @@ function PhotometricMosaicDialog(data) {
     this.joinAreaBar = new SectionBar(this, "Join Region");
     this.joinAreaBar.setSection(joinAreaSection);
     this.joinAreaBar.enableCheckBox();
-    this.joinAreaBar.checkBox.toolTip = JoinRegionTooltip;
+    this.joinAreaBar.toolTip = JoinRegionTooltip;
     this.joinAreaBar.checkBox.onClick = this.setHasJoinAreaPreview;
     this.joinAreaBar.onToggleSection = this.onToggleSection;
     this.setHasJoinAreaPreview(data.hasJoinAreaPreview);
     // SectionBar "Join Region" End
 
     // =======================================
-    // SectionBar: "Gradient"
+    // SectionBar: "Gradient Sample Generation"
     // =======================================
-    // GroupBox: "Gradient Sample Generation"
-    // ---------------------------------------
     const joinDirectionStrLen = this.font.width("Join Direction:");
     this.limitSampleStarsPercent_Control = new NumericControl(this);
     this.limitSampleStarsPercent_Control.real = true;
@@ -792,17 +809,17 @@ function PhotometricMosaicDialog(data) {
             "<li>Bright stars can have significantly different profiles between " +
             "the reference and target images. This can effect how many of the " +
             "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is not necessary to reject all faint stars. This script uses the " +
+            "<p>It is only necessary to reject bright stars. This script uses the " +
             "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. These samples do not " +
-            "have to be rejected.</p>";
+            "half the sample area will have little effect. It is more important to " +
+            "include most of the samples than to reject faint stars.</p>";
     this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
     };
     this.limitSampleStarsPercent_Control.setRange(0, 100);
     this.limitSampleStarsPercent_Control.slider.setRange(0, 100);
     this.limitSampleStarsPercent_Control.setPrecision(0);
-    this.limitSampleStarsPercent_Control.slider.minWidth = 200;
+    this.limitSampleStarsPercent_Control.slider.minWidth = 140;
     this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
     
     this.sampleSize_Control = new NumericControl(this);
@@ -824,8 +841,6 @@ function PhotometricMosaicDialog(data) {
             "background gradient. The sample size and the number of samples not " +
             "rejected by stars will determine the maximum resolution of the surface spline. " +
             "However, very small samples will suffer from noise.</p>" +
-            "<p>For performance reasons, if there are more than 2,000 samples, the " +
-            "samples are binned before creating the surface spline.</p>" +
             "<p>Use the 'Sample Grid' button to visualize the grid of samples.</p>";
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
@@ -845,20 +860,25 @@ function PhotometricMosaicDialog(data) {
     this.orientationCombo.editEnabled = false;
     this.orientationCombo.toolTip = 
         "<p>Orientation of the line of intersection. This determines how the " +
-        "background offset is corrected outside of the overlap region: " +
-        "<ul><li>In the direction parallel to the join, the offset is held constant either side of the join</li>" +
-        "<li>In the direction perpendicular to the join, the correction is dependent on the " +
-        "'Propagated Gradient Correction' and 'Tapered Gradient Correction' settings.</li></ul></p>" +
-        "<p>The 'Horizontal' and 'Vertical' modes can be used to force the orientation, " +
-        "but it is usually better to create a  long thin join area in the 'Join Region' section and " +
-        "use 'Auto' instead.</p>" +
-        "<p>The 'Auto' mode usually works well. It first looks at the specified 'Join Region' " +
-         "rectangle, or if this is not specified, the overlap region. " +
-        "If the area is wider than it is tall, the line of intersection " +
-        "is assumed to be horizontal; if not, a vertical join.</p>" +         
-        "<p>The 'Insert' mode is used to insert a target image into the middle of a mosaic. " +
-        "Pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a " +
-        "small area of the mosaic or to add high res images to a wider mosaic.</p>";
+        "background offset is corrected outside of the overlap region. " +
+        "You should usually use 'Auto' while creating a mosaic, or " +
+        "'Insert' to replace a small region in the middle of an existing mosaic.</p>" +
+        "<p>'Auto': The join direction is determined by the 'Join Region' rectangle's " +
+        "longest dimension. If the 'Join Region' has not been specified, the overlap's " +
+        "bounding box is used instead<\p>" +
+        "<p>'Horizontal': Sets the join direction to horizontal. " +
+        "The target's background offset is corrected in the region above and below " +
+        "the join. On the target side of the overlap, the offset is tapered from fully corrected at the " +
+        "top or bottom of the overlap, down to either the average offset correction or the " +
+        "propagated correction (if specified).</p>" +
+        "<p>'Vertical': Sets the join direction to vertical. " +
+        "The target's background offset is corrected in the region to the left and right of " +
+        "the join. On the target side of the overlap, the offset is tapered from fully corrected at the " +
+        "left or right side of the overlap, down to either the average offset correction or the " +
+        "propagated correction (if specified).</p>" +
+        "<p>'Insert': Pixels from the target image are limited to the Join Region or overlap area. " +
+        "This can be used to fix a small area of the mosaic or to add high res images to a wider mosaic. " +
+        "'Insert' only supports the 'Target' and 'Average' mosaic combination modes.</p>";
 
     this.orientationCombo.minWidth = this.font.width("Horizontal");
     this.orientationCombo.addItem("Horizontal");
@@ -884,22 +904,81 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
+    let sampleGridSizer = new HorizontalSizer;
+    sampleGridSizer.spacing = 4;
+    sampleGridSizer.add(this.sampleSize_Control);
+    sampleGridSizer.addSpacing(20);
+    sampleGridSizer.add(displaySamplesButton);
+    
+    this.maxSamples_Control = new NumericControl(this);
+    this.maxSamples_Control.real = false;
+    this.maxSamples_Control.label.text = "Max Samples:";
+    this.maxSamples_Control.label.minWidth = joinDirectionStrLen;
+    this.maxSamples_Control.toolTip = 
+            "<p>Limits the number of samples used to create the surface spline. " +
+            "If the number of samples exceed this limit, they are combined " +
+            "(binned) to create super samples.</p>" +
+            "<p>Increase it if the overlap region is very large. " +
+            "A larger number of samples increases the " +
+            "theoretical maximum resolution of the surface spline. However, " +
+            "small unbinned samples can be less accurate. " +
+            "The default value is usually a good compromise.</p>" +
+            "<p>The time required to initialise the surface spline approximately " +
+            "doubles every 1300 samples.</p>" +
+            "<p>Use the 'Binned Grid' button to visualize the binned samples.</p>";
+    this.maxSamples_Control.onValueUpdated = function (value) {
+        data.maxSamples = value;
+    };
+    this.maxSamples_Control.setRange(1000, 5000);
+    this.maxSamples_Control.slider.setRange(100, 500);
+    this.maxSamples_Control.slider.minWidth = 200;
+    this.maxSamples_Control.setValue(data.maxSamples);
+    
+    let displayBinnedSamplesButton = new PushButton();
+    displayBinnedSamplesButton.text = "Binned Grid ";
+    displayBinnedSamplesButton.toolTip = 
+            "<p>Displays the binned samples that will " +
+            "be used to calculate the background offset and gradient.</p>" +
+            "<p>Samples are binned to improve performance if the number of " +
+            "samples exceeds the specified limit.</p>" +
+            "<p>The area of each binned sample represents the number of samples " +
+            "it was created from.</p>" +
+            "<p>Each binned sample's center is calculated from " +
+            "the center of mass of the samples it was created from.</p>" +
+            "<p>To see which of the unbinned samples were rejected due to stars, " +
+            "use 'Sample Grid'.</p>";
+    displayBinnedSamplesButton.onClick = function () {
+        data.viewFlag = DISPLAY_BINNED_SAMPLES();
+        this.dialog.ok();
+    };
+    
+    let maxSamplesSizer = new HorizontalSizer;
+    maxSamplesSizer.spacing = 4;
+    maxSamplesSizer.add(this.maxSamples_Control);
+    maxSamplesSizer.addSpacing(20);
+    maxSamplesSizer.add(displayBinnedSamplesButton);
+    
     let orientationSizer = new HorizontalSizer;
     orientationSizer.spacing = 4;
     orientationSizer.add(directionLabel);
     orientationSizer.add(this.orientationCombo);
     orientationSizer.addStretch();
-    orientationSizer.add(displaySamplesButton);
     
-    let sampleGenerationGroupBox = createGroupBox(this, "Gradient Sample Generation");
-    sampleGenerationGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
-    sampleGenerationGroupBox.sizer.add(this.sampleSize_Control);
-    sampleGenerationGroupBox.sizer.add(orientationSizer);
-    // GroupBox: "Gradient Sample Generation" End
+    let sampleGenerationSection = new Control(this);
+    sampleGenerationSection.sizer = new VerticalSizer;
+    sampleGenerationSection.sizer.spacing = 4;
+    sampleGenerationSection.sizer.add(this.limitSampleStarsPercent_Control);
+    sampleGenerationSection.sizer.add(sampleGridSizer);
+    sampleGenerationSection.sizer.add(maxSamplesSizer);
+    sampleGenerationSection.sizer.add(orientationSizer);
+    let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
+    sampleGenerationBar.setSection(sampleGenerationSection);
+    sampleGenerationBar.onToggleSection = this.onToggleSection;
+    // SectionBar: "Gradient Sample Generation" End
     
-    // ------------------------------------------
-    // GroupBox: "Gradient Correction"
-    // ------------------------------------------
+    // =======================================
+    // SectionBar: "Gradient Correction"
+    // =======================================
     // Gradient controls
     this.gradientSmoothnessControl = new NumericControl(this);
     this.gradientSmoothnessControl.real = true;
@@ -907,14 +986,17 @@ function PhotometricMosaicDialog(data) {
     this.gradientSmoothnessControl.label.text = "Smoothness:";
     this.gradientSmoothnessControl.label.minWidth = this.font.width("Taper Length:");
     this.gradientSmoothnessControl.toolTip = 
-        "<p>This mode applies a tapered correction to the gradient between " +
-        "the reference and target image. This correction is applied after the " +
-        "'Propagated Gradient Correction' (if specified).</p>" +
+        "<p>Determines the offset and gradient correction that will be " +
+        "applied to the overlap region.</p>" +
+        "<p>The 'Smoothness' control determines how closely the " +
+        "correction follows the sample pair data points. The smoothness " +
+        "value is logarithmic. Smaller values apply less smoothing. " +
+        "The aim is to correct both the gradient trends and " +
+        "the local variations, such as the diffuse light around " +
+        "bright stars, but with enough smoothing to avoid following noise.</p>" +
+        "<p>Use the 'Gradient Graph' to determine the optimum smoothness.</p>" +
         "<p>The full correction is applied across the whole of the overlap's " +
-        "bounding box. A taper is applied from the overlap's target side edge " +
-        "to prevent the gradient correction propagating across the mosaic.</p>" +
-        "<p>A tapered correction is ideal for correcting local difference, for " +
-        "example, due to scattered light surrounding bright stars.</p>";
+        "bounding box.</p>";
     this.gradientSmoothnessControl.onValueUpdated = function (value) {
         data.gradientSmoothness = value;
     };
@@ -926,20 +1008,21 @@ function PhotometricMosaicDialog(data) {
     let gradientGraphButton = new PushButton();
     gradientGraphButton.text = "Gradient Graph";
     gradientGraphButton.toolTip = 
-        "<p>This graph displays the gradient data after the " +
-        "'Propagated Gradient Correction' has been applied. It therefore " +
-        "displays the residual error that still needs correcting.</p>" +
-        "<p>The vertical axis represents the difference between the two images. " +
-        "The horizontal axis represents the join's X-Coordinate (horizontal join) " +
+        "<p>The vertical axis represents the difference between the two images, " +
+        "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
         "<p>The plotted dots represent the difference between each paired target and " +
         "reference sample within the whole of the overlap bounding box area. " +
-        "These points are scattered vertically. This is partly due to gradients perpendicular to " +
-        "the join, and partly due to noise.<\p>" +
-        "<p>The two curves are calculated from the differences at either side " +
-        "(top and bottom for horizontal join) of the " +
-        "'Join Region' and indicate the gradient correction that will be " +
-        "applied at the join between the reference and target images.</p>" +
+        "These points are typically scattered vertically. This is partly due to gradients " +
+        "perpendicular to the join, and partly due to noise.<\p>" +
+        "<p>A bold curve is drawn to represent the gradient correction at the join. " +
+        "This gradient correction is calculated from the offset differences " +
+        "along the join. The join line is necessarily a straight line - it depends on the " +
+        "shape of the reference and target images.</p>" +
+        "<p>A thin line is drawn to show the gradient correction at the other side " +
+        "of the join region, and the thin middle line indicates the gradient half way between. " +
+        "If the combine mode is average or random, all three lines are relevant and are " +
+        "then all drawn as bold.</p>" +
         "<p>The graphs produced for color images use red, green and blue dots " +
         "and lines for each channel. The colors add together. " +
         "For example: red, green and blue add up to white.</p>";
@@ -948,24 +1031,24 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let taperTooltip = "<p>The gradient correction is gradually " +
-            "tapered down over the taper length to the average offset difference. " +
-            "This prevents the local gradient corrections required at the join from " +
-            "propagating to the opposite edge of the target frame.</p>" +
-            "<p>The correction applied to the target image is applied as a single " +
-            "calculation, but in principle it can be thought of as three steps:</p>" +
-            "<ul><li>The scale factor is applied to the whole of the target image. " +
-            "'Taper Length' has no affect. </li>" +
-            "<li>If selected, the 'Propagated Gradient Correction' is applied to the whole " +
-            "of the target image. 'Taper Length' has no affect. </li>" +
-            "<li>If 'Propagated Gradient Correction' was not selected, the " +
-            "average offset between the two images is applied to the whole " +
-            "of the target image. 'Taper Length' has no affect. </li>" +
-            "<li>The horizontal (or vertical) component of the gradient is calculated " +
-            "for the horizontal (or vertical) join. In the overlap region, the " +
-            "full gradient correction is applied to the target image. On the target image's " +
-             "side of the overlap, the applied " +
-            "gradient correction is gradually reduce to zero.</li></ul></p>";
+    let taperTooltip = "<p>The scale factor is applied to the whole of the target image, but the " +
+        "gradient correction depends on the available data. The overlap region has " +
+        "sufficient data to allow full gradient correction. " +
+        "However, there is no data outside the overlap bounding box, so the rest of " +
+        "the target image relies on an extrapolated correction.</p>" +
+        "<p>In the default case (no 'Propagated Gradient Correction') the average " +
+        "offset between the two images at the join is applied to " +
+        "the rest of the target image</p>" +
+        "<p>If 'Propagated Gradient Correction' is specified, the rest of the target " +
+        "image is corrected with the component of the gradient along the length of " +
+        "the join. This is typically a smoother correction than that within the overlap " +
+        "region, following the general gradient trend and ignoring the local variations.<\p>" +
+        "<p>In both cases, there will be an imperfect match between the fully " +
+        "corrected overlap region, and the extrapolated correction. The taper is " +
+        "used to create a smooth transition between these two regions.<\p>" +
+        "<p>In most cases, a long taper usually produces the best result, but the taper should " +
+        "finish before the the end of the target image. However, if there is a spike in the " +
+        "local variation on the join, (e.g. a star halo) a short taper may be necessary.</p>";
     
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
@@ -980,27 +1063,21 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
     
-    let taperSizer = new HorizontalSizer;
-    taperSizer.spacing = 4;
-    taperSizer.add(this.gradientSmoothnessControl);
-    taperSizer.addSpacing(20);
-    taperSizer.add(gradientGraphButton);
+    let gradientSizer = new HorizontalSizer;
+    gradientSizer.spacing = 4;
+    gradientSizer.add(this.gradientSmoothnessControl);
+    gradientSizer.addSpacing(20);
+    gradientSizer.add(gradientGraphButton);
     
-    let gradientGroupBox = createGroupBox(this, "Gradient Correction");
-    gradientGroupBox.sizer.add(taperSizer);
-    gradientGroupBox.sizer.add(this.taperLength_Control);
-    // GroupBox: "Tapered Gradient Correction" End
-    
-
     let gradientSection = new Control(this);
     gradientSection.sizer = new VerticalSizer;
     gradientSection.sizer.spacing = 4;
-    gradientSection.sizer.add(sampleGenerationGroupBox);
-    gradientSection.sizer.add(gradientGroupBox);
-    let gradientBar = new SectionBar(this, "Gradient");
+    gradientSection.sizer.add(gradientSizer);
+    gradientSection.sizer.add(this.taperLength_Control);
+    let gradientBar = new SectionBar(this, "Gradient Correction");
     gradientBar.setSection(gradientSection);
     gradientBar.onToggleSection = this.onToggleSection;
-    //SectionBar: "Gradient" End
+    //SectionBar: "Gradient Correction" End
     
     // =======================================
     // SectionBar: "Propagated Gradient Correction"
@@ -1010,20 +1087,22 @@ function PhotometricMosaicDialog(data) {
     this.propagateSmoothness_Control.setPrecision(1);
     this.propagateSmoothness_Control.label.text = "Smoothness:";
     this.propagateSmoothness_Control.toolTip = 
-        "<p>This mode can be used to correct the horizontal and vertical components of the " +
-        "relative gradient between the reference and target images. This is done " +
-        "in two stages. One component is corrected when tiles are joined into " +
+        "<p>Determines how the gradient correction is applied to the " +
+        "target side of the overlap's bounding box. It has no affect within the " +
+        "overlap region. Consider using it if the reference image has less gradient " +
+        "than the target image. In these cases it can partially correct the " +
+        "horizontal and vertical components of the relative gradient between the " +
+        "reference and target image. This is done in two stages:</p>" +
+        "<p>One component is corrected when tiles are joined into " +
         "horizontal or vertical strips. The other component is corrected when " +
         "these strips are joined.</p>" +
-        "<p>Use this mode if the reference tile has less gradient than the target tile.</p>" +
         "<p>Since this gradient correction is propagated across the mosaic, the " +
-        "correction should follow the general trend. It should not attempt to " +
-        "correct the local variations due to bright stars and other artifacts.</p>" +
-        "<p>When using this option, you should usually also apply a " +
-        "'Tapered Gradient Correction', to fix the residual gradient " +
-        "due to the stars and artifacts.</p>" +
-        "<p>Since the reference tile's gradient will be propagated across the mosaic, " +
-        "consider using DBE as a final correction once the mosaic is complete.</p>";
+        "correction should be a very smooth curve that follows the general trend. " +
+        "It should not attempt to correct the local variations which are unlikely " +
+        "to be valid at the opposite side of the image. The local variations are " +
+        "corrected by 'Gradient Correction' instead.</p>" +
+        "<p>The reference image's gradient will be propagated across the mosaic, " +
+        "so consider using DBE as a final correction once the mosaic is complete.</p>";
     this.propagateSmoothness_Control.onValueUpdated = function (value) {
         data.propagateSmoothness = value;
     };
@@ -1039,13 +1118,14 @@ function PhotometricMosaicDialog(data) {
             "the horizontal axis the join's X-Coordinate (horizontal join) " +
             "or Y-Coordinate (vertical join).</p>" +
             "<p>The plotted dots represent the difference between each paired target and " +
-            "reference sample within the whole of the overlap bounding box area. " +
-            "These points are scattered vertically. This is partly due to gradients perpendicular to " +
-            "the join, and partly due to noise.<\p>" +
-            "<p>The two curves are calculated from the differences at either side " +
-            "(top and bottom for horizontal join) of the " +
-            "overlap bonding box and indicate the gradient correction that will be " +
-            "propagated from this boundary.</p>" +
+            "reference samples within the whole of the overlap bounding box area. " +
+            "These points are typically scattered vertically. This is partly due to gradients " +
+            "perpendicular to the join, and partly due to noise.<\p>" +
+            "<p>The propagated correction is calculated from the offset differences " +
+            "along the target side of the overlap bounding box. " +
+            "A bold curve for each color channel is drawn on the graph to show this " +
+            "correction. A thin line is drawn to show the offset curve at the opposite side " +
+            "of the overlap bounding box.</p>" +
             "<p>The graphs produced for color images use red, green and blue dots " +
             "and lines for each channel. The colors add together. " +
             "For example: red, green and blue add up to white.</p>";
@@ -1252,10 +1332,10 @@ function PhotometricMosaicDialog(data) {
     joinMaskButton.toolTip = 
             "<p>Create a mask of the mosaic join. " +
             "This mask indicates the pixels used to create the mosaic join.</p>" +
-            "<p>If a 'Limit Gradient Sample Area' has not been defined, the join area is " +
+            "<p>If a 'Join Region' has not been defined, the join area is " +
             "simply the overlapping pixels. However, if it has been specified, " +
-            "the join still extends along the full length of the join but it is " +
-            "otherwise limited to the 'Limit Gradient Sample Area'.</p>";
+            "the join extends along the full length of the join but it is " +
+            "otherwise limited to the 'Join Region'.</p>";
     joinMaskButton.onClick = function () {
         data.viewFlag = CREATE_JOIN_MASK();
         this.dialog.ok();
@@ -1317,6 +1397,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(photometrySection);
     this.sizer.add(this.joinAreaBar);
     this.sizer.add(joinAreaSection);
+    this.sizer.add(sampleGenerationBar);
+    this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
     this.sizer.add(gradientSection);
     this.sizer.add(this.propagateGradientBar);
@@ -1331,6 +1413,7 @@ function PhotometricMosaicDialog(data) {
     starDetectionSection.hide();
     photometrySearchSection.hide();
     joinAreaSection.hide();
+    sampleGenerationSection.hide();
     propagateGradientSection.hide();
     starMaskSection.hide();
 
@@ -1419,66 +1502,4 @@ function main() {
     }
     
     return;
-}
-
-/**
- * Create a dialog that displays the supplied bitmap
- * @param {Bitmap} bitmap Bitmap to display (e.g. graph bitmap)
- * @param {String} title Window title
- * @param {String Function(x, y)} screenToWorld Translates bitmap (x,y) to graph (x,y)
- * @returns {GraphDialog}
- */
-function GraphDialog(bitmap, title, screenToWorld)
-{
-    this.__base__ = Dialog;
-    this.__base__();
-    let self = this;
-    
-    /**
-     * Converts bitmap (x,y) into graph coordinates.
-     * @param {Number} x Bitmap x coordinate
-     * @param {Number} y Bitmap y coordinate
-     * @returns {String} Output string in format "( x, y )"
-     */
-    this.displayXY = function (x, y){
-        self.windowTitle = title + "  " + screenToWorld(x, y);
-    };
-    
-    // Draw bitmap into this component
-    this.bitmapControl = new Control(this);
-    this.bitmapControl.setScaledMinSize(bitmap.width, bitmap.height);
-    this.bitmapControl.onPaint = function (){
-        let g = new Graphics(this);
-        g.drawBitmap(0, 0, bitmap);
-        g.end();
-    };
-    this.bitmapControl.onMousePress = function ( x, y, button, buttonState, modifiers ){
-        if (button === 2){
-            // Right mouse button -> MessageBox -> Close dialog and save graph to PixInsight View
-            let messageBox = new MessageBox( "Save Graph (create Image Window)?\n",
-                    "Save and Close Graph", 
-                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Cancel);
-            let reply = messageBox.execute();
-            if (reply === StdButton_Yes){
-                self.done(StdButton_Yes);
-            } else if (reply === StdButton_No){
-                self.done(StdButton_No);
-            }
-        } else {
-            // Any other button. Display graph coordinates in title bar
-            self.displayXY(x, y);
-        }
-    };
-    this.bitmapControl.onMouseMove = function ( x, y, buttonState, modifiers ){
-        // When dragging mouse, display graph coordinates in title bar
-        self.displayXY(x, y);
-    };
-    this.bitmapControl.toolTip = "(Esc: Close,  Left click: (x,y),  Right click: Save)";
-
-    this.sizer = new HorizontalSizer(this);
-    this.sizer.margin = 2;
-    this.sizer.add(this.bitmapControl, 100);
-    this.adjustToContents();
-    this.dialog.setFixedSize();
-    this.windowTitle = title + "  (Esc: Close,  Left click: (x,y),  Right click: Save)";
 }

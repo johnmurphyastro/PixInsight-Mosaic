@@ -1,4 +1,4 @@
-/* global UndoFlag_NoSwapFile */
+/* global UndoFlag_NoSwapFile, Dialog, StdButton_No, StdIcon_Question, StdButton_Cancel, StdButton_Yes */
 
 // Version 1.0 (c) John Murphy 16th-Feb-2020
 //
@@ -212,22 +212,22 @@ function Graph(x0, y0, x1, y1) {
     
     /**
      * Draw straigth lines between the points in the supplied array
-     * @param {Number[]} difArray Index is x-coordinate, value is y-coordinate
-     * @param {Number} firstCoord x or y coordinate for first difArray entry
+     * @param {Number[]} curvePoints Index is x-coordinate, value is y-coordinate
+     * @param {Number} firstCoord x coordinate at curvePoints[0]
      * @param {Number} color Hex color value
      * @param {Boolean} antiAlias If true draw an antialiased line
      */
-    this.drawDifArray = function(difArray, firstCoord, color, antiAlias){
+    this.drawCurve = function(curvePoints, firstCoord, color, antiAlias){
         let g = new Graphics(bitmap_);
         g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
         g.transparentBackground = true;
         g.antialiasing = antiAlias;
         g.pen = new Pen(color);
-        for (let x=1; x < difArray.length; x++){
+        for (let x=1; x < curvePoints.length; x++){
             let x0 = x - 1;
             let x1 = x;
-            let y0 = difArray[x0];
-            let y1 = difArray[x1];
+            let y0 = curvePoints[x0];
+            let y1 = curvePoints[x1];
             x0 += firstCoord;
             x1 += firstCoord;
             g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
@@ -245,11 +245,8 @@ function Graph(x0, y0, x1, y1) {
     this.drawPoint = function(xWorld, yWorld, color){
         let x = xToScreenX(xWorld);
         let y = yToScreenY(yWorld);
-        if (x >= 0 && y >= 0 && x < bitmap_.width && y < bitmap_.height){
+        if (x >= xOrigin_ && y >= 0 && x < bitmap_.width && y <= yOrigin_){
             bitmap_.setPixel(x, y, color);
-        } else {
-            console.criticalln("Out of range: (" + x + "," + y + ") bitmap_ width: "
-                    + bitmap_.width + " heigth: " + bitmap_.height);
         }
     };
     
@@ -474,4 +471,137 @@ function Graph(x0, y0, x1, y1) {
     function calculateFirstTick(minValue, tickIncrement){
         return tickIncrement * Math.ceil(minValue / tickIncrement);
     }
+}
+
+/**
+ * Create a dialog that displays a graph.
+ * The Graph object returned from the supplied createZoomedGraph(Number zoomFactor) 
+ * function must include the methods:
+ * Bitmap Graph.getGraphBitmap()
+ * String Graph.screenToWorld(Number x, Number y)
+ * The GraphDialog is initialised with the Graph returned from createZoomedGraph, 
+ * with a zoom factor of 1
+ * @param {String} title Window title
+ * @param {Graph function(Number zoomFactor)} createZoomedGraph Callback function used
+ * to create a zoomed graph
+ * @returns {GraphDialog}
+ */
+function GraphDialog(title, createZoomedGraph)
+{
+    this.__base__ = Dialog;
+    this.__base__();
+    let self = this;
+    let zoom_ = 1;
+    let createZoomedGraph_ = createZoomedGraph;
+    let graph_ = createZoomedGraph_(zoom_);
+    let bitmap_ = graph_.getGraphBitmap();
+    let screenToWorld_ = graph_.screenToWorld;
+    
+    /**
+     * Provided to give access to the zoomed graph. This is used when saving
+     * the displayed graph to a PixInsight view.
+     * @returns {Graph}
+     */
+    this.getGraph = function(){
+        return graph_;
+    };
+    
+    /**
+     * Converts bitmap (x,y) into graph coordinates.
+     * @param {Number} x Bitmap x coordinate
+     * @param {Number} y Bitmap y coordinate
+     * @returns {String} Output string in format "( x, y )"
+     */
+    function displayXY(x, y){
+        self.windowTitle = title + getZoomString() + "  " + screenToWorld_(x, y);
+    };
+    
+    // Draw bitmap into this component
+    let bitmapControl = new Control(this);
+    bitmapControl.setScaledMinSize(bitmap_.width, bitmap_.height);
+    bitmapControl.onPaint = function (){
+        let g = new Graphics(this);
+        g.drawBitmap(0, 0, bitmap_);
+        g.end();
+    };
+    
+    bitmapControl.onMousePress = function ( x, y, button, buttonState, modifiers ){
+        if (button === 2){
+            // Right mouse button -> MessageBox -> Close dialog and save graph to PixInsight View
+            let messageBox = new MessageBox( "Save Graph (create Image Window)?\n",
+                    "Save and Close Graph", 
+                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Cancel);
+            let reply = messageBox.execute();
+            if (reply === StdButton_Yes){
+                self.done(StdButton_Yes);
+            } else if (reply === StdButton_No){
+                self.done(StdButton_No);
+            }
+        } else {
+            // Any other button. Display graph coordinates in title bar
+            displayXY(x, y);
+        }
+    };
+    
+    bitmapControl.onMouseMove = function ( x, y, buttonState, modifiers ){
+        // When dragging mouse, display graph coordinates in title bar
+        displayXY(x, y);
+        // TODO create pan mode using space bar (modifiers = 8)
+    };
+    
+    bitmapControl.onMouseWheel = function ( x, y, delta, buttonState, modifiers ){
+        if (delta < 0){
+            if (zoom_ < 100){
+                zoom_ += 1;   
+            }
+        } else {
+            if (zoom_ > -98){
+                zoom_ -= 1;
+            }
+        }
+        graph_ = createZoomedGraph_(getZoomFactor());
+        bitmap_ = graph_.getGraphBitmap();
+        screenToWorld_ = graph_.screenToWorld;  // (x,y) pixel to graph coordinates
+        bitmapControl.repaint();    // display the zoomed graph bitmap
+        self.windowTitle = title + getZoomString();   // display zoom factor in title bar
+    };
+    
+    /**
+     * If zoom_ is positive, return zoom_ (1 to 100)
+     * If zoom_ is zero or negative, then:
+     * 0 -> 1/2
+     * -1 -> 1/3
+     * -2 -> 1/4
+     * -98 -> 1/100
+     * @returns {Number} Zoom factor
+     */
+    function getZoomFactor(){
+        return zoom_ > 0 ? zoom_ : 1 / (2 - zoom_);
+    }
+    
+    /**
+     * @returns {String} Zoom string (e.g. " 1:2")
+     */
+    function getZoomString(){
+        let zoomFactor = getZoomFactor();
+        if (zoomFactor < 1){
+            return " 1:" + Math.round(1/zoomFactor);
+        } else {
+            return " " + zoomFactor + ":1";
+        }
+    }
+    
+    bitmapControl.toolTip = 
+            "<p>Esc: Close graph window</p>" +
+            "<p>Mouse wheel: Zoom</p>" +
+            "<p>Left click: Display (x,y) in title bar</p>" +
+            "<p>Right click: Create a PixInsight image of the graph</p>";
+
+    this.sizer = new HorizontalSizer(this);
+    this.sizer.margin = 2;
+    this.sizer.add(bitmapControl, 100);
+    this.adjustToContents();
+    this.dialog.setFixedSize();
+    this.windowTitle = title + " 1:1";
+            //"(Esc: Close,  Left click: (x,y),  Right click: Save,  Mouse wheel: zoom)";
 }

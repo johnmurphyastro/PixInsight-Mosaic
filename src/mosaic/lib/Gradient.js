@@ -892,9 +892,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
  * Calculates maximum and minimum values for the sample points
  * @param {SamplePair[][]} colorSamplePairs SamplePair[] for each channel
  * @param {Number} minScaleDif Range will be at least +/- this value from the average value
+ * @param {Number} zoomFactor Zoom in by modifying minDif and maxDif (smaller
+ * range produces a more zoomed in view)
  * @returns {SamplePairDifMinMax}
  */
-function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
+function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
     this.minDif = Number.POSITIVE_INFINITY;
     this.maxDif = Number.NEGATIVE_INFINITY;
     this.avgDif = 0;
@@ -916,11 +918,15 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
         this.maxDif = this.avgDif + minScaleDif;
         this.minDif = this.avgDif - minScaleDif;
     }
+    if (zoomFactor !== 1){
+        let totalDif = (this.maxDif - this.minDif) / zoomFactor;
+        this.maxDif = this.avgDif + totalDif / 2;
+        this.minDif = this.avgDif - totalDif / 2;
+    }
 }
 
 /**
  * Display graph of (difference between images) / (pixel distance across image)
- * @param {Number} width Graph width. Limited to target image size (width or height).
  * @param {Boolean} isHorizontal
  * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
@@ -930,39 +936,50 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif) {
  * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
  */
-function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
+function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
         joinRect, colorSamplePairs, data, isPropagateGraph){
     
     {   // Constructor
-        let graph = createGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph);
-
         // Display graph in script dialog
         GraphDialog.prototype = new Dialog;
-        let graphDialog = new GraphDialog(graph.getGraphBitmap(), "Gradient Graph", graph.screenToWorld);
+        let graphDialog = new GraphDialog("Gradient Graph", createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
-            let imageWindow = graph.createWindow(windowTitle, true);
+            let zoomedGraph = graphDialog.getGraph();
+            let imageWindow = zoomedGraph.createWindow(windowTitle, true);
             gradientGraphFitsHeader(imageWindow, data, isHorizontal, isTargetAfterRef);
             imageWindow.show();
         }
     }
     
     /**
-     * 
-     * @param {Number} width
-     * @param {Boolean} isHorizontal
-     * @param {Boolean} isTargetAfterRef
-     * @param {SurfaceSpline[]} surfaceSplines
-     * @param {Rect} joinRect
-     * @param {SamplePair[][]} colorSamplePairs
-     * @param {type} data
-     * @param {PhotometricMosaicData} isPropagateGraph
+     * Callback function for GraphDialog to provide a zoomed graph.
+     * GraphDialog uses Graph.getGraphBitmap() and the function pointer Graph.screenToWorld
+     * @param {Number} factor
      * @returns {Graph}
      */
-    function createGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph){
+    function createZoomedGraph(factor){
+        // Using GradientGraph function call parameters
+        let graph = createGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
+                joinRect, colorSamplePairs, data, isPropagateGraph, factor);
+        return graph;
+    }
+    
+    /**
+     * 
+     * @param {Boolean} isHorizontal
+     * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
+     * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
+     * @param {Rect} joinRect Join region or overlap bounding box 
+     * @param {SamplePair[][]} colorSamplePairs The SamplePair points to be displayed for each channel
+     * @param {PhotometricMosaicData} data User settings used to create FITS header
+     * @param {Boolean} isPropagateGraph
+     * @param {Graph function(float zoomFactor)} zoomFactor Zoom factor for vertical axis only zooming.
+     * @returns {Graph}
+     */
+    function createGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
+                joinRect, colorSamplePairs, data, isPropagateGraph, zoomFactor){
         let xMaxCoordinate;
         let xLabel;
         if (isHorizontal){
@@ -973,16 +990,15 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
             xMaxCoordinate = data.targetView.image.height;
         }
         let yLabel = "(" + data.targetView.fullId + ") - (" + data.referenceView.fullId + ")";
-        let axisWidth = Math.min(width, xMaxCoordinate);
         // Graph scale
         // gradientArray stores min / max of fitted lines.
         // also need min / max of sample points.
         const minScaleDif = 5e-5;
-        let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif);
-
-        return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange, axisWidth,
+        let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor);
+        
+        return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
                 isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph, 1);
+                joinRect, colorSamplePairs, data, isPropagateGraph);
     }
     
     /**
@@ -1033,9 +1049,9 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
             let path = graphLinePath.paths[i];
             let firstCoord = isHorizontal ? path[0].x : path[0].y;
             if (graphLinePath.bold[i]){
-                graph.drawDifArray(difArray, firstCoord, lineBoldColor, true);
+                graph.drawCurve(difArray, firstCoord, lineBoldColor, true);
             } else {
-                graph.drawDifArray(difArray, firstCoord, lineColor, false);
+                graph.drawCurve(difArray, firstCoord, lineColor, false);
             }
         }
     }
@@ -1046,7 +1062,6 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {String} yLabel
      * @param {Number} xMaxCoordinate
      * @param {SamplePairDifMinMax} yCoordinateRange
-     * @param {Number} axisWidth
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef
      * @param {SurfaceSpline[]} surfaceSplines
@@ -1054,17 +1069,16 @@ function GradientGraph(width, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {SamplePair[][]} colorSamplePairs
      * @param {PhotometricMosaicData} data
      * @param {Boolean} isPropagateGraph
-     * @param {Number} zoomFactor
      * @returns {Graph}
      */
-    function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange, axisWidth,
+    function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
             isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
-            data, isPropagateGraph, zoomFactor){
+            data, isPropagateGraph){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
-        
+        let axisWidth = Math.min(data.graphWidth, xMaxCoordinate);
         let graph = new Graph(0, minY, xMaxCoordinate, maxY);
-        graph.setAxisLength(axisWidth + 2, 720);
+        graph.setAxisLength(axisWidth + 2, data.graphHeight);
         graph.createGraph(xLabel, yLabel);
 
         let graphLine = new GraphLinePath();
@@ -1160,56 +1174,49 @@ function GraphLinePath(){
     };
     
     /**
-     * Create a straight line path that follows a side of the overlap bounding box
+     * Create two straight line paths that follow opposite sides of the overlap bounding box.
+     * The line on the target side of the overlap will be bold.
      * @param {Overlap} overlap
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef
      */
     this.initPropagatePath = function (overlap, isHorizontal, isTargetAfterRef){
         let overlapBox = overlap.overlapBox;
-        let points;
+        let pathPointsBefore;
+        let pathPointsAfter;
         
-        if (isTargetAfterRef){
-            // Propagate region is after join
-            if (isHorizontal){
-                let minX = overlapBox.x0;
-                let maxX = overlapBox.x1;
-                points = new Array(maxX - minX);
-                for (let x = minX; x<maxX; x++){
-                    // Below join
-                    points[x - minX] = new Point(x, overlapBox.y1);
-                }
-            } else {
-                let minY = overlapBox.y0;
-                let maxY = overlapBox.y1;
-                points = new Array(maxY - minY);
-                for (let y = minY; y<maxY; y++){
-                    // Right of join
-                    points[y - minY] = new Point(overlapBox.x1, y);
-                }
+        // Propagate region is after overlap
+        if (isHorizontal){
+            let minX = overlapBox.x0;
+            let maxX = overlapBox.x1;
+            pathPointsBefore = new Array(maxX - minX);
+            pathPointsAfter = new Array(maxX - minX);
+            for (let x = minX; x<maxX; x++){
+                // Above overlap
+                pathPointsBefore[x - minX] = new Point(x, overlapBox.y0);
+
+                // Below overlap
+                pathPointsAfter[x - minX] = new Point(x, overlapBox.y1);
             }
         } else {
-            // Propagate region is before join
-            if (isHorizontal){
-                let minX = overlapBox.x0;
-                let maxX = overlapBox.x1;
-                points = new Array(maxX - minX);
-                for (let x = minX; x<maxX; x++){
-                    // Above join
-                    points[x - minX] = new Point(x, overlapBox.y0);
-                }
-            } else {
-                let minY = overlapBox.y0;
-                let maxY = overlapBox.y1;
-                points = new Array(maxY - minY);
-                for (let y = minY; y<maxY; y++){
-                    // Left of join
-                    points[y - minY] = new Point(overlapBox.x0, y);
-                }
+            let minY = overlapBox.y0;
+            let maxY = overlapBox.y1;
+            pathPointsBefore = new Array(maxY - minY);
+            pathPointsAfter = new Array(maxY - minY);
+            for (let y = minY; y<maxY; y++){
+                // Left of join
+                pathPointsBefore[y - minY] = new Point(overlapBox.x0, y);
+
+                // Right of overlap
+                pathPointsAfter[y - minY] = new Point(overlapBox.x1, y);
             }
         }
         
-        this.paths.push(points);
-        this.bold.push(true);
+        // before overlap
+        this.paths.push(pathPointsBefore);
+        this.bold.push(!isTargetAfterRef);
+        // after overlap
+        this.paths.push(pathPointsAfter);
+        this.bold.push(isTargetAfterRef);
     };
 }

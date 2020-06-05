@@ -1,4 +1,4 @@
-/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, UndoFlag_Keywords, UndoFlag_PixelData, View, UndoFlag_NoSwapFile, PixelMath, StdButton_Yes, StdIcon_Question, StdButton_No */
+/* global StdIcon_Error, StdButton_Ok, StdIcon_Warning, StdButton_Abort, UndoFlag_Keywords, UndoFlag_PixelData, View, UndoFlag_NoSwapFile, PixelMath, StdButton_Yes, StdIcon_Question, StdButton_No, StdIcon_Information */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -52,6 +52,7 @@ function DISPLAY_GRADIENT_GRAPH(){return 32;}
 function CREATE_MOSAIC_MASK(){return 64;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 function CREATE_JOIN_MASK(){return 256;}
+function DISPLAY_BINNED_SAMPLES(){return 512;}
 
 /**
  * Controller. Processing starts here!
@@ -210,13 +211,7 @@ function photometricMosaic(data)
     }
     if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
         console.hide(); // Allow user to compare with other open windows
-        let displayed = displayStarGraph(referenceView, targetView, 800, colorStarPairs, scaleFactors, data);
-        if (!displayed){
-            new MessageBox("Unable to display the graph because no photometric stars were found.\n" +
-                    "Decrease the 'Star Detection' setting to detect more stars " +
-                    "or increase 'Linear Range'.", 
-                    TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        }
+        displayStarGraph(referenceView, targetView, colorStarPairs, scaleFactors, data);
         return;
     }
     
@@ -248,9 +243,12 @@ function photometricMosaic(data)
         binnedSamples = Math.max(binnedSamples, colorSamplePairs[c].length);
     }
     
-    if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
-        if (data.maxSamples !== 2000){
-            // debug output invoked if maxSamples is set via process icon editor
+    if (data.viewFlag === DISPLAY_BINNED_SAMPLES()){
+        if (unBinnedSamples < data.maxSamples){
+            new MessageBox("Number of samples (" + unBinnedSamples + ") is less than Max Samples (" +
+                    data.maxSamples + ")\nThe samples were not binned." , TITLE(), 
+                    StdIcon_Information, StdButton_Ok).execute();
+        } else {
             let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Binned_Samples";
             displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
         }
@@ -303,7 +301,7 @@ function photometricMosaic(data)
         if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
             console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
-            GradientGraph(1000, isHorizontal, isTargetAfterRef,
+            GradientGraph(isHorizontal, isTargetAfterRef,
                     propagateSurfaceSplines, overlapBox, colorSamplePairs, data, true);
             return;
         }
@@ -328,7 +326,7 @@ function photometricMosaic(data)
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
-        GradientGraph(1000, isHorizontal, isTargetAfterRef,
+        GradientGraph(isHorizontal, isTargetAfterRef,
                 surfaceSplines, joinRect, colorSamplePairs, data, false);
         return;
     }

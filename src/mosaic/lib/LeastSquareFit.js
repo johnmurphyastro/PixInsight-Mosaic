@@ -68,7 +68,8 @@ function LeastSquareFitAlgorithm() {
             console.warningln("WARNING: Least Squares Fit only has one point. Assuming origin as second point.");
             return new LinearFitData(sumY_ / sumX_, 0);
         } else {
-            console.criticalln("ERROR: Least Squares Fit has no points to fit...");
+            console.warningln("WARNING: Least Squares Fit has no points to fit. " +
+                    "Defaulting to gradient = 1, y intercept = 0");
             return new LinearFitData(1, 0);
         }
     };
@@ -84,7 +85,8 @@ function LeastSquareFitAlgorithm() {
             let m = sumXY_ / sumSquaredX_;
             return new LinearFitData(m, 0);
         } else {
-            console.criticalln("ERROR: Least Squares Origin Fit has no points to fit...");
+            console.warningln("WARNING: Least Squares Fit has no points to fit. " +
+                    "Defaulting to gradient = 1, y intercept = 0");
             return new LinearFitData(1, 0);
         }
     };
