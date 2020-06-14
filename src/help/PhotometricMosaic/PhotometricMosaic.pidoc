@@ -101,7 +101,7 @@
 
       Mouse over to see a magnified image of the bottom left corner of the Overlap bounding box. These images were taken with a 50 mm camera lens, so the stars in the corners are heavily distorted. To avoid including these corner areas, a \s {Join Region} is created from Preview02. This has a similar affect to cropping the reference and target images. The reference image (Scutum) will appear to finish at the bottom of the Preview02. The target image (Sagittarius) will appear to start at the top of it.
     }
-    A \s {Join Region} is created to control where the mosaic join occurs. The behavour depends on the mosaic combination mode. (See figure \fignum scutum_sagittarius_join_region):
+    A \s {Join Region} is created to control where the mosaic join occurs. The behavour depends on the mosaic combination mode. The following description uses the mosaic in figure \fignum scutum_sagittarius_join_region as an example.
     \list {
       {\s {Reference} The reference overlays the target, so the join is on the target side of the join region (bottom of Preview02).}
       {\s {Target} The target overlays the reference, so the join is on the reference side of the join region (top of Preview02).}
@@ -115,9 +115,11 @@
       {The whole of the overlap area is used to determine the scale. This means the join region does not have to contain any stars. It can be as narrow as you wish.}
       {If the target image wraps around the edge of the reference (as it does in the example above) the whole of it will still be included in the mosaic, even if it is above or below the join region. The whole length of these side joins will still be seamlessly fitted to the reference image.}
     }
+    When creating a join region to avoid low quality areas, the checkbox \s {Taper from join} should be left unchecked. It should only be checked if there are bright stars at the overlap bounding box's target side edge. This is described in the next section.
   }
 
-  \subsection { Join Region: Avoiding Gradient Graph peaks } {
+  \subsection { Join Region: Avoiding bright star artifacts } {
+    Bright stars often brighten the region around them due to scattered light or a halo from a narrow band filter. If the reference and target images were taken under different conditions, this can create a strong local gradient between the two images. In certain circumstances, this can cause problems at a mosaic join. An example of this type of problem is shown in Figure \fignum join_region_mosaic.
     \figure [numbered:join_region_mosaic] {
       \figtag \s {Narrow join with a problem star halo (from a Ha filter)}
       \imageselect[menupos:right] {
@@ -133,19 +135,41 @@
       (3) Created using a Join Region that avoided the halo and most of the scattered light.\n
       (4) The target frame. The white preview is the overlap bounding box. The green preview specified the Join Region.
     }
+    In Figure \fignum join_region_mosaic, the first image shows a mosaic with a mask that reveals where the overlapping pixels are. The path of the join follows the edge of these overlapping pixels. This path is not necessarily a stright line - it depends on the shape of the reference and target images. For a reference overlay mosaic, the join path is on the target side of these overlapping pixels. For a target overlay the path switches to the reference side. Hence by switching the mosaic mode from reference to target, we can switch were the primary join path is.
+
+    The second image shows a reference overlay mosaic. The primary join path goes through the star's halo and has left a visible line in the image. A target overlay would have been a better choice. The primary join would then be on the other side of the overlapping pixels, and would not run through the halo. The join line would no longer be visible. However, there is a second problem that need solving. Below the bright star is a dark shadow that slowly tapers away. Switching to a target overlay will not fix it. To solve this we first need to understand what causes this shadow.
+
+    Within the overlapping pixel region there is sufficient data to fully correct the target image. Beyond this region, only an extrapolated correction can be applied. The user can choose between two strategies, but in both cases, the correction depends on the gradient along the target side of the overlapping pixels' bounding box. This is the secondary join path. It differs from the primary join path in several ways:
+    \list {
+      {It is a straight line, and follows a side of the overlapping pixels' bounding box.}
+      {It is always on the target side of the bounding box. Switching between reference and target overlay will not affect it.}
+    }
+    The target side of this secondary join line can be corrected in one of two ways:
+    \list {
+      {The average offset along the secondary join line is applied to the rest of the target image. This is the default case, and prevents gradient corrections from propagating through the mosaic.}
+      {An smooth gradient correction is created from the gradient along the secondary join line. This correction ignores the local variations and tries to follow the general trends. This correction is applied to the rest of the target image. This corrects one component of the relative gradient between the reference and target image.}
+    }
+    In either case, the correction on the target side of the secondary join will not match that within the overlapping region. To fix this, a taper is used to gradually transfer from a full correction to a partial one.
+
+    If the secondary join line passes through a strong local gradient (e.g. a star halo) this can cause a dark area that slowly tapers out. One solution is to apply a very short taper. A better solution is to move where this secondary join line occurs.
+
+    By default, creating a \s {Join Region} does not move the secondary join line. This is because for most situations, the target side of the overlap bounding box is the optimum position. If the reference and target image wrap around each other (see figure \figref scutum_sagittarius_join_region for an example of this), these side joins would not always be fully corrected if the secondary join is not at the end of the overlapping region.
+
+    When a black shadow is visible, it can be worth moving the secondary join line to the target side of the Join Region. To do this, select the \s {Taper from join} option. This is a compromise because it might make side joins visible but it is usually worth trying before resorting to a short taper length.
+
     \figure [numbered:join_region_graph] {
       \figtag \s {Gradient graphs with and without Join Region}
       \imageselect[menupos:bottom] {
-        images/horseHeadStarRef.png { Reference overlay}
-        images/horseHeadStarTgt.png { Target overlay }
-        images/horseHeadStarJoinRef.png { Reference overlay with Join Region }
-        images/horseHeadStarJoinTgt.png { Target overlay with Join Region }
-        images/horseHeadStarJoinTaperRef.png { Reference overlay with Join Region, Taper from join }
-        images/horseHeadStarJoinTaperTgt.png { Target overlay with Join Region, Taper from join }
+        images/horseHeadStarRef.png { (1) Reference overlay}
+        images/horseHeadStarTgt.png { (2) Target overlay }
+        images/horseHeadStarJoinRef.png { (3) Reference overlay with Join Region }
+        images/horseHeadStarJoinTgt.png { (4) Target overlay with Join Region }
+        images/horseHeadStarJoinTaperRef.png { (5) Reference overlay with Join Region, Taper from join }
+        images/horseHeadStarJoinTaperTgt.png { (6) Target overlay with Join Region, Taper from join }
       }
-      These graphs display the data from the 'Scutum & Sagittarius Mosiac' in figure \figref scutum_sagittarius_join_region.
+      The bold curve is the gradient correction along the path of the primary join. The thinner darker line is the gradient along the path of the secondary join (sometimes hidden behind the bold curve).
 
-      The bold curves represent the gradient along the path of the join.
+      These graphs display the data from the mosaic shown in figure \figref join_region_mosaic. In this example, the options (5) and (6) will produce the best results. If the thickness of the Join Region rectangle is reduced to 1 pixel, the difference between options (5) and (6) would become negligable.
     }
 
     Figure \fignum join_region_graph shows gradient graphs for the 'Horse Head Mosiac' shown in figure \figref join_region_mosaic.
@@ -155,16 +179,6 @@
     The bold curves represent the gradient along the path of the mosaic join. If there is no \s {Join Region} defined, this path will follow where the overlap starts.
   }
 
-  \subsection { Interpreting the Gradient Graph } {
-    \figure [numbered:gradient_graph_star_halo] {
-      \figtag \s {Gradient Graph showing peak due to diffuse light around bright star}
-      \imageselect[menupos:right] {
-        images/horseHeadStarJoinTaperRef.png { Reference overlay }
-        images/horseHeadStarJoinTaperTgt.png { Target overlay }
-      }
-    }
-    body text
-  }
   \subsection { Optimizing the Scale Factor } {
     \definition {
       { Outlier Removal } {
