@@ -23,18 +23,46 @@
 #define OVERLAY_AVG 4
 
 /**
+ * Create array of points along a horizontal line at y
+ * @param {Number} y Specifies the horizontal line
+ * @param {Rect} rectangle Rectangle determines start and end of line
+ * @returns {Point[]} Points along the specified path
+ */
+function createHorizontalPath(y, rectangle){
+    let min = rectangle.x0;
+    let max = rectangle.x1;
+    let points = new Array(max - min);
+    for (let x = min; x<max; x++){
+        points[x - min] = new Point(x, y);
+    }
+    return points;
+}
+
+/**
+ * Create array of points along a vertical line at x
+ * @param {Number} x Specifies the vertical line
+ * @param {Rect} rectangle Rectangle determines start and end of line
+ * @returns {Point[]} Points along the specified path
+ */
+function createVerticalPath(x, rectangle){
+    let min = rectangle.y0;
+    let max = rectangle.y1;
+    let points = new Array(max - min);
+    for (let y = min; y<max; y++){
+        points[y - min] = new Point(x, y);
+    }
+    return points;
+}
+
+/**
  * Create difference array for the horizontal line at y from minX to maxX
  * @param {SurfaceSpline} surfaceSpline
  * @param {Number} y Specifies the horizontal line
- * @param {Number} minX calculate difference from minX
- * @param {Number} maxX calculate difference until maxX
+ * @param {Rect} rectangle Rectangle determines start and end of line
  * @returns {Number[]} Difference array from minX to maxX - 1
  */
-function createSplineArrayX(surfaceSpline, y, minX, maxX){
-    let points = new Array(maxX - minX);
-    for (let x = minX; x<maxX; x++){
-        points[x - minX] = new Point(x, y);
-    }
+function createSplineArrayX(surfaceSpline, y, rectangle){
+    let points = createHorizontalPath(y, rectangle);
     return (surfaceSpline.evaluate(points)).toArray();
 }
 
@@ -42,15 +70,11 @@ function createSplineArrayX(surfaceSpline, y, minX, maxX){
  * Create difference array for the vertical line at x from minY to maxY
  * @param {SurfaceSpline} surfaceSpline
  * @param {Number} x Specifies the vertical line
- * @param {Number} minY calculate difference from minY
- * @param {Number} maxY calculate difference until maxY
+ * @param {Rect} rectangle Rectangle determines start and end of line
  * @returns {Number[]} Difference array from minY to maxY - 1
  */
-function createSplineArrayY(surfaceSpline, x, minY, maxY){
-    let points = new Array(maxY - minY);
-    for (let y = minY; y<maxY; y++){
-        points[y - minY] = new Point(x, y);
-    }
+function createSplineArrayY(surfaceSpline, x, rectangle){
+    let points = createVerticalPath(x, rectangle);
     return (surfaceSpline.evaluate(points)).toArray();
 }
 
@@ -134,6 +158,62 @@ function calcSurfaceSpline(samplePairs, logSmoothing){
 }
 
 /**
+ * 
+ * @param {Number} imageWidth
+ * @param {Number} imageHeight
+ * @param {Overlap} overlap
+ * @param {Rect} joinRect
+ * @param {Boolean} isHorizontal
+ * @param {PhotometricMosaicData} data
+ * @param {Boolean} isTargetAfterRef
+ * @returns {TargetRegions}
+ */
+function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal, 
+        data, isTargetAfterRef){
+            
+    this.firstTaperStart = 0;
+    this.overlapStart = 0;
+    this.joinStart = 0;
+    this.joinEnd = 0;
+    this.overlapEnd = 0;
+    this.secondTaperEnd = 0;
+    let overlapBox = overlap.overlapBox;
+    
+    if (isHorizontal){
+        this.joinStart = Math.max(joinRect.y0, overlapBox.y0);  // joinRect.y0, limited by overlap.y0
+        this.joinEnd = Math.min(joinRect.y1, overlapBox.y1);    // joinRect.y1, limited by overlap.y1
+        if (!data.taperFromJoin){
+            this.overlapStart = overlapBox.y0;
+            this.overlapEnd = overlapBox.y1;
+        } else if (isTargetAfterRef){
+            this.overlapStart = overlapBox.y0;
+            this.overlapEnd = this.joinEnd;
+        } else {
+            this.overlapStart = this.joinStart;
+            this.overlapEnd = overlapBox.y1;
+        }
+        this.firstTaperStart = Math.max(0, this.overlapStart - data.taperLength); // overlapStart - taperLength
+        this.secondTaperEnd = Math.min(imageHeight, this.overlapEnd + data.taperLength); // overlapEnd + taperLength
+    } else {
+        this.joinStart = Math.max(joinRect.x0, overlapBox.x0);  // joinRect.x0, limited by overlap.x0
+        this.joinEnd = Math.min(joinRect.x1, overlapBox.x1);    // joinRect.x1, limited by overlap.x1
+        if (!data.taperFromJoin){
+            this.overlapStart = overlapBox.x0;
+            this.overlapEnd = overlapBox.x1;
+        } else if (isTargetAfterRef){
+            this.overlapStart = overlapBox.x0;
+            this.overlapEnd = this.joinEnd;
+        } else {
+            this.overlapStart = this.joinStart;
+            this.overlapEnd = overlapBox.x1;
+        }
+        this.firstTaperStart = Math.max(0, this.overlapStart - data.taperLength);
+        this.secondTaperEnd = Math.min(imageWidth, this.overlapEnd + data.taperLength);
+    }
+}
+
+
+/**
  * This class is used to apply the scale and gradient to the target image
  * @param {Number} imageWidth
  * @param {Number} imageHeight
@@ -154,31 +234,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     let isHorizontal_ = isHorizontal;
     let isTargetAfterRef_ = isTargetAfterRef;
     let taperLength_ = data.taperLength;
-    let firstTaperStart_;
-    let overlapStart_;
-    let joinStart_;
-    let joinEnd_;
-    let overlapEnd_;
-    let secondTaperEnd_;
-    let joinType_ = 0;
     
-    if (isHorizontal){
-        let overlapBox = overlap.overlapBox;
-        firstTaperStart_ = Math.max(0, overlapBox.y0 - taperLength_); // overlapStart - taperLength
-        overlapStart_ = overlapBox.y0;
-        joinStart_ = joinRect.y0;
-        joinEnd_ = joinRect.y1;
-        overlapEnd_ = overlapBox.y1;
-        secondTaperEnd_ = Math.min(imageHeight, overlapBox.y1 + taperLength_); // overlapEnd + taperLength
-    } else {
-        let overlapBox = overlap.overlapBox;
-        firstTaperStart_ = Math.max(0, overlapBox.x0 - taperLength_);
-        overlapStart_ = overlapBox.x0;
-        joinStart_ = joinRect.x0;
-        joinEnd_ = joinRect.x1;
-        overlapEnd_ = overlapBox.x1;
-        secondTaperEnd_ = Math.min(imageWidth, overlapBox.x1 + taperLength_);
-    }
+    let regions_ = new TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal, 
+        data, isTargetAfterRef);
+    
+    let joinType_ = 0;
     
     if (data.mosaicOverlayRefFlag){
         joinType_ = OVERLAY_REF;
@@ -373,16 +433,16 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             let minX = joinRect_.x0;
             let maxX = joinRect_.x1;
             length = imageWidth_;
-            let splineArray1 = createSplineArrayX(joinSurfaceSpline, overlapStart_, minX, maxX);
+            let splineArray1 = createSplineArrayX(joinSurfaceSpline, regions_.overlapStart, joinRect_);
             fullDifBeforeOverlap = extendDifArray(splineArray1, minX, maxX, length);
-            let splineArray2 = createSplineArrayX(joinSurfaceSpline, overlapEnd_, minX, maxX);
+            let splineArray2 = createSplineArrayX(joinSurfaceSpline, regions_.overlapEnd, joinRect_);
             fullDifAfterOverlap = extendDifArray(splineArray2, minX, maxX, length);
             if (propagateSurfaceSpline !== null){
                 if (isTargetAfterRef_){
-                    let splineArrayPropagate2 = createSplineArrayX(propagateSurfaceSpline, overlapEnd_, minX, maxX);
+                    let splineArrayPropagate2 = createSplineArrayX(propagateSurfaceSpline, regions_.overlapEnd, joinRect_);
                     bgDifAfterOverlap = extendDifArray(splineArrayPropagate2, minX, maxX, length);
                 } else {
-                    let splineArrayPropagate1 = createSplineArrayX(propagateSurfaceSpline, overlapStart_, minX, maxX);
+                    let splineArrayPropagate1 = createSplineArrayX(propagateSurfaceSpline, regions_.overlapStart, joinRect_);
                     bgDifBeforeOverlap = extendDifArray(splineArrayPropagate1, minX, maxX, length);
                 }     
             }
@@ -390,16 +450,16 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             let minY = joinRect_.y0;
             let maxY = joinRect_.y1;
             length = imageHeight_;
-            let splineArray1 = createSplineArrayY(joinSurfaceSpline, overlapStart_, minY, maxY);
+            let splineArray1 = createSplineArrayY(joinSurfaceSpline, regions_.overlapStart, joinRect_);
             fullDifBeforeOverlap = extendDifArray(splineArray1, minY, maxY, length);
-            let splineArray2 = createSplineArrayY(joinSurfaceSpline, overlapEnd_, minY, maxY);
+            let splineArray2 = createSplineArrayY(joinSurfaceSpline, regions_.overlapEnd, joinRect_);
             fullDifAfterOverlap = extendDifArray(splineArray2, minY, maxY, length);
             if (propagateSurfaceSpline !== null){
                 if (isTargetAfterRef_){
-                    let splineArrayPropagate2 = createSplineArrayY(propagateSurfaceSpline, overlapEnd_, minY, maxY);
+                    let splineArrayPropagate2 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapEnd, minY, maxY);
                     bgDifAfterOverlap = extendDifArray(splineArrayPropagate2, minY, maxY, length);
                 } else {
-                    let splineArrayPropagate1 = createSplineArrayY(propagateSurfaceSpline, overlapStart_, minY, maxY);
+                    let splineArrayPropagate1 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapStart, minY, maxY);
                     bgDifBeforeOverlap = extendDifArray(splineArrayPropagate1, minY, maxY, length);
                 }
             }
@@ -419,58 +479,58 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
                 applyScaleAndGradient(imageRowItr, scale, fullDifBeforeOverlap,
-                        tgtBox.x0, tgtBox.y0, tgtBox.x1, overlapStart_, false);
+                        tgtBox.x0, tgtBox.y0, tgtBox.x1, regions_.overlapStart, OVERLAY_REF);
 
                 // Overlap region before join. Reference side so reference overlay
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, overlapStart_, tgtBox.x1, joinStart_, OVERLAY_REF);
+                        tgtBox.x0, regions_.overlapStart, tgtBox.x1, regions_.joinStart, OVERLAY_REF);
 
                 // Full correction from start of join up to end of the join region
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, joinStart_, tgtBox.x1, joinEnd_, joinType_);
+                        tgtBox.x0, regions_.joinStart, tgtBox.x1, regions_.joinEnd, joinType_);
                         
                 // Overlap region after join. Target side so target overlay
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, joinEnd_, tgtBox.x1, overlapEnd_, OVERLAY_TGT);
+                        tgtBox.x0, regions_.joinEnd, tgtBox.x1, regions_.overlapEnd, OVERLAY_TGT);
 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
                 applyScaleAndGradientTaperDown(imageRowItr, scale, fullDifAfterOverlap, bgDifAfterOverlap,
-                        tgtBox.x0, overlapEnd_, tgtBox.x1, secondTaperEnd_);
+                        tgtBox.x0, regions_.overlapEnd, tgtBox.x1, regions_.secondTaperEnd);
 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
                 applyScaleAndGradient(imageRowItr, scale, bgDifAfterOverlap,
-                        tgtBox.x0, secondTaperEnd_, tgtBox.x1, tgtBox.y1, true);
+                        tgtBox.x0, regions_.secondTaperEnd, tgtBox.x1, tgtBox.y1, OVERLAY_TGT);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
                 applyScaleAndGradient(imageRowItr, scale, bgDifBeforeOverlap,
-                        tgtBox.x0, tgtBox.y0, tgtBox.x1, firstTaperStart_, true);
+                        tgtBox.x0, tgtBox.y0, tgtBox.x1, regions_.firstTaperStart, OVERLAY_TGT);
 
                 // Taper up region. Apply full scale correction and 
                 // gradually increase the gradient correction from zero to full
                 applyScaleAndGradientTaperUp(imageRowItr, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
-                        tgtBox.x0, firstTaperStart_, tgtBox.x1, overlapStart_);
+                        tgtBox.x0, regions_.firstTaperStart, tgtBox.x1, regions_.overlapStart);
 
                 // Overlap region before join. Target side so target overlay
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, overlapStart_, tgtBox.x1, joinStart_, OVERLAY_TGT);
+                        tgtBox.x0, regions_.overlapStart, tgtBox.x1, regions_.joinStart, OVERLAY_TGT);
                         
                 // Full correction from start of the join region to the end of join region 
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, joinStart_, tgtBox.x1, joinEnd_, joinType_);
+                        tgtBox.x0, regions_.joinStart, tgtBox.x1, regions_.joinEnd, joinType_);
                 
                 // Overlap region after join. Reference side so reference overlay
                 applyScaleAndGradientToJoin(imageRowItr, scale, joinSurfaceSpline,
-                        tgtBox.x0, joinEnd_, tgtBox.x1, overlapEnd_, OVERLAY_REF);
+                        tgtBox.x0, regions_.joinEnd, tgtBox.x1, regions_.overlapEnd, OVERLAY_REF);
 
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
                 applyScaleAndGradient(imageRowItr, scale, fullDifAfterOverlap,
-                        tgtBox.x0, overlapEnd_, tgtBox.x1, tgtBox.y1, false);
+                        tgtBox.x0, regions_.overlapEnd, tgtBox.x1, tgtBox.y1, OVERLAY_REF);
             }
         } else {    // vertical join
             let imageColItr = new ImageRowsIterator(refImage, tgtImage, view, channel, createMosaic_, isHorizontal_);
@@ -478,58 +538,58 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                 // Reference side of join
                 // Full correction from start of target up to start of the join region
                 applyScaleAndGradient(imageColItr, scale, fullDifBeforeOverlap,
-                        tgtBox.x0, tgtBox.y0, overlapStart_, tgtBox.y1, false);
+                        tgtBox.x0, tgtBox.y0, regions_.overlapStart, tgtBox.y1, OVERLAY_REF);
 
                 // Overlap region before join. Reference side so reference overlay
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        overlapStart_, tgtBox.y0, joinStart_, tgtBox.y1, OVERLAY_REF);
+                        regions_.overlapStart, tgtBox.y0, regions_.joinStart, tgtBox.y1, OVERLAY_REF);
                 
                 // Full correction from start of join up to end of the join region
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        joinStart_, tgtBox.y0, joinEnd_, tgtBox.y1, joinType_);
+                        regions_.joinStart, tgtBox.y0, regions_.joinEnd, tgtBox.y1, joinType_);
 
                 // Overlap region after join. Target side so target overlay
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        joinEnd_, tgtBox.y0, overlapEnd_, tgtBox.y1, OVERLAY_TGT);
+                        regions_.joinEnd, tgtBox.y0, regions_.overlapEnd, tgtBox.y1, OVERLAY_TGT);
                 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
                 applyScaleAndGradientTaperDown(imageColItr, scale, fullDifAfterOverlap, bgDifAfterOverlap,
-                        overlapEnd_, tgtBox.y0, secondTaperEnd_, tgtBox.y1);
+                        regions_.overlapEnd, tgtBox.y0, regions_.secondTaperEnd, tgtBox.y1);
                 
                 // Target side of join
                 // If taper: Taper has finished. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
                 applyScaleAndGradient(imageColItr, scale, bgDifAfterOverlap,
-                        secondTaperEnd_, tgtBox.y0, tgtBox.x1, tgtBox.y1, true);
+                        regions_.secondTaperEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, OVERLAY_TGT);
             } else {
                 // Target side of join
                 // If taper: Taper has not yet started. Only apply scale and average offset
                 // No taper: bgDif === fullDif. Apply full correction.
                 applyScaleAndGradient(imageColItr, scale, bgDifBeforeOverlap,
-                        tgtBox.x0, tgtBox.y0, firstTaperStart_, tgtBox.y1, true);
+                        tgtBox.x0, tgtBox.y0, regions_.firstTaperStart, tgtBox.y1, OVERLAY_TGT);
 
                 // Taper down region. Apply full scale correction but 
                 // gradually reduce the gradient correction
                 applyScaleAndGradientTaperUp(imageColItr, scale, fullDifBeforeOverlap, bgDifBeforeOverlap,
-                        firstTaperStart_, tgtBox.y0, overlapStart_, tgtBox.y1);
+                        regions_.firstTaperStart, tgtBox.y0, regions_.overlapStart, tgtBox.y1);
                 
                 // Overlap region before join. Target side so target overlay
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        overlapStart_, tgtBox.y0, joinStart_, tgtBox.y1, OVERLAY_TGT);
+                        regions_.overlapStart, tgtBox.y0, regions_.joinStart, tgtBox.y1, OVERLAY_TGT);
                 
                 // Full correction from start of the join region to the end of join 
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        joinStart_, tgtBox.y0, joinEnd_, tgtBox.y1, joinType_);
+                        regions_.joinStart, tgtBox.y0, regions_.joinEnd, tgtBox.y1, joinType_);
 
                 // Overlap region after join. Reference side so reference overlay
                 applyScaleAndGradientToJoin(imageColItr, scale, joinSurfaceSpline,
-                        joinEnd_, tgtBox.y0, overlapEnd_, tgtBox.y1, OVERLAY_REF);
+                        regions_.joinEnd, tgtBox.y0, regions_.overlapEnd, tgtBox.y1, OVERLAY_REF);
                         
                 // Reference side of join
                 // Full correction from end of the join region to the end of the target image 
                 applyScaleAndGradient(imageColItr, scale, fullDifAfterOverlap,
-                        overlapEnd_, tgtBox.y0, tgtBox.x1, tgtBox.y1, false);
+                        regions_.overlapEnd, tgtBox.y0, tgtBox.x1, tgtBox.y1, OVERLAY_REF);
             }
         }
         
@@ -547,15 +607,16 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
      * @param {Number} y0 Region's min y
      * @param {Number} x1 Region's max x
      * @param {Number} y1 Region's max y
-     * @param {Boolean} isTargetSide True if x0,x1,y0,y1 bounding box is on target side of join
+     * @param {Number} joinType valid values are OVERLAY_REF or OVERLAY_TGT
      */
     function applyScaleAndGradient(imageRowItr,
-            scale, difArray, x0, y0, x1, y1, isTargetSide){
+            scale, difArray, x0, y0, x1, y1, joinType){
                 
         if (x0 >= x1 || y0 >= y1)
             return;
         console.write("Processing target");
-
+        
+        let overlayTgt = (joinType === OVERLAY_TGT);
         let difArrayStart = isHorizontal_ ? x0 : y0;
         imageRowItr.setArea(x0, y0, x1, y1);
         while(imageRowItr.hasNext()){
@@ -564,7 +625,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             let refSamples = imageRowItr.getRefSamples();
             let samples = imageRowItr.getOutputBuffer();
             for (let i = 0; i < samples.length; i++) {
-                if (isTargetSide){
+                if (overlayTgt){
                     // Target overlays reference
                     if (tgtSamples[i]){
                         samples[i] = tgtSamples[i] * scale - difArray[difArrayStart + i];
@@ -912,11 +973,9 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
         }
     }
     this.avgDif /= total;
-    
-    if (this.maxDif - this.avgDif < minScaleDif ||
-            this.avgDif - this.minDif < minScaleDif){
-        this.maxDif = this.avgDif + minScaleDif;
-        this.minDif = this.avgDif - minScaleDif;
+    if (this.maxDif - this.minDif < minScaleDif){
+        this.maxDif = Math.max(this.maxDif, this.avgDif + minScaleDif);
+        this.minDif = Math.min(this.minDif, this.avgDif - minScaleDif);
     }
     if (zoomFactor !== 1){
         let totalDif = (this.maxDif - this.minDif) / zoomFactor;
@@ -927,6 +986,7 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
 
 /**
  * Display graph of (difference between images) / (pixel distance across image)
+ * @param {Image} tgtImage 
  * @param {Boolean} isHorizontal
  * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
  * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
@@ -936,10 +996,10 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
  * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
  */
-function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
+function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
         joinRect, colorSamplePairs, data, isPropagateGraph){
     
-    {   // Constructor
+    function construct(){
         // Display graph in script dialog
         GraphDialog.prototype = new Dialog;
         let graphDialog = new GraphDialog("Gradient Graph", createZoomedGraph);
@@ -961,13 +1021,13 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
      */
     function createZoomedGraph(factor){
         // Using GradientGraph function call parameters
-        let graph = createGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
+        let graph = createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isPropagateGraph, factor);
         return graph;
     }
     
     /**
-     * 
+     * @param {Image} tgtImage 
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
      * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
@@ -978,7 +1038,7 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Graph function(float zoomFactor)} zoomFactor Zoom factor for vertical axis only zooming.
      * @returns {Graph}
      */
-    function createGraph(isHorizontal, isTargetAfterRef, surfaceSplines, 
+    function createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isPropagateGraph, zoomFactor){
         let xMaxCoordinate;
         let xLabel;
@@ -997,7 +1057,7 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
         let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor);
         
         return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
-                isHorizontal, isTargetAfterRef, surfaceSplines, 
+                tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isPropagateGraph);
     }
     
@@ -1030,14 +1090,14 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Boolean} isHorizontal
      * @param {Number[][]} difArrays Array of DifArray to draw
      * @param {Number} lineBoldColor
-     * @param {GraphLinePath} graphLinePath Specifies which line should be bold
+     * @param {GraphLinePath[]} graphLinePaths
      * @param {Number} lineColor
      * @param {SamplePair[]} samplePairs
      * @param {Number} pointColor
      * @returns {undefined}
      */
     function drawLineAndPoints(graph, isHorizontal,
-            difArrays, lineBoldColor, graphLinePath, lineColor, samplePairs, pointColor) {
+            difArrays, lineBoldColor, graphLinePaths, lineColor, samplePairs, pointColor) {
                 
         for (let samplePair of samplePairs) {
             // Draw the sample points
@@ -1046,9 +1106,10 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
         }
         for (let i = 0; i < difArrays.length; i++){
             let difArray = difArrays[i];
-            let path = graphLinePath.paths[i];
+            let graphLinePath = graphLinePaths[i];
+            let path = graphLinePath.path;
             let firstCoord = isHorizontal ? path[0].x : path[0].y;
-            if (graphLinePath.bold[i]){
+            if (graphLinePath.bold){
                 graph.drawCurve(difArray, firstCoord, lineBoldColor, true);
             } else {
                 graph.drawCurve(difArray, firstCoord, lineColor, false);
@@ -1062,6 +1123,7 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {String} yLabel
      * @param {Number} xMaxCoordinate
      * @param {SamplePairDifMinMax} yCoordinateRange
+     * @param {Image} tgtImage 
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef
      * @param {SurfaceSpline[]} surfaceSplines
@@ -1072,7 +1134,7 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
      * @returns {Graph}
      */
     function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
-            isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
+            tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
             data, isPropagateGraph){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
@@ -1081,20 +1143,20 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
         graph.setAxisLength(axisWidth + 2, data.graphHeight);
         graph.createGraph(xLabel, yLabel);
 
-        let graphLine = new GraphLinePath();
+        let graphLines;
         if (isPropagateGraph){
-            graphLine.initPropagatePath(data.cache.overlap, isHorizontal, isTargetAfterRef);
+            graphLines = createPropagatePaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         } else {
-            graphLine.initGradientPaths(data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            graphLines = createGradientPaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         }
 
         if (colorSamplePairs.length === 1){ // B&W
             let difArrays = [];
-            for (let path of graphLine.paths){
-                difArrays.push(surfaceSplines[0].evaluate(path).toArray());
+            for (let graphLine of graphLines){
+                difArrays.push(surfaceSplines[0].evaluate(graphLine.path).toArray());
             }
             drawLineAndPoints(graph, isHorizontal,
-                difArrays, 0xFFFF0000, graphLine, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
+                difArrays, 0xFFFF0000, graphLines, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
         } else {
             // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
             // if three samples are on the same pixel we get white and not the last color drawn
@@ -1103,120 +1165,122 @@ function GradientGraph(isHorizontal, isTargetAfterRef, surfaceSplines,
             let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
             for (let c = 0; c < colorSamplePairs.length; c++){
                 let difArrays = [];
-                for (let path of graphLine.paths){
-                    difArrays.push(surfaceSplines[c].evaluate(path).toArray());
+                for (let graphLine of graphLines){
+                    difArrays.push(surfaceSplines[c].evaluate(graphLine.path).toArray());
                 }
                 let graphAreaOnly = graph.createGraphAreaOnly();
                 drawLineAndPoints(graphAreaOnly, isHorizontal,
-                    difArrays, lineBoldColors[c], graphLine, lineColors[c], colorSamplePairs[c], pointColors[c]);
+                    difArrays, lineBoldColors[c], graphLines, lineColors[c], colorSamplePairs[c], pointColors[c]);
                 graph.mergeWithGraphAreaOnly(graphAreaOnly);
             }
         }
         return graph;
     }
+    
+    construct();
 }
 
+/**
+ * Path accross the overlap region
+ * @param {Point[]} path
+ * @param {Boolean} bold
+ * @returns {GraphLinePath}
+ */
+function GraphLinePath(path, bold){
+    this.path = path;
+    this.bold = bold;
+}
 
-function GraphLinePath(){
-    /** {Point[][]} paths min, mid and max paths across overlap region */
-    this.paths = [];
-    /** {Boolean[]} bold Draw nth line bold */
-    this.bold = [];
+/**
+ * @param {Image} tgtImage 
+ * @param {Overlap} overlap
+ * @param {Rect} joinRect
+ * @param {Boolean} isHorizontal
+ * @param {Boolean} isTargetAfterRef
+ * @param {PhotometricMosaicData} data
+ * @returns {GraphLinePath[]}
+ */
+function createGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+    let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
+            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+    let overlapBox = overlap.overlapBox;
+    let joinStartPath;
+    let joinEndPath;
+    let overlapPath;
+    if (isHorizontal){
+        joinStartPath = overlap.getMinOutlineAtXArray(regions.joinStart);
+        joinEndPath = overlap.getMaxOutlineAtXArray(regions.joinEnd);
+        if (isTargetAfterRef){
+            overlapPath = createHorizontalPath(regions.overlapEnd, overlapBox);
+        } else {
+            overlapPath = createHorizontalPath(regions.overlapStart, overlapBox);
+        }
+    } else {
+        joinStartPath = overlap.getMinOutlineAtYArray(regions.joinStart);
+        joinEndPath = overlap.getMaxOutlineAtYArray(regions.joinEnd);
+        if (isTargetAfterRef){
+            overlapPath = createVerticalPath(regions.overlapEnd, overlapBox);
+        } else {
+            overlapPath = createVerticalPath(regions.overlapStart, overlapBox);
+        }
+    }
     
-    /**
-    * 
-    * @param {Overlap} overlap
-    * @param {Rect} joinRect
-    * @param {Boolean} isHorizontal
-    * @param {Boolean} isTargetAfterRef
-    * @param {PhotometricMosaicData} data
-    * @returns {GraphLinePath}
-    */
-    this.initGradientPaths = function (overlap, joinRect, isHorizontal, isTargetAfterRef, data){
-        let minPath;
-        let midPath;
-        let maxPath;
-        if (isHorizontal){
-            let joinStart = joinRect.y0;
-            let joinEnd = joinRect.y1;
-            minPath = overlap.getMinOutlineAtXArray(joinStart);
-            maxPath = overlap.getMaxOutlineAtXArray(joinEnd);
-            midPath = overlap.getMidOutlineAtXArray(minPath, maxPath);
-        } else {
-            let joinStart = joinRect.x0;
-            let joinEnd = joinRect.x1;
-            minPath = overlap.getMinOutlineAtYArray(joinStart);
-            maxPath = overlap.getMaxOutlineAtYArray(joinEnd);
-            midPath = overlap.getMidOutlineAtYArray(minPath, maxPath);
-        }
-
-        this.paths.push(minPath);
-        this.paths.push(midPath);
-        this.paths.push(maxPath);
-
-        this.bold = new Array(this.paths.length);
-        if (data.mosaicAverageFlag || data.mosaicRandomFlag || isTargetAfterRef === null){
-            // Draw all lines bold for average, random and insert modes
-            for (let i=0; i<this.paths.length; i++){
-                this.bold[i] = true;
-            }
-        } else if (data.mosaicOverlayTgtFlag && isTargetAfterRef ||
-                data.mosaicOverlayRefFlag && !isTargetAfterRef){
-            // First line bold
-            for (let i=0; i<this.paths.length; i++){
-                this.bold[i] = (i === 0);
-            }
-        } else {
-            for (let i=0; i<this.paths.length; i++){
-                this.bold[i] = (i === this.paths.length - 1);
-            }
-        }
-    };
+    let graphLinePaths = [];
+    if (data.mosaicAverageFlag || data.mosaicRandomFlag || isTargetAfterRef === null){
+        // Draw join lines bold for average, random and insert modes
+        graphLinePaths.push(new GraphLinePath(overlapPath, false));
+        graphLinePaths.push(new GraphLinePath(joinStartPath, true));
+        graphLinePaths.push(new GraphLinePath(joinEndPath, true));
+    } else if (data.mosaicOverlayTgtFlag && isTargetAfterRef ||
+            data.mosaicOverlayRefFlag && !isTargetAfterRef){
+        // joinStartPath is bold, joinEndPath is dashed
+        graphLinePaths.push(new GraphLinePath(overlapPath, false));
+        graphLinePaths.push(new GraphLinePath(joinStartPath, true));
+//        graphLinePaths.push(new GraphLinePath(joinEndPath, false, true));  
+    } else {
+        // joinStartPath is dashed, joinEndPath is bold
+//        graphLinePaths.push(new GraphLinePath(joinStartPath, false, true));
+        graphLinePaths.push(new GraphLinePath(overlapPath, false));
+        graphLinePaths.push(new GraphLinePath(joinEndPath, true));   
+    }
+    return graphLinePaths;
+}
     
-    /**
-     * Create two straight line paths that follow opposite sides of the overlap bounding box.
-     * The line on the target side of the overlap will be bold.
-     * @param {Overlap} overlap
-     * @param {Boolean} isHorizontal
-     * @param {Boolean} isTargetAfterRef
-     */
-    this.initPropagatePath = function (overlap, isHorizontal, isTargetAfterRef){
-        let overlapBox = overlap.overlapBox;
-        let pathPointsBefore;
-        let pathPointsAfter;
-        
-        // Propagate region is after overlap
-        if (isHorizontal){
-            let minX = overlapBox.x0;
-            let maxX = overlapBox.x1;
-            pathPointsBefore = new Array(maxX - minX);
-            pathPointsAfter = new Array(maxX - minX);
-            for (let x = minX; x<maxX; x++){
-                // Above overlap
-                pathPointsBefore[x - minX] = new Point(x, overlapBox.y0);
+/**
+ * Create two straight line paths that follow opposite sides of the overlap bounding box.
+ * The line on the target side of the overlap will be bold.
+ * @param {Image} tgtImage
+ * @param {Overlap} overlap
+ * @param {Rect} joinRect
+ * @param {Boolean} isHorizontal
+ * @param {Boolean} isTargetAfterRef
+ * @param {PhotometricMosaicData} data
+ * @returns {GraphLinePath[]}
+ */
+function createPropagatePaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+    let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
+            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+    let overlapBox = overlap.overlapBox;
+    let overlapStartPath;
+    let overlapEndPath;
 
-                // Below overlap
-                pathPointsAfter[x - minX] = new Point(x, overlapBox.y1);
-            }
-        } else {
-            let minY = overlapBox.y0;
-            let maxY = overlapBox.y1;
-            pathPointsBefore = new Array(maxY - minY);
-            pathPointsAfter = new Array(maxY - minY);
-            for (let y = minY; y<maxY; y++){
-                // Left of join
-                pathPointsBefore[y - minY] = new Point(overlapBox.x0, y);
+    // Propagate region is target side of overlap
+    if (isHorizontal){
+        overlapStartPath = createHorizontalPath(regions.overlapStart, overlapBox);
+        overlapEndPath = createHorizontalPath(regions.overlapEnd, overlapBox);
+    } else {
+        overlapStartPath = createVerticalPath(regions.overlapStart, overlapBox);
+        overlapEndPath = createVerticalPath(regions.overlapEnd, overlapBox);
+    }
 
-                // Right of overlap
-                pathPointsAfter[y - minY] = new Point(overlapBox.x1, y);
-            }
-        }
-        
-        // before overlap
-        this.paths.push(pathPointsBefore);
-        this.bold.push(!isTargetAfterRef);
-        // after overlap
-        this.paths.push(pathPointsAfter);
-        this.bold.push(isTargetAfterRef);
-    };
+    let graphLinePaths = [];
+    // Add bold lines after thin lines so they are drawn in the correct order
+    if (isTargetAfterRef){
+        graphLinePaths.push(new GraphLinePath(overlapStartPath, false));
+        graphLinePaths.push(new GraphLinePath(overlapEndPath, true));
+    } else {
+        graphLinePaths.push(new GraphLinePath(overlapEndPath, false));
+        graphLinePaths.push(new GraphLinePath(overlapStartPath, true));
+    }
+    return graphLinePaths;
 }

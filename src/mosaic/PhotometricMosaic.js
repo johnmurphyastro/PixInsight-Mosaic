@@ -232,6 +232,7 @@ function photometricMosaic(data)
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
         displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
+        return;
     }
     
     let unBinnedSamples = 0;
@@ -301,8 +302,8 @@ function photometricMosaic(data)
         if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
             console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
-            GradientGraph(isHorizontal, isTargetAfterRef,
-                    propagateSurfaceSplines, overlapBox, colorSamplePairs, data, true);
+            GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
+                    propagateSurfaceSplines, joinRect, colorSamplePairs, data, true);
             return;
         }
     } else {
@@ -326,7 +327,7 @@ function photometricMosaic(data)
     if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
-        GradientGraph(isHorizontal, isTargetAfterRef,
+        GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
                 surfaceSplines, joinRect, colorSamplePairs, data, false);
         return;
     }

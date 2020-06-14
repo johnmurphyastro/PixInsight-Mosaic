@@ -103,9 +103,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
     
     // For stars too bright to have been detected by StarDetector
 //    this.tooBrightMap = new Map();
-    // Private class variables end
     
-    // Constructor
     for (let c=0; c<nChannels; c++){
         binRectMapArray_.push(new Map());
     }
@@ -138,7 +136,9 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
             let star = stars[i];
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
-            let starRadius = Math.sqrt(star.size)/2;
+            let starDiameter = Math.sqrt(star.size);
+            // Double the star radius for bright stars
+            let starRadius = star.peak < 0.5 ? starDiameter/2 : starDiameter;
             removeBinsInCircle(star.pos, starRadius);
         }
     };
@@ -502,13 +502,8 @@ function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMax
             }
         } else {
             // Reduce by factor of 2
-            if (gridThickness >= minRowsOrColumns * 2){
-                joinBinning = 1;
-                perpBinning = 2;
-            } else {
-                joinBinning = 2;
-                perpBinning = 1;
-            }
+            joinBinning = 2;
+            perpBinning = 1;
         }
 
         if (isHorizontal){

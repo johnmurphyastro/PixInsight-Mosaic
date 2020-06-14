@@ -199,7 +199,7 @@ function Overlap(refImage, tgtImage){
     this.tgtBox = getBoundingBox(tgtImage);
     
     /** {TypedArray} bitmap array from overlapBox. A value of 1 indicates were ref & tgt images overlap */
-    let overlapByteArray_;
+    let overlapMaskBuffer_;
     /** True if refBox and TgtBox intersect */
     let hasOverlapFlag_ = false;
     /** Arrays storing min & max coordinates of non zero pixels */
@@ -208,14 +208,22 @@ function Overlap(refImage, tgtImage){
     let minOutlineAtY_ = null;
     let maxOutlineAtY_ = null;
     
-    {   // Constructor
-        if (!this.refBox.intersects(this.tgtBox)){
+    let self = this;
+    
+    /**
+     * Construct object
+     * @param {Rect} refBox
+     * @param {Rect} tgtBox
+     */
+    function construct(refBox, tgtBox){
+        if (!refBox.intersects(tgtBox)){
+            hasOverlapFlag_ = false;
             return;
         }
         hasOverlapFlag_ = true;
-        let result = calculateOverlapBox(refImage, tgtImage, this.refBox, this.tgtBox);
-        this.overlapBox = result.overlapBox;
-        overlapByteArray_ = result.overlapByteArray;
+        let result = calculateOverlapBox(refImage, tgtImage, refBox, tgtBox);
+        self.overlapBox = result.overlapBox;
+        overlapMaskBuffer_ = result.overlapMaskBuffer;
     }
     
     /**
@@ -226,10 +234,10 @@ function Overlap(refImage, tgtImage){
     };
     
     /**
-     * @returns {ByteArray}
+     * @returns {Float32Array}
      */
-    this.getOverlapByteArray = function(){
-        return overlapByteArray_;
+    this.getOverlapMaskBuffer = function(){
+        return overlapMaskBuffer_;
     };
     
     /**
@@ -243,7 +251,7 @@ function Overlap(refImage, tgtImage){
     this.getFullImageMask = function(imageWidth, imageHeight){
         let imageMask = new Image(imageWidth, imageHeight, 1);
 //        mask.fill(0);     // I assume this is not necessary
-        imageMask.setSamples(new Float32Array(this.getOverlapByteArray()), this.overlapBox);
+        imageMask.setSamples(this.getOverlapMaskBuffer(), this.overlapBox);
         return imageMask;
     };
     
@@ -255,7 +263,7 @@ function Overlap(refImage, tgtImage){
      */
     this.getOverlapMask = function(){
         let overlapMask = new Image(this.overlapBox.width, this.overlapBox.height, 1);
-        overlapMask.setSamples(new Float32Array(this.getOverlapByteArray()));
+        overlapMask.setSamples(this.getOverlapMaskBuffer());
         return overlapMask;
     };
     
@@ -366,7 +374,7 @@ function Overlap(refImage, tgtImage){
      * @param {Image} tgtImage
      * @param {Rect} refBox Bounding box of non zero area
      * @param {Rect} tgtBox Bounding box of non zero area
-     * @returns {overlapBox: overlapBox, overlapByteArray: overlapByteArray}
+     * @returns {overlapBox: overlapBox, overlapMaskBuffer: overlapMaskBuffer}
      */
     function calculateOverlapBox(refImage, tgtImage, refBox, tgtBox){
         // intersectBox will be equal to or larger than the overlap region.
@@ -395,7 +403,7 @@ function Overlap(refImage, tgtImage){
             refImage.getSamples(refBuffer[c], intersectBox, c);
             tgtImage.getSamples(tgtBuffer[c], intersectBox, c);
         }
-        let maskBuffer = new ByteArray(bufLen);
+        let maskBuffer = new Float32Array(bufLen);
 
         for (let i=0; i<bufLen; i++){
             let isOverlap = true;
@@ -422,12 +430,12 @@ function Overlap(refImage, tgtImage){
 
         // We have the mask buffer in terms of the intersection box.
         // We need it in terms of the overlapBox
-        let overlapByteArray = new ByteArray((x1 - x0) * (y1 - y0));
+        let overlapMaskBuffer = new Float32Array((x1 - x0) * (y1 - y0));
         let i = 0;
         for (let y = y0; y < y1; y++){
             let yXwidth = y * width;
             for (let x = x0; x < x1; x++){
-                overlapByteArray[i++] = maskBuffer[yXwidth + x];
+                overlapMaskBuffer[i++] = maskBuffer[yXwidth + x];
             }
         }
 
@@ -436,7 +444,7 @@ function Overlap(refImage, tgtImage){
         y0 += intersectBox.y0;
         y1 += intersectBox.y0;
         let overlapBox = new Rect(x0, y0, x1, y1);
-        return {overlapBox: overlapBox, overlapByteArray: overlapByteArray};
+        return {overlapBox: overlapBox, overlapMaskBuffer: overlapMaskBuffer};
     }
     
     /**
@@ -460,14 +468,14 @@ function Overlap(refImage, tgtImage){
         for (let x=0; x<w; x++){
             for (let y=0; y<h; y++){
                 let i = y * w + x;
-                if (overlapByteArray_[i]){
+                if (overlapMaskBuffer_[i]){
                     minOutlineAtX_[x] = new Point(x + x0, y + y0);
                     break;
                 }
             }
             for (let y = h - 1; y >= 0; y--){
                 let i = y * w + x;
-                if (overlapByteArray_[i]){
+                if (overlapMaskBuffer_[i]){
                     maxOutlineAtX_[x] = new Point(x + x0, y + y0);
                     break;
                 }
@@ -496,18 +504,20 @@ function Overlap(refImage, tgtImage){
             let yXw = y * w;
             for (let x=0; x<w; x++){
                 let i = yXw + x;
-                if (overlapByteArray_[i]){
+                if (overlapMaskBuffer_[i]){
                     minOutlineAtY_[y] = new Point(x + x0, y + y0);
                     break;
                 }
             }
             for (let x = w - 1; x >= 0; x--){
                 let i = yXw + x;
-                if (overlapByteArray_[i]){
+                if (overlapMaskBuffer_[i]){
                     maxOutlineAtY_[y] = new Point(x + x0, y + y0);
                     break;
                 }
             }
         }
     }
+    
+    construct(this.refBox, this.tgtBox);
 }

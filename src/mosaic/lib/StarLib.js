@@ -963,7 +963,7 @@ function createImageFromRefAndBitmap(refView, imageRect, maskSamples, bmp, title
  */
 function createOverlapImage(refView, overlap, bmp, title, fitsKeyWords, minZoom) {
     // Create the new image and copy the samples from refView to it
-    createImageFromRefAndBitmap(refView, overlap.overlapBox, overlap.getOverlapByteArray(),
+    createImageFromRefAndBitmap(refView, overlap.overlapBox, overlap.getOverlapMaskBuffer(),
             bmp, title, fitsKeyWords, minZoom);
 }
 
