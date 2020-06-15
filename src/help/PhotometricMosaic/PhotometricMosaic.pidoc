@@ -253,8 +253,40 @@
 
 
   \subsection { Gradient Component Correction } {
-    ...
+    \image images/GradientCorrectionAndComponentCorrection.png
+    Inside the overlap bounding box, the relative gradient between the reference and target image is fully corrected. Outside this region, any gradient correction has to be extrapolated from the available data within the overlapping region.
+
+    The controls shown above provide Gradient Correction and Gradient Component Correction. Gradient Correction is used to fully correct the target image within the overlap's bounding box. Gradient Component Correction, if selected, is used to partially correct the target gradient outside the overlap's bounding box.
+
+    Gradient Component Correction is designed to ignore any detected gradient perpendicular to the join. Typically the join is too thin for the data to be a good representative sample of the perpendicular gradient. Hence only the gradient component along the join is used to correct the target image outside the overlap bounding box.
+
+    If the mosaic is made up of more than one row or column, the other gradient component can be corrected when these strips are joined. This stategy is similar to \xref http://en.wikipedia.org/wiki/Bilinear_interpolation {Bilinear Interpolation}. It does not matter which component is corrected first, the end result will be the same.
+
+    When using Gradient Component Correction, any gradient present within the reference image will get propagated across the mosaic. It is therefore important to remove this gradient once the mosaic is finished. For example by applying Dynamic Background Extraction (DBE).
+
+    \figure {
+      \figtag \s {Mosaic with and without Gradient Component Correction}
+      \imageselect[menupos:right] {
+        images/M33_reference.png      { Reference }
+        images/M33_target.png   { Target }
+        images/M33_mosaic.png    { Mosaic (default options) }
+        images/M33_mosaic_component.png    { Mosaic with Gradient Component Correction }
+      }
+      This example compares the mosaics created with and without Gradient Component Correction. The target image contains a strong horizontal gradient. In both cases, the overlapping region gets fully corrected.
+
+      The mosaic created with default options shows the gradient corrections tapering away outside the overlapping region. This prevents gradient corrections propagating across the mosaic. In this case, since the reference frame has less gradient than the target frame, this is not the best strategy.
+
+      The Mosaic created with Gradient Component Correction uses the gradient component measured along the length of the target side of the overlap's bounding box to correct the rest of the target image. In this example this is the horizontal component, and produces a good result.
+    }
+    \figure {
+      \figtag \s {Smooth Gradient Correction}
+      \imageswap images/GradientPropagateGraph.png images/GradientGraphTgtOverlay.png
+      This graph shows a smooth curve that follows the general gradient trend and is therefore suitable for Gradient Component Correction. It is important that this propagated gradient correction does not include local variations. It is unlikely that they will match the gradient at the other side of the target frame!
+
+      The mouseover graph shows a curve that follows the gradient variations closely. This high level of correction should only be applied in the Gradient Correction section, which is limitted to the overlapping area.
+    }
   }
+
 }
 
 \usage {
