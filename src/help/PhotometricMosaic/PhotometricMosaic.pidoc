@@ -86,13 +86,13 @@
     \figure {
       \figtag \s {Geometry graph for mosaic modes Reference overlay and Target overlay.}
       \imageswap images/GradientGraphRefOverlay.png images/GradientGraphTgtOverlay.png
-      Gradient graph showing the gradient along the join path (bold line) for a Reference overlay mosaic join. The mouse over image shows the gradient for a Target overlay. The Target overlay's join path is on the opposite side of the overlap region. The data points show a vertical scatter due to a gradient perpendicular to the join path.
+      Gradient graph showing the gradient along the join path (bold line) for a Reference overlay mosaic join. The mouse over image shows the gradient for a Target overlay. The Target overlay's join path is on the opposite side of the overlap region. The data points show a vertical scatter due to a gradient perpendicular to the join path. For a description of the thin line, see the \lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts} section.
 
       Use \s {Gradient Graph} in the \s {Gradient Correction} section to display the graph. This example shows a complex gradient along a vertical join. Modify the \s {Smoothness} parameter to create a smooth curve that follows the gradient. Left click on a graph peak to display it's coordinates in the title bar. Then inspect the target image to determine the peak's cause. The mouse wheel zooms the graph. Use the 'Esc' key to return to the script dialog.
     }
   }
 
-  \subsection { Join Region: Avoiding distorted corners } {
+  \subsection { \label join_region_distored_corners Join Region: Avoiding distorted corners } {
     \image images/MilkyWayJoinRegionControl.png
     \figure[numbered:scutum_sagittarius_join_region] {
       \figtag \s {Scutum & Sagittarius Mosiac: Using a Join Region to avoid distorted corners}
@@ -118,7 +118,7 @@
     When creating a join region to avoid low quality areas, the checkbox \s {Taper from join} should be left unchecked. It should only be checked if there are bright stars at the overlap bounding box's target side edge. This is described in the next section.
   }
 
-  \subsection { Join Region: Avoiding bright star artifacts } {
+  \subsection { \label join_region_star_artifacts Join Region: Avoiding bright star artifacts } {
     Bright stars often brighten the region around them due to scattered light or a halo from a narrow band filter. If the reference and target images were taken under different conditions, this can create a strong local gradient between the two images. In certain circumstances, this can cause problems at a mosaic join. An example of this type of problem is shown in Figure \fignum join_region_mosaic.
     \figure [numbered:join_region_mosaic] {
       \figtag \s {Narrow join with a problem star halo (from a Ha filter)}
@@ -137,23 +137,23 @@
     }
     In Figure \fignum join_region_mosaic, the first image shows a mosaic with a mask that reveals where the overlapping pixels are. The path of the join follows the edge of these overlapping pixels. This path is not necessarily a stright line - it depends on the shape of the reference and target images. For a reference overlay mosaic, the join path is on the target side of these overlapping pixels. For a target overlay the path switches to the reference side. Hence by switching the mosaic mode from reference to target, we can switch were the primary join path is.
 
-    The second image shows a reference overlay mosaic. The primary join path goes through the star's halo and has left a visible line in the image. A target overlay would have been a better choice. The primary join would then be on the other side of the overlapping pixels, and would not run through the halo. The join line would no longer be visible. However, there is a second problem that need solving. Below the bright star is a dark shadow that slowly tapers away. Switching to a target overlay will not fix it. To solve this we first need to understand what causes this shadow.
+    The second image shows a reference overlay mosaic. The primary join path goes through the star's halo and has left a visible line in the image. A target overlay would have been a better choice. The primary join would then be on the other side of the overlapping pixels, and would not run through the halo. The join line would no longer be visible. However, there is a second problem that needs solving. Below the bright star is a dark shadow that slowly tapers away. Switching to a target overlay will not fix this. To solve it we first need to understand what causes this shadow.
 
     Within the overlapping pixel region there is sufficient data to fully correct the target image. Beyond this region, only an extrapolated correction can be applied. The user can choose between two strategies, but in both cases, the correction depends on the gradient along the target side of the overlapping pixels' bounding box. This is the secondary join path. It differs from the primary join path in several ways:
     \list {
       {It is a straight line, and follows a side of the overlapping pixels' bounding box.}
       {It is always on the target side of the bounding box. Switching between reference and target overlay will not affect it.}
     }
-    The target side of this secondary join line can be corrected in one of two ways:
+    The target image outside the overlap region can be corrected in one of two ways:
     \list {
       {The average offset along the secondary join line is applied to the rest of the target image. This is the default case, and prevents gradient corrections from propagating through the mosaic.}
       {An smooth gradient correction is created from the gradient along the secondary join line. This correction ignores the local variations and tries to follow the general trends. This correction is applied to the rest of the target image. This corrects one component of the relative gradient between the reference and target image.}
     }
-    In either case, the correction on the target side of the secondary join will not match that within the overlapping region. To fix this, a taper is used to gradually transfer from a full correction to a partial one.
+    In either case, the correction on the target side of the secondary join will not completely match that within the overlapping region. To fix this, a taper is used to gradually transfer from a full correction to a partial one.
 
     If the secondary join line passes through a strong local gradient (e.g. a star halo) this can cause a dark area that slowly tapers out. One solution is to apply a very short taper. A better solution is to move where this secondary join line occurs.
 
-    By default, creating a \s {Join Region} does not move the secondary join line. This is because for most situations, the target side of the overlap bounding box is the optimum position. If the reference and target image wrap around each other (see figure \figref scutum_sagittarius_join_region for an example of this), these side joins would not always be fully corrected if the secondary join is not at the end of the overlapping region.
+    The position of the primary join can be set by specifying a \s {Join Region} (see the previous \lref join_region_distored_corners {section}). However, the Join Region's default behavior does not move the secondary join line. This is because for most situations, the target side of the overlap bounding box is the optimum position. If the reference and target image wrap around each other (see figure \figref scutum_sagittarius_join_region for an example of this), these side joins would not always be fully corrected if the secondary join is not at the end of the overlapping region.
 
     When a black shadow is visible, it can be worth moving the secondary join line to the target side of the Join Region. To do this, select the \s {Taper from join} option. This is a compromise because it might make side joins visible but it is usually worth trying before resorting to a short taper length.
 
@@ -172,55 +172,85 @@
       These graphs display the data from the mosaic shown in figure \figref join_region_mosaic. In this example, the options (5) and (6) will produce the best results. If the thickness of the Join Region rectangle is reduced to 1 pixel, the difference between options (5) and (6) would become negligable.
     }
 
-    Figure \fignum join_region_graph shows gradient graphs for the 'Horse Head Mosiac' shown in figure \figref join_region_mosaic.
+    Figure \fignum join_region_graph shows gradient graphs for the two tiles from the 'Horse Head Mosiac' shown in figure \figref join_region_mosaic.
 
     The plotted points represent the background offset difference between the reference and target images. A gradient perpendicular to the join axis spreads these points vertically.
 
-    The bold curves represent the gradient along the path of the mosaic join. If there is no \s {Join Region} defined, this path will follow where the overlap starts.
-  }
-
-  \subsection { Optimizing the Scale Factor } {
+    The thick bright graph line indicates the gradient along the path of the primary join. The thin darker line shows the gradient along the path of the secondary join. These lines are described below for each of the example graphs:
     \definition {
-      { Outlier Removal } {
-        Caution! Only remove obvious outlier points. Do not removing a large numbers of data points to produce an artifical perfect fit.
+      {(1) Reference overlay} {
+        The path of the primary join is on the target side of the overlapping pixels. This path goes straight through the star's Ha filter halo, which has caused the prominent peak in the gradient graph. The graph correctly predicts that the join line is likely to be visible at this point.
+
+        The path of the secondary join is on the target side of the overlap's bounding box. Both the reference and target images are alomost exactly 'square on' and have almost straight edges, so the path of the secondary join is very close to the path of the primary join. Hence the secondary join gradient line is hidden behind the primary line. The graph correctly predicts that a darker or brighter area is likely to occur in the taper region at this point.
       }
-      { Scale Errors and Gradient Graphs } {
-        Gradient graphs curves often contain significant peaks. This is usually due to a scattered light around a star, or a star halo. If the two images were taken in different conditions, this can cause a local difference between the two images in the vicinity of the star. This is a real difference and not due to a scale error. The solution is to specify a join region that avoid these artifacts.
+      {(2) Target overlay} {
+        The path of the primary join is on the reference side of the overlapping pixels. This path avoids the star's Ha filter halo and is only affected by scattered light. The graph peak is drastically reduced indicating that the join line is far less likely to be visible at this point.
 
-        However, if a gradient graph has a peak that corresponds to a brighter area of the image - e.g. a nebula or galaxy, this might indicate a scale error. The following example illustrates this situation.
+        The path of the secondary join is still on the target side of the overlap's bounding box. Its path still goes straight through the star's Ha filter halo, causing the prominent peak in the gradient graph. The graph correctly predicts that a darker or brighter area is likely to occur in the taper region at this point.
+      }
+      {(3) Reference overlay with Join Region} {
+        The path of the primary join is on the target side of the Join Region. This path avoids the star's halo, so the graph peak is drastically reduced.
 
-        (To display a gradient graph, use \s {Gradient Graph} in the \s {Gradient Correction} section.)
-        \figure {
-          \figtag \s {Before and after scale correction}
-          \imageswap images/GradientGraphScaleErr.png images/GradientGraphScaleFix.png
-          The graph shows a significant peak at x-coordinate 1,900. By inspecting the join region within mosaic image (see the 'Inspect_Join' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
+        The path of the secondary join is still on the target side of the overlap's bounding box. Its path still goes straight through the star's Ha filter halo, causing the prominent peak in the gradient graph. The graph correctly predicts that a darker or brighter area is likely to occur in the taper region at this point.
+      }
+      {(4) Target overlay with Join Region} {
+        The path of the primary join is on the reference side of the Join Region. This path is slightly further away from the star than case (3), so the peak is slightly smaller. However, the peak is slightly higher than case (2). This is because the reference side of the Join Region is closer to the star than the reference side of the overlapping pixels.
 
-          The mouse over image shows the graph after the scale has been corrected. There is a very slight over correction, but it is now very close. The graph now reveals a slight gradient across the image.
+        The path of the secondary join is still on the target side of the overlap's bounding box. Its path still goes straight through the star's Ha filter halo, causing the prominent peak in the gradient graph. The graph correctly predicts that a darker or brighter area is likely to occur in the taper region at this point.
+      }
+      {(5) Reference overlay with Join Region, Taper from join} {
+        The path of the primary join is on the target side of the Join Region. This path avoids the star's halo, so the graph peak is drastically reduced.
 
-          \image images/GradientGraphScaleHorseHead.png
-        }
+        Due to the 'Taper from join' setting, the path of the secondary join is now on the target side of the Join Region. This avoids the star halo, so this graph peak is now also drastically reduced.
+      }
+      {(6) Target overlay with Join Region, Taper from join} {
+        The path of the primary join is on the reference side of the Join Region. This path avoids the star's halo, so the graph peak is drastically reduced. The reference side of the Join Region is slightly further from the star than the target side, so the peak is slightly smaller than in case (5).
 
-        To correct a scale error, it is necessary to reject one or more stars from the photometry. This is illustrated below:
-
-        \figure {
-            \figtag \s {Scale error}
-            \imageselect[menupos:right] {
-               images/GradientGraphScaleGraph.png      { Initial graph }
-               images/GradientGraphScaleGraphZoom.png   { Initial graph 27:1}
-               images/GradientGraphScaleGraphZoomFix.png    { Brightest star removed }
-            }
-            At first sight, the 'Initial graph' image looks good. However, after using the mouse wheel to zooming in (see 'Initial graph 27:1') it can be seen that the best fit line is not a good fit to the fainter stars. The brightest star should have been an outlier, but it has stongly influenced the best fit line due to its distance from the origin. Since the bright star is very close to the incorrectly fitted line, it cannot be rejected by using the \s {Outlier Removal} control. However, it can be rejected by reducing the \s {Linear Range}. In this case it was reduced to 0.1 (see 'Brightest star removed').
-         }
-         It is clear that even a very small scale error can have a significant effect on the offset and gradient that will be removed. However, the gradient graph's vertical axis reveals that, at least in this case, the offset differences were very small and would not have caused a visable difference.
-
-         \figure {
-          \figtag \s {Brightest star - underestimated size}
-          \image images/GradientGraphScaleHorseHeadStar.png
-          By using \s {Photometry Stars} the reason for the brightest star's photometry error becomes clear. The size of the star has been underestimated, and some of the star's flux has contributed to the background sky measurement. There are very few stars within the dark nebula, which explains why a single star was able to have a strong effect.
-        }
+        Due to the 'Taper from join' setting, the path of the secondary join is now on the target side of the Join Region. This avoids the star halo, so this graph peak is now also drastically reduced. This peak is exactly the same size as in case (5).
       }
     }
+    In these examples, case (6) is the best solution. However, the optimum solution would have been to move the Join Region so that it started at the reference side of the overlap bounding box. The reference side of the Join Region would then be as far from the star as possible. If the Join Region is made very thin (OK for Reference overlay or Target overlay) this would make cases (5) and (6) almost identical. The user would then be free to choose Reference or Target overlay, depending on which has the best quality. There is no limit to how thin the Join Region can be. It does not need to contain any stars - the whole of the overlapping region is always used to photometrically determine the scale.
+
+    The graph auto scales to the data range, so check the scale on the vertical axis to determine how significant the graph peaks are. To locate the star that's causing the peak, read the coordinate along the join from the graph's horizontal axis. Alternatively, a left mouse click on the peak will display the mouse coordinates (join coordinate, offset) in the graph title bar. If there is no bright star at the coordinate, a graph peak may be due to a scale error. To learn more, read the next section.
   }
+
+  \subsection { Detecting a Scale Error with the Gradient Graph } {
+
+    Gradient graphs curves often contain significant peaks. This is usually due to a scattered light around a star, or a star halo. If the two images were taken in different conditions, this can cause a local difference between the two images in the vicinity of the star. This is a real difference and not due to a scale error. The solution is to specify a join region that avoid these artifacts. See the previous section.
+
+    However, if a gradient graph has a peak that corresponds to a brighter area of the image - e.g. a brighter part of a nebula or galaxy, this might indicate a scale error. The following example illustrates this situation.
+
+    (To display a gradient graph, use \s {Gradient Graph} in the \s {Gradient Correction} section.)
+    \figure {
+      \figtag \s {Before and after scale correction}
+      \imageswap images/GradientGraphScaleErr.png images/GradientGraphScaleFix.png
+      The graph shows a significant peak at x-coordinate 1,921 (displayed in the title bar by left clicking the peak). By inspecting the join region within mosaic image (see the 'Inspect_Join' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
+
+      The mouse over image shows the graph after the scale has been corrected. There is a very slight over correction, but it is now very close. The graph now reveals a slight gradient across the image.
+
+      \image images/GradientGraphScaleHorseHead.png
+    }
+
+    The scale was corrected by reject a stars from the photometry. However, it was only clear which star needed to be rejected after zooming in on the Photometry Graph. See below:
+
+    \figure {
+        \figtag \s {Scale error}
+        \imageselect[menupos:right] {
+          images/GradientGraphScaleGraph.png      { Initial graph }
+          images/GradientGraphScaleGraphZoom.png   { Initial graph 27:1}
+          images/GradientGraphScaleGraphZoomFix.png    { Brightest star removed }
+        }
+        At first sight, the 'Initial graph' image looks good. However, after using the mouse wheel to zoom in (see 'Initial graph 27:1') it can be seen that the best fit line is not a good fit to the fainter stars. The brightest star should have been an outlier, but it has stongly influenced the best fit line due to its distance from the origin. Since the bright star is very close to the incorrectly fitted line, it cannot be rejected by using the \s {Outlier Removal} control. However, it can be rejected by reducing the \s {Linear Range}. In this case it was reduced to 0.1 (see 'Brightest star removed').
+      }
+         It is clear that even a very small scale error can have a significant effect on the offset and gradient that will be removed. However, the gradient graph's vertical axis reveals that, at least in this case, the offset differences were very small and would not have caused a visable difference.
+
+      \figure {
+      \figtag \s {Brightest star - underestimated size}
+      \image images/GradientGraphScaleHorseHeadStar.png
+      By using \s {Photometry Stars} the reason for the brightest star's photometry error becomes clear. The size of the star has been underestimated, and some of the star's flux has contributed to the background sky measurement. There are very few stars within the dark nebula, which explains why a single star was able to have a strong effect.
+    }
+  }
+
 
   \subsection { Gradient Component Correction } {
     ...
