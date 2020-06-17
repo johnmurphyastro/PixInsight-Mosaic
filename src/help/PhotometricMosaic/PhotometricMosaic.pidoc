@@ -280,10 +280,10 @@
     }
     \figure {
       \figtag \s {Smooth Gradient Correction}
-      \imageswap images/GradientPropagateGraph.png images/GradientGraphTgtOverlay.png
+      \imageswap images/GradientPropagateGraph.png images/GradientPropagateGraph2.png
       This graph shows a smooth curve that follows the general gradient trend and is therefore suitable for Gradient Component Correction. It is important that this propagated gradient correction does not include local variations. It is unlikely that they will match the gradient at the other side of the target frame!
 
-      The mouseover graph shows a curve that follows the gradient variations closely. This high level of correction should only be applied in the Gradient Correction section, which is limitted to the overlapping area.
+      The mouseover graph shows a curve that follows the gradient variations too closely. This high level of correction should only be applied in the Gradient Correction section, which is limitted to the overlapping area.
     }
   }
 
@@ -295,13 +295,13 @@
 
   \subsection { Reference & Target Views } {
     \definition {
-      { Reference View } {
+      { Reference view } {
         The target image will be matched to this reference image. The reference image is not modified.
       }
-      { Target View } {
-            This image is cloned, then multiplied by the photometrically determined scale factor, and finally the gradient is calculated and subtracted.
+      { Target view } {
+        This image is cloned, then multiplied by the photometrically determined scale factor, and finally the gradient is calculated and subtracted.
 
-This action is invoked every time the user selects 'OK', irrespective of whether the \s {Create Mosaic} check box is selected.
+        This action is invoked every time the user selects 'OK', irrespective of whether the \s {Create Mosaic} check box is selected.
       }
     }
   }
@@ -309,16 +309,16 @@ This action is invoked every time the user selects 'OK', irrespective of whether
   \subsection { Star Detection } {
     \image images/StarDetection.png
     \definition {
-      { Star Detection } {
-        This parameter's logarithmic value configures the sensitivity of the star detection. Smaller values detect more stars. You usually don't need to modify this parameter.
+      { Star detection } {
+        Logarithm of the star detection sensitivity. Increase this value to detect less stars. You usually don't need to modify this parameter.
 
-Subsets of these detected stars are used for photometry, rejecting samples that contain stars, and to create the mosaic star mask.
+        Subsets of these detected stars are used for photometry, rejecting samples that contain stars, and to create the mosaic star mask.
 
-The detected stars are cached until either the PhotometricMosaic dialog is closed or a modification invalidates the cache.
+        The detected stars are cached until either the PhotometricMosaic dialog is closed or a modification invalidates the cache.
 
 You can use the Detected Stars option to see which stars were detected.
       }
-      { Detected Stars } {
+      { Detected stars } {
         \image images/DetectedStars.png
         Displays all the stars detected in the reference and target images in two separate windows. The color of the squares indicate the color channel the star was detected in. The colors add, so white indicates the star was detected in red, green and blue.
 
@@ -330,10 +330,11 @@ You can use the Detected Stars option to see which stars were detected.
   \subsection { Photometric Star Search } {
     \image images/PhotometricStarSearch.png
     \definition {
-      { Star Flux Tolerance } {
-        Although the input target and reference images have been registered, the star center positions can still differ slightly and therefore need to be matched. Star flux tolerance is used to prevent invalid star matches. Smaller values reject more matches.
+      { Star flux tolerance } {
+        Star flux tolerance is used to prevent invalid target to reference " +
+            "star matches. Smaller values reject more matches.
 
-Star matches are rejected if the difference in star flux is larger than expected. The algorithm first calculates the average scale difference, and then rejects matches if their brightness ratio is greater than
+        Star matches are rejected if the difference in star flux is larger than expected. The algorithm first calculates the average scale difference, and then rejects matches if their brightness ratio is greater than
           \e {(expected ratio * tolerance)}
         or smaller than
           \e {(expected ratio / tolerance)}
@@ -355,7 +356,7 @@ Star matches are rejected if the difference in star flux is larger than expected
   \subsection { Photometric Scale } {
     \image images/PhotometricScale.png
     \definition {
-      {Limit Stars}{
+      {Limit stars}{
         Specifies the percentage of the brightest detected stars that will be used to find photometric stars.
 
         100\% implies that all detected stars are used, up to a maximum of 1000.
@@ -365,30 +366,30 @@ Star matches are rejected if the difference in star flux is larger than expected
         0\% implies no stars will be used. The scale will default to one.
 
 
-Including too many very faint stars can reduce the accuracy of the calculated scale.
+        Including too many very faint stars can reduce the accuracy of the calculated scale.
       }
-      {Linear Range}{
-        Restricts the stars used for photometry to those that have a peak pixel value less than the specified value. This ensures that the photometric stars are within the camera's linear response range.
+      {Linear range}{
+        Restricts the stars used for photometry to those that have a peak pixel value less than the specified value. Use this to reject stars that are outside the camera's linear response range.
 
-        After examining the Photometry Graph, if the brightest plotted stars looks suspect, they can be removed by reducing the \s {Linear Range}. This can sometimes be easer than using Outlier Removal.
+        After examining the Photometry Graph, if the brightest plotted stars looks suspect, they can be removed by reducing the \s {Linear range}. This can sometimes be easer than using Outlier Removal.
       }
-      {Outlier Removal}{
+      {Outlier removal}{
         The photometric measurement of some stars can be suspect. For example, a star's size may be underestimated causing some of its flux to contribute to the background measurement. This control determines the number of outlier stars to remove. This can improve accuracy, but don't over do it!
 
-Use the Photometry Graph button to see the photometry data points and their best fit line.
+Use the Photometry graph button to see the photometry data points and their best fit line.
       }
-      {Photometry Graph}{
+      {Photometry graph}{
         \image images/PhotometryGraphColor.png
         For each star detected within the overlap region, provided the star meets the photometry criteria, the star's reference flux is plotted against its target flux. Color (red, green and blue) is used to represent the data for each color channel. The plotted lines indicate the best fit lines (least squares fit) that go through the origin. The gradient of these lines gives the required scale factors.
 
-        The graph is drawn into a script dialog to allow user interaction. Use the mouse wheel to zoom in or out, the left mouse button to display the current (x,y) coordinate and the right mouse button to save the graph as a PixInsight view window. The zoom level and (x,y) coordinate is displayed in the title bar. To return to the script, use the 'Esc' key or the title bar window close button.
+        The graph provides user interaction. Use the mouse wheel to zoom in or out, the left mouse button to display the current (x,y) coordinate and the right mouse button to save the graph as a PixInsight view window. The zoom level and (x,y) coordinate is displayed in the title bar. To return to the script, use the 'Esc' key or the title bar window close button.
 
 If the graph is saved as a PixInsight view, useful data is saved to the FITS header.
         \image images/PhotometryFitsHeader.png
       }
-      {Photometry Stars}{
+      {Photometry stars}{
         \image images/PhotometryStars.png
-        Displays the stars that met the criteria for photometry. These stars were within the specified \s {Linear Range} and were found in both target and reference images and were not rejected by \s {Outlier Removal}. The color represents the color channel. Hence a white square indicates the star was found in the red, green and blue channels.
+        Displays the stars that met the criteria for photometry. These stars were within the specified \s {Linear range} and were found in both target and reference images and were not rejected by \s {Outlier removal}. The color represents the color channel. Hence a white square indicates the star was found in the red, green and blue channels.
 
         Useful data is also saved to the FITS header, including the position of the star that has the largest error.
       }
@@ -397,47 +398,61 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Join Region } {
     \image images/JoinRegion.png
-    The join region determines the size and position of the join between the two images. If a join region is not specified, it defaults to the whole of the overlap region.
+    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
 
-    The join region rectangle's long axis should align with the join and should ideally avoid distorted regions such as image corners. For all \s {Join Direction} modes except for \s {Insert}, the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the join region rectangle depends on the Mosaic overlay mode:
+    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. For all \s {Join Direction} modes except for \s {Insert}, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic overlay mode:
     \list{
-          {Reference: The edge closest to the target image determines the join line. Ideally, this line should avoids bright stars.}
-          {Target: The edge closest to the reference image determines the join line. Ideally, this line should avoids bright stars.}
-          {Random: The rectangle should be thick enough to blend the two sides of the join.}
-          {Average: The join region determines the area that will benefit from the enhanced signal to noise ratio.}
-        }
+      {Reference overlay: The edge closest to the target image determines the primary join line. This line should avoids bright stars.}
+      {Target overlay: The edge closest to the reference image determines the primary join line. This line should avoids bright stars.}
+      {Random: The rectangle should be thick enough to blend the two sides of the join.}
+      {Average: The join region determines the area that will benefit from the enhanced signal to noise ratio.}
+    }
+    It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
+
     Inside the join region, the behavior depends on the mosaic combination mode. The behavior outside the region (for all modes except \s {Insert}):"
     \list{
-          {Reference side of join: Reference overlay}
-          {Target side of join: Target overlay}
+      {Reference side of join region: Reference overlay}
+      {Target side of join region: Target overlay}
     }
-    It is not necessary for the join region to contain any stars. The whole of the overlap region is always used to determine the photometric scale and the background gradient.
-    \definition {
-      {Get area from preview}{
-        \image images/JoinRegionPreview.png
-        The \s {Get area from preview} combo box is used to initialize the join region from a preview.
 
-        The image shows the target frame. Perview01 has been created to specify the join region. Providing the \s {Join Direction} is not set to \s {Insert}, the created join region will be extended along its length to the overlap's bounding box.
+    \definition {
+      {Taper from join}{
+        Moves the taper zone from the target side of the overlap bounding box to the target side of  the join region.
+
+        The target image's offset and gradient are fully corrected within the join region, but outside the overlap bounding box the gradient can only be partially corrected. A taper is applied to blend these two regions together.
+
+        The taper is usually applied at the target side boundary of the overlap bounding box. If this option is selected, the taper is applied from the target side of the 'Join Region' instead.
+
+        You should only select this option if there is a bright star on the target side boundary of the overlap bounding box that is causing a brightening or darkening in the taper zone on the target side of the star.
+
+        Inspect the 'Gradient graph' (Overlap Area Gradient section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
+
+        Caution: if the images wrap around each other at the sides, selecting this option may affect the correction applied to these side joins.
+      }
+
+      {Get area from preview}{
+        This combo box is used to initialize the join region from a preview.
+        \image images/JoinRegionPreview.png
+        The image above shows a target frame. Perview01 has been created to specify the join region. Providing the \s {Join Direction} is not set to \s {Insert}, the created join region will be extended along its length to the overlap's bounding box.
 
         The preview has been positioned so that it avoids the corners of both the target and reference images.
 
         I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join Mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
-
       }
     }
   }
 
   \subsection { Gradient Sample Generation } {
     \image images/GradientSampleGeneration.png
-    The overlapping region is divided up into a grid of sample squares. A sample's value is the median of the pixels it contains. These sample values are used to calculate the background offset and gradient. Using samples ensures that the offset and gradient calculation is less affected by bright stars with differing FWHM sizes.
+    The overlapping region is divided up into a grid of sample squares. A sample's value is the median of the pixels it contains. These sample values are used to calculate the background offset and gradient. Using samples ensures that the offset and gradient calculation is less affected by bright stars with differing profiles.
 
-    Samples are rejected if they contain one or more zero pixels in either image or if they contain a star bright enough to be included in the '\s {Limit Stars \%}' list.
+    Samples are rejected if they contain one or more zero pixels in either image or if they contain a star bright enough to be included in the '\s {Limit stars \%}' list.
 
-    The samples are used to create a surface spline that models the background gradient. The sample size and the number of surviving samples determines the maximum theoretical resolution of the surface spline. However, very small samples will suffer from noise.
+    The samples are used to create a surface spline that models the background gradient. The sample size and the number of surviving samples determines the maximum theoretical resolution of the surface spline. However, small samples will suffer from more noise.
 
     This section controls how the samples are generated.
     \definition {
-        {Limit Stars \%}{
+        {Limit stars \%}{
           Specifies the percentage of the brightest detected stars that will be used to reject samples. 0\% implies that no samples are rejected due to stars. This is OK provided that no star takes up more than half of a sample's area. 100\% implies that all detected stars are used to reject samples. Samples that contain bright stars are rejected for two reasons:
           \list {
             {Bright pixels are more affected by any errors in the calculated scale.}
@@ -445,30 +460,47 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
           }
           It is only necessary to reject bright stars. This script uses the median value from each sample, so any star that takes up less than half the sample area will have little effect. It is more important to include most of the samples than to reject faint stars.
         }
-        {Sample Size}{
-          Specifies the size of the sample squares. Ideally, the samples should be about 1.5x the size of the largest star. Use the \s {Sample Grid} button to visualize the grid of samples.
+        {Sample size}{
+          Specifies the size of the sample squares. Ideally, the samples should be about 1.5x the size of the largest star. Use the \s {Sample grid} button to visualize the grid of samples.
       }
-      {Sample Grid}{
+      {Sample grid}{
         \image images/Samples.png
-        The \s {Sample Grid} button displays the grid of samples that will be used to calculate the background offset and gradient.
+        Displays the grid of samples that will be used to calculate the background offset and gradient.
 
-        Samples are rejected if they contain one or more zero pixels in either image or if they contain a star included in the Limit Stars \% list. The surviving samples are drawn as squares. The stars used to reject samples are indicated by circles.
+        Samples are rejected if they contain one or more zero pixels in either image or if they contain a star included in the 'Limit stars \%' list. The surviving samples are drawn as squares. The stars used to reject samples are indicated by circles.
       }
-      {Join Direction}{
-        Determines the orientation of the line of intersection. This determines how the background offset is corrected outside of the overlap region. You should usually use \s {Auto} while creating a mosaic, or \s {Insert} to replace a small region in the middle of an existing mosaic.
+      {Max samples}{
+        Limits the number of samples used to create the surface spline. If the number of samples exceed this limit, they are combined (binned) to create super samples. This is done to improve performance. The time required to initialize the surface spline approximately doubles every 1300 samples.
+
+        Increase it if the overlap area is very large. A larger number of samples increases the theoretical maximum resolution of the surface spline. However, small unbinned samples are noiser and require more smoothing. The default value is usually a good compromise.
+
+        Use the 'Binned grid' button to visualize the binned samples.
+      }
+      {Binned grid}{
+        \figure {
+          \figtag \s {Binned sample grid, sample grid}
+          \imageswap images/SamplesBinned.png images/SamplesNotBinned.png
+          The image shows a 3x3 binned sample grid. Mouseover to see the sample grid squares that the binned grid was created from.
+        }
+        Displays the binned samples that will be used to calculate the background offset and gradient. Samples are binned to improve performance if the number of samples exceeds the 'Max samples' limit.
+
+        The area of each binned sample represents the number of samples it was created from. Each binned sample's center is calculated from the center of mass of the samples it was created from. The drawn boxes no longer indicate exactly which of the pixels are being used. To see which of the unbinned samples were rejected due to stars or black pixels, it is necessary to use 'Sample grid' instead.
+      }
+      {Join direction}{
+        Determines the orientation of the line of intersection. This determines how the background offset is corrected outside of the overlap area. You should usually use \s {Auto} while creating a mosaic, or \s {Insert} to replace a small region in the middle of an existing mosaic.
 
         \s {Auto}: The join direction is determined by the join region rectangle's longest dimension. If the \s {Join Region} has not been specified, the overlap's bounding box is used instead.
 
-        \s {Horizontal}: Sets the join direction to horizontal. The target's background offset is corrected in the region above and below the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the propagated correction (if specified).
+        \s {Horizontal}: Sets the join direction to horizontal. The target's background offset is corrected in the region above and below the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the 'Extrapolated gradient' correction (if specified).
 
-        \s {Vertical}: Sets the join direction to vertical. The target's background offset is corrected in the region to the left and right of the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the propagated correction (if specified).
+        \s {Vertical}: Sets the join direction to vertical. The target's background offset is corrected in the region to the left and right of the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the 'Extrapolated gradient' correction (if specified).
 
-        \s {Insert}: Pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Insert} only supports the \s {Target} and \s {Average} mosaic combination modes.
+        \s {Insert}: Pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Insert} only supports the \s {Target overlay} and \s {Average} mosaic combination modes.
       }
     }
   }
 
-  \subsection { Gradient Correction } {
+  \subsection { Overlap Area Gradient } {
     \image images/Gradient.png
     This section determines how the target pixels within the whole of the overlap region are corrected, and to specifiy the size of the transition region between the fully corrected overlap region and the rest of the target image.
 
@@ -482,7 +514,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         The full correction is applied across the whole of the overlap's bounding box.
       }
-      {Taper Length}{
+      {Taper length}{
         The length of the taper that's applied between the fully corrected overlap region and the rest of the target image to provide a smooth transition. In most cases, a long taper usually produces the best result, but the taper should finish before the the end of the target image. However, if there is a spike in the local variation along the join, (e.g. a star halo) a short taper may be necessary.
 
         The scale factor is applied to the whole of the target image, but the gradient correction is dependent on the available data. The overlap region has sufficient data to allow full gradient correction. However, there is no data outside the overlap bounding box, so the rest of the target image relies on an extrapolated correction.
@@ -493,7 +525,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         In both cases, there will be an imperfect match between the fully corrected overlap region, and the extrapolated correction. The taper is used to create a smooth transition between these two regions.
       }
-      {Gradient Graph}{
+      {Gradient graph}{
         \image images/GradientGraphTgtOverlay.png
 
         The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
@@ -509,7 +541,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
   }
 
-  \subsection { Gradient Component Correction } {
+  \subsection { Extrapolated Gradient } {
     \image images/PropagatedGradientCorrection.png
     This section determines how the gradient correction is applied to the target side of the overlap's bounding box. It has no affect within the overlap region. Consider using it if the reference image has less gradient than the target image. In these cases it can partially correct the horizontal and vertical components of the relative gradient between the reference and target image. This is done in two stages:
 
@@ -523,7 +555,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         Use the \s {Gradient Graph} to determine the optimum smoothness.
       }
-      {Gradient Graph}{
+      {Gradient graph}{
         \image images/GradientPropagateGraph.png
         The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
 
@@ -545,7 +577,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
     At the edge of the overlapping region, the star mask holes get abruptly terminated. If this was not done, the PixelMath fix would create black holes in the mosaic image where the overlap finished.
     \definition {
-      {Limit Stars \%}{
+      {Limit stars \%}{
         Specifies the percentage of the brightest detected stars that will be used to create the star mask.
 
 0\% will produce a solid mask with no stars.
@@ -554,13 +586,13 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
 Small faint stars are usually free of artifacts, so normally only a small percentage of the detected stars need to be used.
       }
-      {Multiply Star Radius}{
+      {Multiply star radius}{
         Sets the mask star radius to a multiple of the star's radius. This increases the size for large stars more than small ones.
       }
-      {Add to Star Radius}{
+      {Add to star radius}{
         Used to increases or decreases the radius of all mask stars. This is applied after the Multiply Star Radius.
       }
-      {Create Mask}{
+      {Create mask}{
         Creates a star mask that reveals bright stars.
       }
       {Stars}{
@@ -584,7 +616,7 @@ If this option is not selected, the corrections will be applied to a copy of the
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
       }
-      {Join Mask}{
+      {Join mask}{
         Create a mask of the mosaic join. This mask indicates the pixels used to create the mosaic join.
 
         If a \s {Join Region} has not been defined, the join area is simply the overlapping pixels. However, if it has been specified, the join extends along the full length of the join but it is otherwise limited to the join region.
