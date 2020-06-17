@@ -166,14 +166,14 @@ function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     if (includePropagate){
-        if (data.propagateFlag){
+        if (data.extrapolatedGradientFlag){
             keywords.push(new FITSKeyword("HISTORY", "", 
-                SCRIPT_NAME() + ".propagateSmoothness: " + data.propagateSmoothness));
+                SCRIPT_NAME() + ".extrapolatedGradientSmoothness: " + data.extrapolatedGradientSmoothness));
         }
     }
     if (includeGradient){
         keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".gradientSmoothness: " + data.gradientSmoothness));
+            SCRIPT_NAME() + ".overlapGradientSmoothness: " + data.overlapGradientSmoothness));
         keywords.push(new FITSKeyword("HISTORY", "",
             SCRIPT_NAME() + ".taperLength: " + data.taperLength));
     }

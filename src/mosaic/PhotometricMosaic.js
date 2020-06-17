@@ -47,8 +47,8 @@ function DISPLAY_DETECTED_STARS(){return 1;}
 function DISPLAY_PHOTOMETRY_STARS(){return 2;}
 function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
 function DISPLAY_GRADIENT_SAMPLES(){return 8;}
-function DISPLAY_PROPAGATE_GRAPH(){return 16;}
-function DISPLAY_GRADIENT_GRAPH(){return 32;}
+function DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH(){return 16;}
+function DISPLAY_OVERLAP_GRADIENT_GRAPH(){return 32;}
 function CREATE_MOSAIC_MASK(){return 64;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 function CREATE_JOIN_MASK(){return 256;}
@@ -286,12 +286,12 @@ function photometricMosaic(data)
     }
     let createSurfaceSplineTime = new Date().getTime();
     let propagateSurfaceSplines;
-    if (data.propagateFlag && data.viewFlag !== DISPLAY_GRADIENT_GRAPH()) {
+    if (data.extrapolatedGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         propagateSurfaceSplines = [];
         try {
             for (let c = 0; c < nChannels; c++) {
                 let samplePairs = colorSamplePairs[c];
-                propagateSurfaceSplines[c] = calcSurfaceSpline(samplePairs, data.propagateSmoothness);        
+                propagateSurfaceSplines[c] = calcSurfaceSpline(samplePairs, data.extrapolatedGradientSmoothness);        
             }
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
@@ -299,7 +299,7 @@ function photometricMosaic(data)
             return;
         }
         
-        if (data.viewFlag === DISPLAY_PROPAGATE_GRAPH()) {
+        if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
             console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
@@ -314,7 +314,7 @@ function photometricMosaic(data)
     try {
         for (let c = 0; c < nChannels; c++) {
             let samplePairs = colorSamplePairs[c];
-            surfaceSplines[c] = calcSurfaceSpline(samplePairs, data.gradientSmoothness);
+            surfaceSplines[c] = calcSurfaceSpline(samplePairs, data.overlapGradientSmoothness);
         }
     } catch (ex){
         new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
@@ -324,7 +324,7 @@ function photometricMosaic(data)
     console.writeln(colorSamplePairs[0].length,
             " samples, ", getElapsedTime(createSurfaceSplineTime));
 
-    if (data.viewFlag === DISPLAY_GRADIENT_GRAPH()) {
+    if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
         GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
@@ -398,7 +398,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
-        if (data.propagateFlag){
+        if (data.extrapolatedGradientFlag){
             propagateSurfaceSpline = propagateSurfaceSplines[channel];
         }
         let surfaceSpline = surfaceSplines[channel];

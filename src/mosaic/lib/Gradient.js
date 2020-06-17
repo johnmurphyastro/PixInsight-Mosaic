@@ -993,11 +993,11 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
  * @param {Rect} joinRect Create dif arrays at either side of this rectangle 
  * @param {SamplePair[][]} colorSamplePairs The SamplePair points to be displayed for each channel
  * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @param {Boolean} isPropagateGraph If true, display single line for target side of overlap bounding box
+ * @param {Boolean} isExtrapolateGraph If true, display single line for target side of overlap bounding box
  * @returns {undefined}
  */
 function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
-        joinRect, colorSamplePairs, data, isPropagateGraph){
+        joinRect, colorSamplePairs, data, isExtrapolateGraph){
     
     function construct(){
         // Display graph in script dialog
@@ -1022,7 +1022,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
     function createZoomedGraph(factor){
         // Using GradientGraph function call parameters
         let graph = createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph, factor);
+                joinRect, colorSamplePairs, data, isExtrapolateGraph, factor);
         return graph;
     }
     
@@ -1034,12 +1034,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Rect} joinRect Join region or overlap bounding box 
      * @param {SamplePair[][]} colorSamplePairs The SamplePair points to be displayed for each channel
      * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @param {Boolean} isPropagateGraph
+     * @param {Boolean} isExtrapolateGraph
      * @param {Graph function(float zoomFactor)} zoomFactor Zoom factor for vertical axis only zooming.
      * @returns {Graph}
      */
     function createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph, zoomFactor){
+                joinRect, colorSamplePairs, data, isExtrapolateGraph, zoomFactor){
         let xMaxCoordinate;
         let xLabel;
         if (isHorizontal){
@@ -1058,7 +1058,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         
         return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
                 tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
-                joinRect, colorSamplePairs, data, isPropagateGraph);
+                joinRect, colorSamplePairs, data, isExtrapolateGraph);
     }
     
     /**
@@ -1075,8 +1075,8 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         fitsHeaderImages(keywords, data);
         fitsHeaderStarDetection(keywords, data);
         fitsHeaderPhotometry(keywords, data);
-        let includeGradient = (data.viewFlag === DISPLAY_GRADIENT_GRAPH());
-        let includePropagate = (data.viewFlag === DISPLAY_PROPAGATE_GRAPH());
+        let includeGradient = (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH());
+        let includePropagate = (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH());
         fitsHeaderGradient(keywords, data, includeGradient, includePropagate);
         fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
         fitsHeaderMosaic(keywords, data);
@@ -1130,12 +1130,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Rect} joinRect
      * @param {SamplePair[][]} colorSamplePairs
      * @param {PhotometricMosaicData} data
-     * @param {Boolean} isPropagateGraph
+     * @param {Boolean} isExtrapolateGraph
      * @returns {Graph}
      */
     function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
             tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
-            data, isPropagateGraph){
+            data, isExtrapolateGraph){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
         let axisWidth = Math.min(data.graphWidth, xMaxCoordinate);
@@ -1144,10 +1144,10 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         graph.createGraph(xLabel, yLabel);
 
         let graphLines;
-        if (isPropagateGraph){
-            graphLines = createPropagatePaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+        if (isExtrapolateGraph){
+            graphLines = createExtrapolateGradientPaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         } else {
-            graphLines = createGradientPaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            graphLines = createOverlapGradientPaths(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         }
 
         if (colorSamplePairs.length === 1){ // B&W
@@ -1200,7 +1200,7 @@ function GraphLinePath(path, bold){
  * @param {PhotometricMosaicData} data
  * @returns {GraphLinePath[]}
  */
-function createGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+function createOverlapGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
     let overlapBox = overlap.overlapBox;
@@ -1233,13 +1233,11 @@ function createGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTarget
         graphLinePaths.push(new GraphLinePath(joinEndPath, true));
     } else if (data.mosaicOverlayTgtFlag && isTargetAfterRef ||
             data.mosaicOverlayRefFlag && !isTargetAfterRef){
-        // joinStartPath is bold, joinEndPath is dashed
+        // joinStartPath is bold
         graphLinePaths.push(new GraphLinePath(overlapPath, false));
         graphLinePaths.push(new GraphLinePath(joinStartPath, true));
-//        graphLinePaths.push(new GraphLinePath(joinEndPath, false, true));  
     } else {
-        // joinStartPath is dashed, joinEndPath is bold
-//        graphLinePaths.push(new GraphLinePath(joinStartPath, false, true));
+        // joinEndPath is bold
         graphLinePaths.push(new GraphLinePath(overlapPath, false));
         graphLinePaths.push(new GraphLinePath(joinEndPath, true));   
     }
@@ -1247,8 +1245,7 @@ function createGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTarget
 }
     
 /**
- * Create two straight line paths that follow opposite sides of the overlap bounding box.
- * The line on the target side of the overlap will be bold.
+ * Creates a straight line path that follows the target side of the overlap bounding box.
  * @param {Image} tgtImage
  * @param {Overlap} overlap
  * @param {Rect} joinRect
@@ -1257,30 +1254,30 @@ function createGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTarget
  * @param {PhotometricMosaicData} data
  * @returns {GraphLinePath[]}
  */
-function createPropagatePaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+function createExtrapolateGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
     let overlapBox = overlap.overlapBox;
-    let overlapStartPath;
-    let overlapEndPath;
-
-    // Propagate region is target side of overlap
-    if (isHorizontal){
-        overlapStartPath = createHorizontalPath(regions.overlapStart, overlapBox);
-        overlapEndPath = createHorizontalPath(regions.overlapEnd, overlapBox);
-    } else {
-        overlapStartPath = createVerticalPath(regions.overlapStart, overlapBox);
-        overlapEndPath = createVerticalPath(regions.overlapEnd, overlapBox);
-    }
 
     let graphLinePaths = [];
-    // Add bold lines after thin lines so they are drawn in the correct order
-    if (isTargetAfterRef){
-        graphLinePaths.push(new GraphLinePath(overlapStartPath, false));
-        graphLinePaths.push(new GraphLinePath(overlapEndPath, true));
+    // Extrapolated gradient region is target side of overlap
+    if (isHorizontal){
+        if (isTargetAfterRef){
+            let overlapEndPath = createHorizontalPath(regions.overlapEnd, overlapBox);
+            graphLinePaths.push(new GraphLinePath(overlapEndPath, false));
+        } else {
+            let overlapStartPath = createHorizontalPath(regions.overlapStart, overlapBox);
+            graphLinePaths.push(new GraphLinePath(overlapStartPath, false));
+        }
     } else {
-        graphLinePaths.push(new GraphLinePath(overlapEndPath, false));
-        graphLinePaths.push(new GraphLinePath(overlapStartPath, true));
+        if (isTargetAfterRef){
+            let overlapEndPath = createVerticalPath(regions.overlapEnd, overlapBox);
+            graphLinePaths.push(new GraphLinePath(overlapEndPath, false));
+        } else {
+            let overlapStartPath = createVerticalPath(regions.overlapStart, overlapBox);
+            graphLinePaths.push(new GraphLinePath(overlapStartPath, false));
+        }        
     }
+
     return graphLinePaths;
 }
