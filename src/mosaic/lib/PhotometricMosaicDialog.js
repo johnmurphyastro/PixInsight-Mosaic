@@ -1142,7 +1142,7 @@ function PhotometricMosaicDialog(data) {
         "This path is the target side of the overlap area's bounding box " +
         "or, if 'Taper from join' is selected, the target side of the 'Join Region'. " +
         "This gradient will be applied to the rest of the target image.</p>" +
-        "<p>If there is a gradient perpendicular to the join, this curve will " +
+        "<p>If there is a gradient perpendicular to the join, the curve will " +
         "tend to follow the top or bottom envelope of the plotted points.</p>" +
         "<p>The graphs produced for color images use red, green and blue dots " +
         "and lines for each channel. The colors add together. " +

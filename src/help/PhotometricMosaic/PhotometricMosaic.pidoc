@@ -508,33 +508,25 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
     \definition {
       {Smoothness}{
-        This determines how closely the correction follows the sample pair data points. The smoothness value is logarithmic. Smaller values apply less smoothing. The aim is to correct both the gradient trends and the local variations, such as the diffuse light around bright stars, but with enough smoothing to avoid following noise.
+        Logarithm of the smoothness setting. This determines the smoothness of the gradient correction applied to the overlap area. This determines how closely the correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to correct both the gradient trends and the local variations, such as the diffuse light around bright stars, but with enough smoothing to avoid following noise.
 
-        Use the \s {Gradient Graph} to determine the optimum smoothness.
+        Use the \s {Gradient graph} to determine the optimum smoothness.
 
         The full correction is applied across the whole of the overlap's bounding box.
       }
       {Taper length}{
-        The length of the taper that's applied between the fully corrected overlap region and the rest of the target image to provide a smooth transition. In most cases, a long taper usually produces the best result, but the taper should finish before the the end of the target image. However, if there is a spike in the local variation along the join, (e.g. a star halo) a short taper may be necessary.
-
-        The scale factor is applied to the whole of the target image, but the gradient correction is dependent on the available data. The overlap region has sufficient data to allow full gradient correction. However, there is no data outside the overlap bounding box, so the rest of the target image relies on an extrapolated correction.
-
-        In the default case (no \s {Propagated Gradient Correction}) the average offset between the two images along target side edge of the overlap's bounding box is applied to the rest of the target image.
-
-        If \s {Propagated Gradient Correction} is specified, the rest of the target image is corrected with the component of the gradient measured along the target side edge of the overlap's bounding box. Typically a smoother correction is specified for this propagated correction, following the general gradient trend and ignoring the local variations.
-
-        In both cases, there will be an imperfect match between the fully corrected overlap region, and the extrapolated correction. The taper is used to create a smooth transition between these two regions.
+        The length of the taper that's applied between the fully corrected overlap bounding box area and the rest of the partially corrected target image to provide a smooth transition. In most cases the default taper length usually works well, but make sure the taper finishes before the the end of the target image. However, if there is a strong peak in the gradient graph's secondary join curve (e.g. due to a star halo) a short taper may be necessary to avoid a darker or brighter area in the taper region.
       }
       {Gradient graph}{
         \image images/GradientGraphTgtOverlay.png
 
         The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
 
-        The plotted dots represent the difference between each paired target and reference sample within the whole of the overlap bounding box area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
+        The plotted dots represent the difference between each paired target and reference sample within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
 
-        A bold curve is drawn to represent the gradient correction at the join. This gradient correction is calculated from the offset differences along the join. The path of the join line might not be straight - it depends on the shape of the reference and target images.
+        The bold curve is the gradient correction along the path of the primary join. This path is the outline of either the overlapping pixels or the 'Join Region' (if specified). For a 'Reference overlay' join, this path is on the target side. For a 'Target overlay' join, the reference side. For 'Random' and 'Average' join modes, bold curves are drawn for both target and reference sides.
 
-        A thin line is drawn to show the gradient correction at the opposite side of the join region, and the thin middle line indicates the gradient half way between. If the combine mode is average or random, all three lines are relevant and are then all drawn as bold.
+        The thinner darker line is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box or, if 'Taper from join' is selected, the target side of the 'Join Region'.
 
         The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
       }
@@ -543,27 +535,28 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Extrapolated Gradient } {
     \image images/PropagatedGradientCorrection.png
-    This section determines how the gradient correction is applied to the target side of the overlap's bounding box. It has no affect within the overlap region. Consider using it if the reference image has less gradient than the target image. In these cases it can partially correct the horizontal and vertical components of the relative gradient between the reference and target image. This is done in two stages:
+    This section corrects the relative gradient between the reference and target frames. The applied gradient is based on the gradient detected on the target side edge of either the overlap's bounding box or, if 'Taper from join' is selected, the target side edge of the 'Join Region'. It is applied from this edge to the rest of the target image. It is not applied to the overlap area (this area is already fully corrected).
 
-        One component is corrected when tiles are joined into horizontal or vertical strips. The other component is corrected when these strips are joined.
-
-        Since this gradient correction is propagated across the mosaic, the correction should be a very smooth curve that follows the general trend. It should not attempt to correct the local variations which are unlikely to be valid at the opposite side of the image. The local variations are corrected by \s {Gradient Correction} instead.
-        The reference image's gradient will be propagated across the mosaic, so consider using DBE as a final correction once the mosaic is complete.
+    Consider using this option if the reference image has less gradient than the target. In these cases it can correct either the horizontal or vertical components of the relative gradient between the two images. If this option is used both when joining tiles into rows or columns, and then when these strips are joined, both components of the relative gradient will be applied.
       \definition {
       {Smoothness}{
-        This determines how closely the correction follows the sample pair data points. The smoothness value is logarithmic. Smaller values apply less smoothing. The aim is to correct the gradient trend but to ignore the local variations, such as the diffuse light around bright stars.
+        Logarithm of the smoothness setting. This determines the smoothness of the extrapolated gradient correction. This is applied to the rest of the target image after the target side of the overlap area.
 
-        Use the \s {Gradient Graph} to determine the optimum smoothness.
+        The 'Smoothness' control determines how closely the correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to only correct the gradient trends and not the local variations, such as the diffuse light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
+
+        Use the 'Gradient graph' to determine the optimum smoothness.
+
+        The reference image's gradient will be propagated across the mosaic, so consider using DBE as a final correction once the mosaic is complete.
       }
       {Gradient graph}{
         \image images/GradientPropagateGraph.png
         The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
 
-            The plotted dots represent the difference between each paired target and reference samples within the whole of the overlap bounding box area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
+            The plotted dots represent the difference between each paired target and reference samples within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
 
-            The propagated correction is calculated from the offset differences along the target side of the overlap's bounding box. A bold curve for each color channel is drawn on the graph to show this correction. A thin line is drawn to show the offset curve at the opposite side of the overlap bounding box.
+        The curve is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box or, if 'Taper from join' is selected, the target side of the 'Join Region'. This gradient will be applied to the rest of the target image. If there is a gradient perpendicular to the join, the curve will tend to follow the top or bottom envelope of the plotted points
 
-            The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
+        The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
       }
     }
   }
@@ -573,24 +566,24 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     A mosaic join created with the \s {Random} combination mode is highly affective, but often produces speckled star edges around bright stars. This section creates a mask that can be used to fix this.
 
     \image images/StarSpeckleFix.png
-    The image above shows a mosaic created with the Random combien mode from the reference 'F04n9_r' and target 'F05n9_r' images. A mask created from this section has been applied. To fix the speckle artifacts around the bright stars, the PixelMath expression needs to be either the reference or target image ('F04n9_r' or 'F05n9_r'). It is worth choosing the image with the sharpest stars.
+    The image above shows a mosaic created with the Random combine mode from the reference 'F04n9_r' and target 'F05n9_r' images. A mask created from this section has been applied. To fix the speckle artifacts around the bright stars, the PixelMath expression needs to be either the reference or target image ('F04n9_r' or 'F05n9_r'). It is worth choosing the image with the sharpest stars.
 
-    At the edge of the overlapping region, the star mask holes get abruptly terminated. If this was not done, the PixelMath fix would create black holes in the mosaic image where the overlap finished.
+    At the edge of the overlapping region, the star mask holes get abruptly terminated. If this were not done, the PixelMath fix would create black holes in the mosaic image where the overlapping pixels ran out.
     \definition {
       {Limit stars \%}{
         Specifies the percentage of the brightest detected stars that will be used to create the star mask.
 
-0\% will produce a solid mask with no stars.
+        0\% will produce a solid mask with no stars.
 
-100\% will produce a mask that includes all detected stars.
+        100\% will produce a mask that includes all detected stars.
 
-Small faint stars are usually free of artifacts, so normally only a small percentage of the detected stars need to be used.
+        Small faint stars are usually free of artifacts, so normally only a small percentage of the detected stars need to be used.
       }
       {Multiply star radius}{
         Sets the mask star radius to a multiple of the star's radius. This increases the size for large stars more than small ones.
       }
       {Add to star radius}{
-        Used to increases or decreases the radius of all mask stars. This is applied after the Multiply Star Radius.
+        Used to increases or decreases the radius of all mask stars. This is applied after the 'Multiply star radius'.
       }
       {Create mask}{
         Creates a star mask that reveals bright stars.
@@ -605,19 +598,18 @@ Small faint stars are usually free of artifacts, so normally only a small percen
     \image images/MosaicSection.png
     \definition {
       {Create Mosaic}{
-        If selected, the reference and target frames are combined and displayed in a window named: 'Mosaic'.
-If this option is not selected, the corrections will be applied to a copy of the target image, but the mosaic will not be created.
+        If selected, the reference and target frames are combined and displayed in a window named: 'Mosaic'. Otherwise the corrections will still be applied to a copy of the target image, but the mosaic will not be created.
       }
-      {Combination Mode}{
+      {Combination mode}{
         \list {
-          {Reference: The reference image pixels are drawn on top of the target image.}
-          {Target: The target image pixels are drawn on top of the reference image.}
+          {Reference overlay: The reference image pixels are drawn on top of the target image.}
+          {Target overlay: The target image pixels are drawn on top of the reference image.}
           {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly affective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply either the reference or target image to the mosaic through a mask that only reveals the bright stars. The \s {Mosaic Star Mask} section has been provided for this purpose.}
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
       }
       {Join mask}{
-        Create a mask of the mosaic join. This mask indicates the pixels used to create the mosaic join.
+        Creates a mask of the mosaic join. This mask indicates the pixels used to create the mosaic join.
 
         If a \s {Join Region} has not been defined, the join area is simply the overlapping pixels. However, if it has been specified, the join extends along the full length of the join but it is otherwise limited to the join region.
       }
