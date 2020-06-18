@@ -456,10 +456,10 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             fullDifAfterOverlap = extendDifArray(splineArray2, minY, maxY, length);
             if (propagateSurfaceSpline !== null){
                 if (isTargetAfterRef_){
-                    let splineArrayPropagate2 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapEnd, minY, maxY);
+                    let splineArrayPropagate2 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapEnd, joinRect_);
                     bgDifAfterOverlap = extendDifArray(splineArrayPropagate2, minY, maxY, length);
                 } else {
-                    let splineArrayPropagate1 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapStart, minY, maxY);
+                    let splineArrayPropagate1 = createSplineArrayY(propagateSurfaceSpline, regions_.overlapStart, joinRect_);
                     bgDifBeforeOverlap = extendDifArray(splineArrayPropagate1, minY, maxY, length);
                 }
             }
