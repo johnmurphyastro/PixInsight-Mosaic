@@ -37,10 +37,6 @@ function VERSION(){return  "2.0";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimMosaicTile";}
-function HORIZONTAL(){return 0;}
-function VERTICAL(){return 1;}
-function INSERT(){return 2;}
-function AUTO(){return 3;}
 function MOSAIC_NAME(){return "Mosaic";}
 function WINDOW_ID_PREFIX(){return "PM__";}
 function DISPLAY_DETECTED_STARS(){return 1;}
@@ -113,7 +109,7 @@ function photometricMosaic(data)
         }
         let intersectRect = joinAreaPreview.intersection(overlapBox);
         isHorizontal = isJoinHorizontal(data, intersectRect);
-        if (data.orientation === INSERT()){
+        if (data.insertFlag){
             joinRect = intersectRect;
         } else {
             joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
@@ -257,7 +253,7 @@ function photometricMosaic(data)
     }
 
     let isTargetAfterRef;
-    if (data.orientation === INSERT()){
+    if (data.insertFlag){
         isTargetAfterRef = null;
     } else if (isHorizontal){
         isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);
@@ -468,21 +464,13 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
  * @returns {Boolean} True if the mosaic join is mostly horizontal
  */
 function isJoinHorizontal(data, joinRect){
-    if (data.orientation === HORIZONTAL()){
-        console.writeln("<b>Mode: Horizontal Gradient</b>");
-        return true;
-    }
-    if (data.orientation === VERTICAL()){
-        console.writeln("<b>Mode: Vertical Gradient</b>");
-        return false;
-    }
     let isHorizontal = joinRect.width > joinRect.height;
-    if (data.orientation === INSERT()){
+    if (data.insertFlag){
         console.writeln("<b>Mode: Insert target image into reference image</b>");
     } else if (isHorizontal) {
-        console.writeln("<b>Mode auto selected: Horizontal Gradient</b>");
+        console.writeln("<b>Mode auto selected: Horizontal join</b>");
     } else {
-        console.writeln("<b>Mode auto selected: Vertical Gradient</b>");
+        console.writeln("<b>Mode auto selected: Vertical join</b>");
     }
     return isHorizontal;
 }

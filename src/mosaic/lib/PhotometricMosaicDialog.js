@@ -86,6 +86,7 @@ function PhotometricMosaicData() {
         if (this.targetView.isMainView) {
             Parameters.set("targetView", this.targetView.fullId);
         }
+        Parameters.set("insertFlag", this.insertFlag);
           
         // Star Detection
         Parameters.set("starDetection", this.logStarDetection);
@@ -111,7 +112,6 @@ function PhotometricMosaicData() {
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("maxSamples", this.maxSamples);
-        Parameters.set("orientation", this.orientation);
         
         // Overlap Area Gradient
         Parameters.set("overlapGradientSmoothness", this.overlapGradientSmoothness);
@@ -147,6 +147,8 @@ function PhotometricMosaicData() {
             let viewId = Parameters.getString("targetView");
             this.targetView = View.viewById(viewId);
         }
+        if (Parameters.has("insertFlag"))
+            this.insertFlag = Parameters.getBoolean("insertFlag");
         
         // Star Detection
         if (Parameters.has("starDetection"))
@@ -191,8 +193,6 @@ function PhotometricMosaicData() {
             this.sampleSize = Parameters.getInteger("sampleSize");
         if (Parameters.has("maxSamples"))
             this.maxSamples = Parameters.getInteger("maxSamples");
-        if (Parameters.has("orientation"))
-            this.orientation = Parameters.getInteger("orientation");
         
         // Gradient Tapered Correction
         if (Parameters.has("overlapGradientSmoothness"))
@@ -234,6 +234,8 @@ function PhotometricMosaicData() {
 
     // Initialise the scripts data
     this.setParameters = function () {
+        this.insertFlag = false;
+        
         // Star Detection
         this.logStarDetection = -1;
         
@@ -258,7 +260,6 @@ function PhotometricMosaicData() {
         this.limitSampleStarsPercent = 10;
         this.sampleSize = 15;
         this.maxSamples = 2000;
-        this.orientation = AUTO();
         
         // Gradient Tapered Correction
         this.overlapGradientSmoothness = -1;
@@ -270,8 +271,8 @@ function PhotometricMosaicData() {
         
         // Mosaic Star Mask
         this.limitMaskStarsPercent = 10;
-        this.radiusMult = 2.5;
-        this.radiusAdd = -1;
+        this.radiusMult = 2;
+        this.radiusAdd = 0;
         
         // Create Mosaic
         this.createMosaicFlag = true;
@@ -294,6 +295,8 @@ function PhotometricMosaicData() {
     this.resetParameters = function (linearFitDialog) {
         // Reset the script's data
         this.setParameters();
+        
+        linearFitDialog.insert_Control.checked = this.insertFlag;
         
         // Star Detection
         linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
@@ -319,7 +322,6 @@ function PhotometricMosaicData() {
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
         linearFitDialog.maxSamples_Control.setValue(this.maxSamples);
-        linearFitDialog.orientationCombo.currentItem = AUTO();
         
         // Gradient Tapered Correction
         linearFitDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
@@ -396,7 +398,8 @@ function PhotometricMosaicDialog(data) {
 
     let referenceImage_ViewList = new ViewList(this);
     referenceImage_ViewList.getMainViews();
-    referenceImage_ViewList.minWidth = 300;
+    referenceImage_ViewList.minWidth = 470;
+    referenceImage_ViewList.maxWidth = 470;
     if (data.referenceView !== null){
         referenceImage_ViewList.currentView = data.referenceView;
     }
@@ -408,6 +411,7 @@ function PhotometricMosaicDialog(data) {
     referenceImage_Sizer.spacing = 4;
     referenceImage_Sizer.add(referenceImage_Label);
     referenceImage_Sizer.add(referenceImage_ViewList, 100);
+    referenceImage_Sizer.addStretch();
 
     let targetImage_Label = new Label(this);
     targetImage_Label.text = "Target view:";
@@ -419,18 +423,33 @@ function PhotometricMosaicDialog(data) {
 
     let targetImage_ViewList = new ViewList(this);
     targetImage_ViewList.getMainViews();
-    targetImage_ViewList.minWidth = 300;
+    targetImage_ViewList.minWidth = 470;
+    targetImage_ViewList.maxWidth = 470;
     if (data.targetView !== null){
         targetImage_ViewList.currentView = data.targetView;
     }
     targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
     };
+    
+    this.insert_Control = new CheckBox();
+    this.insert_Control.text = "Insert";
+    this.insert_Control.toolTip = 
+        "<p>Restricts the pixels from the target image to the 'Join Region' or overlap bounding box.</p>" +
+        "<p>This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic.</p>" +
+        "<p>'Insert' only supports the mosaic combination modes 'Target overlay' and 'Average'.</p>";
+    this.insert_Control.onCheck = function (checked){
+        data.insertFlag = checked;
+    };
+    this.insert_Control.checked = data.insertFlag;
 
     let targetImage_Sizer = new HorizontalSizer;
     targetImage_Sizer.spacing = 4;
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(targetImage_ViewList, 100);
+    targetImage_Sizer.addSpacing(10);
+    targetImage_Sizer.add(this.insert_Control);
+    targetImage_Sizer.addStretch();
     
     let selectViewSection = new Control(this);
     selectViewSection.sizer = new VerticalSizer;
@@ -666,7 +685,7 @@ function PhotometricMosaicDialog(data) {
             "<p>The join region determines the size and position of the join " +
             "between the two images. The rectangle's long axis should align with the join " +
             "and should ideally avoid low quality regions such as image corners. " +
-            "For all 'Join direction' modes except for 'Insert', the " +
+            "Provided 'Insert' is not selected, the " +
             "long axis of the join region is updated to start and finish at the overlap's bounding box. " +
             "The ideal size and position of the Join Region rectangle depends on " +
             "the Mosaic overlay mode:</p>" +
@@ -681,7 +700,7 @@ function PhotometricMosaicDialog(data) {
              "<p>It is not necessary for the join region to contain any stars. The whole of the " +
             "overlap area is always used to determine the photometric scale and background gradient.</p>" +
             "<p>Inside the join region, the behavior depends on the mosaic combination mode. " +
-            "The behavior outside this region (for all modes except 'Insert'):" +
+            "The behavior outside this region (provided 'Insert' is not selected):" +
             "<ul><li>Reference side of join region: Reference overlay</li>" +
             "<li>Target side of join region: Target overlay</li></ul></p>";
             
@@ -878,45 +897,6 @@ function PhotometricMosaicDialog(data) {
     this.sampleSize_Control.slider.minWidth = 200;
     this.sampleSize_Control.setValue(data.sampleSize);
     
-    let directionLabel = new Label(this);
-    directionLabel.text = "Join direction:";
-    directionLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    directionLabel.minWidth = joinDirectionStrLen;
-    
-    this.orientationCombo = new ComboBox(this);
-    this.orientationCombo.editEnabled = false;
-    this.orientationCombo.toolTip =
-        "<p>Orientation of the line of intersection. This determines how the " +
-        "background offset is corrected outside of the overlap area. " +
-        "You should usually use 'Auto' while creating a mosaic, or " +
-        "'Insert' to replace a small region in the middle of an existing mosaic.</p>" +
-        "<p>'Auto': The join direction is determined by the 'Join Region' rectangle's " +
-        "longest dimension. If the 'Join Region' has not been specified, the overlap's " +
-        "bounding box is used instead.<\p>" +
-        "<p>'Horizontal': Sets the join direction to horizontal. " +
-        "The target's background offset is corrected in the region above and below " +
-        "the join. On the target side of the overlap, the offset is tapered from fully corrected at the " +
-        "overlap boundary, down to either the average offset correction or the " +
-        "'Extrapolated gradient' correction (if specified).</p>" +
-        "<p>'Vertical': Sets the join direction to vertical. " +
-        "The target's background offset is corrected in the region to the left and right of " +
-        "the join. On the target side of the overlap, the offset is tapered from fully corrected at the " +
-        "overlap boundary, down to either the average offset correction or the " +
-        "'Extrapolated gradient' correction (if specified).</p>" +
-        "<p>'Insert': Pixels from the target image are limited to the 'Join Region' or overlap bounding box. " +
-        "This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. " +
-        "'Insert' only supports the 'Target overlay' and 'Average' mosaic combination modes.</p>";
-
-    this.orientationCombo.minWidth = this.font.width("Horizontal");
-    this.orientationCombo.addItem("Horizontal");
-    this.orientationCombo.addItem("Vertical");
-    this.orientationCombo.addItem("Insert");
-    this.orientationCombo.addItem("Auto");
-    this.orientationCombo.currentItem = data.orientation;
-    this.orientationCombo.onItemSelected = function () {
-        data.orientation = this.currentItem;
-    };
-    
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample grid";
     displaySamplesButton.toolTip =
@@ -985,19 +965,12 @@ function PhotometricMosaicDialog(data) {
     maxSamplesSizer.addSpacing(20);
     maxSamplesSizer.add(displayBinnedSamplesButton);
     
-    let orientationSizer = new HorizontalSizer;
-    orientationSizer.spacing = 4;
-    orientationSizer.add(directionLabel);
-    orientationSizer.add(this.orientationCombo);
-    orientationSizer.addStretch();
-    
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
     sampleGenerationSection.sizer.spacing = 4;
     sampleGenerationSection.sizer.add(this.limitSampleStarsPercent_Control);
     sampleGenerationSection.sizer.add(sampleGridSizer);
     sampleGenerationSection.sizer.add(maxSamplesSizer);
-    sampleGenerationSection.sizer.add(orientationSizer);
     let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
     sampleGenerationBar.setSection(sampleGenerationSection);
     sampleGenerationBar.onToggleSection = this.onToggleSection;
@@ -1518,7 +1491,7 @@ function main() {
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.createMosaicFlag && data.orientation === INSERT() && (data.mosaicOverlayRefFlag || data.mosaicRandomFlag)){
+        if (data.createMosaicFlag && data.insertFlag && (data.mosaicOverlayRefFlag || data.mosaicRandomFlag)){
             (new MessageBox("Valid mosaic overlay methods for the Insert mode are\nTarget overlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;

@@ -294,6 +294,7 @@
 \image images/PhotometricMosaicAll.png
 
   \subsection { Reference & Target Views } {
+    \image images/ReferenceAndTarget.png
     \definition {
       { Reference view } {
         The target image will be matched to this reference image. The reference image is not modified.
@@ -302,6 +303,11 @@
         This image is cloned, then multiplied by the photometrically determined scale factor, and finally the gradient is calculated and subtracted.
 
         This action is invoked every time the user selects 'OK', irrespective of whether the \s {Create Mosaic} check box is selected.
+      }
+      { Insert } {
+        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Insert} only supports the mosaic combination modes \s {Target overlay} and \s {Average}.
+
+        If unselected, the whole of the target image is used. The orientation of the join (horizontal or vertical) is determined by the \s {Join Region} rectangle's longest dimension. If the \s {Join Region} has not been specified, the overlap's bounding box is used instead.
       }
     }
   }
@@ -400,7 +406,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     \image images/JoinRegion.png
     Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
 
-    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. For all \s {Join Direction} modes except for \s {Insert}, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic overlay mode:
+    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \s {Insert} is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic overlay mode:
     \list{
       {Reference overlay: The edge closest to the target image determines the primary join line. This line should avoids bright stars.}
       {Target overlay: The edge closest to the reference image determines the primary join line. This line should avoids bright stars.}
@@ -409,11 +415,12 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
     It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
 
-    Inside the join region, the behavior depends on the mosaic combination mode. The behavior outside the region (for all modes except \s {Insert}):"
+    Inside the join region, the behavior depends on the mosaic combination mode. If \s {Insert} is not selected, the behavior outside this region is:"
     \list{
       {Reference side of join region: Reference overlay}
       {Target side of join region: Target overlay}
     }
+    If \s {Insert} is selected, all pixels outside of the join region are replaced by Reference pixels.
 
     \definition {
       {Taper from join}{
@@ -433,7 +440,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       {Get area from preview}{
         This combo box is used to initialize the join region from a preview.
         \image images/JoinRegionPreview.png
-        The image above shows a target frame. Perview01 has been created to specify the join region. Providing the \s {Join Direction} is not set to \s {Insert}, the created join region will be extended along its length to the overlap's bounding box.
+        The image above shows a target frame. Perview01 has been created to specify the join region. Provided \s {Insert} is not selected, the created join region will be extended along its length to the overlap's bounding box.
 
         The preview has been positioned so that it avoids the corners of both the target and reference images.
 
@@ -485,17 +492,6 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
         Displays the binned samples that will be used to calculate the background offset and gradient. Samples are binned to improve performance if the number of samples exceeds the 'Max samples' limit.
 
         The area of each binned sample represents the number of samples it was created from. Each binned sample's center is calculated from the center of mass of the samples it was created from. The drawn boxes no longer indicate exactly which of the pixels are being used. To see which of the unbinned samples were rejected due to stars or black pixels, it is necessary to use 'Sample grid' instead.
-      }
-      {Join direction}{
-        Determines the orientation of the line of intersection. This determines how the background offset is corrected outside of the overlap area. You should usually use \s {Auto} while creating a mosaic, or \s {Insert} to replace a small region in the middle of an existing mosaic.
-
-        \s {Auto}: The join direction is determined by the join region rectangle's longest dimension. If the \s {Join Region} has not been specified, the overlap's bounding box is used instead.
-
-        \s {Horizontal}: Sets the join direction to horizontal. The target's background offset is corrected in the region above and below the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the 'Extrapolated gradient' correction (if specified).
-
-        \s {Vertical}: Sets the join direction to vertical. The target's background offset is corrected in the region to the left and right of the join. On the target side of the overlap, the offset is tapered from fully corrected at the overlap boundary, down to either the average offset correction or the 'Extrapolated gradient' correction (if specified).
-
-        \s {Insert}: Pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Insert} only supports the \s {Target overlay} and \s {Average} mosaic combination modes.
       }
     }
   }

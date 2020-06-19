@@ -139,6 +139,9 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
             let starDiameter = Math.sqrt(star.size);
             // Double the star radius for bright stars
             let starRadius = star.peak < 0.5 ? starDiameter/2 : starDiameter;
+            if (star.peak > 0.8){
+                starRadius *= 1.5;
+            }
             removeBinsInCircle(star.pos, starRadius);
         }
     };

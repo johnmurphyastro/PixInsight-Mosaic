@@ -828,7 +828,13 @@ function displayMask(tgtView, joinArea, detectedStars, data){
     for (let i = 0; i < firstNstars; ++i){
         let star = detectedStars.allStars[i];
         // size is the area. sqrt gives box side length. Half gives circle radius
-        let radius = (Math.sqrt(star.size)/2) * data.radiusMult + data.radiusAdd;
+        // Double the star radius for bright stars
+        let starDiameter = Math.sqrt(star.size);
+        let starRadius = star.peak < 0.5 ? starDiameter/2 : starDiameter;
+        if (star.peak > 0.8){
+            starRadius *= 1.5;
+        }
+        let radius = starRadius * data.radiusMult + data.radiusAdd;
         G.fillCircle(star.pos, radius);
     }
     G.end();
