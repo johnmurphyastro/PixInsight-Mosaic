@@ -1370,11 +1370,13 @@ function PhotometricMosaicDialog(data) {
     const helpWindowTitle = TITLE() + " Help";
     const HELP_MSG =
             "<p>To install this script, use 'SCRIPT \> Feature Scripts...' and then in the " +
-            "'Feature Scripts' dialog box, press the 'Add' button and select the folder where you have saved this script.</p>" +
-            "<p>To install the help files, copy the 'PhotometricMosaic' folder from the 'Help' folder to " +
-            "'[PixInsight]/doc/scripts/PhotometricMosaic</p>" +
-            "<p>For example, on Windows, the correct installation would be:</p>" +
-            "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/PhotometricMosaic.html</p>";
+            "'Feature Scripts' dialog box, press the 'Add' button and select the folder " +
+            "where you unzipped this script.</p>" +
+            "<p>To install the help files, unzip 'PhotometricMosaicHelp.zip' to " +
+            "'[PixInsight]/doc/scripts/'</p>" +
+            "<p>For example, on Windows, the correct installation would include:</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/PhotometricMosaic.html</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/images/</p>";
     
     let okTooltip = "<p>Applies the calculated scale and gradient to a copy of the target image.</p>" +
             "<p>If 'Create Mosaic' is selected, a mosaic image is created and displayed.</p>";

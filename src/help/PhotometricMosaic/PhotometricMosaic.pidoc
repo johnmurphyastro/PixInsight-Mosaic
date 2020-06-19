@@ -72,7 +72,7 @@
     \figure {
       \figtag \s {Photometry graph with an outlier star}
       \imageswap images/PhotometryGraphOutlier.png images/PhotometryGraphOutlierFix.png
-      Use the \s {Photometry Graph} in the \s {Photometric Scale} section to display the graph. In this example, an obvious outlier can be seen at target star flux = 1.42e-1, reference star flux = 1.65e-1 (arbitary flux units). A left click on the outlier star was used to display its flux values in the graph's title bar. The mouse wheel zooms the graph. Use the 'Esc' key to return to the script dialog. In this example, the outlier star was excluded by setting \s {Outlier Removal} to one.
+      Use the \s {Photometry graph} in the \s {Photometric Scale} section to display the graph. In this example, an obvious outlier can be seen at target star flux = 1.42e-1, reference star flux = 1.65e-1 (arbitary flux units). A left click on the outlier star was used to display its flux values in the graph's title bar. The mouse wheel zooms the graph. Use the 'Esc' key to return to the script dialog. In this example, the outlier star was excluded by setting \s {Outlier removal} to one.
     }
     \list{
       {Select the reference and target views.}
@@ -97,7 +97,7 @@
     \figure[numbered:scutum_sagittarius_join_region] {
       \figtag \s {Scutum & Sagittarius Mosiac: Using a Join Region to avoid distorted corners}
       \imageswap[float,marginRight:1em] images/MilkyWayJoinRegion.png images/MilkyWayCorner.png
-      Mosaic of Scutum (reference, top image) and Sagittarius (target, bottom image). A mask (created by \s {Join Mask} in the \s {Create Mosaic} section) has been applied to reveal the overlapping pixels.
+      Mosaic of Scutum (reference, top image) and Sagittarius (target, bottom image). A mask (created by \s {Join mask} in the \s {Create Mosaic} section) has been applied to reveal the overlapping pixels.
 
       Mouse over to see a magnified image of the bottom left corner of the Overlap bounding box. These images were taken with a 50 mm camera lens, so the stars in the corners are heavily distorted. To avoid including these corner areas, a \s {Join Region} is created from Preview02. This has a similar affect to cropping the reference and target images. The reference image (Scutum) will appear to finish at the bottom of the Preview02. The target image (Sagittarius) will appear to start at the top of it.
     }
@@ -155,7 +155,12 @@
 
     The position of the primary join can be set by specifying a \s {Join Region} (see the previous \lref join_region_distored_corners {section}). However, the Join Region's default behavior does not move the secondary join line. This is because for most situations, the target side of the overlap bounding box is the optimum position. If the reference and target image wrap around each other (see figure \figref scutum_sagittarius_join_region for an example of this), these side joins would not always be fully corrected if the secondary join were not at the end of the overlapping region.
 
-    When a black shadow is visible, it can be worth moving the secondary join line to the target side of the Join Region. To do this, select the \s {Taper from join} option. This is a compromise because it might make side joins visible but it is usually worth trying before resorting to a short taper length.
+    When a black shadow is visible, it can be worth moving the secondary join line. Simply switching between Reference overlay and Target overlay will not work this time. Instead, the options are:
+    \list {
+      {Switch the reference and target images in the \s {Reference & Target Views} section. This will move the secondary join line to the other side of the overlap.}
+      {Select the \s {Taper from join} option. This will move the secondary join line to the target side of the Join Region. This option is a compromise because it might make side joins visible.}
+      {Use a very short taper length. This does not move the secondary join line, but it may reduce the problem to an acceptable level.}
+    }
 
     \figure [numbered:join_region_graph] {
       \figtag \s {Gradient graphs with and without Join Region}
@@ -224,7 +229,7 @@
     \figure {
       \figtag \s {Before and after scale correction}
       \imageswap images/GradientGraphScaleErr.png images/GradientGraphScaleFix.png
-      The graph shows a significant peak at x-coordinate 1,921 (displayed in the title bar by left clicking the peak). By inspecting the join region within mosaic image (see the 'Inspect_Join' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
+      The graph shows a significant peak at x-coordinate 1,921 (displayed in the title bar by left clicking the peak). By inspecting the join region within the mosaic image (see the 'Inspect_Join' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
 
       The mouse over image shows the graph after the scale has been corrected. There is a very slight over correction, but it is now very close. The graph now reveals a slight gradient across the image.
 
@@ -337,8 +342,7 @@ You can use the Detected Stars option to see which stars were detected.
     \image images/PhotometricStarSearch.png
     \definition {
       { Star flux tolerance } {
-        Star flux tolerance is used to prevent invalid target to reference " +
-            "star matches. Smaller values reject more matches.
+        Star flux tolerance is used to prevent invalid target to reference star matches. Smaller values reject more matches.
 
         Star matches are rejected if the difference in star flux is larger than expected. The algorithm first calculates the average scale difference, and then rejects matches if their brightness ratio is greater than
           \e {(expected ratio * tolerance)}
@@ -406,7 +410,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     \image images/JoinRegion.png
     Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
 
-    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \s {Insert} is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic overlay mode:
+    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \s {Insert} (Reference & Target Views section) is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
     \list{
       {Reference overlay: The edge closest to the target image determines the primary join line. This line should avoids bright stars.}
       {Target overlay: The edge closest to the reference image determines the primary join line. This line should avoids bright stars.}
@@ -415,7 +419,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
     It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
 
-    Inside the join region, the behavior depends on the mosaic combination mode. If \s {Insert} is not selected, the behavior outside this region is:"
+    Inside the join region, the behavior depends on the mosaic combination mode. If \s {Insert} is not selected, the behavior outside this region is:
     \list{
       {Reference side of join region: Reference overlay}
       {Target side of join region: Target overlay}
@@ -444,7 +448,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         The preview has been positioned so that it avoids the corners of both the target and reference images.
 
-        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join Mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
+        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
       }
     }
   }
@@ -536,7 +540,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     Consider using this option if the reference image has less gradient than the target. In these cases it can correct either the horizontal or vertical components of the relative gradient between the two images. If this option is used both when joining tiles into rows or columns, and then when these strips are joined, both components of the relative gradient will be applied.
       \definition {
       {Smoothness}{
-        Logarithm of the smoothness setting. This determines the smoothness of the extrapolated gradient correction. This is applied to the rest of the target image after the target side of the overlap area.
+        Logarithm of the smoothness setting. This determines the smoothness of the extrapolated gradient correction.
 
         The 'Smoothness' control determines how closely the correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to only correct the gradient trends and not the local variations, such as the diffuse light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
 
@@ -559,10 +563,10 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Mosaic Star Mask } {
     \image images/MosaicMaskSection.png
-    A mosaic join created with the \s {Random} combination mode is highly affective, but often produces speckled star edges around bright stars. This section creates a mask that can be used to fix this.
+    A mosaic join created with the \s {Random} combination mode is highly affective, but often produces speckled edges around bright stars. This section creates a mask that can be used to fix this.
 
     \image images/StarSpeckleFix.png
-    The image above shows a mosaic created with the Random combine mode from the reference 'F04n9_r' and target 'F05n9_r' images. A mask created from this section has been applied. To fix the speckle artifacts around the bright stars, the PixelMath expression needs to be either the reference or target image ('F04n9_r' or 'F05n9_r'). It is worth choosing the image with the sharpest stars.
+    The image above shows a mosaic created with the Random combine mode from the reference 'F04n9_r' and target 'F05n9_r' images. A mask created from this section has been applied. To fix the speckle artifacts around the bright stars, the PixelMath expression needs to apply the reference image ('F04n9_r' in this example).
 
     At the edge of the overlapping region, the star mask holes get abruptly terminated. If this were not done, the PixelMath fix would create black holes in the mosaic image where the overlapping pixels ran out.
     \definition {
@@ -600,7 +604,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
         \list {
           {Reference overlay: The reference image pixels are drawn on top of the target image.}
           {Target overlay: The target image pixels are drawn on top of the reference image.}
-          {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly affective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply either the reference or target image to the mosaic through a mask that only reveals the bright stars. The \s {Mosaic Star Mask} section has been provided for this purpose.}
+          {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly affective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply the reference image to the mosaic through a mask that only reveals the bright stars. The \s {Mosaic Star Mask} section has been provided for this purpose.}
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
       }
@@ -620,7 +624,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 }
 
 \relatedtools {
-
+  ScreenTransferFunction
 }
 
 \make
