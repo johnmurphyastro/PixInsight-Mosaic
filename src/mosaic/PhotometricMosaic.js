@@ -99,6 +99,7 @@ function photometricMosaic(data)
     let isHorizontal;
     let joinRect;
     let overlapBox = overlap.overlapBox;
+    createPreview(targetView, overlapBox, "Overlap");
     if (data.hasJoinAreaPreview) {
         let joinAreaPreview = new Rect(data.joinAreaPreview_X0, data.joinAreaPreview_Y0, 
                 data.joinAreaPreview_X1, data.joinAreaPreview_Y1);
@@ -114,6 +115,8 @@ function photometricMosaic(data)
         } else {
             joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
         }
+        // Show the join area in a preview
+        createPreview(targetView, joinRect, "JoinRegion");
     } else {
         isHorizontal = isJoinHorizontal(data, overlapBox);
         joinRect = overlapBox;
@@ -126,7 +129,6 @@ function photometricMosaic(data)
 
     let detectedStars = new StarsDetected();
     detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
-    createPreview(targetView, overlapBox, "Overlap");
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
@@ -437,8 +439,6 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     view.window.keywords = keywords;
     view.endProcess();
     view.stf = refView.stf;
-    // Show the join area in a preview
-    //imgWindow.createPreview(joinRect, "Join");
 
     if (data.createMosaicFlag){
         // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
@@ -485,19 +485,16 @@ function createPreview(targetView, rect, previewName){
     let w = targetView.window;
     let previews = w.previews;
     let found = false;
-    let overlapPreview = null;
     for (let preview of previews){
         let r = w.previewRect( preview );
         if (r.x0 === rect.x0 && r.x1 === rect.x1 &&
                 r.y0 === rect.y0 && r.y1 === rect.y1){
             found = true; // preview already exists
-            overlapPreview = preview;
             break;
         }
     }
     if (!found){
-        let preview = w.createPreview(rect, previewName);
-        overlapPreview = preview;
+        w.createPreview(rect, previewName);
     }
 }
 
