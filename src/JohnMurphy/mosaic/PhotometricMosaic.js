@@ -101,8 +101,7 @@ function photometricMosaic(data)
     let overlapBox = overlap.overlapBox;
     createPreview(targetView, overlapBox, "Overlap");
     if (data.hasJoinAreaPreview) {
-        let joinAreaPreview = new Rect(data.joinAreaPreview_X0, data.joinAreaPreview_Y0, 
-                data.joinAreaPreview_X1, data.joinAreaPreview_Y1);
+        let joinAreaPreview = data.joinAreaPreviewRect;
         if (!joinAreaPreview.intersects(overlapBox)){
             let errorMsg = "Error: Join Region preview does not intersect with the image overlap";
             new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();

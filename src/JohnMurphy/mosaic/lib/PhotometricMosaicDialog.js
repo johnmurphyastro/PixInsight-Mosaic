@@ -101,10 +101,10 @@ function PhotometricMosaicData() {
         
         // Join Region
         Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
-        Parameters.set("joinAreaPreview_X0", this.joinAreaPreview_X0);
-        Parameters.set("joinAreaPreview_Y0", this.joinAreaPreview_Y0);
-        Parameters.set("joinAreaPreview_X1", this.joinAreaPreview_X1);
-        Parameters.set("joinAreaPreview_Y1", this.joinAreaPreview_Y1);
+        Parameters.set("joinAreaPreviewX0", this.joinAreaPreviewRect.x0);
+        Parameters.set("joinAreaPreviewY0", this.joinAreaPreviewRect.y0);
+        Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
+        Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
         Parameters.set("taperFromJoin", this.taperFromJoin);
         Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
         
@@ -167,24 +167,33 @@ function PhotometricMosaicData() {
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         
         // Join Region
-        if (Parameters.has("hasJoinAreaPreview"))
-            this.hasJoinAreaPreview = Parameters.getBoolean("hasJoinAreaPreview");
-        if (Parameters.has("joinAreaPreview_X0")){
-            this.joinAreaPreview_X0 = Parameters.getInteger("joinAreaPreview_X0");
+        {
+            let x = 0;
+            let y = 0;
+            let w = 1;
+            let h = 1;
+            
+            if (Parameters.has("hasJoinAreaPreview"))
+                this.hasJoinAreaPreview = Parameters.getBoolean("hasJoinAreaPreview");
+            if (Parameters.has("joinAreaPreviewX0")){
+                x = Parameters.getInteger("joinAreaPreviewX0");
+            }
+            if (Parameters.has("joinAreaPreviewY0")){
+                y = Parameters.getInteger("joinAreaPreviewY0");
+            }
+            if (Parameters.has("joinAreaPreviewWidth")){
+                w = Parameters.getInteger("joinAreaPreviewWidth");
+            }
+            if (Parameters.has("joinAreaPreviewHeight")){
+                h = Parameters.getInteger("joinAreaPreviewHeight");
+            }
+            this.joinAreaPreviewRect = new Rect(x, y, x + w, y + h);
+            
+            if (Parameters.has("taperFromJoin"))
+                this.taperFromJoin = Parameters.getBoolean("taperFromJoin");
+            if (Parameters.has("cropTargetToJoinRegionFlag"))
+                this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         }
-        if (Parameters.has("joinAreaPreview_Y0")){
-            this.joinAreaPreview_Y0 = Parameters.getInteger("joinAreaPreview_Y0");
-        }
-        if (Parameters.has("joinAreaPreview_X1")){
-            this.joinAreaPreview_X1 = Parameters.getInteger("joinAreaPreview_X1");
-        }
-        if (Parameters.has("joinAreaPreview_Y1")){
-            this.joinAreaPreview_Y1 = Parameters.getInteger("joinAreaPreview_Y1");
-        }
-        if (Parameters.has("taperFromJoin"))
-            this.taperFromJoin = Parameters.getBoolean("taperFromJoin");
-        if (Parameters.has("cropTargetToJoinRegionFlag"))
-            this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         
         // Gradient Sample Generation
         if (Parameters.has("limitSampleStarsPercent"))
@@ -248,10 +257,7 @@ function PhotometricMosaicData() {
         
         // Limit Gradient Sample Area
         this.hasJoinAreaPreview = false;
-        this.joinAreaPreview_X0 = 0;
-        this.joinAreaPreview_Y0 = 0;
-        this.joinAreaPreview_X1 = 0;
-        this.joinAreaPreview_Y1 = 0;
+        this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
         this.taperFromJoin = false;
         this.cropTargetToJoinRegionFlag = false;
         
@@ -308,10 +314,10 @@ function PhotometricMosaicData() {
         linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
         // Join Region
-        linearFitDialog.rectangleX0_Control.setValue(this.joinAreaPreview_X0);
-        linearFitDialog.rectangleY0_Control.setValue(this.joinAreaPreview_Y0);
-        linearFitDialog.rectangleX1_Control.setValue(this.joinAreaPreview_X1);
-        linearFitDialog.rectangleY1_Control.setValue(this.joinAreaPreview_Y1);
+        linearFitDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
+        linearFitDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
+        linearFitDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
+        linearFitDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
         linearFitDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
         linearFitDialog.taperFromJoin_Control.checked = this.taperFromJoin;
         linearFitDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
@@ -659,14 +665,14 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Join Region"
     // =======================================
-    const getAreaFromPreviewStr = "Get area from preview:";
+    const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
     const JoinRegionTooltip =
             "<p>Limits the join region to a subset of the overlap area.</p>" +
             "<p>The join region determines the size and position of the join " +
             "between the two images. The rectangle's long axis should align with the join " +
             "and should ideally avoid low quality regions such as image corners. " +
-            "Provided 'Crop target image' is not selected, the " +
+            "Provided 'Crop target' is not selected, the " +
             "long axis of the join region is updated to start and finish at the overlap's bounding box. " +
             "The ideal size and position of the Join Region rectangle depends on " +
             "the Mosaic overlay mode:</p>" +
@@ -686,51 +692,53 @@ function PhotometricMosaicDialog(data) {
             "<li>Target side of join region: Target overlay</li></ul></p>";
             
     this.rectangleX0_Control = createNumericEdit("Left:", JoinRegionTooltip,
-            data.joinAreaPreview_X0, 50);
+            data.joinAreaPreviewRect.x0, 50);
     this.rectangleX0_Control.label.setFixedWidth(
             this.font.width("Left:") + GET_AREA_FROM_PREVIEW_STRLEN + 4);
     this.rectangleX0_Control.onValueUpdated = function (value){
-        data.joinAreaPreview_X0 = value;
+        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
     this.rectangleY0_Control = createNumericEdit("Top:", JoinRegionTooltip,
-            data.joinAreaPreview_Y0, 50);
+            data.joinAreaPreviewRect.y0, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
-        data.joinAreaPreview_Y0 = value;
+        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
-    this.rectangleX1_Control = createNumericEdit("Right:", JoinRegionTooltip,
-            data.joinAreaPreview_X1, 50);
-    this.rectangleX1_Control.onValueUpdated = function (value){
-        data.joinAreaPreview_X1 = value;
+    this.rectangleWidth_Control = createNumericEdit("Width:", JoinRegionTooltip,
+            data.joinAreaPreviewRect.width, 50);
+    this.rectangleWidth_Control.onValueUpdated = function (value){
+        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
-    this.rectangleY1_Control = createNumericEdit("Bottom:", JoinRegionTooltip,
-            data.joinAreaPreview_Y1, 50);
-    this.rectangleY1_Control.onValueUpdated = function (value){
-        data.joinAreaPreview_Y1 = value;
+    this.rectangleHeight_Control = createNumericEdit("Height:", JoinRegionTooltip,
+            data.joinAreaPreviewRect.height, 50);
+    this.rectangleHeight_Control.onValueUpdated = function (value){
+        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
+    
+    function getJoinAreaPreviewRect(){
+        let x = self.rectangleX0_Control.value;
+        let y = self.rectangleY0_Control.value;
+        let w = self.rectangleWidth_Control.value;
+        let h = self.rectangleHeight_Control.value;
+        return new Rect(x, y, x + w, y + h);
+    }
 
     let joinAreaHorizSizer1 = new HorizontalSizer; 
     joinAreaHorizSizer1.spacing = 10;
     joinAreaHorizSizer1.add(this.rectangleX0_Control);
     joinAreaHorizSizer1.add(this.rectangleY0_Control);
-    joinAreaHorizSizer1.add(this.rectangleX1_Control);
-    joinAreaHorizSizer1.add(this.rectangleY1_Control);
+    joinAreaHorizSizer1.add(this.rectangleWidth_Control);
+    joinAreaHorizSizer1.add(this.rectangleHeight_Control);
     joinAreaHorizSizer1.addStretch();
 
     function previewUpdateActions(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
             dialog.joinAreaBar.checkBox.checked = data.hasJoinAreaPreview;
-            ///let imageWindow = view.window;
-            let rect = view.window.previewRect(view);
-            data.joinAreaPreview_X0 = rect.x0;
-            data.joinAreaPreview_Y0 = rect.y0;
-            data.joinAreaPreview_X1 = rect.x1;
-            data.joinAreaPreview_Y1 = rect.y1;
-
-            dialog.rectangleX0_Control.setValue(data.joinAreaPreview_X0);
-            dialog.rectangleY0_Control.setValue(data.joinAreaPreview_Y0);
-            dialog.rectangleX1_Control.setValue(data.joinAreaPreview_X1);
-            dialog.rectangleY1_Control.setValue(data.joinAreaPreview_Y1);
+            data.joinAreaPreviewRect = view.window.previewRect(view);
+            dialog.rectangleX0_Control.setValue(data.joinAreaPreviewRect.x0);
+            dialog.rectangleY0_Control.setValue(data.joinAreaPreviewRect.y0);
+            dialog.rectangleWidth_Control.setValue(data.joinAreaPreviewRect.width);
+            dialog.rectangleHeight_Control.setValue(data.joinAreaPreviewRect.height);
             
             dialog.setHasJoinAreaPreview(true);
         } else {
@@ -773,9 +781,9 @@ function PhotometricMosaicDialog(data) {
         data.hasJoinAreaPreview = checked;
         self.joinAreaBar.checkBox.checked = checked;
         self.rectangleX0_Control.enabled = checked;
-        self.rectangleX1_Control.enabled = checked;
+        self.rectangleWidth_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
-        self.rectangleY1_Control.enabled = checked;
+        self.rectangleHeight_Control.enabled = checked;
         self.taperFromJoin_Control.enabled = checked;
         self.cropTarget_Control.enabled = checked;
         if (!checked){
@@ -811,7 +819,7 @@ function PhotometricMosaicDialog(data) {
     this.taperFromJoin_Control.checked = data.taperFromJoin;
     
     this.cropTarget_Control = new CheckBox();
-    this.cropTarget_Control.text = "Crop target image";
+    this.cropTarget_Control.text = "Crop target";
     this.cropTarget_Control.toolTip = 
         "<p>Restricts target image pixels to the Join Region. " +
         "All target pixels outside the Join Region are ignored.</p>" +
@@ -1484,8 +1492,8 @@ function main() {
             continue;
         }
         if (data.hasJoinAreaPreview){
-            if (data.joinAreaPreview_X1 > data.targetView.image.width || 
-                    data.joinAreaPreview_Y1 > data.referenceView.image.height){
+            if (data.joinAreaPreviewRect.x1 > data.targetView.image.width || 
+                    data.joinAreaPreviewRect.y1 > data.referenceView.image.height){
                 (new MessageBox("ERROR: Join Region Preview extends beyond the edge of the image\n" +
                 "Have you selected the wrong preview?", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
                 continue;
@@ -1501,7 +1509,7 @@ function main() {
             continue;
         }
         if (data.createMosaicFlag && data.cropTargetToJoinRegionFlag && (data.mosaicOverlayRefFlag || data.mosaicRandomFlag)){
-            (new MessageBox("Valid mosaic combination modes for the 'Crop target image' option are\nTarget overlay and Average", 
+            (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nTarget overlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
