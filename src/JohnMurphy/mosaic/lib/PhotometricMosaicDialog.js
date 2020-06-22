@@ -1508,7 +1508,7 @@ function main() {
 
         // Calculate and apply the linear fit
         photometricMosaic(data);
-        data.saveParameters();  // Want to save script parameters to the newly created mosaic window. This does not work...
+        data.saveParameters();  // Save script parameters to the newly created mosaic window.
         console.hide();
     }
     
