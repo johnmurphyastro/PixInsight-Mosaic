@@ -101,8 +101,8 @@ function PhotometricMosaicData() {
         
         // Join Region
         Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
-        Parameters.set("joinAreaPreviewX0", this.joinAreaPreviewRect.x0);
-        Parameters.set("joinAreaPreviewY0", this.joinAreaPreviewRect.y0);
+        Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
+        Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
         Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
         Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
         Parameters.set("taperFromJoin", this.taperFromJoin);
@@ -175,11 +175,11 @@ function PhotometricMosaicData() {
             
             if (Parameters.has("hasJoinAreaPreview"))
                 this.hasJoinAreaPreview = Parameters.getBoolean("hasJoinAreaPreview");
-            if (Parameters.has("joinAreaPreviewX0")){
-                x = Parameters.getInteger("joinAreaPreviewX0");
+            if (Parameters.has("joinAreaPreviewLeft")){
+                x = Parameters.getInteger("joinAreaPreviewLeft");
             }
-            if (Parameters.has("joinAreaPreviewY0")){
-                y = Parameters.getInteger("joinAreaPreviewY0");
+            if (Parameters.has("joinAreaPreviewTop")){
+                y = Parameters.getInteger("joinAreaPreviewTop");
             }
             if (Parameters.has("joinAreaPreviewWidth")){
                 w = Parameters.getInteger("joinAreaPreviewWidth");
