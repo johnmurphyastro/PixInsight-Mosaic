@@ -116,6 +116,21 @@ function photometricMosaic(data)
         }
         // Show the join area in a preview
         createPreview(targetView, joinRect, "JoinRegion");
+    } else if (data.hasJoinSize){
+        isHorizontal = isJoinHorizontal(data, overlapBox);
+        let halfSize = data.joinSize / 2;
+        if (isHorizontal){
+            let middle = (overlapBox.y0 + overlapBox.y1) / 2;
+            let top = Math.max(overlapBox.y0, Math.round(middle - halfSize));
+            let bot = Math.min(overlapBox.y1, Math.round(middle + halfSize));
+            joinRect = new Rect(overlapBox.x0, top, overlapBox.x1, bot);
+        } else {
+            let middle = (overlapBox.x0 + overlapBox.x1) / 2;
+            let left = Math.max(overlapBox.x0, Math.round(middle - halfSize));
+            let right = Math.min(overlapBox.x1, Math.round(middle + halfSize));
+            joinRect = new Rect(left, overlapBox.y0, right, overlapBox.y1);
+        }
+        createPreview(targetView, joinRect, "JoinRegion");
     } else {
         isHorizontal = isJoinHorizontal(data, overlapBox);
         joinRect = overlapBox;

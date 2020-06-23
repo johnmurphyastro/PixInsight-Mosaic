@@ -108,6 +108,10 @@ function PhotometricMosaicData() {
         Parameters.set("taperFromJoin", this.taperFromJoin);
         Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
         
+        // Join Size
+        Parameters.set("hasJoinSize", this.hasJoinSize);
+        Parameters.set("joinSize", this.joinSize);
+        
         // Gradient Sample Generation
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleStarRadiusMult", this.sampleStarRadiusMult);
@@ -196,6 +200,12 @@ function PhotometricMosaicData() {
                 this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         }
         
+        // Join Size
+        if (Parameters.has("hasJoinSize"))
+            this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
+        if (Parameters.has("joinSize"))
+            this.joinSize = Parameters.getInteger("joinSize");
+        
         // Gradient Sample Generation
         if (Parameters.has("limitSampleStarsPercent"))
             this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
@@ -264,6 +274,10 @@ function PhotometricMosaicData() {
         this.taperFromJoin = false;
         this.cropTargetToJoinRegionFlag = false;
         
+        // Join Size
+        this.hasJoinSize = true;
+        this.joinSize = 25;
+        
         // Gradient Sample Generation
         this.limitSampleStarsPercent = 10;
         this.sampleStarRadiusMult = 5;
@@ -325,6 +339,10 @@ function PhotometricMosaicData() {
         linearFitDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
         linearFitDialog.taperFromJoin_Control.checked = this.taperFromJoin;
         linearFitDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
+        
+        // Join Size
+        linearFitDialog.joinSize_Control.setValue(this.joinSize);
+        linearFitDialog.setHasJoinSize(this.hasJoinSize);
         
         // Gradient Sample Generation
         linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
@@ -791,11 +809,13 @@ function PhotometricMosaicDialog(data) {
         self.rectangleHeight_Control.enabled = checked;
         self.taperFromJoin_Control.enabled = checked;
         self.cropTarget_Control.enabled = checked;
-        if (!checked){
+        if (checked){
+            self.setHasJoinSize(false);
+        } else {
             data.taperFromJoin = false;
             self.taperFromJoin_Control.checked = false;
             data.cropTargetToJoinRegionFlag = false;
-            self.cropTarget_Control.checked = false;
+            self.cropTarget_Control.checked = false; 
         }
     };
     
@@ -855,6 +875,46 @@ function PhotometricMosaicDialog(data) {
     this.joinAreaBar.checkBox.onClick = this.setHasJoinAreaPreview;
     this.joinAreaBar.onToggleSection = this.onToggleSection;
     this.setHasJoinAreaPreview(data.hasJoinAreaPreview);
+    // SectionBar "Join Region" End
+
+    // =======================================
+    // SectionBar: "Join Size"
+    // =======================================
+    let joinSizeTooltip = 
+            "<p>Limits the join region to a subset of the overlap area.</p>";
+    this.joinSize_Control = new NumericControl(this);
+    this.joinSize_Control.real = false;
+    this.joinSize_Control.label.text = "Join size:";
+    this.joinSize_Control.toolTip = joinSizeTooltip;
+            
+    this.joinSize_Control.onValueUpdated = function (value) {
+        data.joinSize = value;
+    };
+    this.joinSize_Control.setRange(1, 250);
+    this.joinSize_Control.slider.setRange(1, 250);
+    this.joinSize_Control.slider.minWidth = 250;
+    this.joinSize_Control.setValue(data.joinSize);
+    
+    this.setHasJoinSize = function(checked){
+        if (checked){
+            self.setHasJoinAreaPreview(false);
+        }
+        data.hasJoinSize = checked;
+        self.joinSizeBar.checkBox.checked = checked;
+        self.joinSize_Control.enabled = checked;
+    };
+    
+    let joinSizeSection = new Control(this);
+    joinSizeSection.sizer = new VerticalSizer;
+    joinSizeSection.sizer.spacing = 4;
+    joinSizeSection.sizer.add(this.joinSize_Control);
+    this.joinSizeBar = new SectionBar(this, "Join Size");
+    this.joinSizeBar.setSection(joinSizeSection);
+    this.joinSizeBar.enableCheckBox();
+    this.joinSizeBar.toolTip = joinSizeTooltip;
+    this.joinSizeBar.checkBox.onClick = this.setHasJoinSize;
+    this.joinSizeBar.onToggleSection = this.onToggleSection;
+    this.setHasJoinSize(data.hasJoinSize);
     // SectionBar "Join Region" End
 
     // =======================================
@@ -1435,6 +1495,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(this.joinAreaBar);
     this.sizer.add(joinAreaSection);
+    this.sizer.add(this.joinSizeBar);
+    this.sizer.add(joinSizeSection);
     this.sizer.add(gradientBar);
     this.sizer.add(overlapGradientSection);
     this.sizer.add(this.extrapolatedGradientBar);
@@ -1449,6 +1511,7 @@ function PhotometricMosaicDialog(data) {
     starDetectionSection.hide();
     photometrySearchSection.hide();
     joinAreaSection.hide();
+    joinSizeSection.hide();
     sampleGenerationSection.hide();
     extrapolatedGradientSection.hide();
     starMaskSection.hide();
