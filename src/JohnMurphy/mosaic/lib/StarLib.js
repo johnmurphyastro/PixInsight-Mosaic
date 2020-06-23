@@ -749,10 +749,11 @@ function displayMaskStars(refView, joinArea, detectedStars, targetId, antialias,
     for (let i = 0; i < firstNstars; ++i){
         let star = allStars[i];
         // size is the area. sqrt gives box side length. Half gives circle radius
-        let radius = Math.sqrt(star.size)/2;
+        let starDiameter = Math.sqrt(star.size);
         let x = star.pos.x + offsetX;
         let y = star.pos.y + offsetY;
-        G.strokeCircle(x, y, radius * data.radiusMult + data.radiusAdd);
+        let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
+        G.strokeCircle(x, y, starRadius + data.maskStarRadiusAdd);
     }
     G.end();
 
@@ -830,11 +831,8 @@ function displayMask(tgtView, joinArea, detectedStars, data){
         // size is the area. sqrt gives box side length. Half gives circle radius
         // Double the star radius for bright stars
         let starDiameter = Math.sqrt(star.size);
-        let starRadius = star.peak < 0.5 ? starDiameter/2 : starDiameter;
-        if (star.peak > 0.8){
-            starRadius *= 1.5;
-        }
-        let radius = starRadius * data.radiusMult + data.radiusAdd;
+        let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
+        let radius = starRadius + data.maskStarRadiusAdd;
         G.fillCircle(star.pos, radius);
     }
     G.end();

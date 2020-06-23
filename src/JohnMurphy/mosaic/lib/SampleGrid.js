@@ -63,7 +63,7 @@ function createSampleGrid(targetImage, referenceImage, scaleFactors,
     let nChannels = referenceImage.isColor ? 3 : 1;
     let bins = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
     bins.addSampleBins(targetImage, referenceImage, data.linearRange);
-    bins.removeBinRectWithStars(stars, firstNstars);
+    bins.removeBinRectWithStars(stars, firstNstars, data.sampleStarRadiusMult);
     
     // Use the radius of the brightest detected star * 2
     //let radius = Math.sqrt(stars[0].size);
@@ -130,18 +130,16 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * Remove all bin entries that are fully or partially covered by a star
      * @param {Star[]} stars Must be sorted by flux before calling this function
      * @param {Number} firstNstars Only use this number of the brightest stars
+     * @param {Number} sampleStarRadiusMult
      */
-    this.removeBinRectWithStars = function(stars, firstNstars){
+    this.removeBinRectWithStars = function(stars, firstNstars, sampleStarRadiusMult){
         for (let i=0; i<firstNstars; i++){
             let star = stars[i];
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
             let starDiameter = Math.sqrt(star.size);
-            // Double the star radius for bright stars
-            let starRadius = star.peak < 0.5 ? starDiameter/2 : starDiameter;
-            if (star.peak > 0.8){
-                starRadius *= 1.5;
-            }
+            // Increase protection for saturated or almost saturated stars
+            let starRadius = starDiameter * Math.pow(sampleStarRadiusMult, star.peak) / 2;
             removeBinsInCircle(star.pos, starRadius);
         }
     };
