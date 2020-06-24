@@ -455,13 +455,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     view.stf = refView.stf;
 
     if (data.createMosaicFlag){
-        // Create a preview a bit larger than the overlap bounding box to allow user to inspect.
-        let x0 = Math.max(0, joinRect.x0 - 10);
-        let x1 = Math.min(view.image.width, joinRect.x1 + 10);
-        let y0 = Math.max(0, joinRect.y0 - 10);
-        let y1 = Math.min(view.image.height, joinRect.y1 + 10);
-        let previewRect = new Rect(x0, y0, x1, y1);
-        imgWindow.createPreview(previewRect, "Inspect_Join");
+        imgWindow.createPreview(joinRect, "JoinRegion");
     }
     // But show the main mosaic view.
     imgWindow.currentView = view;

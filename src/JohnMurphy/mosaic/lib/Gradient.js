@@ -182,6 +182,18 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
     if (isHorizontal){
         this.joinStart = Math.max(joinRect.y0, overlapBox.y0);  // joinRect.y0, limited by overlap.y0
         this.joinEnd = Math.min(joinRect.y1, overlapBox.y1);    // joinRect.y1, limited by overlap.y1
+    } else {
+        this.joinStart = Math.max(joinRect.x0, overlapBox.x0);  // joinRect.x0, limited by overlap.x0
+        this.joinEnd = Math.min(joinRect.x1, overlapBox.x1);    // joinRect.x1, limited by overlap.x1
+    }
+    
+    if (data.mosaicOverlayTgtFlag){
+        // In overlay mode, the join has zero thickness and is runs along middle of join region
+        this.joinStart = Math.floor((this.joinStart + this.joinEnd) / 2);
+        this.joinEnd = this.joinStart;
+    }
+    
+    if (isHorizontal){
         if (!data.taperFromJoin){
             this.overlapStart = overlapBox.y0;
             this.overlapEnd = overlapBox.y1;
@@ -195,8 +207,6 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
         this.firstTaperStart = Math.max(0, this.overlapStart - data.taperLength); // overlapStart - taperLength
         this.secondTaperEnd = Math.min(imageHeight, this.overlapEnd + data.taperLength); // overlapEnd + taperLength
     } else {
-        this.joinStart = Math.max(joinRect.x0, overlapBox.x0);  // joinRect.x0, limited by overlap.x0
-        this.joinEnd = Math.min(joinRect.x1, overlapBox.x1);    // joinRect.x1, limited by overlap.x1
         if (!data.taperFromJoin){
             this.overlapStart = overlapBox.x0;
             this.overlapEnd = overlapBox.x1;
@@ -240,9 +250,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     
     let joinType_ = 0;
     
-    if (data.mosaicOverlayRefFlag){
-        joinType_ = OVERLAY_REF;
-    } else if (data.mosaicOverlayTgtFlag){
+    if (data.mosaicOverlayTgtFlag){
         joinType_ = OVERLAY_TGT;
     } else if (data.mosaicRandomFlag){
         joinType_ = OVERLAY_RND;
@@ -1208,16 +1216,16 @@ function createOverlapGradientPaths(tgtImage, overlap, joinRect, isHorizontal, i
     let joinEndPath;
     let overlapPath;
     if (isHorizontal){
-        joinStartPath = overlap.getMinOutlineAtXArray(regions.joinStart);
-        joinEndPath = overlap.getMaxOutlineAtXArray(regions.joinEnd);
+        joinStartPath = overlap.calcHorizOutlinePath(regions.joinStart);
+        joinEndPath = overlap.calcHorizOutlinePath(regions.joinEnd);
         if (isTargetAfterRef){
             overlapPath = createHorizontalPath(regions.overlapEnd, overlapBox);
         } else {
             overlapPath = createHorizontalPath(regions.overlapStart, overlapBox);
         }
     } else {
-        joinStartPath = overlap.getMinOutlineAtYArray(regions.joinStart);
-        joinEndPath = overlap.getMaxOutlineAtYArray(regions.joinEnd);
+        joinStartPath = overlap.calcVerticalOutlinePath(regions.joinStart);
+        joinEndPath = overlap.calcVerticalOutlinePath(regions.joinEnd);
         if (isTargetAfterRef){
             overlapPath = createVerticalPath(regions.overlapEnd, overlapBox);
         } else {
@@ -1231,13 +1239,9 @@ function createOverlapGradientPaths(tgtImage, overlap, joinRect, isHorizontal, i
         graphLinePaths.push(new GraphLinePath(overlapPath, false));
         graphLinePaths.push(new GraphLinePath(joinStartPath, true));
         graphLinePaths.push(new GraphLinePath(joinEndPath, true));
-    } else if (data.mosaicOverlayTgtFlag && isTargetAfterRef ||
-            data.mosaicOverlayRefFlag && !isTargetAfterRef){
-        // joinStartPath is bold
-        graphLinePaths.push(new GraphLinePath(overlapPath, false));
-        graphLinePaths.push(new GraphLinePath(joinStartPath, true));
     } else {
-        // joinEndPath is bold
+        // Overlay so joinStartPath == joinEndPath
+        // draw join path bold
         graphLinePaths.push(new GraphLinePath(overlapPath, false));
         graphLinePaths.push(new GraphLinePath(joinEndPath, true));   
     }

@@ -133,7 +133,6 @@ function PhotometricMosaicData() {
         
         // Create Mosaic
         Parameters.set("createMosaicFlag", this.createMosaicFlag);
-        Parameters.set("mosaicOverlayRefFlag", this.mosaicOverlayRefFlag);
         Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
         Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
         Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag); 
@@ -239,8 +238,6 @@ function PhotometricMosaicData() {
         // Create Mosaic
         if (Parameters.has("createMosaicFlag"))
             this.createMosaicFlag = Parameters.getBoolean("createMosaicFlag");
-        if (Parameters.has("mosaicOverlayRefFlag"))
-            this.mosaicOverlayRefFlag = Parameters.getBoolean("mosaicOverlayRefFlag");
         if (Parameters.has("mosaicOverlayTgtFlag"))
             this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
         if (Parameters.has("mosaicRandomFlag"))
@@ -299,9 +296,8 @@ function PhotometricMosaicData() {
         
         // Create Mosaic
         this.createMosaicFlag = true;
-        this.mosaicOverlayRefFlag = true;
         this.mosaicOverlayTgtFlag = false;
-        this.mosaicRandomFlag = false;
+        this.mosaicRandomFlag = true;
         this.mosaicAverageFlag = false;
         
         this.graphWidth = 1000; // Gradient graph width
@@ -365,7 +361,6 @@ function PhotometricMosaicData() {
         
         // Create Mosaic
         linearFitDialog.setCreateMosaicFlag(this.createMosaicFlag);
-        linearFitDialog.mosaicOverlayRefControl.checked = this.mosaicOverlayRefFlag;
         linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
         linearFitDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
         linearFitDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
@@ -1358,27 +1353,15 @@ function PhotometricMosaicDialog(data) {
     overlay_Label.text = "Combination mode:";
     overlay_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     overlay_Label.minWidth = this.font.width("Overlay:");
-
-    this.mosaicOverlayRefControl = new RadioButton(this);
-    this.mosaicOverlayRefControl.text = "Reference overlay";
-    this.mosaicOverlayRefControl.toolTip =
-            "<p>The reference image pixels are drawn on top of the target image.</p>";
-    this.mosaicOverlayRefControl.checked = data.mosaicOverlayRefFlag;
-    this.mosaicOverlayRefControl.onClick = function (checked) {
-        data.mosaicOverlayRefFlag = checked;
-        data.mosaicOverlayTgtFlag = !checked;
-        data.mosaicRandomFlag = !checked;
-        data.mosaicAverageFlag = !checked;
-    };
     
     this.mosaicOverlayTgtControl = new RadioButton(this);
-    this.mosaicOverlayTgtControl.text = "Target overlay";
+    this.mosaicOverlayTgtControl.text = "Overlay";
     this.mosaicOverlayTgtControl.toolTip =
-            "<p>The target image pixels are drawn on top of the reference image.</p>";
+            "<p>On target side of join path, target pixels are drawn on top of the reference.</p>" +
+            "<p>On reference side of join path, reference pixels are drawn on top of the target.</p>";
     this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
     this.mosaicOverlayTgtControl.onClick = function (checked) {
         data.mosaicOverlayTgtFlag = checked;
-        data.mosaicOverlayRefFlag = !checked;
         data.mosaicRandomFlag = !checked;
         data.mosaicAverageFlag = !checked;
     };
@@ -1397,7 +1380,6 @@ function PhotometricMosaicDialog(data) {
     this.mosaicRandomControl.checked = data.mosaicRandomFlag;
     this.mosaicRandomControl.onClick = function (checked) {
         data.mosaicRandomFlag = checked;
-        data.mosaicOverlayRefFlag = !checked;
         data.mosaicOverlayTgtFlag = !checked;
         data.mosaicAverageFlag = !checked;
     };
@@ -1411,7 +1393,6 @@ function PhotometricMosaicDialog(data) {
     this.mosaicAverageControl.onClick = function (checked) {
         data.mosaicAverageFlag = checked;
         data.mosaicRandomFlag = !checked;
-        data.mosaicOverlayRefFlag = !checked;
         data.mosaicOverlayTgtFlag = !checked;
     };
     
@@ -1439,7 +1420,6 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer = new HorizontalSizer;
     mosaicSection.sizer.spacing = 10;
     mosaicSection.sizer.add(overlay_Label);
-    mosaicSection.sizer.add(this.mosaicOverlayRefControl);
     mosaicSection.sizer.add(this.mosaicOverlayTgtControl);
     mosaicSection.sizer.add(this.mosaicRandomControl);
     mosaicSection.sizer.add(this.mosaicAverageControl);
@@ -1587,8 +1567,8 @@ function main() {
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.createMosaicFlag && data.cropTargetToJoinRegionFlag && (data.mosaicOverlayRefFlag || data.mosaicRandomFlag)){
-            (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nTarget overlay and Average", 
+        if (data.createMosaicFlag && data.cropTargetToJoinRegionFlag && data.mosaicRandomFlag){
+            (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nOverlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }

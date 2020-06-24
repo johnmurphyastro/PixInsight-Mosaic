@@ -268,39 +268,57 @@ function Overlap(refImage, tgtImage){
     };
     
     /**
-     * Creates array of points for the left side of the overlap outline
-     * @param {Number} minY If part of the outline is above minY, follow the y = minY line
-     * @returns {Point[]} Points that follow the overlap outline (or minY)
+     * Creates a path that follows the horizontal line if it is within the 
+     * overlaping pixels. If it is above the overlap, it follows the top outline
+     * of the overlap. If below, the bottom outline.
+     * @param {Number} yCoord Specifies horizontal line y = yCoord
+     * @returns {Point[]} The horizontal path constrained by the overlap
      */
-    this.getMinOutlineAtXArray = function(minY){
-        if (minOutlineAtX_ === null){
+    this.calcHorizOutlinePath = function(yCoord){
+        if (minOutlineAtX_ === null || maxOutlineAtX_ === null){
             calculateOutlineAtX(this.overlapBox);
         }
-        let copy = minOutlineAtX_.slice();
-        for (let i=0; i<copy.length; i++){
-            if (copy[i].y < minY){
-                copy[i] = new Point(copy[i].x, minY);
+        let path = new Array(minOutlineAtX_.length);
+        for (let i=0; i<path.length; i++){
+            if (yCoord < minOutlineAtX_[i].y){
+                // horizontal line is above top outline so use top outline
+                path[i] = new Point(minOutlineAtX_[i]);
+            } else if (yCoord > maxOutlineAtX_[i].y){
+                // horizontal line is below bottom outline so use bottom outline
+                path[i] = new Point(maxOutlineAtX_[i]);
+            } else {
+                // Horizontal line is inside overlap so use horizontal line
+                path[i] = new Point(minOutlineAtX_[i].x, yCoord);
             }
         }
-        return copy;
+        return path;
     };
     
     /**
-     * Creates array of points for the right side of the overlap outline
-     * @param {Number} maxY If part of the outline is below maxY, follow the y = maxY line
-     * @returns {Point[]} Points that follow the overlap outline (or maxY)
+     * Creates a path that follows the vertical line if it is within the 
+     * overlaping pixels. If it is left of the overlap, it follows the left outline
+     * of the overlap. If right, the right outline.
+     * @param {Number} xCoord Specifies vertical line x = xCoord
+     * @returns {Point[]} The vertical path constrained by the overlap
      */
-    this.getMaxOutlineAtXArray = function(maxY){
-        if (maxOutlineAtX_ === null){
-            calculateOutlineAtX(this.overlapBox);
+    this.calcVerticalOutlinePath = function(xCoord){
+        if (minOutlineAtY_ === null || maxOutlineAtY_ === null){
+            calculateOutlineAtY(this.overlapBox);
         }
-        let copy = maxOutlineAtX_.slice();
-        for (let i=0; i<copy.length; i++){
-            if (copy[i].y > maxY){
-                copy[i] = new Point(copy[i].x, maxY);
+        let path = new Array(minOutlineAtY_.length);
+        for (let i=0; i<path.length; i++){
+            if (xCoord < minOutlineAtY_[i].x){
+                // vertical line is left of left outline so use left outline
+                path[i] = new Point(minOutlineAtY_[i]);
+            } else if (xCoord > maxOutlineAtY_[i].x){
+                // vertical line is right of right outline so use right outline
+                path[i] = new Point(maxOutlineAtY_[i]);
+            } else {
+                // vertical line is inside overlap so use vertical line
+                path[i] = new Point(xCoord, minOutlineAtY_[i].y);
             }
         }
-        return copy;
+        return path;
     };
     
     /**
@@ -316,42 +334,6 @@ function Overlap(refImage, tgtImage){
             midAtX[i] = new Point(minAtXArray[i].x, avgY);
         }
         return midAtX;
-    };
-    
-    /**
-     * Creates array of points for the top side of the overlap outline
-     * @param {Number} minX If part of the outline is left of minX, follow the x = minX line
-     * @returns {Point[]} Points that follow the overlap outline (or minX)
-     */
-    this.getMinOutlineAtYArray = function(minX){
-        if (minOutlineAtY_ === null){
-            calculateOutlineAtY(this.overlapBox);
-        }
-        let copy = minOutlineAtY_.slice();
-        for (let i=0; i<copy.length; i++){
-            if (copy[i].x < minX){
-                copy[i] = new Point(minX, copy[i].y);
-            }
-        }
-        return copy;
-    };
-    
-    /**
-     * Creates array of points for the bottom side of the overlap outline
-     * @param {Number} maxX If part of the outline is right of maxX, follow the x = maxX line
-     * @returns {Point[]} Points that follow the overlap outline (or maxX)
-     */
-    this.getMaxOutlineAtYArray = function(maxX){
-        if (maxOutlineAtY_ === null){
-            calculateOutlineAtY(this.overlapBox);
-        }
-        let copy = maxOutlineAtY_.slice();
-        for (let i=0; i<copy.length; i++){
-            if (copy[i].x > maxX){
-                copy[i] = new Point(maxX, copy[i].y);
-            }
-        }
-        return copy;
     };
     
     /**
@@ -448,9 +430,9 @@ function Overlap(refImage, tgtImage){
     }
     
     /**
-     * Calculates and stores the overlap pixel vertical outline.
-     * minOutlineAtX_ stores points for the left side of the outline.
-     * maxOutlineAtX_ stores points for the right side of the outline.
+     * Calculates and stores the overlap pixel horizontal outline.
+     * minOutlineAtX_ stores points for the top side of the outline.
+     * maxOutlineAtX_ stores points for the bottom side of the outline.
      * The stored (x,y) coordinates are image coordinates.
      * The index of the array is the nth x pixel for the local overlap region
      * (i.e. index 0 corresponds to the left most point of the overlap bounding box).
@@ -484,9 +466,9 @@ function Overlap(refImage, tgtImage){
     }
     
     /**
-     * Calculates and stores the overlap pixel horizontal outline.
-     * minOutlineAtY_ stores points for the top side of the outline.
-     * maxOutlineAtY_ stores points for the bottom side of the outline.
+     * Calculates and stores the overlap pixel vertical outline.
+     * minOutlineAtY_ stores points for the left side of the outline.
+     * maxOutlineAtY_ stores points for the right side of the outline.
      * The stored (x,y) coordinates are image coordinates.
      * The index of the array is the nth x pixel for the local overlap region
      * (i.e. index 0 corresponds to the upper most point of the overlap bounding box).

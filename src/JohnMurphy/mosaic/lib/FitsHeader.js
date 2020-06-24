@@ -206,10 +206,8 @@ function fitsHeaderMosaic(keywords, data){
         let mode = "unknown";
         if (data.mosaicAverageFlag){
             mode = "Average";
-        } else if (data.mosaicOverlayRefFlag){
-            mode = "Reference";
         } else if (data.mosaicOverlayTgtFlag){
-            mode = "Target";
+            mode = "Overlay";
         } else if (data.mosaicRandomFlag){
             mode = "Random";
         }
