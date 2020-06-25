@@ -273,7 +273,7 @@ function PhotometricMosaicData() {
         
         // Join Size
         this.hasJoinSize = true;
-        this.joinSize = 25;
+        this.joinSize = 20;
         
         // Gradient Sample Generation
         this.limitSampleStarsPercent = 10;
@@ -681,7 +681,7 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Photometric Scale" End
 
     // =======================================
-    // SectionBar: "Join Region"
+    // SectionBar: "Join Region (from preview)"
     // =======================================
     const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
@@ -693,11 +693,9 @@ function PhotometricMosaicDialog(data) {
             "Provided 'Crop target' is not selected, the " +
             "long axis of the join region is updated to start and finish at the overlap's bounding box. " +
             "The ideal size and position of the Join Region rectangle depends on " +
-            "the Mosaic overlay mode:</p>" +
-            "<ul><li>Reference overlay: The edge closest to the target image " +
-            "determines the primary join line. Ideally, this line should avoids bright stars.</li>" +
-            "<li>Target overlay: The edge closest to the reference image " +
-            "determines the primary join line. Ideally, this line should avoids bright stars.</li>" +
+            "the Mosaic combination mode:</p>" +
+            "<ul><li>Overlay: The primary join line runs along the middle of the Join Region. " +
+            "Ideally this line should avoids bright stars.</li>" +
             "<li>Random: The rectangle should be thick enough to blend the two " +
             "sides of the join.</li>" +
             "<li>Average: The join region' determines the area that will benefit " +
@@ -844,7 +842,7 @@ function PhotometricMosaicDialog(data) {
         "<p>Restricts target image pixels to the Join Region. " +
         "All target pixels outside the Join Region are ignored.</p>" +
         "<p>This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic.</p>" +
-        "<p>This option only supports the mosaic combination modes 'Target overlay' and 'Average'.</p>";
+        "<p>This option only supports the mosaic combination modes 'Overlay' and 'Average'.</p>";
     this.cropTarget_Control.onCheck = function (checked){
         data.cropTargetToJoinRegionFlag = checked;
     };
@@ -863,7 +861,7 @@ function PhotometricMosaicDialog(data) {
     joinAreaSection.sizer.add(joinAreaHorizSizer1);
     joinAreaSection.sizer.add(joinAreaHorizSizer2);
     joinAreaSection.sizer.add(joinAreaFlagsHorizSizer);
-    this.joinAreaBar = new SectionBar(this, "Join Region");
+    this.joinAreaBar = new SectionBar(this, "Join Region (from preview)");
     this.joinAreaBar.setSection(joinAreaSection);
     this.joinAreaBar.enableCheckBox();
     this.joinAreaBar.toolTip = JoinRegionTooltip;
@@ -873,7 +871,7 @@ function PhotometricMosaicDialog(data) {
     // SectionBar "Join Region" End
 
     // =======================================
-    // SectionBar: "Join Size"
+    // SectionBar: "Join Region (from size)"
     // =======================================
     let joinSizeTooltip = 
             "<p>Limits the join region to a subset of the overlap area.</p>";
@@ -903,7 +901,7 @@ function PhotometricMosaicDialog(data) {
     joinSizeSection.sizer = new VerticalSizer;
     joinSizeSection.sizer.spacing = 4;
     joinSizeSection.sizer.add(this.joinSize_Control);
-    this.joinSizeBar = new SectionBar(this, "Join Size");
+    this.joinSizeBar = new SectionBar(this, "Join Region (from size)");
     this.joinSizeBar.setSection(joinSizeSection);
     this.joinSizeBar.enableCheckBox();
     this.joinSizeBar.toolTip = joinSizeTooltip;
@@ -1106,12 +1104,13 @@ function PhotometricMosaicDialog(data) {
         "reference sample within the whole of the overlap area. " +
         "These points are typically scattered vertically. This is partly due to gradients " +
         "perpendicular to the join, and partly due to noise.<\p>" +
-        "<p>The bold curve is the gradient correction along the path of the primary join. " +
-        "This path is the outline of either the overlapping pixels or the " +
-        "'Join Region' (if specified). For a 'Reference overlay' join, this path is " +
-        "on the target side. For a 'Target overlay' join, the reference side. " +
-        "For 'Random' and 'Average' join modes, bold curves are drawn for both " +
-        "target and reference sides.</p>" +
+        "<p>The bold curve(s) shows the gradient along the primary join path(s). " +
+        "It depends on the mosaic combine mode and the Join Region " +
+        "(if a Join Region has not been defined, it defaults to the overlap bounding box).</p>" +
+        "<p>Overlay: The primary path runs along the join, at the center of the Join Region. " +
+        "This is the transition between reference overlay and target overlay.</p>" +
+        "<p>Random or Average: The primary paths run along the sides of the Join Region. " +
+        "These two paths are at the transition where the Random or Average combine starts and finishes.</p>" +
         "<p>The thinner darker line is the gradient correction along the path of the " +
         "secondary join. This path is the target side of the overlap area's bounding box " +
         "or, if 'Taper from join' is selected, the target side of the 'Join Region'.</p>" +
@@ -1357,8 +1356,9 @@ function PhotometricMosaicDialog(data) {
     this.mosaicOverlayTgtControl = new RadioButton(this);
     this.mosaicOverlayTgtControl.text = "Overlay";
     this.mosaicOverlayTgtControl.toolTip =
-            "<p>On target side of join path, target pixels are drawn on top of the reference.</p>" +
-            "<p>On reference side of join path, reference pixels are drawn on top of the target.</p>";
+            "<p>On the target side of the join path, target pixels are drawn " +
+            "on top of the reference. On the reference side, reference pixels " +
+            "are drawn on top.</p>";
     this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
     this.mosaicOverlayTgtControl.onClick = function (checked) {
         data.mosaicOverlayTgtFlag = checked;
