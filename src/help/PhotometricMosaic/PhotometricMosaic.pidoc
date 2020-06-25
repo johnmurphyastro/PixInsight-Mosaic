@@ -19,38 +19,60 @@
 }
 
 \description {
-  \subsection { Design Goals } {
+  \subsection { Introduction } {
     \definition {
-      { Accurate Scale Factor }{
-        To match the target frame to the reference, it is necessary to multiply it by a scale factor and then subtract a background offset. These two parameters are related, so if there is an error in the calculated scale factor, this error will affect the calculated offset. Typically, for the average background pixel value, these two errors will appear to cancel, and the join may look OK. However, this leads to two problems:
-        \list {
-          {At higher pixel values, the errors will be apparent.}
-          {An incorrect scale will result in a difference in contrast between the reference and target image. The effects of this are widespread. For example, it can make the background look more noisy than it really is. Or it can make a dense star field (e.g. Milky Way region) look more sparse in one frame. }
-        }
-        Unfortunately accurately determining the scale factor is tricky. For example, if one of the images was taken under poor seeing conditions, the stars in one frame may be spread over more pixels (larger Full Width at Half Maximum). Their peak values are lower than they should be. This may confuse a pixel by pixel comparison between the two images.
+      { Scale Factor }{
+        To match the target frame to the reference, it is necessary to multiply by a scale factor to correct any difference in brightness and then subtract an offset to correct any difference in background level:
 
-        This script solves this problem by applying photometry to the stars in the overlapping region. The scale is then determined from a least squares fit line through the photometry data. For this to work, there needs to be at least one unsaturated star in the overlapping region. The scale is calculated separately for each color channel, so the target frame's color balance will automatically be adjusted to match the reference frame.
+        \wh\wh\wh\wh\wh\wh\wh\wh\e {target x scale - offset = reference}
+
+        Where \e target is the target pixel value; \e scale is the scale factor; \e offset is the difference between the reference and target background level; \e reference is the reference pixel value.
+
+        This script first calculates the scale factor and then uses this formula to calculate the offset. It is vital that the scale factor is measured accurately. Even small errors can have noticeable effects on the calculated offset. Errors can also result in a contrast difference between the reference and target frames. This can make the target background look noisier than it really is. A dense star field (e.g Milky Way region) can look more sparse in one frame. These resulting problems can exist even when the join appears to be seamless.
+
+        Unfortunately accurately determining the scale factor is tricky. For example, if one of the images was taken under poor seeing conditions, the stars in one frame would be spread over more pixels. Their peak values will be lower than they should be. This should not be allowed to affect the scale factor calculation.
+
+        This script uses photometry to measure star brightness. This is robust against differing star profiles and different background offset levels. To further reduce the errors, the final scale factor is determined from a least squares fit line through the photometry data. The scale is calculated separately for each color channel, so the target frame's color balance will automatically be adjusted to match the reference frame.
+
+        This script requires that:
+        \list {
+          {A single scale factor is valid for the whole of the target image. This assumption is reasonable provided that the images have had flats applied.}
+          {At least one unsaturated star is found in both images. If none are found, the scale defaults to one and a warning is displayed.}
+        }
+
       }
 
       { Background Offset }{
-        The overlapping region is divided up into a grid of samples. If a sample is too close to a bright star, or it contains one or more black pixels, the sample is rejected. The background offset is then calculated from the median pixel value within each sample.
-
-        This strategy is used to for the following reasons:
+        Unlike the scale factor, the background offset is expected to vary across the image:
         \list {
-          {Bright stars are more effected by scale errors. Rejecting samples close to bright stars makes the calculated offset more robust. }
-          {Calculating the offset from samples is more robust against small alignment errors and stars with differing profiles. }
+          {A smooth variation due to light pollution}
+          {Local variations. For example, scattered light around bright stars, filter halos, etc.}
+        }
+        To correct these gradients, a surface spline is created to model the offset across the overlapping area. The overlapping area is first divided up into a grid of samples. The median value of each sample is used to determine the sample’s background level. The surface spline is then created from these data points. Using samples has several advantages:
+        \list {
+          {Constructing the surface spline is computationally expensive; the time approximately doubles for every 1300 data points. By using samples, the number of data points is reduced.}
+          {Provided a star takes up less than half the area of a sample, the star will not strongly affect the median value. This is useful because scale errors have a bigger effect on bright pixels.}
+          {Samples that contain the brightest stars can be rejected. This is important if these stars occupy more than half the sample’s pixels.}
+          {Samples are less affected by small alignment errors and stars with differing profiles.}
         }
       }
+
       { Ad Hoc Mosaics }{
         This script is designed for planned mosaics where the images form a regular grid. For ad hoc mosaics, it will be necessary to use the 'Mosaic -> SplitMosaicTile' script to create a regular grid from the ad hoc frames. Creating extra joins sounds counter productive, but because the data on both sides of these new joins will be identical, they will be seamlessly joined in the final mosaic.
       }
-      { Horizontal and Vertical Gradients }{
-        Within the overlapping region, this script will fully correct target's gradient to match the reference. Outside this region, the target image can be corrected for the gradient detected along the length of the (approximately horizontal or vertical) join. This only corrects the horizontal or vertical component of the gradient.
 
-         The mosaic tiles are first joined into rows or columns. These strips are then joined to create the final mosaic. As the rows (or columns) are built, one component of the relative gradient is corrected. When the strips are joined together, the other component gets fixed. It does not matter which component gets fixed first - the final result will be the same. This strategy is similar to \xref http://en.wikipedia.org/wiki/Bilinear_interpolation {Bilinear Interpolation}.
+      { Horizontal and Vertical Gradients }{
+        Within the overlapping region, this script corrects the target's gradient to match the reference. Outside this region the gradient correction has to be extrapolated.
+
+        A gradient can be split into its horizontal and vertical components. The component that runs along the length of a join can be determined quite accurately. However, most joins have insufficient overlap to accurately determine the perpendicular component. Hence when two frames are joined, the extrapolated gradient correction is limited to the component along the join.
+
+        When a large mosaic is created, this script requires that the frames are first joined into rows or columns, and then the resulting strips are joined to create the final mosaic. This allows both gradient components to be corrected. For example, when creating a column from individual frames, the extrapolated gradient correction uses the horizontal component. When these columns are joined to create the final mosaic, the vertical component is corrected. In this way both components get corrected. This strategy is similar to \xref http://en.wikipedia.org/wiki/Bilinear_interpolation {Bilinear Interpolation}. It does not matter which order the components are corrected. It does not affect the final result.
+
+        The relative gradient between the reference and target frame gets corrected, but if the reference frame has a gradient, this will be propagated through the target. When selecting the first reference frame, choose the frame with the least gradient. This is often the frame that was highest in the sky. After the mosaic is completed, remove any propagated gradient (e.g. use DynamicBackgroundExtraction).
       }
+
       { Memory usage }{
-        Mosaics can become very large. This script has therefore been designed to be as memory efficient as possible.
+        Mosaics can become very large. This script has therefore been designed to be as memory efficient as possible by only working on two images at a time.
       }
     }
   }
@@ -84,7 +106,7 @@
     }
     For a multi frame mosaic, first join the images into rows or columns. Then join the resulting strips into the final mosaic.
     \figure {
-      \figtag \s {Gradient graph for mosaic modes Reference overlay and Target overlay.}
+      \figtag \s {Gradient graph for mosaic mode Reference overlay and Target overlay.}
       \imageswap images/GradientGraphRefOverlay.png images/GradientGraphTgtOverlay.png
       Gradient graph showing the gradient along the join path (bold line) for a Reference overlay mosaic join. The mouse over image shows the gradient for a Target overlay. The Target overlay's join path is on the opposite side of the overlap region. The data points show a vertical scatter due to a gradient perpendicular to the join path. For a description of the thin line, see the \lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts} section.
 
@@ -93,7 +115,7 @@
   }
 
   \subsection { \label join_region_distored_corners Join Region: Avoiding distorted corners } {
-    \image images/MilkyWayJoinRegionControl.png
+    \image images/JoinRegion.png
     \figure[numbered:scutum_sagittarius_join_region] {
       \figtag \s {Scutum & Sagittarius Mosiac: Using a Join Region to avoid distorted corners}
       \imageswap[float,marginRight:1em] images/MilkyWayJoinRegion.png images/MilkyWayCorner.png
@@ -309,11 +331,6 @@
 
         This action is invoked every time the user selects 'OK', irrespective of whether the \s {Create Mosaic} check box is selected.
       }
-      { Insert } {
-        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Insert} only supports the mosaic combination modes \s {Target overlay} and \s {Average}.
-
-        If unselected, the whole of the target image is used. The orientation of the join (horizontal or vertical) is determined by the \s {Join Region} rectangle's longest dimension. If the \s {Join Region} has not been specified, the overlap's bounding box is used instead.
-      }
     }
   }
 
@@ -406,53 +423,6 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
   }
 
-  \subsection { Join Region } {
-    \image images/JoinRegion.png
-    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
-
-    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \s {Insert} (Reference & Target Views section) is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
-    \list{
-      {Reference overlay: The edge closest to the target image determines the primary join line. This line should avoids bright stars.}
-      {Target overlay: The edge closest to the reference image determines the primary join line. This line should avoids bright stars.}
-      {Random: The rectangle should be thick enough to blend the two sides of the join.}
-      {Average: The join region determines the area that will benefit from the enhanced signal to noise ratio.}
-    }
-    It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
-
-    Inside the join region, the behavior depends on the mosaic combination mode. If \s {Insert} is not selected, the behavior outside this region is:
-    \list{
-      {Reference side of join region: Reference overlay}
-      {Target side of join region: Target overlay}
-    }
-    If \s {Insert} is selected, all pixels outside of the join region are replaced by Reference pixels.
-
-    \definition {
-      {Taper from join}{
-        Moves the taper zone from the target side of the overlap bounding box to the target side of  the join region.
-
-        The target image's offset and gradient are fully corrected within the join region, but outside the overlap bounding box the gradient can only be partially corrected. A taper is applied to blend these two regions together.
-
-        The taper is usually applied at the target side boundary of the overlap bounding box. If this option is selected, the taper is applied from the target side of the 'Join Region' instead.
-
-        You should only select this option if there is a bright star on the target side boundary of the overlap bounding box that is causing a brightening or darkening in the taper zone on the target side of the star.
-
-        Inspect the 'Gradient graph' (Overlap Area Gradient section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
-
-        Caution: if the images wrap around each other at the sides, selecting this option may affect the correction applied to these side joins.
-      }
-
-      {Get area from preview}{
-        This combo box is used to initialize the join region from a preview.
-        \image images/JoinRegionPreview.png
-        The image above shows a target frame. Perview01 has been created to specify the join region. Provided \s {Insert} is not selected, the created join region will be extended along its length to the overlap's bounding box.
-
-        The preview has been positioned so that it avoids the corners of both the target and reference images.
-
-        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
-      }
-    }
-  }
-
   \subsection { Gradient Sample Generation } {
     \image images/GradientSampleGeneration.png
     The overlapping region is divided up into a grid of sample squares. A sample's value is the median of the pixels it contains. These sample values are used to calculate the background offset and gradient. Using samples ensures that the offset and gradient calculation is less affected by bright stars with differing profiles.
@@ -470,6 +440,14 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
             {Bright stars can have significantly different profiles between the reference and target images. This can effect how many of the pixels illuminated by a star fall into a neighboring sample.}
           }
           It is only necessary to reject bright stars. This script uses the median value from each sample, so any star that takes up less than half the sample area will have little effect. It is more important to include most of the samples than to reject faint stars.
+        }
+        {Multiply star radius}{
+          \image images/SamplesMultStarRadius.png
+          Increase to reject more samples around saturated stars. In this example, it was set to 15. For stars that are saturated (peak value equal to 1.0) the star radius is multiplied by the specified value. This results in samples being rejected around the star.
+
+          By rejecting samples around a bright star, the local effects of the star can be ignored. This can prevent problems in the taper zone on the target side of the Join Region, but it will result in a poor correction for the star. However, the star can be fixed after the mosaic has been created by using PixelMath to apply the reference frame to the mosaic through a mask created in the \s {Mosaic Star Mask} section.
+
+          The multiplication factor is (Multiply star radius) \sup {(peak value)}, where 'peak value' is the stars maximum pixel value. Hence in this example the multiplication factor is 15\sup{(peak value)}, which is approximatly 15\sup{0.0} = 1.0 for faint stars and 15\sup{1.0} = 15.0 for saturated stars.
         }
         {Sample size}{
           Specifies the size of the sample squares. Ideally, the samples should be about 1.5x the size of the largest star. Use the \s {Sample grid} button to visualize the grid of samples.
@@ -500,6 +478,64 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
   }
 
+  \subsection { Join Region (from preview) } {
+    \image images/JoinRegion.png
+    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
+
+    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided 'Crop target' is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
+    \list{
+      {Overlay: The primary join line runs along the middle of the Join Region. Ideally this line should avoids bright stars.}
+      {Random: The rectangle should be thick enough to blend the two sides of the join.}
+      {Average: The join region determines the area that will benefit from the enhanced signal to noise ratio.}
+    }
+    It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
+
+    Inside the join region, the behavior depends on the mosaic combination mode. The behavior outside this region is:
+    \list{
+      {Reference side of join region: reference overlay}
+      {Target side of join region: target overlay}
+    }
+    If 'Crop target' is selected, all pixels outside of the join region are replaced by Reference pixels.\n\n
+
+    \definition {
+      {From preview}{
+        This combo box is used to initialize the join region from a preview.
+        \image images/JoinRegionPreview.png
+        The image above shows a target frame. Perview01 has been created to specify the join region. Provided 'Crop target' is not selected, the created join region will be extended along its length to the overlap's bounding box.
+
+        The preview has been positioned so that it avoids the corners of both the target and reference images.
+
+        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
+      }
+
+      {Taper from join}{
+        Moves the taper zone from the target side of the overlap bounding box to the target side of  the join region.
+
+        The target image's offset and gradient are fully corrected within the join region, but outside the overlap bounding box the gradient can only be partially corrected. A taper is applied to blend these two regions together.
+
+        The taper is usually applied at the target side boundary of the overlap bounding box. If this option is selected, the taper is applied from the target side of the 'Join Region' instead.
+
+        You should only select this option if there is a bright star on the target side boundary of the overlap bounding box that is causing a brightening or darkening in the taper zone on the target side of the star.
+
+        Inspect the 'Gradient graph' (Overlap Area Gradient section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
+
+        Caution: if the images wrap around each other at the sides, selecting this option may affect the correction applied to these side joins.
+      }
+
+      {Crop target} {
+        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Crop target} only supports the mosaic combination modes \s {Overlay} and \s {Average}.
+
+        Outside the \s {Join Region} only reference pixels are used. Target pixels are ignored even if the reference pixel is black.
+      }
+
+    }
+  }
+
+  \subsection { Join Region (from size) } {
+    \image images/JoinRegionFromSize.png
+    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
+  }
+
   \subsection { Overlap Area Gradient } {
     \image images/Gradient.png
     This section determines how the target pixels within the whole of the overlap region are corrected, and to specify the size of the transition region between the fully corrected overlap region and the rest of the target image.
@@ -524,8 +560,11 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         The plotted dots represent the difference between each paired target and reference sample within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
 
-        The bold curve is the gradient correction along the path of the primary join. This path is the outline of either the overlapping pixels or the 'Join Region' (if specified). For a 'Reference overlay' join, this path is on the target side. For a 'Target overlay' join, the reference side. For 'Random' and 'Average' join modes, bold curves are drawn for both target and reference sides.
-
+        The bold curve(s) shows the gradient along the primary join path(s). It depends on the mosaic combine mode and the Join Region (if a Join Region has not been defined, it defaults to the overlap bounding box).
+        \list {
+          {Overlay: The primary path runs along the join, at the center of the Join Region. This is the transition between reference overlay and target overlay.}
+          {Random or Average: The primary paths run along the sides of the Join Region. These two paths are at the transition where the Random or Average combine starts and finishes.}
+        }
         The thinner darker line is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box or, if 'Taper from join' is selected, the target side of the 'Join Region'.
 
         The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
@@ -580,7 +619,10 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
         Small faint stars are usually free of artifacts, so normally only a small percentage of the detected stars need to be used.
       }
       {Multiply star radius}{
-        Sets the mask star radius to a multiple of the star's radius. This increases the size for large stars more than small ones.
+        \image images/MosaicMaskMultStarRadius.png
+        Increases the mask star radius for saturated stars. In this example, it was set to 15. For stars that are saturated or close to saturation (peak value close to 1.0) the star radius is increased.
+
+        The multiplication factor is (Multiply star radius) \sup {(peak value)}, where 'peak value' is the stars maximum pixel value. Hence in this example the multiplication factor is 15\sup{(peak value)}, which is approximatly 15\sup{0.0} = 1.0 for faint stars and 15\sup{1.0} = 15.0 for saturated stars.
       }
       {Add to star radius}{
         Used to increases or decreases the radius of all mask stars. This is applied after the 'Multiply star radius'.
@@ -602,8 +644,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       }
       {Combination mode}{
         \list {
-          {Reference overlay: The reference image pixels are drawn on top of the target image.}
-          {Target overlay: The target image pixels are drawn on top of the reference image.}
+          {Overlay: On the target side of the join path, target pixels are drawn on top of the reference. On the reference side, reference pixels are drawn on top.}
           {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly affective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply the reference image to the mosaic through a mask that only reveals the bright stars. The \s {Mosaic Star Mask} section has been provided for this purpose.}
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
