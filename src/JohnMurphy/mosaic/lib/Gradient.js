@@ -622,7 +622,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
                 
         if (x0 >= x1 || y0 >= y1)
             return;
-        console.write("Processing target");
+        console.write("Processing target            ");
         
         let overlayTgt = (joinType === OVERLAY_TGT);
         let difArrayStart = isHorizontal_ ? x0 : y0;
@@ -838,7 +838,23 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             imageRowItr.writeRow();
         }
         
-        console.write("Processing join  ");
+        let joinTypeStr;
+        switch (joinType){
+            case OVERLAY_RND:
+                joinTypeStr = "(Random)     ";
+                break;
+            case OVERLAY_REF:
+                joinTypeStr = "(Overlay Ref)";
+                break;
+            case OVERLAY_TGT:
+                joinTypeStr = "(Overlay Tgt)";
+                break;
+            case OVERLAY_AVG:
+                joinTypeStr = "(Average    )";
+        }
+            
+                
+        console.write("Processing join ", joinTypeStr);
         imageRowItr.setArea(x0, y0, x1, y1);
         while(imageRowItr.hasNext()){
             imageRowItr.next();
@@ -865,7 +881,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
         if (x0 >= x1 || y0 >= y1)
             return;
         
-        console.write("Processing taper ");       
+        console.write("Processing taper             ");       
         let difArrayStart;
         let taperStart;
         if (isHorizontal_){
@@ -919,7 +935,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
         if (x0 >= x1 || y0 >= y1)
             return;
         
-        console.write("Processing taper ");
+        console.write("Processing taper             ");
         let taperEnd;
         let difArrayStart;
         if (isHorizontal_){

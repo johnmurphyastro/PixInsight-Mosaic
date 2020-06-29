@@ -867,7 +867,6 @@ function PhotometricMosaicDialog(data) {
     this.joinAreaBar.toolTip = JoinRegionTooltip;
     this.joinAreaBar.checkBox.onClick = this.setHasJoinAreaPreview;
     this.joinAreaBar.onToggleSection = this.onToggleSection;
-    this.setHasJoinAreaPreview(data.hasJoinAreaPreview);
     // SectionBar "Join Region" End
 
     // =======================================
@@ -908,6 +907,7 @@ function PhotometricMosaicDialog(data) {
     this.joinSizeBar.checkBox.onClick = this.setHasJoinSize;
     this.joinSizeBar.onToggleSection = this.onToggleSection;
     this.setHasJoinSize(data.hasJoinSize);
+    this.setHasJoinAreaPreview(data.hasJoinAreaPreview); 
     // SectionBar "Join Region" End
 
     // =======================================
