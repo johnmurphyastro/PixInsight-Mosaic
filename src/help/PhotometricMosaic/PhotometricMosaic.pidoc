@@ -45,7 +45,7 @@
       { Background Offset }{
         Unlike the scale factor, the background offset is expected to vary across the image:
         \list {
-          {A smooth variation due to light pollution}
+          {Large scale variations. For example, light pollution.}
           {Local variations. For example, scattered light around bright stars, filter halos, etc.}
         }
         To correct these gradients, a surface spline is created to model the offset across the overlapping area. The overlapping area is first divided up into a grid of samples. The median value of each sample is used to determine the sample’s background level. The surface spline is then created from these data points. Using samples has several advantages:
@@ -230,7 +230,7 @@
         }
         This mosaic was created using the Join Region, and a default \lref overlap_smoothness {Smoothness} setting of -1. The difference this time is that the samples around the bright star were rejected by setting \lref multiply_star_radius {Multiply star radius} (\lref gradient_sample_generation {Gradient Sample Generation} section) to 18.
 
-        This \lref multiply_star_radius {Multiply star radius} setting has rejected all samples covering the star's filter halo. Hence the surface spline no longer has a large peak over the halo. Only a slight peak remains due to scattered light beyond the filter halo. With only a slight peak, the default level of \lref overlap_smoothness {Smoothness} will no longer prevent the surface spline from returning to the background level before it reaches the primary join line. It can therefore correct this region correctly, so the horizontal line disappears. Since the samples near the secondary join line have also been rejected, the star's diffraction spikes and filter halo no longer affects the taper between the Overlap area and the rest of the target image.
+        This \lref multiply_star_radius {Multiply star radius} setting has rejected all samples covering the star's filter halo (see third image in figure \fignum multiply_star_radius). Hence the surface spline no longer has a large peak over the halo. Only a slight peak remains due to scattered light beyond the filter halo. With only a slight peak, the default level of \lref overlap_smoothness {Smoothness} will no longer prevent the surface spline from returning to the background level before it reaches the primary join line. It can therefore correct this region correctly, so the horizontal line disappears. Since the samples near the secondary join line have also been rejected, the star's diffraction spikes and filter halo no longer affects the taper between the Overlap area and the rest of the target image.
       }
     }
     The third option has produced a good result. It is not only the preferred option, but also the default one. The script's defaults include the creation of a narrow Join Region running through the center of the Overlap area and \lref multiply_star_radius {Multiply star radius} set to 5. The default \lref multiply_star_radius {Multiply star radius} setting is usually sufficient, but in this case the narrow band filter halo required a larger setting. However, if necessary, the second option can also be made to work. The problem that needs to be overcome is the bright / dark shadow below the bright star. This can be solved in several ways:
@@ -246,7 +246,7 @@
     }
 
 
-    \figure [numbered:join_region_graph] {
+    \figure {
       \figtag \s {Gradient graphs for the mosaics in figure \figref join_region_mosaic}
       \imageselect[menupos:bottom] {
         images/horseHeadStarRef.png { (1) Smoothness -1; Multiply star radius 1 }
@@ -369,7 +369,7 @@
       { Target view } {
         This image is cloned, then multiplied by the photometrically determined scale factor, and finally the gradient is calculated and subtracted.
 
-        This action is invoked every time the user selects 'OK', irrespective of whether the \s {Create Mosaic} checkbox is selected.
+        This action is invoked every time the user selects 'OK', irrespective of whether the \lref create_mosaic {Create Mosaic} checkbox is selected.
       }
     }
   }
@@ -467,13 +467,13 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     \image images/GradientSampleGeneration.png
     The overlapping region is divided up into a grid of sample squares. A sample's value is the median of the pixels it contains. These sample values are used to calculate the background offset and gradient. Using samples ensures that the offset and gradient calculation is less affected by bright stars with differing profiles.
 
-    Samples are rejected if they contain one or more zero pixels in either image or if they contain a star bright enough to be included in the '\s {Limit stars \%}' list.
+    Samples are rejected if they contain one or more zero pixels in either image or if they contain a star bright enough to be included in the \lref sample_limit_stars {Limit stars \%} list.
 
     The samples are used to create a surface spline that models the background gradient. The sample size and the number of surviving samples determines the maximum theoretical resolution of the surface spline. However, small samples will suffer from more noise.
 
     This section controls how the samples are generated.
     \definition {
-        {Limit stars \%}{
+        {Limit stars \% \label sample_limit_stars}{
           Specifies the percentage of the brightest detected stars that will be used to reject samples. 0\% implies that no samples are rejected due to stars. This is OK provided that no star takes up more than half of a sample's area. 100\% implies that all detected stars are used to reject samples. Samples that contain bright stars are rejected for two reasons:
           \list {
             {Bright pixels are more affected by any errors in the calculated scale.}
@@ -485,27 +485,27 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
           \image images/SamplesMultStarRadius.png
           Increase to reject more samples around saturated stars. In this example, it was set to 15. For stars that are saturated (peak value equal to 1.0) the star radius is multiplied by the specified value. This results in samples being rejected around the star.
 
-          By rejecting samples around a bright star, the local effects of the star can be ignored. This can prevent problems in the taper zone on the target side of the Join Region, but it will result in a poor correction for the star. However, the star can be fixed after the mosaic has been created by using PixelMath to apply the reference frame to the mosaic through a mask created in the \s {Mosaic Star Mask} section.
+          By rejecting samples around a bright star, the local effects of the star can be ignored. This can prevent problems in the taper zone on the target side of the Join Region, but it will result in a poor correction for the star. However, the star can be fixed after the mosaic has been created by using PixelMath to apply the reference frame to the mosaic through a mask created in the \lref mosaic_star_mask {Mosaic Star Mask} section.
 
           The multiplication factor is (Multiply star radius) \sup {(peak value)}, where 'peak value' is the star's maximum pixel value. Hence in this example the multiplication factor is 15\sup{(peak value)}, which is approximately 15\sup{0.0} = 1.0 for faint stars and 15\sup{1.0} = 15.0 for saturated stars.
         }
         {Sample size}{
-          Specifies the size of the sample squares. Ideally, the samples should be about 1.5x the size of the largest star. Use the \s {Sample grid} button to visualize the grid of samples.
+          Specifies the size of the sample squares. Ideally, the samples should be about 1.5x the size of the largest star. Use the \lref sample_grid {Sample grid} button to visualize the grid of samples.
       }
-      {Sample grid}{
+      {Sample grid \label sample_grid}{
         \image images/Samples.png
         Displays the grid of samples that will be used to calculate the background offset and gradient.
 
-        Samples are rejected if they contain one or more zero pixels in either image or if they contain a star included in the 'Limit stars \%' list. The surviving samples are drawn as squares. The stars used to reject samples are indicated by circles.
+        Samples are rejected if they contain one or more zero pixels in either image or if they contain a star included in the \lref sample_limit_stars {Limit stars \%} list. The surviving samples are drawn as squares. The stars used to reject samples are indicated by circles.
       }
       {Max samples}{
         Limits the number of samples used to create the surface spline. If the number of samples exceed this limit, they are combined (binned) to create super samples. This is done to improve performance. The time required to initialize the surface spline approximately doubles every 1300 samples.
 
         Increase it if the overlap area is very large. A larger number of samples increases the theoretical maximum resolution of the surface spline. However, small unbinned samples are noisier and require more smoothing. The default value is usually a good compromise.
 
-        Use the 'Binned grid' button to visualize the binned samples.
+        Use the \lref binned_grid {Binned grid} button to visualize the binned samples.
       }
-      {Binned grid}{
+      {Binned grid \label binned_grid}{
         \figure {
           \figtag \s {Binned sample grid, sample grid}
           \imageswap images/SamplesBinned.png images/SamplesNotBinned.png
@@ -513,7 +513,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
         }
         Displays the binned samples that will be used to calculate the background offset and gradient. Samples are binned to improve performance if the number of samples exceeds the 'Max samples' limit.
 
-        The area of each binned sample represents the number of samples it was created from. Each binned sample's center is calculated from the center of mass of the samples it was created from. The drawn boxes no longer indicate exactly which of the pixels are being used. To see which of the unbinned samples were rejected due to stars or black pixels, it is necessary to use 'Sample grid' instead.
+        The area of each binned sample represents the number of samples it was created from. Each binned sample's center is calculated from the center of mass of the samples it was created from. The drawn boxes no longer indicate exactly which of the pixels are being used. To see which of the unbinned samples were rejected due to stars or black pixels, it is necessary to use \lref sample_grid {Sample grid} instead.
       }
     }
   }
@@ -522,7 +522,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     \image images/JoinRegion.png
     Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
 
-    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided 'Crop target' is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
+    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \lref crop_target {Crop target} is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
     \list{
       {Overlay: The primary join line runs along the middle of the Join Region. Ideally this line should avoid bright stars.}
       {Random: The rectangle should be thick enough to blend the two sides of the join.}
@@ -535,17 +535,17 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       {Reference side of join region: reference overlay}
       {Target side of join region: target overlay}
     }
-    If 'Crop target' is selected, all pixels outside of the join region are replaced by Reference pixels.\n\n
+    If \lref crop_target {Crop target} is selected, all pixels outside of the join region are replaced by Reference pixels.\n\n
 
     \definition {
       {From preview}{
         This combo box is used to initialize the join region from a preview.
         \image images/JoinRegionPreview.png
-        The image above shows a target frame. Perview01 has been created to specify the join region. Provided 'Crop target' is not selected, the created join region will be extended along its length to the overlap's bounding box.
+        The image above shows a target frame. Perview01 has been created to specify the join region. Provided \lref crop_target {Crop target} is not selected, the created join region will be extended along its length to the overlap's bounding box.
 
         The preview has been positioned so that it avoids the corners of both the target and reference images.
 
-        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \s {Join mask} in the \s {Create Mosaic} section. It is transparent for all overlapping pixels.
+        I have used a mask to illustrate where the overlapping pixels are. The mask was created by \lref join_mask {Join mask} in the \lref create_mosaic {Create Mosaic} section. It is transparent for all overlapping pixels.
       }
 
       {Taper from join \label taper_from_join}{
@@ -557,15 +557,15 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         You should only select this option if there is a bright star on the target side boundary of the overlap bounding box that is causing a brightening or darkening in the taper zone on the target side of the star.
 
-        Inspect the 'Gradient graph' (Overlap Area Gradient section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
+        Inspect the \lref overlap_gradient_graph {Gradient graph} (\lref overlap_area_gradient {Overlap Area Gradient} section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
 
         Caution: if the images wrap around each other at the sides, selecting this option may affect the correction applied to these side joins.
       }
 
-      {Crop target} {
-        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \s {Crop target} only supports the mosaic combination modes \s {Overlay} and \s {Average}.
+      {Crop target \label crop_target} {
+        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \lref crop_target {Crop target} only supports the mosaic combination modes \s {Overlay} and \s {Average}.
 
-        Outside the \s {Join Region} only reference pixels are used. Target pixels are ignored even if the reference pixel is black.
+        Outside the Join Region only reference pixels are used. Target pixels are ignored even if the reference pixel is black.
       }
 
     }
@@ -640,7 +640,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     }
   }
 
-  \subsection { Mosaic Star Mask } {
+  \subsection { Mosaic Star Mask \label mosaic_star_mask} {
     \image images/MosaicMaskSection.png
     A mosaic join created with the \s {Random} combination mode is highly effective, but often produces speckled edges around bright stars. This section creates a mask that can be used to fix this.
 
@@ -685,14 +685,14 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       {Combination mode \label comination_mode}{
         \list {
           {Overlay: On the target side of the join path, target pixels are drawn on top of the reference. On the reference side, reference pixels are drawn on top.}
-          {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly effective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply the reference image to the mosaic through a mask that only reveals the bright stars. The \s {Mosaic Star Mask} section has been provided for this purpose.}
+          {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly effective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply the reference image to the mosaic through a mask that only reveals the bright stars. The \lref mosaic_star_mask {Mosaic Star Mask} section has been provided for this purpose.}
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
       }
       {Join mask \label join_mask}{
         Creates a mask of the mosaic join. This mask indicates the pixels used to create the mosaic join.
 
-        If a \s {Join Region} has not been defined, the join area is simply the overlapping pixels. However, if it has been specified, the join extends along the full length of the join but it is otherwise limited to the join region.
+        If a Join Region has not been defined, the join area is simply the overlapping pixels. However, if it has been specified, the join extends along the full length of the join but it is otherwise limited to the join region.
       }
     }
   }
