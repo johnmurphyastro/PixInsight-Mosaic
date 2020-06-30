@@ -261,7 +261,7 @@ function PhotometricMosaicData() {
         this.starSearchRadius = 2.5;
         
         // Photometric Scale
-        this.limitPhotoStarsPercent = 90;
+        this.limitPhotoStarsPercent = 100;
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
         
