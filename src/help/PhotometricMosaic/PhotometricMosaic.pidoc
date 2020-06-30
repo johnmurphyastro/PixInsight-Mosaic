@@ -129,7 +129,7 @@
     }
   }
 
-  \subsection { Join Region: Taking control of the join } {
+  \subsection { Join Region: Taking control of the join \label join_region_taking_control} {
     It is often useful to control where the join between two frames occurs. This could be achieved by carefully cropping the reference and target images, but that would reduce the number of stars available for the photometric scale measurement. Instead of cropping the images, the position and size of the join should be specified with a Join Region.
     \image images/JoinRegionBoth.png
     The controls shown above show two different ways of specifying a join region.
@@ -228,21 +228,23 @@
           }
           \lref multiply_star_radius {Multiply star radius} increases sample rejection around stars that are saturated or close to saturation.
         }
-        This mosaic was created using the Join Region, and a default \lref overlap_smoothness {Smoothness} setting of -1. The difference this time is that the samples around the bright star were rejected by setting \lref multiply_star_radius {Multiply star radius} (\lref gradient_sample_generation {Gradient Sample Generation} section) to 18.
+        Figure \fignum multiply_star_radius shows the sample grid over the reference image. Sample rejection around the bright star depends on the \lref multiply_star_radius {Multiply star radius} setting.
+
+        The third mosaic was created using the Join Region, and a default \lref overlap_smoothness {Smoothness} setting of -1. The difference this time is that the samples around the bright star were rejected by setting \lref multiply_star_radius {Multiply star radius} (\lref gradient_sample_generation {Gradient Sample Generation} section) to 18.
 
         This \lref multiply_star_radius {Multiply star radius} setting has rejected all samples covering the star's filter halo (see third image in figure \fignum multiply_star_radius). Hence the surface spline no longer has a large peak over the halo. Only a slight peak remains due to scattered light beyond the filter halo. With only a slight peak, the default level of \lref overlap_smoothness {Smoothness} will no longer prevent the surface spline from returning to the background level before it reaches the primary join line. It can therefore correct this region correctly, so the horizontal line disappears. Since the samples near the secondary join line have also been rejected, the star's diffraction spikes and filter halo no longer affects the taper between the Overlap area and the rest of the target image.
       }
     }
-    The third option has produced a good result. It is not only the preferred option, but also the default one. The script's defaults include the creation of a narrow Join Region running through the center of the Overlap area and \lref multiply_star_radius {Multiply star radius} set to 5. The default \lref multiply_star_radius {Multiply star radius} setting is usually sufficient, but in this case the narrow band filter halo required a larger setting. However, if necessary, the second option can also be made to work. The problem that needs to be overcome is the bright / dark shadow below the bright star. This can be solved in several ways:
+    The third option has produced a good result. It is not only the preferred option, but also the default one. The script's defaults include the creation of a narrow Join Region running through the center of the Overlap area and \lref multiply_star_radius {Multiply star radius} set to 5. The default \lref multiply_star_radius {Multiply star radius} setting is usually sufficient, but in this case the narrow band filter halo requires a larger setting. However, if necessary, the second option can also be made to work. The problem that needs to be overcome is the bright / dark shadow below the bright star. This can be solved in several ways:
     \list {
-      {Swap the reference and target images. In this case the target image would then be above the join, so the secondary join path would be at the top of the Overlap area. This largely avoids the diffraction spikes and the star's filter halo, so there should be no artifacts in the taper area.}
+      {Swap the reference and target images. In this case the target image would then be above the join, so the secondary join path would be at the top of the Overlap area. This avoids the diffraction spikes and the star's filter halo, so there should be no artifacts in the taper area.}
       {Use a short \lref taper_length {Taper length}. The bright / dark shadow may then taper out before it is noticeable. However, a short taper length can make changes in brightness between the fully corrected Overlap area and the rest of the target image more noticeable.}
       {Use \lref taper_from_join {Taper from join} to move the secondary join path to the target side of the Join Region. The cost of doing this is that side joins, where the target and reference image wrap around each other, may be less perfectly joined.}
     }
     In some cases there may be so many bright stars that it is impossible to avoid them all - the Join Region will go through one or more bright stars. In these cases there are two options:
     \list {
       {Use \lref multiply_star_radius {Multiply star radius} to remove the samples near these stars. The region around them will not get accurately corrected, so the join line will be visible near the star. Provided that the Join Region is not too close to the edge of the overlapping pixels, these areas can be fixed after the mosaic has been created. Create a mask (Mosaic Star Mask section) using the \lref multiply_star_radius {Multiply star radius} in the mask section to reveal the area around the problem stars. Then, after the mosaic has been created, use PixelMath to copy the reference image through the mask to fix the problem areas.}
-      {Reduce the smoothing until the surface spline accurately follows the regions around the bright stars. It might even be necessary to reduce the size of the samples within the sample grid. Use a short filter length. Although this option can work, an unsmoothed surface spline can create its own set of problems.}
+      {Reduce the smoothing until the surface spline accurately follows the regions around the bright stars. It might also be necessary to reduce the size of the samples within the sample grid. Use a short filter length. Although this option can work, an unsmoothed surface spline can create its own set of problems.}
     }
 
 
@@ -270,11 +272,11 @@
           The samples over both the filter halo and diffraction spikes are now being rejected. Hence the surface spline only models the scattered light beyond the halo. Since the surface spline no longer has a large peak, the default smoothness setting works well.
         }
       }
-      The graph auto scales to the data range, so check the scale on the vertical axis to determine how significant the graph peaks are. To locate the star that's causing the peak, read the coordinate along the join from the graph's horizontal axis. Alternatively, a left mouse click on the peak will display the mouse coordinates (join coordinate, offset) in the graph title bar. If there is no bright star at the coordinate, a graph peak may be due to a scale error. To learn more, read the next section.
+      The graph auto scales to the data range, so check the scale on the vertical axis to determine how significant the graph peaks are. To locate the star that's causing the peak, read the coordinate along the join from the graph's horizontal axis. Alternatively, a left mouse click on the peak will display the mouse coordinates (join coordinate, offset) in the graph title bar. If there is no bright star at the coordinate, a graph peak may be due to a scale error. To learn more, read the \lref detecting_scale_error {Detecting a Scale Error with the Gradient Graph} section.
     }
   }
 
-  \subsection { Detecting a Scale Error with the Gradient Graph } {
+  \subsection { Detecting a Scale Error with the Gradient Graph \label detecting_scale_error} {
 
     Gradient graph curves often contain significant peaks. This is usually due to a scattered light around a star, or a star halo. If the two images were taken in different conditions, this can cause a local difference between the two images in the vicinity of the star. This is a real difference and not due to a scale error. The solution is to specify a join region that avoids these artifacts. See the \lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts} section.
 
@@ -284,30 +286,40 @@
     \figure {
       \figtag \s {Before and after scale correction}
       \imageswap images/GradientGraphScaleErr.png images/GradientGraphScaleFix.png
-      The graph shows a significant peak at x-coordinate 1,921 (displayed in the title bar by left clicking the peak). By inspecting the join region within the mosaic image (see the 'Inspect_Join' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
+      The graph shows a significant peak at x-coordinate 1,921 (displayed in the title bar by left clicking the peak). By inspecting the join region within the mosaic image (see the 'JoinRegion' preview in the image below), we can see that there are no bright stars at this coordinate, so the peak cannot be due to scattered light or a star halo. Instead, the peak corresponds to a brightening of the nebula. Whenever this occurs, it indicates a possible error in the applied scale factor.
 
       The mouse over image shows the graph after the scale has been corrected. There is a very slight overcorrection, but it is now very close. The graph now reveals a slight gradient across the image.
 
       \image images/GradientGraphScaleHorseHead.png
     }
 
-    The scale was corrected by rejecting a star from the photometry. However, it was only clear which star needed to be rejected after zooming in on the Photometry Graph. See below:
+    The scale was corrected by rejecting a star from the photometry. However, it was only clear which star needed to be rejected after zooming in on the Photometry Graph. See figure \fignum scale_error_graphs.
+
+    \figure [numbered:scale_error_graphs] {
+      \figtag \s {Scale error}
+      \imageselect[menupos:right] {
+        images/GradientGraphScaleGraph.png      { Initial graph }
+        images/GradientGraphScaleGraphZoom.png   { Initial graph 27:1}
+        images/GradientGraphScaleGraphZoomFix.png    { Brightest star removed }
+      }
+      \definition {
+        { Initial graph }{
+          At first sight, the best fit line looks a good fit to the data points.
+        }
+        { Initial graph 27:1}{
+          After using the mouse wheel to zoom the graph to 27:1, it can be seen that the best fit line is not a good fit to the fainter stars. The brightest star should have been an outlier, but it has strongly influenced the best fit line due to its distance from the origin and the low number of stars.
+        }
+        { Brightest star removed }{
+          The bright star was very close to the incorrectly fitted line, so it could not be rejected by using \lref outlier_removal {Outlier removal}. Instead it was rejected by reducing the \lref linear_range {Linear range}. In this case it was reduced to 0.1
+        }
+      }
+    }
+    It is clear that even a very small scale error can have a significant effect on the offset and gradient that will be removed. However, the gradient graph's vertical axis reveals that, at least in this case, the offset differences were very small and would not have caused a visible difference.
 
     \figure {
-        \figtag \s {Scale error}
-        \imageselect[menupos:right] {
-          images/GradientGraphScaleGraph.png      { Initial graph }
-          images/GradientGraphScaleGraphZoom.png   { Initial graph 27:1}
-          images/GradientGraphScaleGraphZoomFix.png    { Brightest star removed }
-        }
-        At first sight, the 'Initial graph' image looks good. However, after using the mouse wheel to zoom in (see 'Initial graph 27:1') it can be seen that the best fit line is not a good fit to the fainter stars. The brightest star should have been an outlier, but it has strongly influenced the best fit line due to its distance from the origin. Since the bright star is very close to the incorrectly fitted line, it cannot be rejected by using the \lref outlier_removal {Outlier removal} control. However, it can be rejected by reducing the \lref linear_range {Linear range}. In this case it was reduced to 0.1 (see 'Brightest star removed').
-      }
-         It is clear that even a very small scale error can have a significant effect on the offset and gradient that will be removed. However, the gradient graph's vertical axis reveals that, at least in this case, the offset differences were very small and would not have caused a visible difference.
-
-      \figure {
       \figtag \s {Brightest star - underestimated size}
       \image images/GradientGraphScaleHorseHeadStar.png
-      By using \s {Photometry stars} the reason for the brightest star's photometry error becomes clear. The size of the star has been underestimated, and some of the star's flux has contributed to the background sky measurement. There are very few stars within the dark nebula, which explains why a single star was able to have a strong effect.
+      By using \lref photometry_stars {Photometry stars} the reason for the brightest star's photometry error becomes clear. The size of the star has been underestimated, and some of the star's flux has contributed to the background sky measurement. There are very few stars within the dark nebula, which explains why a single star was able to have a strong effect.
     }
   }
 
@@ -316,13 +328,13 @@
     \image images/GradientCorrectionAndComponentCorrection.png
     Within the overlapping area, the relative gradient between the reference and target image is fully corrected. Outside this area, any gradient correction has to be extrapolated from the available data within the overlapping area.
 
-    The controls shown above provide \lref overlap_area_gradient {Overlap Area Gradient} correction and \lref extrapolated_gradient {Extrapolated Gradient} correction. Overlap Area Gradient correction is used to fully correct the target image within the overlap's bounding box. \lref extrapolated_gradient {Extrapolated Gradient} correction, if selected, is used to correct one component of the target's gradient outside the overlap's bounding box.
+    The controls shown above provide \lref overlap_area_gradient {Overlap Area Gradient} correction and \lref extrapolated_gradient {Extrapolated Gradient} correction. Overlap Area Gradient correction is used to fully correct the target image within the overlap's bounding box. Extrapolated Gradient correction, if selected, is used to correct one component of the target's gradient outside the overlap's bounding box.
 
-    \lref extrapolated_gradient {Extrapolated Gradient} correction is designed to ignore any detected gradient perpendicular to the join. Typically the join is too thin for the data to be a good representative sample of the perpendicular gradient. Hence only the gradient component along the join is used to correct the target image outside the overlap bounding box.
+    Extrapolated Gradient correction is designed to ignore any detected gradient perpendicular to the join. Typically the join is too thin for the data to be a good representative sample of the perpendicular gradient. Hence only the gradient component along the join is used to correct the target image outside the overlap bounding box.
 
     If the mosaic is made up of more than one row or column, the other gradient component can be corrected when these strips are joined. This strategy is similar to \xref http://en.wikipedia.org/wiki/Bilinear_interpolation {Bilinear Interpolation}. It does not matter which component is corrected first, the end result will be the same.
 
-    When using \lref extrapolated_gradient {Extrapolated Gradient} correction, any gradient present within the reference image will get propagated across the mosaic. It is therefore important to remove this gradient once the mosaic is finished. For example by applying Dynamic Background Extraction (DBE).
+    When using Extrapolated Gradient correction, any gradient present within the reference image will get propagated across the mosaic. It is therefore important to remove this gradient once the mosaic is finished. For example by applying Dynamic Background Extraction (DBE).
 
     \figure {
       \figtag \s {Mosaic with and without \lref extrapolated_gradient {Extrapolated Gradient} correction}
@@ -332,11 +344,11 @@
         images/M33_mosaic.png { Mosaic (no Extrapolated Gradient) }
         images/M33_mosaic_component.png { Mosaic with Extrapolated Gradient }
       }
-      This example compares the mosaics created with and without \lref extrapolated_gradient {Extrapolated Gradient} correction. The target image contains a strong horizontal gradient. In both cases, the overlapping region gets fully corrected.
+      This example compares the mosaics created with and without \lref extrapolated_gradient {Extrapolated Gradient} correction. The target image contains a strong horizontal gradient. In both cases, the whole of the Overlap area (not just the Join Region) gets fully corrected.
 
       \definition {
         {Mosaic (no Extrapolated Gradient)}{
-          The gradient corrections taper away outside the overlapping region. This prevents gradient corrections propagating across the mosaic. In this case, since the reference frame has less gradient than the target frame, this is not the best strategy.
+          The gradient correction tapers away (\lref taper_length {Taper length} = 500) outside the overlapping region. This prevents the gradient correction propagating across the mosaic. In this case, since the reference frame has less gradient than the target frame, this is not the best strategy.
         }
         { Mosaic with Extrapolated Gradient }{
           This uses the gradient component measured along the length of the target side of the overlap's bounding box to correct the rest of the target image. In this example this is the horizontal component, and produces a good result.
@@ -346,9 +358,9 @@
     \figure {
       \figtag \s {Extrapolated Gradient Correction}
       \imageswap images/GradientPropagateGraph.png images/GradientPropagateGraph2.png
-      This graph shows a smooth curve that follows the general gradient trend. This is usually the right approach. It is important that the \lref extrapolated_gradient {Extrapolated Gradient} correction does not include local variations (increase \lref extrapolated_smoothness {Smoothness}). It is unlikely that they will match the gradient at the other side of the target frame.
+      This graph shows a smooth curve that follows the general gradient trend. This is usually the right approach. It is important that the \lref extrapolated_gradient {Extrapolated Gradient} correction does not include local variations (\lref extrapolated_smoothness {Smoothness} setting = 2.5). It is unlikely that they will match the gradient at the other side of the target frame.
 
-      The mouseover graph shows a curve that follows the gradient variations more closely (reduced \lref extrapolated_smoothness {Smoothness}). In this example, a mosaic is being created from two columns. Each column was made from five images. In one column, the individual images contained vertical gradients. So in this case, the peaks in the graph do not represent local gradients. They represent large scale gradients across the individual images. Hence in this case this closer fitting curve is likely to produce better results.
+      The mouseover graph shows a curve that follows the gradient variations more closely (\lref extrapolated_smoothness {Smoothness} setting = -0.5). In this example, a mosaic is being created from two columns. Each column was made from five images. In one column, the individual images contained vertical gradients. So in this case, the peaks in the graph do not represent local gradients. They represent large scale gradients across the individual images. Hence in this case this closer fitting curve is likely to produce better results.
 
       Note that in the mouseover graph, the curve follows the lower envelope of the data points. This is due to a gradient that's perpendicular to the join. Since the secondary join's path is on the target side of the overlap bounding box, the resulting gradient curve is on one side of the plotted points.
     }
@@ -454,7 +466,7 @@ Use the Photometry graph button to see the photometry data points and their best
 If the graph is saved as a PixInsight view, useful data is saved to the FITS header.
         \image images/PhotometryFitsHeader.png
       }
-      {Photometry stars}{
+      {Photometry stars \label photometry_stars}{
         \image images/PhotometryStars.png
         Displays the stars that met the criteria for photometry. These stars were within the specified \lref linear_range {Linear range} and were found in both target and reference images and were not rejected by \lref outlier_removal {Outlier removal}. The color represents the color channel. Hence a white square indicates the star was found in the red, green and blue channels.
 
@@ -520,22 +532,14 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Join Region (from preview) \label join_region_from_preview } {
     \image images/JoinRegion.png
-    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
 
-    The join region determines the size and position of the join between the two images. The rectangle's long axis should align with the join and should ideally avoid low quality regions such as image corners. Provided \lref crop_target {Crop target} is not selected, the long axis of the join region is updated to start and finish at the overlap's bounding box. The ideal size and position of the Join Region rectangle depends on the Mosaic combination mode:
-    \list{
-      {Overlay: The primary join line runs along the middle of the Join Region. Ideally this line should avoid bright stars.}
-      {Random: The rectangle should be thick enough to blend the two sides of the join.}
-      {Average: The join region determines the area that will benefit from the enhanced signal to noise ratio.}
-    }
-    It is not necessary for the join region to contain any stars. The whole of the overlap area is always used to determine the photometric scale and the background gradient.
+    Creates a Join Region from a preview, or directly by entering the top left corner and the width and height.
 
-    Inside the join region, the behavior depends on the mosaic combination mode. The behavior outside this region is:
-    \list{
-      {Reference side of join region: reference overlay}
-      {Target side of join region: target overlay}
-    }
-    If \lref crop_target {Crop target} is selected, all pixels outside of the join region are replaced by Reference pixels.\n\n
+    \lref join_region_from_preview {Join Region (from preview)} and \lref join_region_from_size {Join Region (from size)} are mutually exclusive. When one is selected, the other is unselected. If both are unselected, the Join Region defaults to the whole of the overlap area.
+
+    To learn how to use a Join Region, see:\n
+    \lref join_region_taking_control {Join Region: Taking control of the join}\n
+    \lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts}
 
     \definition {
       {From preview}{
@@ -549,23 +553,15 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       }
 
       {Taper from join \label taper_from_join}{
-        Moves the taper zone from the target side of the overlap bounding box to the target side of  the join region.
-
-        The target image's offset and gradient are fully corrected within the join region, but outside the overlap bounding box the gradient can only be partially corrected. A taper is applied to blend these two regions together.
-
-        The taper is usually applied at the target side boundary of the overlap bounding box. If this option is selected, the taper is applied from the target side of the 'Join Region' instead.
-
-        You should only select this option if there is a bright star on the target side boundary of the overlap bounding box that is causing a brightening or darkening in the taper zone on the target side of the star.
-
-        Inspect the \lref overlap_gradient_graph {Gradient graph} (\lref overlap_area_gradient {Overlap Area Gradient} section) to check for peaks in the gradient curve that follows the secondary join's path (the thin darker line).
-
-        Caution: if the images wrap around each other at the sides, selecting this option may affect the correction applied to these side joins.
+        Moves the taper zone from the target side of the overlap bounding box to the target side of  the join region. This option is used to avoid bright or dark shadows within the taper zone. However, there are usually better ways to do this. To learn more, see:\n
+\lref join_region_taking_control {Join Region: Taking control of the join}\n
+\lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts}
       }
 
       {Crop target \label crop_target} {
-        If selected, pixels from the target image are limited to the Join Region or overlap area. This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic. \lref crop_target {Crop target} only supports the mosaic combination modes \s {Overlay} and \s {Average}.
+        If selected, it effectively crops the target image to the Join Region. This is used to insert an area into an existing mosaic - for example to fix a bad area. When selected, the Join Region rectangle can have any orientation.
 
-        Outside the Join Region only reference pixels are used. Target pixels are ignored even if the reference pixel is black.
+        If this option is not selected, the Join Region rectangle's long axis must be aligned with the join axis. The Join Region length will be updated so that the region starts and finishes at the Overlap area bounding box.
       }
 
     }
@@ -573,25 +569,33 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Join Region (from size) \label join_region_from_size } {
     \image images/JoinRegionFromSize.png
-    Limits the join region to a subset of the overlap area. If unspecified, it defaults to the whole of the overlap area.
+    Creates a Join Region rectangle that is centered within the overlap area, running along the whole length of the overlap.
+
+    \lref join_region_from_preview {Join Region (from preview)} and \lref join_region_from_size {Join Region (from size)} are mutually exclusive. When one is selected, the other is unselected. If both are unselected, the Join Region defaults to the whole of the overlap area.
+
+    To learn how to use a Join Region, see:\n
+    \lref join_region_taking_control {Join Region: Taking control of the join}\n
+    \lref join_region_star_artifacts {Join Region: Avoiding bright star artifacts}
+
+    \definition {
+      {Join size}{
+        Specifies the thickness of the Join Region. For a horizontal join, this is the height. For a vertical join, the width.
+      }
+    }
   }
 
   \subsection { Overlap Area Gradient \label overlap_area_gradient} {
     \image images/Gradient.png
-    This section determines how the target pixels within the whole of the overlap region are corrected, and to specify the size of the transition region between the fully corrected overlap region and the rest of the target image.
-
-    For efficiency, only the target pixels that will become visible get corrected. For example, if the selected mosaic overlay mode is Reference Overlay, if a reference pixel exists, the corresponding target pixel can be ignored.
+    This section determines how the target pixels within the whole of the overlap region are corrected, and specifies the size of the transition region between the fully corrected overlap region and the rest of the target image.
 
     \definition {
       {Smoothness \label overlap_smoothness}{
-        Logarithm of the smoothness setting. This determines the smoothness of the gradient correction applied to the overlap area. This determines how closely the correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to correct both the gradient trends and the local variations, such as the diffuse light around bright stars, but with enough smoothing to avoid following noise.
+        Logarithm of the smoothness setting. This determines how closely the gradient correction follows the sample data points. Smaller values apply less smoothing. The aim is to correct both the gradient trends and the local variations, such as the scattered light around bright stars, but with enough smoothing to avoid following noise.
 
         Use the \lref overlap_gradient_graph {Gradient graph} to determine the optimum smoothness.
-
-        The full correction is applied across the whole of the overlap's bounding box.
       }
       {Taper length \label taper_length}{
-        The length of the taper that's applied between the fully corrected overlap bounding box area and the rest of the partially corrected target image to provide a smooth transition. In most cases the default taper length usually works well, but make sure the taper finishes before the end of the target image. However, if there is a strong peak in the gradient graph's secondary join curve (e.g. due to a star halo) a short taper may be necessary to avoid a darker or brighter area in the taper region.
+        The length of the taper that's applied between the fully corrected overlap bounding box area and the rest of the partially corrected target image to provide a smooth transition. A longer Taper length will produce a smoother transition, but a shorter Taper length may be required if local gradients are large to prevent bright or dark shadows appearing in the taper region.
       }
       {Gradient graph \label overlap_gradient_graph}{
         \image images/GradientGraphTgtOverlay.png
@@ -600,7 +604,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
         The plotted dots represent the difference between each paired target and reference sample within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
 
-        The bold curve(s) shows the gradient along the primary join path(s). It depends on the mosaic combine mode and the Join Region (if a Join Region has not been defined, it defaults to the overlap bounding box).
+        The bold curve(s) shows the gradient along the primary join path(s). The primary join path(s) depends on the mosaic combine mode and the Join Region (if a Join Region has not been defined, it defaults to the overlap bounding box).
         \list {
           {Overlay: The primary path runs along the join, at the center of the Join Region. This is the transition between reference overlay and target overlay.}
           {Random or Average: The primary paths run along the sides of the Join Region. These two paths are at the transition where the Random or Average combine starts and finishes.}
@@ -614,18 +618,14 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
   \subsection { Extrapolated Gradient \label extrapolated_gradient} {
     \image images/PropagatedGradientCorrection.png
-    This section corrects the relative gradient between the reference and target frames. The applied gradient is based on the gradient detected on the target side edge of either the overlap's bounding box or, if \lref taper_from_join {Taper from join} is selected, the target side edge of the 'Join Region'. It is applied from this edge to the rest of the target image. It is not applied to the overlap area (this area is already fully corrected).
+    Applies an extrapolated gradient correction to the target image. The correction is based on the gradient detected on the target side edge of either the overlap's bounding box or, if \lref taper_from_join {Taper from join} is selected, the target side edge of the 'Join Region'. It is applied from this edge to the rest of the target image.
 
-    Consider using this option if the reference image has less gradient than the target. In these cases it can correct either the horizontal or vertical components of the relative gradient between the two images. If this option is used both when joining tiles into rows or columns, and then when these strips are joined, both components of the relative gradient will be applied.
+    Consider using this option if the reference image has less gradient than the target. The reference image's gradient will be propagated across the mosaic, so consider using DBE as a final correction once the mosaic is complete.
       \definition {
       {Smoothness \label extrapolated_smoothness}{
-        Logarithm of the smoothness setting. This determines the smoothness of the extrapolated gradient correction.
-
-        The 'Smoothness' control determines how closely the correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to only correct the gradient trends and not the local variations, such as the diffuse light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
+        Logarithm of the smoothness setting. It determines how closely the gradient correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to only correct the gradient trends and not the local variations, such as the scattered light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
 
         Use the \lref extrapolated_gradient_graph {Gradient graph} to determine the optimum smoothness.
-
-        The reference image's gradient will be propagated across the mosaic, so consider using DBE as a final correction once the mosaic is complete.
       }
       {Gradient graph \label extrapolated_gradient_graph}{
         \image images/GradientPropagateGraph.png
@@ -633,7 +633,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 
             The plotted dots represent the difference between each paired target and reference samples within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
 
-        The curve is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box or, if \lref taper_from_join {Taper from join} is selected, the target side of the 'Join Region'. This gradient will be applied to the rest of the target image. If there is a gradient perpendicular to the join, the curve will tend to follow the top or bottom envelope of the plotted points
+        The curve is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box or, if \lref taper_from_join {Taper from join} is selected, the target side of the 'Join Region'. This gradient will be applied to the rest of the target image.
 
         The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
       }
@@ -680,11 +680,11 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
     \image images/MosaicSection.png
     \definition {
       {Create Mosaic}{
-        If selected, the reference and target frames are combined and displayed in a window named: 'Mosaic'. Otherwise the corrections will still be applied to a copy of the target image, but the mosaic will not be created.
+        If selected, the reference and target frames are combined and displayed in a window named: 'Mosaic'. Otherwise the corrections will be applied to a copy of the target image.
       }
       {Combination mode \label comination_mode}{
         \list {
-          {Overlay: On the target side of the join path, target pixels are drawn on top of the reference. On the reference side, reference pixels are drawn on top.}
+          {Overlay: The Join Region is divided along its length. On the target side, target pixels are drawn on top of the reference. On the reference side, reference pixels are drawn on top.}
           {Random: Over the join region, pixels are randomly chosen from the reference and target images. This mode is particularly effective at hiding the join, but if the star profiles in the reference and target images don't match, this can lead to speckled pixels around the stars. These speckled star artifacts can be fixed by using PixelMath to apply the reference image to the mosaic through a mask that only reveals the bright stars. The \lref mosaic_star_mask {Mosaic Star Mask} section has been provided for this purpose.}
           {Average: Over the join region, pixels are set to the average of the reference and target pixels. This mode has the advantage of increasing the signal to noise ratio over the join, but this can also make the join more visible.}
         }
@@ -692,7 +692,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
       {Join mask \label join_mask}{
         Creates a mask of the mosaic join. This mask indicates the pixels used to create the mosaic join.
 
-        If a Join Region has not been defined, the join area is simply the overlapping pixels. However, if it has been specified, the join extends along the full length of the join but it is otherwise limited to the join region.
+        If a Join Region has not been defined, the join area is simply the overlapping pixels. Otherwise, the Join mask extends along the full length of the join but it is otherwise limited to the Join Region.
       }
     }
   }
