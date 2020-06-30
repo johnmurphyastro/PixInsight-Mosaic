@@ -17,7 +17,8 @@
 "use strict";
 #feature-id Mosaic > PhotometricMosaic
 
-#feature-info Calculates scale and gradient offset between two images over their overlapping area.<br/>\
+#feature-info Creates mosaics from previously registered images, using photometry \
+to determine the brightness scale factor and a surface spline to model the relative gradient.<br/>\
 Copyright &copy; 2019-2020 John Murphy.<br/> \
 StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights Reserved.<br/>
 
