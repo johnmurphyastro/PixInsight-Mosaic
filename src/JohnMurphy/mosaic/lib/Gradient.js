@@ -1180,7 +1180,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
                 difArrays.push(surfaceSplines[0].evaluate(graphLine.path).toArray());
             }
             drawLineAndPoints(graph, isHorizontal,
-                difArrays, 0xFFFF0000, graphLines, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF); // TODO
+                difArrays, 0xFFFF0000, graphLines, 0xFF990000, colorSamplePairs[0], 0xFFFFFFFF);
         } else {
             // Color. Need to create 3 graphs for r, g, b and then merge them (binary OR) so that
             // if three samples are on the same pixel we get white and not the last color drawn
