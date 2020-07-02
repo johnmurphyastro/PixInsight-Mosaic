@@ -81,7 +81,7 @@ function createSplineArrayY(surfaceSpline, x, rectangle){
 /**
  * Extend a dif array to cover either full image width or height.
  * Between minCoord and maxCoord, the difference is supplied from splineArray.
- * Outside this range, the values at minCoord and maxCoord are propogated to the array ends.
+ * Outside this range, the values at minCoord and maxCoord are propagated to the array ends.
  * @param {Number[]} splineArray Difference array.
  * @param {Number} minCoord Hold difference constant until minCoord
  * @param {Number} maxCoord Hold difference constant after maxCoord
@@ -128,7 +128,7 @@ function createAvgDifArray(difArray){
  * Calculates a surface spline representing the difference between reference and target samples.
  * Represents the gradient in a single channel. (use 3 instances  for color images.)
  * @param {SamplePair[]} samplePairs median values from ref and tgt samples
- * @param {Number} logSmoothing Logrithmic value; larger values smooth more
+ * @param {Number} logSmoothing Logarithmic value; larger values smooth more
  * @returns {SurfaceSpline}
  */
 function calcSurfaceSpline(samplePairs, logSmoothing){
@@ -276,7 +276,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     
     /**
      * Iterates through the rows (or columns) within the specified image area.
-     * After each interation, provides methods to read the reference and target row,
+     * After each iteration, provides methods to read the reference and target row,
      * and write the output row.
      * @param {Image} refImage Input reference image (not modified)
      * @param {Image} tgtImage Input target image (not modified)
@@ -371,7 +371,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
             return rect_.y0;
         };
         /**
-         * If creating a mosiac, returns the reference image samples.
+         * If creating a mosaic, returns the reference image samples.
          * Otherwise, returns an array filled with zeros.
          * Do not modify the returned array.
          * @returns {Float64Array} Reference samples or zero values
@@ -1205,7 +1205,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
 }
 
 /**
- * Path accross the overlap region
+ * Path across the overlap region
  * @param {Point[]} path
  * @param {Boolean} bold
  * @returns {GraphLinePath}

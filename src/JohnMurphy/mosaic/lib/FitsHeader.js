@@ -55,7 +55,7 @@ function copyFitsAstrometricSolution(sourceView, keywords) {
 }
 
 /**
- * Copy known observaton keywords from source to target fits headers.
+ * Copy known observation keywords from source to target fits headers.
  * The RA and DEC are not copied since these will probably be invalid.
  * @param {View} sourceView Copy observation data from this view
  * @param {FITSKeyword} keywords Append observation data to this view

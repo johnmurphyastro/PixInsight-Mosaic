@@ -269,7 +269,7 @@ function Overlap(refImage, tgtImage){
     
     /**
      * Creates a path that follows the horizontal line if it is within the 
-     * overlaping pixels. If it is above the overlap, it follows the top outline
+     * overlapping pixels. If it is above the overlap, it follows the top outline
      * of the overlap. If below, the bottom outline.
      * @param {Number} yCoord Specifies horizontal line y = yCoord
      * @returns {Point[]} The horizontal path constrained by the overlap
@@ -296,7 +296,7 @@ function Overlap(refImage, tgtImage){
     
     /**
      * Creates a path that follows the vertical line if it is within the 
-     * overlaping pixels. If it is left of the overlap, it follows the left outline
+     * overlapping pixels. If it is left of the overlap, it follows the left outline
      * of the overlap. If right, the right outline.
      * @param {Number} xCoord Specifies vertical line x = xCoord
      * @returns {Point[]} The vertical path constrained by the overlap

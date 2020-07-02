@@ -254,7 +254,7 @@ function trimImage(data)
 // -----------------------------------------------------------------------------
 function TrimImageData() {
 
-    // Used to poplulate the contents of a saved process icon
+    // Used to populate the contents of a saved process icon
     this.saveParameters = function () {
         if (this.targetView.isMainView) {
             Parameters.set("targetView", this.targetView.fullId);
@@ -335,7 +335,7 @@ function trimImageDialog(data) {
     // Set some basic widths from dialog text
     let labelWidth1 = this.font.width("Bottom:_");
 
-    // Create the Program Discription at the top
+    // Create the Program Description at the top
     let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() + 
             "</b> &mdash; Erodes the non zero area of an image to remove rough edges.<br />" +
             "Copyright &copy; 2019-2020 John Murphy.");

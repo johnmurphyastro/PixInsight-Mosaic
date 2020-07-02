@@ -195,7 +195,7 @@ function StarsDetected(){
          * Limit the total number of stars to a percentage of the input stars,
          * or a percentage of 1000 if there are more than 1000 stars in the input
          * array. The dimmest stars are filtered out.
-         * @param {Star[]} stars Stars to be filered. This array is not modified.
+         * @param {Star[]} stars Stars to be filtered. This array is not modified.
          * @param {PhotometricMosaicData} data Values from user interface
          * @returns {Star[]} The filtered stars
          */
@@ -595,7 +595,7 @@ function displayPhotometryStars(refView, detectedStars, colorStarPairs, scaleFac
     };
     
     /** Create vector graphics context for the specified bitmap. 
-     * Pen is set to color. Anitaliasing is off.
+     * Pen is set to color. Anti Aliasing is off.
      * @param {Bitmap} bitmap
      * @param {Number} color
      * @returns {VectorGraphics}
@@ -671,7 +671,7 @@ function displayDetectedStars(view, colorStars, postfix, data) {
     };
     
     /** Create vector graphics context for the specified bitmap. 
-     * Pen is set to color. Anitaliasing is off.
+     * Pen is set to color. Anti Aliasing is off.
      * @param {Bitmap} bitmap
      * @param {Number} color
      * @returns {VectorGraphics}

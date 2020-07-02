@@ -109,7 +109,7 @@ function CopyImageEraseArea(tgtView, data, eraseRect, titlePostfix){
 // Form/Dialog data
 // -----------------------------------------------------------------------------
 function SplitData() {
-    // Used to poplulate the contents of a saved process icon
+    // Used to populate the contents of a saved process icon
     this.saveParameters = function () {
         if (this.targetView.isMainView) {
             Parameters.set("targetView", this.targetView.fullId);
@@ -167,7 +167,7 @@ function SplitDialog(data) {
     let labelWidth1 = this.font.width("Split Coordinate:_");
 
     //-------------------------------------------------------
-    // Create the Program Discription at the top
+    // Create the Program Description at the top
     //-------------------------------------------------------
     let titleLabel = createTitleLabel("<b>" + TITLE + " v" + VERSION + 
             "</b> &mdash; Splits an image into two overlapping images.<br />" +

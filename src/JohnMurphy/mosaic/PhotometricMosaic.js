@@ -378,7 +378,7 @@ function calculateScale(starPairs) {
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
- * @param {SurfaceSpline[]} propagateSurfaceSplines SurfaceSpline for each color channel, propogated
+ * @param {SurfaceSpline[]} propagateSurfaceSplines SurfaceSpline for each color channel, propagated
  * @param {SurfaceSpline[]} surfaceSplines SurfaceSpline for each color channel, tapered
  * @param {Overlap} overlap represents overlap region
  * @param {Rect} joinRect Bounding box of join region (preview extended to overlapBox)

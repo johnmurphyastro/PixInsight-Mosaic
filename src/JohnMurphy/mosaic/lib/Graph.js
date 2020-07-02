@@ -211,7 +211,7 @@ function Graph(x0, y0, x1, y1) {
     };
     
     /**
-     * Draw straigth lines between the points in the supplied array
+     * Draw straight lines between the points in the supplied array
      * @param {Number[]} curvePoints Index is x-coordinate, value is y-coordinate
      * @param {Number} firstCoord x coordinate at curvePoints[0]
      * @param {Number} color Hex color value
@@ -237,7 +237,7 @@ function Graph(x0, y0, x1, y1) {
     
     /**
      * Draw a point on the graph. If the point is outside the graph's data range,
-     * a error is reported on the Console.
+     * an error is reported on the Console.
      * @param {Number} xWorld
      * @param {Number} yWorld
      * @param {Number} color
@@ -418,7 +418,7 @@ function Graph(x0, y0, x1, y1) {
      */
     function drawYAxisLabel(font, imageHeight, text, axisColor){
         // draw into a small bitmap
-        // rotate the bit map by 90 degrees
+        // rotate the bitmap by 90 degrees
         // copy bitmap into graph right hand margin
         let w = Math.min(imageHeight, font.width(text));
         let h = font.ascent + font.descent;

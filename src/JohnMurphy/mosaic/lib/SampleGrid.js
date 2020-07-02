@@ -248,13 +248,13 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
         let binRect = new Rect(binSize_, binSize_);
         binRect.moveTo(getX(xKey), getY(yKey));
         for (let c=0; c < nChannels; c++){
-            // Dont add sample if it contains 1 or more pixels that are black
+            // Don't add sample if it contains 1 or more pixels that are black
             if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
                 // exclude this sample from this channel.
                 continue;
             }
 //            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
-//                // Star will not be in star array, so deal with it seperately
+//                // Star will not be in star array, so deal with it separately
 //                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
 //                return;
 //            }
@@ -525,7 +525,7 @@ function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMax
      */
     function createBinnedSamplePair(insideBin, sampleWidth, sampleHeight, binWidth, binHeight){
         // Weight is the number of input SamplePair that are in the binned area.
-        // Not always the geometricaly expected number due to SamplePair rejection (e.g. stars)
+        // Not always the geometrically expected number due to SamplePair rejection (e.g. stars)
         const weight = insideBin.length;
 
         // binnedSamplePair center: calculated from center of mass
