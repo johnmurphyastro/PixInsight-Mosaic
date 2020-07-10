@@ -1,4 +1,4 @@
-/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, UndoFlag_Keywords, UndoFlag_PixelData */
+/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, UndoFlag_Keywords, UndoFlag_PixelData, CoreApplication */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -27,7 +27,7 @@ Copyright &copy; 2019-2020 John Murphy.<br/>
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"
 
-function VERSION(){return "1.0";}
+function VERSION(){return "1.1";}
 function TITLE(){return "Trim Mosaic Tile";}
 function DEFAULT_TRIM(){return 3;}
 
@@ -414,8 +414,14 @@ trimImageDialog.prototype = new Dialog;
 
 // Trim Image main process
 function main() {
-    //console.hide();
-
+    const MAJOR = 1;
+    const MINOR = 8;
+    const RELEASE = 8;
+    const REVISION = 5;
+    if (!isVersionOk(MAJOR, MINOR, RELEASE, REVISION)){
+        displayVersionWarning(MAJOR, MINOR, RELEASE, REVISION);
+    }
+    
     if (ImageWindow.openWindows.length < 1) {
         (new MessageBox("ERROR: there must be at least one image open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
         return;

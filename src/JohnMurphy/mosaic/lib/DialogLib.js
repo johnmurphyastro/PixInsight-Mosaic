@@ -1,4 +1,4 @@
-/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter, Dialog */
+/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter, Dialog, CoreApplication */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -25,6 +25,32 @@
 #include <pjsr/StdCursor.jsh>
 #include <pjsr/SectionBar.jsh>
 
+function isVersionOk(major, minor, release, revision){
+    if (CoreApplication.versionMajor > major)
+        return true;
+    if (CoreApplication.versionMajor < major)
+        return false;
+
+    if (CoreApplication.versionMinor > minor)
+        return true;
+    if (CoreApplication.versionMinor < minor)
+        return false;
+
+    if (CoreApplication.versionRelease > release)
+        return true;
+    if (CoreApplication.versionRelease < release)
+        return false;
+
+    return (CoreApplication.versionRevision >= revision);
+}
+
+function displayVersionWarning(major, minor, release, revision){
+    Console.criticalln("PixInsight version:  ", 
+        CoreApplication.versionMajor, ".", CoreApplication.versionMinor,
+        ".", CoreApplication.versionRelease, "-", CoreApplication.versionRevision);
+    Console.criticalln("Minimum requirement: ", major, ".", minor, ".", release, "-", revision);
+}
+        
 /**
  * Returns the elapsed time since startTime.
  * If the elapsed time is less than a second, it is returned as milliseconds, with a 'ms' postfix.

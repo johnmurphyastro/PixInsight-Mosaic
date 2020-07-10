@@ -1533,7 +1533,13 @@ PhotometricMosaicDialog.prototype = new Dialog;
 
 // Photometric Mosaic main process
 function main() {
-//    GradientTest();
+    const MAJOR = 1;
+    const MINOR = 8;
+    const RELEASE = 8;
+    const REVISION = 5;
+    if (!isVersionOk(MAJOR, MINOR, RELEASE, REVISION)){
+        displayVersionWarning(MAJOR, MINOR, RELEASE, REVISION);
+    }
 
     if (ImageWindow.openWindows.length < 2) {
         (new MessageBox("ERROR: There must be at least two images open for this script to function", TITLE(), StdIcon_Error, StdButton_Ok)).execute();

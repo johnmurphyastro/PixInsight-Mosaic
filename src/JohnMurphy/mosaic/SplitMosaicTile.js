@@ -24,7 +24,7 @@ Copyright &copy; 2019-2020 John Murphy.<br/>
 #include <pjsr/UndoFlag.jsh>
 #include "lib/DialogLib.js"
 
-#define VERSION  "1.0"
+#define VERSION  "1.1"
 #define TITLE "SplitMosaicTile"
 #define HORIZONTAL 0
 #define VERTICAL 1
@@ -313,7 +313,14 @@ SplitDialog.prototype = new Dialog;
 
 // Mosaic Linear Fit main process
 function main() {
-
+    const MAJOR = 1;
+    const MINOR = 8;
+    const RELEASE = 8;
+    const REVISION = 4;
+    if (!isVersionOk(MAJOR, MINOR, RELEASE, REVISION)){
+        displayVersionWarning(MAJOR, MINOR, RELEASE, REVISION);
+    }
+    
     if (ImageWindow.openWindows.length < 1) {
         (new MessageBox("ERROR: there must be at least one image open for this script to function", TITLE, StdIcon_Error, StdButton_Ok)).execute();
         return;
