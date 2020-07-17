@@ -1,0 +1,86 @@
+\documentclass PIScriptDoc
+
+\script SplitMosaicTile
+
+\keywords {
+   mosaic
+}
+
+\author {
+   John Murphy
+}
+
+\copyright {
+   2019-2020 John Murphy
+}
+
+\brief {
+    Splits an image into two overlapping images.
+}
+
+\description {
+  Splits the target image at the specified x (horizontal split) or y
+  (vertical split) coordinate. Two new images are created. Each image contains
+  image data from one side of the split, plus the overlap region.
+  The other side of the overlap region is set to black.
+
+  This is a helper script for the PhotometricMosaic script. It is used to convert
+  an ad-hoc mosaic into a regular grid of rows and columns. This will produce better
+  results from the PhotometricMosaic script, despite the extra joins that will be
+  required. It is usually easy to seamlessly join these extra joins because the
+  image data is identical on both sides of the join.
+
+
+  \figure {
+    \figtag \s {Horizontal split}
+    \imageselect[menupos:right] {
+      images/Sagittarius.png { Sagittarius (target image) }
+      images/SagittariusLeft.png { Sagittarius Left }
+      images/SagittariusRight.png { Sagittarius Right }
+    }
+    These images show the Sagittarius target image being split into the overlapping Sagittarius_Left
+    and Sagittarius_Right images.
+
+    Split direction: Horizontal \n
+    Split coordinate: 4000 \n
+    Overlap: 400
+  }
+}
+
+\usage {
+
+\image images/SplitMosaicTileAll.png
+
+  \subsection { Target view } {
+    Specifies the image that will be split into two overlapping images. The
+    target image is not modified.
+  }
+
+  \subsection { Split direction } {
+    Vertical to split into top and bottom.
+
+    Horizontal to split into left and right.
+  }
+
+  \subsection { Split coordinate \label split_coordinate} {
+    Split the image at this x coordinate (Horizontal split), or y coordinate (Vertical split).
+  }
+
+  \subsection { Overlap } {
+    Specifies the amount of overlap to leave between the two new images.
+
+    Each image extends this overlap distance beyond the
+    \lref split_coordinate {Split coordinate}.
+  }
+
+}
+
+\relatedscripts {
+  PhotometricMosaic, TrimMosaicTile, ImageSolver, ManualImageSolver, MosaicByCoordinates
+}
+
+\relatedtools {
+  ScreenTransferFunction
+}
+
+\make

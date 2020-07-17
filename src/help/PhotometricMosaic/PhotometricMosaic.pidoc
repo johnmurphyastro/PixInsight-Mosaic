@@ -699,7 +699,7 @@ If the graph is saved as a PixInsight view, useful data is saved to the FITS hea
 }
 
 \relatedscripts {
-  ImageSolver, ManualImageSolver, MosaicByCoordinates
+  ImageSolver, ManualImageSolver, MosaicByCoordinates, TrimMosaicTile, SplitMosaicTile
 }
 
 \relatedtools {

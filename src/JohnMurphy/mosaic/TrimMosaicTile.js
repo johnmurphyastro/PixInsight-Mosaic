@@ -342,7 +342,7 @@ function trimImageDialog(data) {
 
     // Create the target image field
     let targetImage_Label = new Label(this);
-    targetImage_Label.text = "Target View:";
+    targetImage_Label.text = "Target view:";
     targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     targetImage_Label.minWidth = labelWidth1;
 
@@ -350,7 +350,7 @@ function trimImageDialog(data) {
     this.targetImage_ViewList.getMainViews();
     this.targetImage_ViewList.minWidth = 460;
     this.targetImage_ViewList.currentView = data.targetView;
-    this.targetImage_ViewList.toolTip = "<p>Select an image to generate a PSF for</p>";
+    this.targetImage_ViewList.toolTip = "<p>Erode the non zero area of this image</p>";
     this.targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
     };
@@ -385,10 +385,18 @@ function trimImageDialog(data) {
     };
 
     const helpWindowTitle = TITLE() + " v" + VERSION();
-    const helpMsg = "<p>Trim the pixels at the edge of the non zero part of an image. " +
-            "Black pixels are ignored. Modified pixels are set to black.</p>";
+    const HELP_MSG =
+            "<p>To install this script, use 'SCRIPT \> Feature Scripts...' and then in the " +
+            "'Feature Scripts' dialog box, press the 'Add' button and select the folder " +
+            "where you unzipped this script.</p>" +
+            "<p>To install the help files, unzip 'PhotometricMosaicHelp.zip' to " +
+            "'[PixInsight]/doc/scripts/'</p>" +
+            "<p>For example, on Windows, the correct installation would include:</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/TrimMosaicTile/TrimMosaicTile.html</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/TrimMosaicTile/images/</p>";
 
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, helpMsg);
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data,
+            helpWindowTitle, HELP_MSG, "TrimMosaicTile");
 
     // Vertically stack all the objects
     this.sizer = new VerticalSizer;

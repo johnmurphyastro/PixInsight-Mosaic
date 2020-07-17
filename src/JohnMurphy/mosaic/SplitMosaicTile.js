@@ -177,7 +177,7 @@ function SplitDialog(data) {
     // Create the reference image field
     //-------------------------------------------------------
     let targetImage_Label = new Label(this);
-    targetImage_Label.text = "Target View:";
+    targetImage_Label.text = "Target view:";
     targetImage_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     targetImage_Label.minWidth = labelWidth1;
 
@@ -206,7 +206,7 @@ function SplitDialog(data) {
     // Linear Fit Method Field
     //-------------------------------------------------------
     let algorithm_Label = new Label(this);
-    algorithm_Label.text = "Split Direction:";
+    algorithm_Label.text = "Split direction:";
     algorithm_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     algorithm_Label.minWidth = labelWidth1;
 
@@ -240,10 +240,10 @@ function SplitDialog(data) {
     //-------------------------------------------------------
     this.coordinate_Control = new NumericControl(this);
     this.coordinate_Control.real = false;
-    this.coordinate_Control.label.text = "Split Coordinate:";
+    this.coordinate_Control.label.text = "Split coordinate:";
     this.coordinate_Control.label.minWidth = labelWidth1;
     this.coordinate_Control.toolTip = 
-            "<p>Split the image at this x (Horizontal split) or y (Vertical split) coordinate.</p>";
+            "<p>Split the image at this x (horizontal split) or y (vertical split) coordinate.</p>";
     this.coordinate_Control.onValueUpdated = function (value) {
         data.coordinate = value;
     };
@@ -280,12 +280,18 @@ function SplitDialog(data) {
 
     const helpWindowTitle = TITLE + " v" + VERSION;
     const HELP_MSG =
-            "<p>Split the image at the specified x (Horizontal split) or y (Vertical split) coordinate. " +
-            "Two new images are created. Each image contains image data one side of the split, " +
-            "plus the overlap region. The other side of the overlap region is set to black (0)</p>";
+            "<p>To install this script, use 'SCRIPT \> Feature Scripts...' and then in the " +
+            "'Feature Scripts' dialog box, press the 'Add' button and select the folder " +
+            "where you unzipped this script.</p>" +
+            "<p>To install the help files, unzip 'PhotometricMosaicHelp.zip' to " +
+            "'[PixInsight]/doc/scripts/'</p>" +
+            "<p>For example, on Windows, the correct installation would include:</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/SplitMosaicTile/SplitMosaicTile.html</p>" +
+            "<p>C:/Program Files/PixInsight/doc/scripts/SplitMosaicTile/images/</p>";
 
-    let buttons_Sizer = createWindowControlButtons(this.dialog, data, helpWindowTitle, HELP_MSG);
-
+    let buttons_Sizer = createWindowControlButtons(this.dialog, data,
+            helpWindowTitle, HELP_MSG, "SplitMosaicTile");
+    
     //-------------------------------------------------------
     // Vertically stack all the objects
     //-------------------------------------------------------

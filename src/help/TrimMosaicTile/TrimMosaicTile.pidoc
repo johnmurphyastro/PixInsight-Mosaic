@@ -1,0 +1,81 @@
+\documentclass PIScriptDoc
+
+\script TrimMosaicTile
+
+\keywords {
+   mosaic
+}
+
+\author {
+   John Murphy
+}
+
+\copyright {
+   2019-2020 John Murphy
+}
+
+\brief {
+    Removes rough or smoothed antialiased edges from a registered mosaic tile.
+}
+
+\description {
+  Removes rough or smoothed antialiased edges from a previously registered mosaic tile
+  by eroding the non zero area by the specified number of pixels.
+
+  This is a helper script for PhotometricMosaic, which requires that both the reference
+  and target images have hard edges. TrimMosaicTile is used to:
+  \list {
+    {Clean up rough edges to ensure that each image pixel has a full contribution from
+    all the stacked images.}
+    {Registered images (e.g. MosaicByCoordinates) often have slightly soft edges. These
+    soft edges must be removed.}
+  }
+  It is important that TrimMosaicTile is applied after the mosaic tiles have been registered.
+
+  This script updates the FITS header with the amount trimmed from the image. PhotometricMosaic
+  checks the FITS header for these entries, and writes a warning to the Console if either
+  the reference or target images have not been trimmed.
+  \figure {
+      \figtag \s {Mosaic tile before and after TrimMosaicTile script}
+      \imageswap images/Sagittarius.png images/SagittariusTrim.png
+      These two images show a mosaic tile before and after TrimMosaicTile has been
+      used to remove an equal amount from the top, bottom, left and right of the
+      non zero area.
+    }
+}
+
+\usage {
+
+\image images/TrimMosaicTileAll.png
+
+  \subsection { Target view } {
+    Erode the non zero area of this image. The target image is modified.
+  }
+
+  \subsection { Top } {
+    Specifies the number of pixels to erode from the top of the non zero area.
+  }
+
+  \subsection { Bottom } {
+    Specifies the number of pixels to erode from the bottom of the non zero area.
+  }
+
+  \subsection { Left } {
+    Specifies the number of pixels to erode from the left of the non zero area.
+  }
+
+  \subsection { Right } {
+    Specifies the number of pixels to erode from the right of the non zero area.
+  }
+
+}
+
+\relatedscripts {
+  PhotometricMosaic, SplitMosaicTile, ImageSolver, ManualImageSolver, MosaicByCoordinates
+}
+
+\relatedtools {
+  ScreenTransferFunction
+}
+
+\make
