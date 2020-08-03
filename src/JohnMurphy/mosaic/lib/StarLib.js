@@ -942,14 +942,29 @@ function createImageFromRefAndBitmap(refView, imageRect, maskSamples, bmp, title
     }
     view.endProcess();
 
+    let stf = refView.stf;
+    var HT = new HistogramTransformation;
+    HT.H = 
+        [[stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [0, 0.5, 1, 0, 1],
+        [0, 0.5, 1, 0, 1]];
+
+    HT.executeOn(view, false); // no swap file
+
+    let sampleAreaDialog = new SampleGridDialog(title, view.image, imageRect.x0, imageRect.y0);
+    sampleAreaDialog.execute();
+    
+    w.close();
+
     // Ensure the user can see it!
-    view.stf = refView.stf;
-    w.zoomToFit();
-    if (w.zoomFactor < minZoom){
-        w.zoomFactor = minZoom;
-        w.fitWindow();
-    }
-    w.show();
+//    w.zoomToFit();
+//    if (w.zoomFactor < minZoom){
+//        w.zoomFactor = minZoom;
+//        w.fitWindow();
+//    }
+//    w.show();
     
 }
 
