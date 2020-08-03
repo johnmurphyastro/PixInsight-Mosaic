@@ -1603,7 +1603,7 @@ function main() {
             continue;
         }
 
-        // Calculate and apply the linear fit
+        // Run the script
         photometricMosaic(data);
         data.saveParameters();  // Save script parameters to the newly created mosaic window.
         console.hide();
