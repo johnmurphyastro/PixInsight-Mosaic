@@ -174,7 +174,7 @@ function SplitDialog(data) {
             "Copyright &copy; 2019-2020 John Murphy.");
 
     //-------------------------------------------------------
-    // Create the reference image field
+    // Create the target image field
     //-------------------------------------------------------
     let targetImage_Label = new Label(this);
     targetImage_Label.text = "Target view:";
@@ -203,7 +203,7 @@ function SplitDialog(data) {
     targetImage_Sizer.add(this.targetImage_ViewList, 100);
 
     //-------------------------------------------------------
-    // Linear Fit Method Field
+    // Orientation
     //-------------------------------------------------------
     let algorithm_Label = new Label(this);
     algorithm_Label.text = "Split direction:";
@@ -347,13 +347,12 @@ function main() {
         console.writeln("=================================================");
         console.writeln("<b>", TITLE, " ", VERSION, "</b>:");
 
-        // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
             (new MessageBox("WARNING: Target view must be selected", TITLE, StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
 
-        // Calculate and apply the linear fit
+        // User has selected OK. Split the image into two
         splitImage(data);
         console.hide();
 
