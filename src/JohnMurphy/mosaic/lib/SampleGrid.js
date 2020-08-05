@@ -42,15 +42,12 @@ function SamplePair(targetMedian, referenceMedian, rect) {
  * Create SamplePair[] for each color channel
  * @param {Image} targetImage
  * @param {Image} referenceImage
- * @param {LinearFitData[]} scaleFactors
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {Rect} sampleRect Reject samples outside this area (overlap bounding box)
  * @param {PhotometricMosaicData} data User settings
- * @param {Boolean} isHorizontal Determines sort order for SamplePair
- * @returns {SamplePair[][]} Returns SamplePair[] for each color
+ * @returns {SampleGridMap} Map of sample squares (all color channels)
  */
-function createSampleGrid(targetImage, referenceImage, scaleFactors,
-        stars, sampleRect, data, isHorizontal) {
+function createSampleGridMap(targetImage, referenceImage, stars, sampleRect, data) {
 
     let firstNstars;
     if (data.limitSampleStarsPercent < 100){
@@ -61,17 +58,28 @@ function createSampleGrid(targetImage, referenceImage, scaleFactors,
                 
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
-    let bins = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
-    bins.addSampleBins(targetImage, referenceImage, data.linearRange);
-    bins.removeBinRectWithStars(stars, firstNstars, data.sampleStarRadiusMult);
+    let sampleGridMap = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
+    sampleGridMap.addSampleBins(targetImage, referenceImage, data.linearRange);
+    sampleGridMap.removeBinRectWithStars(stars, firstNstars, data.sampleStarRadiusMult);
     
-    // Use the radius of the brightest detected star * 2
-    //let radius = Math.sqrt(stars[0].size);
-    //bins.removeBinRectWithSaturatedStars(radius);
+    return sampleGridMap;
+}
+
+/**
+ * Create SamplePair[] for each color channel
+ * @param {SampleGridMap} sampleGridMap Map of sample squares (all color channels)
+ * @param {Image} targetImage
+ * @param {Image} referenceImage
+ * @param {LinearFitData[]} scaleFactors
+ * @param {Boolean} isHorizontal Determines sort order for SamplePair
+ * @returns {SamplePair[][]} Returns SamplePair[] for each color
+ */
+function createSamplePairs(sampleGridMap, targetImage, referenceImage, scaleFactors, isHorizontal){
+    let nChannels = referenceImage.isColor ? 3 : 1;
     let colorSamplePairs = [];
     for (let c=0; c<nChannels; c++){
         let scale = scaleFactors[c].m;
-        let samplePairArray = bins.createSamplePairArray(targetImage, referenceImage,
+        let samplePairArray = sampleGridMap.createSamplePairArray(targetImage, referenceImage,
                 scale, c, isHorizontal);
         colorSamplePairs.push(samplePairArray);
     }
@@ -100,9 +108,6 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
     let y1_ = overlapBox.y1;
     // binRect maps for all colors
     let binRectMapArray_ = [];
-    
-    // For stars too bright to have been detected by StarDetector
-//    this.tooBrightMap = new Map();
     
     for (let c=0; c<nChannels; c++){
         binRectMapArray_.push(new Map());
@@ -169,6 +174,14 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
             samplePairArray.sort((a, b) => a.rect.y0 - b.rect.y0);
         }
         return samplePairArray;
+    };
+    
+    /**
+     * @param {Number} channel Get sample rectanges for this color channel
+     * @returns {Rect[]} Array of sample grid rectangles 
+     */
+    this.getBinRectArray = function(channel){
+        return binRectMapArray_[channel].values();
     };
     
     // Private methods
@@ -253,27 +266,9 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
                 // exclude this sample from this channel.
                 continue;
             }
-//            if (tgtImage.maximum(binRect) > rejectHigh || refImage.maximum(binRect) > rejectHigh){
-//                // Star will not be in star array, so deal with it separately
-//                this.tooBrightMap.set(this.createKey(xKey, yKey), refImage.maximumPosition(binRect));
-//                return;
-//            }
             binRectMapArray_[c].set(createKey(xKey, yKey), binRect);
         }
     }
-    
-//    /**
-//     * Remove all bin entries that are fully or partially covered by a saturated star
-//     * addBinRect() records these to the 'tooBrightMap', along with the
-//     * position of the brightest pixel. We treat this brightest pixel as the 
-//     * center of a bright star.
-//     * @param {Number} starRadius
-//     */
-//    this.removeBinRectWithSaturatedStars = function(starRadius){
-//        for (let point of this.tooBrightMap.values()){
-//            this.removeBinsInCircle(point, starRadius);
-//        }
-//    };
     
     /**
      * Reject bin entries from the map if:
@@ -315,53 +310,6 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
             binRectMapArray_[c].delete(key);
         }
     }
-}
-
-/** Display the SamplePair squares
- * @param {Image} refView Copy image and STF from this view.
- * @param {SamplePair[]} samplePairs The samplePairs to be displayed.
- * @param {StarsDetected} detectedStars
- * @param {String} title Window title
- * @param {PhotometricMosaicData} data User settings
- */
-function displaySampleGrid(refView, samplePairs, detectedStars, title, data) {
-    const overlapBox = data.cache.overlap.overlapBox;
-    let offsetX = -overlapBox.x0;
-    let offsetY = -overlapBox.y0;
-    let bmp = new Bitmap(overlapBox.width, overlapBox.height);
-    bmp.fill(0x00000000);
-    //let G = new VectorGraphics(bmp);
-    let G = new Graphics(bmp);  // makes it easier to see which samples have been rejected
-    G.pen = new Pen(0xffff0000);
-    samplePairs.forEach(function (samplePair) {
-        let rect = new Rect(samplePair.rect);
-        rect.translateBy(offsetX, offsetY);
-        G.drawRect(rect);
-    });
-
-    let stars = detectedStars.allStars;
-    let firstNstars;
-    if (data.limitSampleStarsPercent < 100){
-        firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
-    } else {
-        firstNstars = stars.length;
-    }
-    G.antialiasing = true;
-    for (let i = 0; i < firstNstars; ++i){
-        let star = stars[i];
-        let radius = Math.sqrt(star.size)/2;
-        let x = star.pos.x + offsetX;
-        let y = star.pos.y + offsetY;
-        G.strokeCircle(x, y, radius);
-    }
-    G.end();
-    
-    let keywords = [];
-    fitsHeaderImages(keywords, data);
-    fitsHeaderStarDetection(keywords, data);
-    fitsHeaderGradient(keywords, data, false, false);
-    
-    createOverlapImage(refView, data.cache.overlap, bmp, title, keywords, 1);
 }
 
 /**

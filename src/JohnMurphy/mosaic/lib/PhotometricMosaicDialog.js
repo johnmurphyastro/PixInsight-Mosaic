@@ -311,59 +311,59 @@ function PhotometricMosaicData() {
     };
 
     // Used when the user presses the reset button
-    this.resetParameters = function (linearFitDialog) {
+    this.resetParameters = function (photometricMosaicDialog) {
         // Reset the script's data
         this.setParameters();
         
         // Star Detection
-        linearFitDialog.starDetectionControl.setValue(this.logStarDetection);
+        photometricMosaicDialog.starDetectionControl.setValue(this.logStarDetection);
         
         // Photometric Star Search
-        linearFitDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
-        linearFitDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
+        photometricMosaicDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
+        photometricMosaicDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
         
         // Photometric Scale
-        linearFitDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
-        linearFitDialog.rejectHigh_Control.setValue(this.linearRange);
-        linearFitDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
+        photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
+        photometricMosaicDialog.rejectHigh_Control.setValue(this.linearRange);
+        photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
         // Join Region
-        linearFitDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
-        linearFitDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
-        linearFitDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
-        linearFitDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        linearFitDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
-        linearFitDialog.taperFromJoin_Control.checked = this.taperFromJoin;
-        linearFitDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
+        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
+        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
+        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
+        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
+        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
+        photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
+        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
         
         // Join Size
-        linearFitDialog.joinSize_Control.setValue(this.joinSize);
-        linearFitDialog.setHasJoinSize(this.hasJoinSize);
+        photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
+        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
         
         // Gradient Sample Generation
-        linearFitDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
-        linearFitDialog.sampleStarRadiusMult_Control.setValue(this.sampleStarRadiusMult);
-        linearFitDialog.sampleSize_Control.setValue(this.sampleSize);
-        linearFitDialog.maxSamples_Control.setValue(this.maxSamples);
+        photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
+        photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(this.sampleStarRadiusMult);
+        photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
+        photometricMosaicDialog.maxSamples_Control.setValue(this.maxSamples);
         
         // Gradient Tapered Correction
-        linearFitDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
-        linearFitDialog.taperLength_Control.setValue(this.taperLength);
+        photometricMosaicDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
+        photometricMosaicDialog.taperLength_Control.setValue(this.taperLength);
         
         // Gradient Propagated Correction
-        linearFitDialog.extrapolatedGradientSmoothness_Control.setValue(this.extrapolatedGradientSmoothness);
-        linearFitDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
+        photometricMosaicDialog.extrapolatedGradientSmoothness_Control.setValue(this.extrapolatedGradientSmoothness);
+        photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
         
         // Mosaic Star Mask
-        linearFitDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
-        linearFitDialog.maskStarRadiusMult_Control.setValue(this.maskStarRadiusMult);
-        linearFitDialog.maskStarRadiusAdd_Control.setValue(this.maskStarRadiusAdd);
+        photometricMosaicDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
+        photometricMosaicDialog.maskStarRadiusMult_Control.setValue(this.maskStarRadiusMult);
+        photometricMosaicDialog.maskStarRadiusAdd_Control.setValue(this.maskStarRadiusAdd);
         
         // Create Mosaic
-        linearFitDialog.setCreateMosaicFlag(this.createMosaicFlag);
-        linearFitDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
-        linearFitDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
-        linearFitDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
+        photometricMosaicDialog.setCreateMosaicFlag(this.createMosaicFlag);
+        photometricMosaicDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
+        photometricMosaicDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
+        photometricMosaicDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
     };
     
     // Initialise the script's data
@@ -922,67 +922,24 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Gradient Sample Generation"
     // =======================================
-    const SampleGenerationStrLen = this.font.width("Multiply star radius:");
-    this.limitSampleStarsPercent_Control = new NumericControl(this);
-    this.limitSampleStarsPercent_Control.real = false;
-    this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitSampleStarsPercent_Control.label.minWidth = SampleGenerationStrLen;
-    this.limitSampleStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
-            "<p>100% implies that all detected stars are used to reject samples.</p>" +
-            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
-            "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can affect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is only necessary to reject bright stars. This script uses the " +
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. It is more important to " +
-            "include most of the samples than to reject faint stars.</p>";
+    const sampleGenerationStrLen = this.font.width("Multiply star radius:");
+    
+    this.limitSampleStarsPercent_Control = 
+            createLimitSampleStarsPercentControl(this, data, sampleGenerationStrLen);
     this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
     };
-    this.limitSampleStarsPercent_Control.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.slider.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.slider.minWidth = 140;
-    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
     
-    this.sampleStarRadiusMult_Control = new NumericControl(this);
-    this.sampleStarRadiusMult_Control.real = true;
-    this.sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
-    this.sampleStarRadiusMult_Control.label.minWidth = SampleGenerationStrLen;
-    this.sampleStarRadiusMult_Control.toolTip =
-            "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>" +
-            "<p>Read the Help sections on 'Join Region' to learn when these " +
-            "samples should be rejected.</p>";
+    this.sampleStarRadiusMult_Control = 
+            createSampleStarRadiusMultControl(this, data, sampleGenerationStrLen);
     this.sampleStarRadiusMult_Control.onValueUpdated = function (value) {
         data.sampleStarRadiusMult = value;
     };
-    this.sampleStarRadiusMult_Control.setPrecision(1);
-    this.sampleStarRadiusMult_Control.setRange(1, 25);
-    this.sampleStarRadiusMult_Control.slider.setRange(1, 250);
-    this.sampleStarRadiusMult_Control.slider.minWidth = 250;
-    this.sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);
     
-    this.sampleSize_Control = new NumericControl(this);
-    this.sampleSize_Control.real = false;
-    this.sampleSize_Control.label.text = "Sample size:";
-    this.sampleSize_Control.label.minWidth = SampleGenerationStrLen;
-    this.sampleSize_Control.toolTip =
-            "<p>Specifies the size of the sample squares.</p>" +
-            "<p>Ideally, the samples should be about 1.5x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>" +
-            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>";
+    this.sampleSize_Control = createSampleSizeControl(this, data, sampleGenerationStrLen);
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
     };
-    this.sampleSize_Control.setRange(3, 50);
-    this.sampleSize_Control.slider.setRange(3, 50);
-    this.sampleSize_Control.slider.minWidth = 200;
-    this.sampleSize_Control.setValue(data.sampleSize);
     
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Sample grid";
@@ -1008,7 +965,7 @@ function PhotometricMosaicDialog(data) {
     this.maxSamples_Control = new NumericControl(this);
     this.maxSamples_Control.real = false;
     this.maxSamples_Control.label.text = "Max samples:";
-    this.maxSamples_Control.label.minWidth = SampleGenerationStrLen;
+    this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
     this.maxSamples_Control.toolTip =
             "<p>Limits the number of samples used to create the surface spline. " +
             "If the number of samples exceed this limit, they are combined " +
@@ -1528,6 +1485,67 @@ function PhotometricMosaicDialog(data) {
     this.setFixedSize();
 }
 
+function createLimitSampleStarsPercentControl(dialog, data, sampleGenerationStrLen){
+    let limitSampleStarsPercent_Control = new NumericControl(dialog);
+    limitSampleStarsPercent_Control.real = false;
+    limitSampleStarsPercent_Control.label.text = "Limit stars %:";
+    limitSampleStarsPercent_Control.label.minWidth = sampleGenerationStrLen;
+    limitSampleStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples.</p>" +
+            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
+            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
+            "<li>Bright stars can have significantly different profiles between " +
+            "the reference and target images. This can affect how many of the " +
+            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "<p>It is only necessary to reject bright stars. This script uses the " +
+            "median value from each sample, so any star that takes up less than " +
+            "half the sample area will have little effect. It is more important to " +
+            "include most of the samples than to reject faint stars.</p>";
+    limitSampleStarsPercent_Control.setRange(0, 100);
+    limitSampleStarsPercent_Control.slider.setRange(0, 100);
+    limitSampleStarsPercent_Control.slider.minWidth = 101;
+    limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
+    return limitSampleStarsPercent_Control;
+}
+ 
+function createSampleStarRadiusMultControl(dialog, data, labelLength){
+    let sampleStarRadiusMult_Control = new NumericControl(dialog);
+    sampleStarRadiusMult_Control.real = true;
+    sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
+    sampleStarRadiusMult_Control.label.minWidth = labelLength;
+    sampleStarRadiusMult_Control.toolTip =
+            "<p>Increase to reject more samples around saturated stars.</p>" +
+            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>" +
+            "<p>Read the Help sections on 'Join Region' to learn when these " +
+            "samples should be rejected.</p>";
+    sampleStarRadiusMult_Control.setPrecision(1);
+    sampleStarRadiusMult_Control.setRange(1, 25);
+    sampleStarRadiusMult_Control.slider.setRange(1, 250);
+    sampleStarRadiusMult_Control.slider.minWidth = 250;
+    sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);
+    return sampleStarRadiusMult_Control;
+}
+ 
+function createSampleSizeControl(dialog, data, labelLength){
+    let sampleSize_Control = new NumericControl(dialog);
+    sampleSize_Control.real = false;
+    sampleSize_Control.label.text = "Sample size:";
+    sampleSize_Control.label.minWidth = labelLength;
+    sampleSize_Control.toolTip =
+            "<p>Specifies the size of the sample squares.</p>" +
+            "<p>Ideally, the samples should be about 1.5x the size of the largest " +
+            "star that's not rejected by 'Limit stars %'.</p>" +
+            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>";
+    sampleSize_Control.setRange(3, 50);
+    sampleSize_Control.slider.setRange(3, 50);
+    sampleSize_Control.slider.minWidth = 50;
+    sampleSize_Control.setValue(data.sampleSize);
+    return sampleSize_Control;
+}
+
 // Our dialog inherits all properties and methods from the core Dialog object.
 PhotometricMosaicDialog.prototype = new Dialog;
 
@@ -1553,10 +1571,10 @@ function main() {
         data.loadParameters();
     }
 
-    let linearFitDialog = new PhotometricMosaicDialog(data);
+    let photometricMosaicDialog = new PhotometricMosaicDialog(data);
     for (; ; ) {
         data.viewFlag = 0;
-        if (!linearFitDialog.execute())
+        if (!photometricMosaicDialog.execute())
             break;
         console.show();
         console.abortEnabled = false; // Allowing abort would complicate cache strategy
@@ -1604,7 +1622,7 @@ function main() {
         }
 
         // Run the script
-        photometricMosaic(data);
+        photometricMosaic(data, photometricMosaicDialog);
         data.saveParameters();  // Save script parameters to the newly created mosaic window.
         console.hide();
     }

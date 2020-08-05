@@ -1,6 +1,95 @@
-/* global Dialog, StdCursor_ClosedHand, MouseButton_Left, StdCursor_UpArrow, Frame */
+/* global Dialog, StdCursor_ClosedHand, MouseButton_Left, StdCursor_UpArrow, Frame, UndoFlag_NoSwapFile, StdCursor_Checkmark */
 
-// This file is based on PreviewControl.js from the AnnotationImage script, 
+// (c) John Murphy 4th-July-2020
+//
+// ======== #license ===============================================================
+// This program is free software: you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by the
+// Free Software Foundation, version 3 of the License.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+// more details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program.  If not, see <http://www.gnu.org/licenses/>.
+// =================================================================================
+//"use strict";
+
+/**
+ * Extract the overlap image from the supplied view.
+ * The view is cropped to the overlap bounding box. Any pixels within this 
+ * bounding box that are not part of the overlap are set to black.
+ * The resulting image has the original STF applied as a stretch and is 
+ * returned as a bitmap image.
+ * @param {View} refView The overlap image will be extracted from the image in this view.
+ * @param {Rect} imageRect The overlap bounding box rectangle.
+ * @param {TypedArray} maskSamples Specifies the overlapping pixels.
+ * @returns {Bitmap} Image of the overlapping pixels
+ */
+function extractOverlapImage(refView, imageRect, maskSamples){
+    /**
+     * Get all the samples from the image that are within the area rectangle.
+     * @param {Float32Array} refSamples Overlap area from refView (modified)
+     * @param {Float32Array} mask If mask is zero, set refSamples to zero
+     */
+    function applyMask(refSamples, mask) {
+        for (let i = mask.length - 1; i > -1; i--) {
+            if (mask[i] === 0) {
+                refSamples[i] = 0;
+            }
+        }
+    };
+    
+    if (maskSamples.length !== imageRect.width * imageRect.height){
+        console.criticalln("PreviewControl extractOverlapImage error: mask does not match crop area.\n" +
+                "Mask buffer length = " + maskSamples.length + 
+                "\nCrop rectangle = " + imageRect);
+        return null; // TODO should throw exception
+    }
+    let refImage = refView.image;
+    let refSamples = new Float32Array(maskSamples.length);
+    let rect = new Rect(imageRect.width, imageRect.height);
+    
+    // Create a temporary view just big enough for the overlapping region's bounding box
+    // Width, height, n channels, bitsPerSample, float, color, title
+    let w = new ImageWindow(imageRect.width, imageRect.height, 3, 16, false, true, "OverlapImage");
+    let view = w.mainView;
+    view.beginProcess(UndoFlag_NoSwapFile);
+    if (refImage.isColor){
+        for (let c = 0; c < 3; c++){
+            refImage.getSamples(refSamples, imageRect, c);
+            applyMask(refSamples, maskSamples);
+            view.image.setSamples(refSamples, rect, c);
+        }
+    } else {
+        refImage.getSamples(refSamples, imageRect, 0);
+        applyMask(refSamples, maskSamples);
+        view.image.setSamples(refSamples, rect, 0);
+        view.image.setSamples(refSamples, rect, 1);
+        view.image.setSamples(refSamples, rect, 2);
+    }
+    view.endProcess();
+
+    // Apply a Histogram Transformation based on the reference view's STF
+    // before converting this temporary view into a bitmap
+    let stf = refView.stf;
+    var HT = new HistogramTransformation;
+    HT.H = 
+        [[stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [stf[0][1], stf[0][0], stf[0][2], 0, 1],
+        [0, 0.5, 1, 0, 1],
+        [0, 0.5, 1, 0, 1]];
+    HT.executeOn(view, false); // no swap file
+
+    let bitmap = view.image.render();
+    w.close();
+    return bitmap;
+}
+
+// the PreviewControl method is based on PreviewControl.js from the AnnotationImage script, 
 // which has the following copyright notice:
 /*
  Preview Control
@@ -33,37 +122,44 @@
  POSSIBILITY OF SUCH DAMAGE.
  */
 // Modified by John Murphy
-//"use strict";
-#include <pjsr/ButtonCodes.jsh>
-#include <pjsr/StdCursor.jsh>
 
+/**
+ * 
+ * @param {UIObject} parent
+ * @param {Bitmap} image image The unscaled bitmap to display. It is not modified.
+ * @param {width:, height:} metadata Specifies dimensions of drawing region if image = null
+ * @returns {PreviewControl}
+ */
 function PreviewControl(parent, image, metadata) {
     this.__base__ = Frame;
     this.__base__(parent);
 
     /**
-     * 
+     * Set the background image, or the drawing area if the image is null
      * @param {Bitmap} image The unscaled bitmap to display. It is not modified.
      * @param {width:, height:} metadata Specifies dimensions of drawing region if image = null
-     * TODO check how metadata is used; Is it an independant draw area size?
      */
     this.setImage = function (image, metadata) {
-        this.image = image;
         if (metadata){
             this.metadata = metadata;
         } else {
             this.metadata = {width: image.width, height:image.height};
         }
-        // The zoomed bitmap, calculated from image.
+        // The original bitmap at 1:1 scale
+        this.image = image;
+        // The zoomed bitmap, calculated from this.image
         this.scaledImage = null;
-        // Set the lower zoom limit when the whole image is visible.
+        // Set the lower zoom limit when the whole image is visible
         this.setZoomOutLimit();
-        // This sets the inital zoom to 1:1. Use -100 to set to ZoomOutLimit.
+        // This sets the inital zoom to 1:1. Use -100 to set to ZoomOutLimit
         this.updateZoom(1, null);
     };
 
     /**
-     * Update the zoom, constrained to the ZoomOutLimit
+     * Update the zoom, constrained to the ZoomOutLimit. Max zoom = 4.
+     * If newZoom > 0 and <= 4, scale = newZoom
+     * If newZoom <= 0 and >= zoomOutLimit, scale = 1/(-newZoom + 2)
+     * e.g. 2 -> 2, 1 -> 1, 0 -> 1/2, -1 -> 1/3
      * @param {Number} newZoom
      * @param {Point} refPoint Center zoom here (if null defaults to center of viewport).
      * refPoint is in local viewport coordinates
@@ -89,7 +185,7 @@ function PreviewControl(parent, image, metadata) {
         this.scaledImage = null;
         gc(true);
 
-        // Calculate scale from zoom index. e.g. 2 -> 2, 1 -> 1, 0 -> 1/2, -1 -> 1/3
+        // Calculate scale from zoom index. 
         // Update zoom text
         let zoomText;
         if (this.zoom > 0) {
@@ -277,6 +373,12 @@ function PreviewControl(parent, image, metadata) {
         }
     };
 
+    /**
+     * @param {Number} wNew New width
+     * @param {Number} hNew New height
+     * @param {Number} wOld old width
+     * @param {Number} hOld old height
+     */
     this.scrollbox.viewport.onResize = function (wNew, hNew, wOld, hOld) {
         let preview = this.parent.parent;
         if (preview.scaledImage) {
@@ -290,17 +392,23 @@ function PreviewControl(parent, image, metadata) {
         this.update();
     };
 
+    /**
+     * @param {Number} x0 Viewport x0
+     * @param {Number} y0 Viewport y0
+     * @param {Number} x1 Viewport x1
+     * @param {Number} y1 Viewport y1
+     */
     this.scrollbox.viewport.onPaint = function (x0, y0, x1, y1) {
         let preview = this.parent.parent;
         let graphics = new VectorGraphics(this);
 
         graphics.fillRect(x0, y0, x1, y1, new Brush(0xff202020));
 
-        let offsetX = (this.parent.maxHorizontalScrollPosition > 0) ?
+        let translateX = (this.parent.maxHorizontalScrollPosition > 0) ?
                 -this.parent.horizontalScrollPosition : (this.width - preview.scaledImage.width) / 2;
-        let offsetY = (this.parent.maxVerticalScrollPosition > 0) ?
+        let translateY = (this.parent.maxVerticalScrollPosition > 0) ?
                 -this.parent.verticalScrollPosition : (this.height - preview.scaledImage.height) / 2;
-        graphics.translateTransformation(offsetX, offsetY);
+        graphics.translateTransformation(translateX, translateY);
 
         if (preview.image)
             graphics.drawBitmap(0, 0, preview.scaledImage);
@@ -311,13 +419,17 @@ function PreviewControl(parent, image, metadata) {
         graphics.drawRect(-1, -1, preview.scaledImage.width + 1, preview.scaledImage.height + 1);
 
         if (preview.onCustomPaint) {
-            graphics.antialiasing = true;
-            graphics.scaleTransformation(preview.scale, preview.scale);
-            preview.onCustomPaint.call(preview.onCustomPaintScope, graphics, x0, y0, x1, y1);
+            // Draw on top of the bitmap if onCustomPaint(...) method has been set
+            preview.onCustomPaint.call(preview.onCustomPaintScope, 
+                    this, translateX, translateY, preview.scale, x0, y0, x1, y1);
         }
 
         graphics.end();
     };
+    
+    this.ok_Button = new PushButton();
+    this.ok_Button.text = "OK";
+    this.ok_Button.cursor = new Cursor(StdCursor_Checkmark);
 
     this.zoomButton_Sizer = new HorizontalSizer();
     this.zoomButton_Sizer.margin = 4;
@@ -326,6 +438,7 @@ function PreviewControl(parent, image, metadata) {
     this.zoomButton_Sizer.add(this.zoomOut_Button);
     this.zoomButton_Sizer.add(this.zoom11_Button);
     this.zoomButton_Sizer.addStretch();
+    this.zoomButton_Sizer.add(this.ok_Button);
 
     this.sizer = new VerticalSizer();
     this.sizer.add(this.scroll_Sizer);
@@ -334,7 +447,7 @@ function PreviewControl(parent, image, metadata) {
     this.setImage(image, metadata);
     
     this.width = Math.min(this.logicalPixelsToPhysical(1800), image.width + 10);
-    this.height = Math.min(this.logicalPixelsToPhysical(1000), image.height + this.zoomIn_Button.height + 20);
+    this.height = Math.min(this.logicalPixelsToPhysical(900), image.height + this.zoomIn_Button.height + 20);
 }
 
 PreviewControl.prototype = new Frame;

@@ -1,4 +1,4 @@
-/* global Dialog, StdCursor_ClosedHand, MouseButton_Left, StdCursor_UpArrow */
+/* global Dialog, StdCursor_ClosedHand, MouseButton_Left, StdCursor_UpArrow, StdCursor_Checkmark */
 
 // Version 1.0 (c) John Murphy 30th-July-2020
 //
@@ -18,62 +18,173 @@
 //"use strict";
 
 /**
- * Create a dialog that displays a graph.
- * The Graph object returned from the supplied createZoomedGraph(Number zoomFactor) 
- * function must include the methods:
- * Bitmap Graph.getGraphBitmap()
- * String Graph.screenToWorld(Number x, Number y)
+ * Display the SampleGrid in a Dialog that contains a scrolled window and 
+ * controls to adjust the SampleGrid parameters.
  * @param {String} title Window title
- * @param {Image} image Convert this image into a bitmap using current STF and display it
- * @param {Number} offsetX Offset in pixels from (0,0) to the left side of the bitmap
- * @param {Number} offsetY Offset in pixels from (0,0) to the top side of the bitmap
+ * @param {Bitmap} bitmap Background image of the overlap area at 1:1 scale
+ * @param {SampleGridMap} sampleGridMap Specifies the grid samples
+ * @param {StarsDetected} detectedStars Contains all the detected stars
+ * @param {PhotometricMosaicData} data Values from user interface
+ * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
-function SampleGridDialog(title, image, offsetX, offsetY)
+function SampleGridDialog(title, bitmap, sampleGridMap, detectedStars, data, photometricMosaicDialog)
 {
     this.__base__ = Dialog;
     this.__base__();
     
     let self = this;
-    let bitmap = image.render();
     let zoomText = "1:1";
-    let coordText = "(---,---)";
+    let coordText;
+    setCoordText(null);
+    let bitmapOffset = getBitmapOffset(data);
     
-    this.userResizable = true;
-    this.previewControl = new PreviewControl(this, bitmap, null);
-    this.previewControl.setTitleText = setTitle;
-    this.previewControl.updateZoomText = function (text){
-        zoomText = text;
-        setTitle();
-    };
-    this.previewControl.updateCoord = function (point){
-        if (point === null){
-            coordText = "(---,---)";
-        } else {
-            let x = offsetX + point.x;
-            let y = offsetY + point.y;
-            coordText = format("(%8.2f,%8.2f )", x, y);
-        }
-        setTitle();
-    };
+    /**
+     * The offset between the full mosaic image and the bounding box of the overlap area.
+     * Note that bitmap is of the overlap area.
+     * @param {PhotometricMosaicData} data
+     * @returns {Point} bitmap offset
+     */
+    function getBitmapOffset(data){
+        let overlapBox = data.cache.overlap.overlapBox;
+        return new Point(overlapBox.x0, overlapBox.y0);
+    }
     
+    /**
+     * Set dialog title, including the current zoom and cursor coordinates
+     */
     function setTitle(){
         self.windowTitle = title + " " + zoomText + " " + coordText;
     };
+    
+    /**
+     * Set coordText, the cursor coordinate text. The coordText
+     * is relative to the full mosaic image's top left corner.
+     * @param {Point} point cursor coordinates relative to the (1:1) bitmap
+     */
+    function setCoordText(point){
+        if (point === null){
+            coordText = "(---,---)";
+        } else {
+            let x = bitmapOffset.x + point.x;
+            let y = bitmapOffset.y + point.y;
+            coordText = format("(%8.2f,%8.2f )", x, y);
+        }
+    }
+    
+    /**
+     * Draw on top of the background bitmap, within the scrolled window
+     * @param {Control} viewport
+     * @param {Number} translateX
+     * @param {Number} translateY
+     * @param {Number} scale
+     */
+    function drawSampleGrid(viewport, translateX, translateY, scale){
+        let graphics = new VectorGraphics(viewport);
+        graphics.translateTransformation(translateX, translateY);
+        graphics.scaleTransformation(scale, scale);
+        graphics.pen = new Pen(0xffff0000);
+        // Draw the sample grid
+        for (let binRect of sampleGridMap.getBinRectArray(0)){
+            let rect = new Rect(binRect);
+            rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
+            graphics.drawRect(rect);
+        }
+        
+        // Draw circles around the stars used to reject grid sample squares
+        let stars = detectedStars.allStars;
+        let firstNstars;
+        if (data.limitSampleStarsPercent < 100){
+            firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
+        } else {
+            firstNstars = stars.length;
+        }
+        graphics.antialiasing = true;
+        for (let i = 0; i < firstNstars; ++i){
+            let star = stars[i];
+            let radius = Math.sqrt(star.size)/2;
+            let x = star.pos.x - bitmapOffset.x;
+            let y = star.pos.y - bitmapOffset.y;
+            graphics.strokeCircle(x, y, radius);
+        }
+        graphics.end();
+    }
+    
+    // =================================
+    // Sample Generation Preview frame
+    // =================================
+    let previewControl = new PreviewControl(this, bitmap, null);
+    previewControl.updateZoomText = function (text){
+        zoomText = text;
+        setTitle();
+    };
+    previewControl.updateCoord = function (point){
+        setCoordText(point);
+        setTitle();
+    };
+    previewControl.onCustomPaintScope = this;
+    previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
+        drawSampleGrid(viewport, translateX, translateY, scale);
+    };
+    previewControl.ok_Button.onClick = function(){
+        self.ok();
+    };
+    
+    // ========================================
+    // User controls
+    // ========================================
+    const labelLength = this.font.width("Multiply star radius:");
+    let limitSampleStarsPercent_Control = 
+            createLimitSampleStarsPercentControl(this, data, labelLength);
+        limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
+        updateSampleGrid();
+        photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
+    };
+    
+    let sampleStarRadiusMult_Control =
+            createSampleStarRadiusMultControl(this, data, labelLength);
+    sampleStarRadiusMult_Control.onValueUpdated = function (value){
+        data.sampleStarRadiusMult = value;
+        updateSampleGrid();
+        photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(value);
+    };
+    
+    let sampleSize_Control = createSampleSizeControl(this, data, labelLength);
+    sampleSize_Control.onValueUpdated = function (value) {
+        data.sampleSize = value;
+        updateSampleGrid();
+        photometricMosaicDialog.sampleSize_Control.setValue(value);
+    };
+    
+    /**
+     * Create a new SampleGridMap from the updated parameters, and draw it 
+     * on top of the background bitmap within the scrolled window.
+     */
+    function updateSampleGrid(){
+        sampleGridMap = createSampleGridMap(data.targetView.image, data.referenceView.image,
+            detectedStars.allStars, data.cache.overlap.overlapBox, data);
+        previewControl.forceRedraw();
+    }
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 8;
-    this.sizer.spacing = 6;
-    this.sizer.add(this.previewControl);
-    this.sizer.addSpacing(2);
-//   this.sizer.add( this.buttons_Sizer );
+    this.sizer.margin = 4;
+    this.sizer.spacing = 4;
+    this.sizer.add(previewControl);
+    this.sizer.add(limitSampleStarsPercent_Control);
+    this.sizer.add(sampleStarRadiusMult_Control);
+    this.sizer.add(sampleSize_Control);
 
-    this.resize(this.previewControl.width + 50, this.previewControl.height + 50);
+    // The PreviewControl size is determined by the size of the bitmap
+    // The dialog must also leave enough room for the extra controls we are adding
+    this.userResizable = true;
+    let preferredWidth = previewControl.width + 50;
+    let preferredHeight = previewControl.height + 50 + 4 * 5 + 
+            limitSampleStarsPercent_Control.height * 3;
+    this.resize(preferredWidth, preferredHeight);
+    
     setTitle();
 }
 
 SampleGridDialog.prototype = new Dialog;
-
-
-

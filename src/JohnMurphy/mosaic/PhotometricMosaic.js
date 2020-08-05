@@ -57,7 +57,7 @@ function DISPLAY_BINNED_SAMPLES(){return 512;}
  * Controller. Processing starts here!
  * @param {PhotometricMosaicData} data Values from user interface
  */
-function photometricMosaic(data)
+function photometricMosaic(data, photometricMosaicDialog)
 {
     let startTime = new Date().getTime();
     let targetView = data.targetView;
@@ -238,15 +238,22 @@ function photometricMosaic(data)
         return;
     }
     
-    let colorSamplePairs = createSampleGrid(targetView.image, referenceView.image,
-            scaleFactors, detectedStars.allStars, overlapBox, data, isHorizontal);
+    //targetImage, referenceImage, stars, sampleRect, data
+    let sampleGridMap = createSampleGridMap(targetView.image, referenceView.image,
+            detectedStars.allStars, overlapBox, data);
+            
+    let colorSamplePairs = createSamplePairs(
+            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal);
     if (colorSamplePairs[0].length < 3) {
         new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
-        let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Samples";
-        displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
+        let overlap = data.cache.overlap;
+        let bitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new SampleGridDialog("SampleGrid", bitmap, sampleGridMap, detectedStars, 
+                data, photometricMosaicDialog);
+        dialog.execute();
         return;
     }
     
