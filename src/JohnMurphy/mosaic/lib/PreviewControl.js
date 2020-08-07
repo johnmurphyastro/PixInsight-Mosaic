@@ -417,7 +417,7 @@ function PreviewControl(parent, image, metadata) {
     this.scrollbox.viewport.onPaint = function (x0, y0, x1, y1) {
         let preview = this.parent.parent;
         let graphics = new VectorGraphics(this);
-
+        graphics.clipRect = new Rect(x0, y0, x1, y1);
         graphics.fillRect(x0, y0, x1, y1, new Brush(0xff202020));
 
         let translateX = (this.parent.maxHorizontalScrollPosition > 0) ?

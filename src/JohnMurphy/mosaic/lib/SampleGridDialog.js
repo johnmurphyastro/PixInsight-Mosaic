@@ -92,9 +92,14 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * @param {Number} translateX
      * @param {Number} translateY
      * @param {Number} scale
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
      */
-    function drawSampleGrid(viewport, translateX, translateY, scale){
+    function drawSampleGrid(viewport, translateX, translateY, scale, x0, y0, x1, y1){
         let graphics = new VectorGraphics(viewport);
+        graphics.clipRect = new Rect(x0, y0, x1, y1);
         graphics.translateTransformation(translateX, translateY);
         graphics.scaleTransformation(scale, scale);
         graphics.pen = new Pen(0xffff0000);
@@ -139,7 +144,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     previewControl.onCustomPaintScope = this;
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        drawSampleGrid(viewport, translateX, translateY, scale);
+        drawSampleGrid(viewport, translateX, translateY, scale, x0, y0, x1, y1);
     };
     previewControl.ok_Button.onClick = function(){
         self.ok();

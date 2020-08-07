@@ -114,9 +114,14 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
      * @param {Number} translateX
      * @param {Number} translateY
      * @param {Number} scale
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
      */
-    function drawDetectedStars(viewport, translateX, translateY, scale){
+    function drawDetectedStars(viewport, translateX, translateY, scale, x0, y0, x1, y1){
         let graphics = new VectorGraphics(viewport);
+        graphics.clipRect = new Rect(x0, y0, x1, y1);
         graphics.translateTransformation(translateX, translateY);
         graphics.scaleTransformation(scale, scale);
         graphics.pen = new Pen(0xffff0000);
@@ -145,7 +150,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     };
     previewControl.onCustomPaintScope = this;
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        drawDetectedStars(viewport, translateX, translateY, scale);
+        drawDetectedStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
     };
     previewControl.ok_Button.onClick = function(){
         self.ok();
