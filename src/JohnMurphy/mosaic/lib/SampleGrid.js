@@ -500,20 +500,22 @@ function createBinnedSampleGrid(overlapBox, samplePairs, isHorizontal, sampleMax
         // Area is (weight) * (area of a single input SamplePair)
         // Create a square binnedSamplePair based on this area and the calculated center
         let area = weight * sampleWidth * sampleHeight;
-        let halfWidth;
-        let halfHeight;
+        let width;
+        let height;
         if (area === binWidth * binHeight){
             // fully populated bin
-            halfWidth = Math.round(binWidth / 2);
-            halfHeight = Math.round(binHeight / 2);
+            width = binWidth;
+            height = binHeight;
         } else {
-            halfWidth = Math.round(Math.sqrt(area)/2);
-            halfHeight = halfWidth;
+            width = Math.sqrt(area);
+            height = width;
         }
+        let halfWidth = Math.round(width / 2);
+        let halfHeight = Math.round(height / 2);
         let x0 = center.x - halfWidth;
-        let x1 = center.x + halfWidth;
+        let x1 = x0 + width;
         let y0 = center.y - halfHeight;
-        let y1 = center.y + halfHeight;
+        let y1 = y0 + height;
         let rect = new Rect(x0, y0, x1, y1);
         let binnedSamplePair = new SamplePair(targetMedian, referenceMedian, rect);
         binnedSamplePair.weight = weight;

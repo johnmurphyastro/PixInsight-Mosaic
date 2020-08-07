@@ -18,18 +18,16 @@
 //"use strict";
 
 /**
- * Display the SampleGrid in a Dialog that contains a scrolled window and 
- * controls to adjust the SampleGrid parameters.
+ * Display the detected stars in a Dialog that contains a scrolled window.
+ * The user can choose to display stars from the reference image or the target image.
  * @param {String} title Window title
  * @param {Bitmap} refBitmap Background image of the reference overlap area at 1:1 scale
  * @param {Bitmap} tgtBitmap Background image of the target overlap area at 1:1 scale
- * @param {SampleGridMap} sampleGridMap Specifies the grid samples
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
- * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
-function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedStars, data, photometricMosaicDialog)
+function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
 {
     this.__base__ = Dialog;
     this.__base__();
@@ -37,12 +35,15 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     const REF = 10;
     const TGT = 20;
     let self = this;
+    
     let zoomText = "1:1";
     let coordText;
     setCoordText(null);
     let selectedBitmap = REF;
-    let bitmap = getBitmap(selectedBitmap);
+    let selectedChannel = 3;    // 0=R, 1=G, 2=B, 3 = all
     let bitmapOffset = getBitmapOffset(data);
+    let bitmap = getBitmap(selectedBitmap);
+    let stars = getStars(selectedBitmap, selectedChannel);
     
     /**
      * Return bitmap of the reference or target image
@@ -51,6 +52,27 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      */
     function getBitmap(refOrTgt){
         return refOrTgt === REF ? refBitmap : tgtBitmap;
+    }
+    
+    /**
+     * Display the stars detected in the reference (refOrTgt = REF) or target image.
+     * The displayed stars can be limited to a single color channel.
+     * @param {NUMBER} refOrTgt Set to REF or TGT
+     * @param {Number} channel Only display stars from this channel. If channel = 3,
+     * show all stars in the image (reference image or target image)
+     * @returns {Star[]}
+     */
+    function getStars(refOrTgt, channel){
+        let colorStars = refOrTgt === REF ? detectedStars.refColorStars : detectedStars.tgtColorStars;
+        stars = [];
+        if (channel < colorStars.length){
+            stars = colorStars[channel];
+        } else if (colorStars.length === 3){
+            stars = colorStars[0].concat(colorStars[1], colorStars[2]);
+        } else {
+            stars = colorStars[0];
+        }
+        return stars;
     }
     
     /**
@@ -93,31 +115,15 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * @param {Number} translateY
      * @param {Number} scale
      */
-    function drawSampleGrid(viewport, translateX, translateY, scale){
+    function drawDetectedStars(viewport, translateX, translateY, scale){
         let graphics = new VectorGraphics(viewport);
         graphics.translateTransformation(translateX, translateY);
         graphics.scaleTransformation(scale, scale);
         graphics.pen = new Pen(0xffff0000);
-        graphics.antialiasing = false;
-        // Draw the sample grid
-        for (let binRect of sampleGridMap.getBinRectArray(0)){
-            let rect = new Rect(binRect);
-            rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
-            graphics.drawRect(rect);
-        }
-        
-        // Draw circles around the stars used to reject grid sample squares
-        let stars = detectedStars.allStars;
-        let firstNstars;
-        if (data.limitSampleStarsPercent < 100){
-            firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
-        } else {
-            firstNstars = stars.length;
-        }
         graphics.antialiasing = true;
-        for (let i = 0; i < firstNstars; ++i){
+        for (let i = 0; i < stars.length; ++i){
             let star = stars[i];
-            let radius = Math.sqrt(star.size)/2;
+            let radius = Math.sqrt(star.size)/2 + 4;
             let x = star.pos.x - bitmapOffset.x;
             let y = star.pos.y - bitmapOffset.y;
             graphics.strokeCircle(x, y, radius);
@@ -139,63 +145,88 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     previewControl.onCustomPaintScope = this;
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        drawSampleGrid(viewport, translateX, translateY, scale);
+        drawDetectedStars(viewport, translateX, translateY, scale);
     };
     previewControl.ok_Button.onClick = function(){
         self.ok();
     };
-    
+
     // ========================================
     // User controls
     // ========================================
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
-    refCheckBox.toolTip = "If selected show reference background. Otherwise show target background.";
+    refCheckBox.toolTip = "If selected show reference stars. Otherwise show target stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
+        stars = getStars(selectedBitmap, selectedChannel);
         previewControl.updateBitmap(bitmap);
-        updateSampleGrid();
+        update();
     };
     
+    let redRadioButton = new RadioButton(this);
+    redRadioButton.text = "Red";
+    redRadioButton.toolTip = "Display the detected stars within the red channel";
+    redRadioButton.checked = false;
+    redRadioButton.onClick = function (checked) {
+        selectedChannel = 0;
+        stars = getStars(selectedBitmap, selectedChannel);
+        update();
+    };
+    
+    let greenRadioButton = new RadioButton(this);
+    greenRadioButton.text = "Green";
+    greenRadioButton.toolTip = "Display the detected stars within the green channel";
+    greenRadioButton.checked = false;
+    greenRadioButton.onClick = function (checked) {
+        selectedChannel = 1;
+        stars = getStars(selectedBitmap, selectedChannel);
+        update();
+    };
+    
+    let blueRadioButton = new RadioButton(this);
+    blueRadioButton.text = "Blue";
+    blueRadioButton.toolTip = "Display the detected stars within the blue channel";
+    blueRadioButton.checked = false;
+    blueRadioButton.onClick = function (checked) {
+        selectedChannel = 2;
+        stars = getStars(selectedBitmap, selectedChannel);
+        update();
+    };
+    
+    let allRadioButton = new RadioButton(this);
+    allRadioButton.text = "All";
+    allRadioButton.toolTip = "Display the detected stars from all channels";
+    allRadioButton.checked = true;
+    allRadioButton.onClick = function (checked) {
+        selectedChannel = 3;
+        stars = getStars(selectedBitmap, selectedChannel);
+        update();
+    };
+    
+    if (detectedStars.refColorStars.length === 1){
+        redRadioButton.enabled = false;
+        greenRadioButton.enabled = false;
+        blueRadioButton.enabled = false;
+    }
+    
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 2;
-    optionsSizer.addSpacing(8);
+    optionsSizer.margin = 4;
+    optionsSizer.spacing = 10;
     optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(redRadioButton);
+    optionsSizer.add(greenRadioButton);
+    optionsSizer.add(blueRadioButton);
+    optionsSizer.add(allRadioButton);
     optionsSizer.addStretch();
-    
-    const labelLength = this.font.width("Multiply star radius:");
-    let limitSampleStarsPercent_Control = 
-                createLimitSampleStarsPercentControl(this, data, labelLength);
-            limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-            data.limitSampleStarsPercent = value;
-            updateSampleGrid();
-            photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
-        };
 
-    let sampleStarRadiusMult_Control =
-                createSampleStarRadiusMultControl(this, data, labelLength);
-        sampleStarRadiusMult_Control.onValueUpdated = function (value){
-            data.sampleStarRadiusMult = value;
-            updateSampleGrid();
-            photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(value);
-        };
-
-    let sampleSize_Control = createSampleSizeControl(this, data, labelLength);
-        sampleSize_Control.onValueUpdated = function (value) {
-            data.sampleSize = value;
-            updateSampleGrid();
-            photometricMosaicDialog.sampleSize_Control.setValue(value);
-        };
-    
     /**
-     * Create a new SampleGridMap from the updated parameters, and draw it 
-     * on top of the background bitmap within the scrolled window.
+     * Draw the stars on top of the background bitmap within the scrolled window.
      */
-    function updateSampleGrid(){
-        sampleGridMap = createSampleGridMap(data.targetView.image, data.referenceView.image,
-            detectedStars.allStars, data.cache.overlap.overlapBox, data);
+    function update(){
         previewControl.forceRedraw();
     }
 
@@ -205,19 +236,14 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     this.sizer.spacing = 4;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
-    this.sizer.add(limitSampleStarsPercent_Control);
-    this.sizer.add(sampleStarRadiusMult_Control);
-    this.sizer.add(sampleSize_Control);
 
     // The PreviewControl size is determined by the size of the bitmap
-    // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
     let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 5 + 
-            refCheckBox.height + limitSampleStarsPercent_Control.height * 3;
+    let preferredHeight = previewControl.height + 50 + 4 * 3 + refCheckBox.height;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();
 }
 
-SampleGridDialog.prototype = new Dialog;
+DetectedStarsDialog.prototype = new Dialog;

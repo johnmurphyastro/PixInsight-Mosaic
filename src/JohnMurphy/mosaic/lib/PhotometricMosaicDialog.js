@@ -355,7 +355,7 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
         
         // Mosaic Star Mask
-        photometricMosaicDialog.LimitMaskStars_Control.setValue(this.limitMaskStarsPercent);
+        photometricMosaicDialog.limitMaskStars_Control.setValue(this.limitMaskStarsPercent);
         photometricMosaicDialog.maskStarRadiusMult_Control.setValue(this.maskStarRadiusMult);
         photometricMosaicDialog.maskStarRadiusAdd_Control.setValue(this.maskStarRadiusAdd);
         
@@ -571,67 +571,26 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Photometric Scale"
     // =======================================
-    this.limitPhotoStarsPercent_Control = new NumericControl(this);
-    this.limitPhotoStarsPercent_Control.real = true;
-    this.limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitPhotoStarsPercent_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.limitPhotoStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of detected stars used for photometry. " +
-            "The faintest stars are rejected.</p>" +
-            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
-            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
-            "<p>0% implies no stars will be used. The scale will default to one.</p>";
+    this.limitPhotoStarsPercent_Control = 
+            createLimitPhotoStarsPercentControl(this, data, OUTLIER_REMOVAL_STRLEN);
     this.limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
         data.limitPhotoStarsPercent = value;
     };
-    this.limitPhotoStarsPercent_Control.setRange(0, 100);
-    this.limitPhotoStarsPercent_Control.slider.setRange(0, 200);
-    this.limitPhotoStarsPercent_Control.setPrecision(2);
-    this.limitPhotoStarsPercent_Control.slider.minWidth = 200;
-    this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
     
-    this.rejectHigh_Control = new NumericControl(this);
-    this.rejectHigh_Control.real = true;
-    this.rejectHigh_Control.label.text = "Linear range:";
-    this.rejectHigh_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.rejectHigh_Control.toolTip =
-            "<p>Restricts the stars used for photometry to those " +
-            "that have a peak pixel value less than the specified value.</p>" +
-            "<p>Use this to reject stars that are outside the " +
-            "camera's linear response range.</p>";
+    this.rejectHigh_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
     this.rejectHigh_Control.onValueUpdated = function (value) {
         data.linearRange = value;
     };
-    this.rejectHigh_Control.setRange(0.001, 1.0);
-    this.rejectHigh_Control.slider.setRange(0, 500);
-    this.rejectHigh_Control.setPrecision(3);
-    this.rejectHigh_Control.slider.minWidth = 200;
-    this.rejectHigh_Control.setValue(data.linearRange);
 
     let photometricScaleHorizSizer1 = new HorizontalSizer;
     photometricScaleHorizSizer1.spacing = 4;
     photometricScaleHorizSizer1.add(this.rejectHigh_Control);
     photometricScaleHorizSizer1.addStretch();
     
-    this.outlierRemoval_Control = new NumericControl(this);
-    this.outlierRemoval_Control.real = false;
-    this.outlierRemoval_Control.label.text = "Outlier removal:";
-    this.outlierRemoval_Control.label.minWidth = OUTLIER_REMOVAL_STRLEN;
-    this.outlierRemoval_Control.toolTip =
-            "<p>Determines the number of outlier stars to remove.</p>" +
-            "<p>The photometric measurement of some stars can be suspect. " +
-            "For example, a star's size may be underestimated causing some of " +
-            "its flux to contribute to the background measurement. " +
-            "Removing a few outliers can improve accuracy, but don't over do it.</p>" +
-            "<p>Use the 'Photometry graph' button to see the " +
-            "photometry data points and their best fit line.</p>";
+    this.outlierRemoval_Control = createOutlierRemovalControl(this, data, OUTLIER_REMOVAL_STRLEN);
     this.outlierRemoval_Control.onValueUpdated = function (value) {
         data.outlierRemoval = value;
     };
-    this.outlierRemoval_Control.setRange(0, 50);
-    this.outlierRemoval_Control.slider.setRange(0, 50);
-    this.outlierRemoval_Control.slider.minWidth = 221;
-    this.outlierRemoval_Control.setValue(data.outlierRemoval);
     
     let photometryGraphButton = new PushButton();
     photometryGraphButton.text = "Photometry graph";
@@ -962,29 +921,11 @@ function PhotometricMosaicDialog(data) {
     sampleGridSizer.addSpacing(20);
     sampleGridSizer.add(displaySamplesButton);
     
-    this.maxSamples_Control = new NumericControl(this);
-    this.maxSamples_Control.real = false;
-    this.maxSamples_Control.label.text = "Max samples:";
-    this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
-    this.maxSamples_Control.toolTip =
-            "<p>Limits the number of samples used to create the surface spline. " +
-            "If the number of samples exceed this limit, they are combined " +
-            "(binned) to create super samples.</p>" +
-            "<p>Increase if the overlap area is very large. " +
-            "A larger number of samples increases the " +
-            "theoretical maximum resolution of the surface spline. However, " +
-            "small unbinned samples are noisier and require more smoothing. " +
-            "The default value is usually a good compromise.</p>" +
-            "<p>The time required to initialize the surface spline approximately " +
-            "doubles every 1300 samples.</p>" +
-            "<p>Use the 'Binned grid' button to visualize the binned samples.</p>";
+    this.maxSamples_Control = createMaxSamplesControl(this, data);
     this.maxSamples_Control.onValueUpdated = function (value) {
         data.maxSamples = value;
     };
-    this.maxSamples_Control.setRange(1000, 5000);
-    this.maxSamples_Control.slider.setRange(100, 500);
-    this.maxSamples_Control.slider.minWidth = 200;
-    this.maxSamples_Control.setValue(data.maxSamples);
+    this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
     
     let displayBinnedSamplesButton = new PushButton();
     displayBinnedSamplesButton.text = "Binned grid ";
@@ -1224,53 +1165,17 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Mosaic Star Mask"
     // =======================================
     let starMaskLabelSize = this.font.width("Multiply star radius:");
-    this.LimitMaskStars_Control = new NumericControl(this);
-    this.LimitMaskStars_Control.real = false;
-    this.LimitMaskStars_Control.label.text = "Limit stars %:";
-    this.LimitMaskStars_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to " +
-            "create the star mask.</p>" +
-            "<p>0% will produce a solid mask with no stars.<br />" +
-            "100% will produce a mask that includes all detected stars.</p>" +
-            "<p>Small faint stars are usually free of artifacts, so normally " +
-            "only a small percentage of the detected stars need to be used.</p>";
-    this.LimitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
-    this.LimitMaskStars_Control.setRange(0, 100);
-    this.LimitMaskStars_Control.slider.setRange(0, 100);
-    this.LimitMaskStars_Control.slider.minWidth = 200;
-    this.LimitMaskStars_Control.setValue(data.limitMaskStarsPercent);
-    this.LimitMaskStars_Control.onValueUpdated = function (value) {
+    this.limitMaskStars_Control = createLimitMaskStarsControl(this, data, starMaskLabelSize);
+    this.limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
     };
     
-    this.maskStarRadiusMult_Control = new NumericControl(this);
-    this.maskStarRadiusMult_Control.real = true;
-    this.maskStarRadiusMult_Control.label.text = "Multiply star radius:";
-    this.maskStarRadiusMult_Control.toolTip =
-            "<p>Increases the size of the brightest stars.</p>" +
-            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
-    this.maskStarRadiusMult_Control.label.setFixedWidth(starMaskLabelSize);
-    this.maskStarRadiusMult_Control.setRange(1, 25);
-    this.maskStarRadiusMult_Control.slider.setRange(1, 250);
-    this.maskStarRadiusMult_Control.setPrecision(1);
-    this.maskStarRadiusMult_Control.slider.minWidth = 250;
-    this.maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
+    this.maskStarRadiusMult_Control = createMaskStarRadiusMultControl(this, data, starMaskLabelSize);
     this.maskStarRadiusMult_Control.onValueUpdated = function (value) {
         data.maskStarRadiusMult = value;
     };
     
-    this.maskStarRadiusAdd_Control = new NumericControl(this);
-    this.maskStarRadiusAdd_Control.real = true;
-    this.maskStarRadiusAdd_Control.label.text = "Add to star radius:";
-    this.maskStarRadiusAdd_Control.toolTip =
-            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply star radius'.</p>";
-    this.maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
-    this.maskStarRadiusAdd_Control.setRange(0, 10);
-    this.maskStarRadiusAdd_Control.slider.setRange(0, 100);
-    this.maskStarRadiusAdd_Control.setPrecision(1);
-    this.maskStarRadiusAdd_Control.slider.minWidth = 100;
-    this.maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
+    this.maskStarRadiusAdd_Control = createMaskStarRadiusAddControl(this, data, starMaskLabelSize);
     this.maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
     };
@@ -1308,7 +1213,7 @@ function PhotometricMosaicDialog(data) {
     let starMaskSection = new Control(this);
     starMaskSection.sizer = new VerticalSizer;
     starMaskSection.sizer.spacing = 4;
-    starMaskSection.sizer.add(this.LimitMaskStars_Control);
+    starMaskSection.sizer.add(this.limitMaskStars_Control);
     starMaskSection.sizer.add(this.maskStarRadiusMult_Control);
     starMaskSection.sizer.add(this.maskStarRadiusAdd_Control);
     starMaskSection.sizer.add(mask_Sizer);
@@ -1485,6 +1390,68 @@ function PhotometricMosaicDialog(data) {
     this.setFixedSize();
 }
 
+//-------------------------------------------------------
+// Photometry Stars Controls
+//-------------------------------------------------------
+function createLimitPhotoStarsPercentControl(dialog, data, strLength){
+    let limitPhotoStarsPercent_Control = new NumericControl(dialog);
+    limitPhotoStarsPercent_Control.real = true;
+    limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
+    limitPhotoStarsPercent_Control.label.minWidth = strLength;
+    limitPhotoStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of detected stars used for photometry. " +
+            "The faintest stars are rejected.</p>" +
+            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
+            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
+            "<p>0% implies no stars will be used. The scale will default to one.</p>";
+    limitPhotoStarsPercent_Control.setRange(0, 100);
+    limitPhotoStarsPercent_Control.slider.setRange(0, 200);
+    limitPhotoStarsPercent_Control.setPrecision(2);
+    limitPhotoStarsPercent_Control.slider.minWidth = 200;
+    limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+    return limitPhotoStarsPercent_Control;
+}
+
+function createLinearRangeControl(dialog, data, strLength){
+    let rejectHigh_Control = new NumericControl(dialog);
+    rejectHigh_Control.real = true;
+    rejectHigh_Control.label.text = "Linear range:";
+    rejectHigh_Control.label.minWidth = strLength;
+    rejectHigh_Control.toolTip =
+            "<p>Restricts the stars used for photometry to those " +
+            "that have a peak pixel value less than the specified value.</p>" +
+            "<p>Use this to reject stars that are outside the " +
+            "camera's linear response range.</p>";
+    rejectHigh_Control.setRange(0.001, 1.0);
+    rejectHigh_Control.slider.setRange(0, 500);
+    rejectHigh_Control.setPrecision(3);
+    rejectHigh_Control.slider.minWidth = 200;
+    rejectHigh_Control.setValue(data.linearRange);
+    return rejectHigh_Control;
+}
+
+function createOutlierRemovalControl(dialog, data, strLength){
+    let outlierRemoval_Control = new NumericControl(dialog);
+    outlierRemoval_Control.real = false;
+    outlierRemoval_Control.label.text = "Outlier removal:";
+    outlierRemoval_Control.label.minWidth = strLength;
+    outlierRemoval_Control.toolTip =
+            "<p>Determines the number of outlier stars to remove.</p>" +
+            "<p>The photometric measurement of some stars can be suspect. " +
+            "For example, a star's size may be underestimated causing some of " +
+            "its flux to contribute to the background measurement. " +
+            "Removing a few outliers can improve accuracy, but don't over do it.</p>" +
+            "<p>Use the 'Photometry graph' button to see the " +
+            "photometry data points and their best fit line.</p>";
+    outlierRemoval_Control.setRange(0, 50);
+    outlierRemoval_Control.slider.setRange(0, 50);
+    outlierRemoval_Control.slider.minWidth = 221;
+    outlierRemoval_Control.setValue(data.outlierRemoval);
+    return outlierRemoval_Control;
+}
+//-------------------------------------------------------
+// Sample Grid Controls
+//-------------------------------------------------------
 function createLimitSampleStarsPercentControl(dialog, data, sampleGenerationStrLen){
     let limitSampleStarsPercent_Control = new NumericControl(dialog);
     limitSampleStarsPercent_Control.real = false;
@@ -1544,6 +1511,84 @@ function createSampleSizeControl(dialog, data, labelLength){
     sampleSize_Control.slider.minWidth = 50;
     sampleSize_Control.setValue(data.sampleSize);
     return sampleSize_Control;
+}
+
+function createMaxSamplesControl(dialog, data){
+    let maxSamples_Control = new NumericControl(this);
+    maxSamples_Control.real = false;
+    maxSamples_Control.label.text = "Max samples:";
+    maxSamples_Control.toolTip =
+            "<p>Limits the number of samples used to create the surface spline. " +
+            "If the number of samples exceed this limit, they are combined " +
+            "(binned) to create super samples.</p>" +
+            "<p>Increase if the overlap area is very large. " +
+            "A larger number of samples increases the " +
+            "theoretical maximum resolution of the surface spline. However, " +
+            "small unbinned samples are noisier and require more smoothing. " +
+            "The default value is usually a good compromise.</p>" +
+            "<p>The time required to initialize the surface spline approximately " +
+            "doubles every 1300 samples.</p>" +
+            "<p>Use the 'Binned grid' button to visualize the binned samples.</p>";
+    
+    maxSamples_Control.setRange(1000, 5000);
+    maxSamples_Control.slider.setRange(100, 500);
+    maxSamples_Control.slider.minWidth = 200;
+    maxSamples_Control.setValue(data.maxSamples);
+    return maxSamples_Control;
+}
+
+// ----------------------------
+// Star mask controls
+// ----------------------------
+function createLimitMaskStarsControl(dialog, data, labelLength){
+    let limitMaskStars_Control = new NumericControl(dialog);
+    limitMaskStars_Control.real = false;
+    limitMaskStars_Control.label.text = "Limit stars %:";
+    limitMaskStars_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to " +
+            "create the star mask.</p>" +
+            "<p>0% will produce a solid mask with no stars.<br />" +
+            "100% will produce a mask that includes all detected stars.</p>" +
+            "<p>Small faint stars are usually free of artifacts, so normally " +
+            "only a small percentage of the detected stars need to be used.</p>";
+    limitMaskStars_Control.label.setFixedWidth(labelLength);
+    limitMaskStars_Control.setRange(0, 100);
+    limitMaskStars_Control.slider.setRange(0, 100);
+    limitMaskStars_Control.slider.minWidth = 200;
+    limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
+    return limitMaskStars_Control;
+}
+
+function createMaskStarRadiusMultControl(dialog, data, labelLength){
+    let maskStarRadiusMult_Control = new NumericControl(dialog);
+    maskStarRadiusMult_Control.real = true;
+    maskStarRadiusMult_Control.label.text = "Multiply star radius:";
+    maskStarRadiusMult_Control.toolTip =
+            "<p>Increases the size of the brightest stars.</p>" +
+            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
+    maskStarRadiusMult_Control.label.setFixedWidth(labelLength);
+    maskStarRadiusMult_Control.setRange(1, 25);
+    maskStarRadiusMult_Control.slider.setRange(1, 250);
+    maskStarRadiusMult_Control.setPrecision(1);
+    maskStarRadiusMult_Control.slider.minWidth = 250;
+    maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
+    return maskStarRadiusMult_Control;
+}
+
+function createMaskStarRadiusAddControl(dialog, data, labelLength){
+    let maskStarRadiusAdd_Control = new NumericControl(dialog);
+    maskStarRadiusAdd_Control.real = true;
+    maskStarRadiusAdd_Control.label.text = "Add to star radius:";
+    maskStarRadiusAdd_Control.toolTip =
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply star radius'.</p>";
+    maskStarRadiusAdd_Control.label.setFixedWidth(labelLength);
+    maskStarRadiusAdd_Control.setRange(0, 10);
+    maskStarRadiusAdd_Control.slider.setRange(0, 100);
+    maskStarRadiusAdd_Control.setPrecision(1);
+    maskStarRadiusAdd_Control.slider.minWidth = 100;
+    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
+    return maskStarRadiusAdd_Control;
 }
 
 // Our dialog inherits all properties and methods from the core Dialog object.

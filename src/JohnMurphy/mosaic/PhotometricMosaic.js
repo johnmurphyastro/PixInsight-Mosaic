@@ -32,8 +32,12 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/Gradient.js"
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"
-#include "lib/SampleGridDialog.js"
 #include "lib/PreviewControl.js"
+#include "lib/SampleGridDialog.js"
+#include "lib/BinnedSampleGridDialog.js"
+#include "lib/DetectedStarsDialog.js"
+#include "lib/PhotometryStarsDialog.js"
+#include "lib/MaskStarsDialog.js"
 
 // To stop my IDE from generating warnings...
 function VERSION(){return  "2.1";}
@@ -56,6 +60,7 @@ function DISPLAY_BINNED_SAMPLES(){return 512;}
 /**
  * Controller. Processing starts here!
  * @param {PhotometricMosaicData} data Values from user interface
+ * @param {PhotometricMosaicDialog} photometricMosaicDialog 
  */
 function photometricMosaic(data, photometricMosaicDialog)
 {
@@ -149,8 +154,11 @@ function photometricMosaic(data, photometricMosaicDialog)
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
-        displayDetectedStars(referenceView, detectedStars.refColorStars, "_ref", data);
-        displayDetectedStars(targetView, detectedStars.tgtColorStars, "_tgt", data);
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new DetectedStarsDialog("Detected Stars", refBitmap, tgtBitmap, detectedStars, data);
+        dialog.execute();
         return;
     }
     
@@ -159,29 +167,24 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
     if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
-        displayMaskStars(referenceView, joinRect, detectedStars, targetView.fullId,  
-                false, "__MosaicMaskStars", data);
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new MaskStarsDialog("Mask Stars", refBitmap, tgtBitmap, joinRect, 
+                detectedStars, data, photometricMosaicDialog);
+        dialog.execute();
         return;
     }
     
     // Photometry stars
-    let colorStarPairs = detectedStars.getColorStarPairs(referenceView, data);
+    let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
     let scaleFactors = [];
     
-    // Remove photometric star outliers and calculate the scale
+    // Calculate the scale
     console.writeln("\n<b><u>Calculating scale</u></b>");
     for (let c = 0; c < nChannels; c++){
         let starPairs = colorStarPairs[c];
         let linearFitData = calculateScale(starPairs);
-        for (let i=0; i<data.outlierRemoval; i++){
-            if (starPairs.length < 4){
-                console.warningln("Channel[", c, "]: Only ", starPairs.length, 
-                    " photometry stars. Keeping outlier.");
-                break;
-            }
-            starPairs = removeStarPairOutlier(starPairs, linearFitData);
-            linearFitData = calculateScale(starPairs);
-        }
         scaleFactors.push(linearFitData);
     }
     if (targetView.image.isColor){
@@ -221,7 +224,14 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
-        displayPhotometryStars(referenceView, detectedStars, colorStarPairs, scaleFactors, targetView.fullId, data);
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        detectedStars.showConsoleInfo = false;
+        let dialog = new PhotometryStarsDialog("Photometry Stars", refBitmap, tgtBitmap, nChannels, 
+                colorStarPairs, detectedStars, data, photometricMosaicDialog);
+        dialog.execute();
+        detectedStars.showConsoleInfo = true;
         return;
     }
     if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
@@ -242,39 +252,37 @@ function photometricMosaic(data, photometricMosaicDialog)
     let sampleGridMap = createSampleGridMap(targetView.image, referenceView.image,
             detectedStars.allStars, overlapBox, data);
             
-    let colorSamplePairs = createSamplePairs(
-            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal);
-    if (colorSamplePairs[0].length < 3) {
-        new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        return;
-    }
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         let overlap = data.cache.overlap;
-        let bitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new SampleGridDialog("SampleGrid", bitmap, sampleGridMap, detectedStars, 
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new SampleGridDialog("SampleGrid", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
                 data, photometricMosaicDialog);
         dialog.execute();
         return;
     }
     
-    let unBinnedSamples = 0;
-    let binnedSamples = 0;
+    let colorSamplePairs = createSamplePairs(
+            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal);
+    if (colorSamplePairs[0].length < 3) {
+        // TODO check all channels?
+        new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
+    }
+    
+    let binnedColorSamplePairs = [];
     for (let c=0; c<nChannels; c++){
-        unBinnedSamples = Math.max(unBinnedSamples, colorSamplePairs[c].length);
-        colorSamplePairs[c] = createBinnedSampleGrid(overlapBox, colorSamplePairs[c], 
+        binnedColorSamplePairs[c] = createBinnedSampleGrid(overlapBox, colorSamplePairs[c], 
                 isHorizontal, data.maxSamples);
-        binnedSamples = Math.max(binnedSamples, colorSamplePairs[c].length);
     }
     
     if (data.viewFlag === DISPLAY_BINNED_SAMPLES()){
-        if (unBinnedSamples < data.maxSamples){
-            new MessageBox("Number of samples (" + unBinnedSamples + ") is less than Max Samples (" +
-                    data.maxSamples + ")\nThe samples were not binned." , TITLE(), 
-                    StdIcon_Information, StdButton_Ok).execute();
-        } else {
-            let title = WINDOW_ID_PREFIX() + targetView.fullId + "__Binned_Samples";
-            displaySampleGrid(referenceView, colorSamplePairs[0], detectedStars, title, data);
-        }
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new BinnedSampleGridDialog("Binned Sample Grid", refBitmap, 
+                colorSamplePairs[0], isHorizontal, 
+                detectedStars, data, photometricMosaicDialog);
+        dialog.execute();
         return;
     }
 
@@ -303,8 +311,9 @@ function photometricMosaic(data, photometricMosaicDialog)
 
     // Calculate the gradient for each channel
     console.writeln("\n<b><u>Calculating surface spline</u></b>");
-    if (binnedSamples < unBinnedSamples){
-        console.writeln("Reduced number of samples from ", unBinnedSamples, " to ", binnedSamples);
+    if (binnedColorSamplePairs[0].length < colorSamplePairs[0].length){
+        console.writeln("Reduced number of samples from ", binnedColorSamplePairs[0].length, 
+                " to ", colorSamplePairs[0].length);
     }
     let createSurfaceSplineTime = new Date().getTime();
     let propagateSurfaceSplines;
@@ -312,7 +321,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         propagateSurfaceSplines = [];
         try {
             for (let c = 0; c < nChannels; c++) {
-                let samplePairs = colorSamplePairs[c];
+                let samplePairs = binnedColorSamplePairs[c];
                 propagateSurfaceSplines[c] = calcSurfaceSpline(samplePairs, data.extrapolatedGradientSmoothness);        
             }
         } catch (ex){
@@ -325,7 +334,7 @@ function photometricMosaic(data, photometricMosaicDialog)
             console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                    propagateSurfaceSplines, joinRect, colorSamplePairs, data, true);
+                    propagateSurfaceSplines, joinRect, binnedColorSamplePairs, data, true);
             return;
         }
     } else {
@@ -335,7 +344,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     let surfaceSplines = [];
     try {
         for (let c = 0; c < nChannels; c++) {
-            let samplePairs = colorSamplePairs[c];
+            let samplePairs = binnedColorSamplePairs[c];
             surfaceSplines[c] = calcSurfaceSpline(samplePairs, data.overlapGradientSmoothness);
         }
     } catch (ex){
@@ -343,14 +352,14 @@ function photometricMosaic(data, photometricMosaicDialog)
                 TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    console.writeln(colorSamplePairs[0].length,
+    console.writeln(binnedColorSamplePairs[0].length,
             " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
         GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                surfaceSplines, joinRect, colorSamplePairs, data, false);
+                surfaceSplines, joinRect, binnedColorSamplePairs, data, false);
         return;
     }
 
@@ -366,18 +375,6 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
     processEvents();
-}
-
-/**
- * @param {StarPair[]} starPairs
- * @returns {LinearFitData} Least Square Fit between reference & target star flux
- */
-function calculateScale(starPairs) {
-    let leastSquareFit = new LeastSquareFitAlgorithm();
-    for (let starPair of starPairs) {
-        leastSquareFit.addValue(starPair.tgtStar.flux, starPair.refStar.flux);
-    }
-    return leastSquareFit.getOriginFit();
 }
 
 /**

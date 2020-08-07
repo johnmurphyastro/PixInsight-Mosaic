@@ -18,18 +18,19 @@
 //"use strict";
 
 /**
- * Display the SampleGrid in a Dialog that contains a scrolled window and 
- * controls to adjust the SampleGrid parameters.
+ * Display the Mask Stars in a Dialog that contains a scrolled window and 
+ * controls to adjust the Mask Star parameters.
  * @param {String} title Window title
  * @param {Bitmap} refBitmap Background image of the reference overlap area at 1:1 scale
  * @param {Bitmap} tgtBitmap Background image of the target overlap area at 1:1 scale
- * @param {SampleGridMap} sampleGridMap Specifies the grid samples
+ * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
  * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
-function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedStars, data, photometricMosaicDialog)
+function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, data,
+        photometricMosaicDialog)
 {
     this.__base__ = Dialog;
     this.__base__();
@@ -37,12 +38,27 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     const REF = 10;
     const TGT = 20;
     let self = this;
+    
     let zoomText = "1:1";
     let coordText;
     setCoordText(null);
     let selectedBitmap = REF;
-    let bitmap = getBitmap(selectedBitmap);
     let bitmapOffset = getBitmapOffset(data);
+    let bitmap = getBitmap(selectedBitmap);
+    let clipRect = getClipRect();
+    
+    /**
+     * Create a clipRect based on the joinArea.
+     * This is used to limit the star drawing to the join area.
+     * @returns {Rect}
+     */
+    function getClipRect(){
+        let x0 = joinArea.x0 - bitmapOffset.x;
+        let y0 = joinArea.y0 - bitmapOffset.y;
+        let x1 = joinArea.x1 - bitmapOffset.x;
+        let y1 = joinArea.y1 - bitmapOffset.y;
+        return new Rect(x0, y0, x1, y1);
+    }
     
     /**
      * Return bitmap of the reference or target image
@@ -93,34 +109,30 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * @param {Number} translateY
      * @param {Number} scale
      */
-    function drawSampleGrid(viewport, translateX, translateY, scale){
+    function drawMaskStars(viewport, translateX, translateY, scale){
         let graphics = new VectorGraphics(viewport);
         graphics.translateTransformation(translateX, translateY);
         graphics.scaleTransformation(scale, scale);
         graphics.pen = new Pen(0xffff0000);
-        graphics.antialiasing = false;
-        // Draw the sample grid
-        for (let binRect of sampleGridMap.getBinRectArray(0)){
-            let rect = new Rect(binRect);
-            rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
-            graphics.drawRect(rect);
-        }
-        
-        // Draw circles around the stars used to reject grid sample squares
-        let stars = detectedStars.allStars;
-        let firstNstars;
-        if (data.limitSampleStarsPercent < 100){
-            firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
-        } else {
-            firstNstars = stars.length;
-        }
+        graphics.drawRect(clipRect);
         graphics.antialiasing = true;
+        graphics.clipRect = clipRect;
+        let allStars = detectedStars.allStars;
+        let firstNstars;
+        if (data.limitMaskStarsPercent < 100){
+            firstNstars = Math.floor(allStars.length * data.limitMaskStarsPercent / 100);
+        } else {
+            firstNstars = allStars.length;
+        }
+
         for (let i = 0; i < firstNstars; ++i){
-            let star = stars[i];
-            let radius = Math.sqrt(star.size)/2;
+            let star = allStars[i];
+            // size is the area. sqrt gives box side length. Half gives circle radius
+            let starDiameter = Math.sqrt(star.size);
             let x = star.pos.x - bitmapOffset.x;
             let y = star.pos.y - bitmapOffset.y;
-            graphics.strokeCircle(x, y, radius);
+            let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
+            graphics.strokeCircle(x, y, starRadius + data.maskStarRadiusAdd);
         }
         graphics.end();
     }
@@ -139,63 +151,57 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     previewControl.onCustomPaintScope = this;
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        drawSampleGrid(viewport, translateX, translateY, scale);
+        drawMaskStars(viewport, translateX, translateY, scale);
     };
     previewControl.ok_Button.onClick = function(){
         self.ok();
     };
-    
+
     // ========================================
     // User controls
     // ========================================
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
-    refCheckBox.toolTip = "If selected show reference background. Otherwise show target background.";
+    refCheckBox.toolTip = "Display reference or target image.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         previewControl.updateBitmap(bitmap);
-        updateSampleGrid();
+        update();
     };
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 2;
-    optionsSizer.addSpacing(8);
+    optionsSizer.margin = 4;
     optionsSizer.add(refCheckBox);
     optionsSizer.addStretch();
-    
-    const labelLength = this.font.width("Multiply star radius:");
-    let limitSampleStarsPercent_Control = 
-                createLimitSampleStarsPercentControl(this, data, labelLength);
-            limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-            data.limitSampleStarsPercent = value;
-            updateSampleGrid();
-            photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
-        };
 
-    let sampleStarRadiusMult_Control =
-                createSampleStarRadiusMultControl(this, data, labelLength);
-        sampleStarRadiusMult_Control.onValueUpdated = function (value){
-            data.sampleStarRadiusMult = value;
-            updateSampleGrid();
-            photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(value);
-        };
-
-    let sampleSize_Control = createSampleSizeControl(this, data, labelLength);
-        sampleSize_Control.onValueUpdated = function (value) {
-            data.sampleSize = value;
-            updateSampleGrid();
-            photometricMosaicDialog.sampleSize_Control.setValue(value);
-        };
+    let starMaskLabelSize = this.font.width("Multiply star radius:");
+    let limitMaskStars_Control = createLimitMaskStarsControl(this, data, starMaskLabelSize);
+    limitMaskStars_Control.onValueUpdated = function (value) {
+        data.limitMaskStarsPercent = value;
+        update();
+        photometricMosaicDialog.limitMaskStars_Control.setValue(value);
+    };
     
+    let maskStarRadiusMult_Control = createMaskStarRadiusMultControl(this, data, starMaskLabelSize);
+    maskStarRadiusMult_Control.onValueUpdated = function (value) {
+        data.maskStarRadiusMult = value;
+        update();
+        photometricMosaicDialog.maskStarRadiusMult_Control.setValue(value);
+    };
+    
+    let maskStarRadiusAdd_Control = createMaskStarRadiusAddControl(this, data, starMaskLabelSize);
+    maskStarRadiusAdd_Control.onValueUpdated = function (value) {
+        data.maskStarRadiusAdd = value;
+        update();
+        photometricMosaicDialog.maskStarRadiusAdd_Control.setValue(value);
+    };
+
     /**
-     * Create a new SampleGridMap from the updated parameters, and draw it 
-     * on top of the background bitmap within the scrolled window.
+     * Draw the stars on top of the background bitmap within the scrolled window.
      */
-    function updateSampleGrid(){
-        sampleGridMap = createSampleGridMap(data.targetView.image, data.referenceView.image,
-            detectedStars.allStars, data.cache.overlap.overlapBox, data);
+    function update(){
         previewControl.forceRedraw();
     }
 
@@ -205,19 +211,18 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     this.sizer.spacing = 4;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
-    this.sizer.add(limitSampleStarsPercent_Control);
-    this.sizer.add(sampleStarRadiusMult_Control);
-    this.sizer.add(sampleSize_Control);
+    this.sizer.add(limitMaskStars_Control);
+    this.sizer.add(maskStarRadiusMult_Control);
+    this.sizer.add(maskStarRadiusAdd_Control);
 
     // The PreviewControl size is determined by the size of the bitmap
-    // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
     let preferredWidth = previewControl.width + 50;
     let preferredHeight = previewControl.height + 50 + 4 * 5 + 
-            refCheckBox.height + limitSampleStarsPercent_Control.height * 3;
+            refCheckBox.height + limitMaskStars_Control.height * 3;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();
 }
 
-SampleGridDialog.prototype = new Dialog;
+MaskStarsDialog.prototype = new Dialog;

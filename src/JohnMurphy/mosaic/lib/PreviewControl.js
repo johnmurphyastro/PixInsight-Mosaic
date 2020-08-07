@@ -154,6 +154,22 @@ function PreviewControl(parent, image, metadata) {
         // This sets the inital zoom to 1:1. Use -100 to set to ZoomOutLimit
         this.updateZoom(1, null);
     };
+    
+    /**
+     * Update the background image. The new image must be the same size as the
+     * original image.
+     * This also updates the scaled image. The scroll position and zoom level
+     * are left unchanged.
+     * @param {Bitmap} image
+     */
+    this.updateBitmap = function (image){
+        if (image.width === this.image.width && image.height === this.image.height){
+            this.image = image;
+            this.scaledImage = this.image.scaled(this.scale);
+        } else {
+            console.criticalln("PreviewControl error: bitmap size changed");
+        }
+    };
 
     /**
      * Update the zoom, constrained to the ZoomOutLimit. Max zoom = 4.
