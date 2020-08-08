@@ -99,7 +99,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     
     let ok_Button = new PushButton();
     ok_Button.text = "OK";
-    ok_Button.cursor = new Cursor(StdCursor_Checkmark);
+    ok_Button.icon = dialog.scaledResource( ":/icons/ok.png" );
     ok_Button.onClick = function () {
         dialog.ok();
     };
@@ -109,7 +109,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
 
     let cancel_Button = new PushButton();
     cancel_Button.text = "Cancel";
-    cancel_Button.cursor = new Cursor(StdCursor_Crossmark);
+    cancel_Button.icon = dialog.scaledResource( ":/icons/cancel.png" );
     cancel_Button.onClick = function () {
         dialog.cancel();
     };

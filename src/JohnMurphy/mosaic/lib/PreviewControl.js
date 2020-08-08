@@ -1,4 +1,4 @@
-/* global Dialog, StdCursor_ClosedHand, MouseButton_Left, StdCursor_UpArrow, Frame, UndoFlag_NoSwapFile, StdCursor_Checkmark */
+/* global Dialog, MouseButton_Left, Frame, UndoFlag_NoSwapFile */
 
 // (c) John Murphy 4th-July-2020
 //
@@ -272,7 +272,6 @@ function PreviewControl(parent, image, metadata) {
     this.scrollbox = new ScrollBox(this);
     this.scrollbox.autoScroll = true;
     this.scrollbox.tracking = true;
-    this.scrollbox.cursor = new Cursor(StdCursor_UpArrow);
     this.scrollbox.pageHeight = this.scrollbox.viewport.height;
     this.scrollbox.pageWidth = this.scrollbox.viewport.width;
     this.scrollbox.lineHeight = 10;
@@ -332,7 +331,8 @@ function PreviewControl(parent, image, metadata) {
             orgCursor: new Point(x, y),
             orgScroll: new Point(preview.scrollbox.horizontalScrollPosition, preview.scrollbox.verticalScrollPosition)
         };
-        this.cursor = new Cursor(StdCursor_ClosedHand);
+        // Setting the cursor does not work. Don't know why.
+        // this.cursor = new Cursor(StdCursor_ClosedHand);
     };
 
     /**
@@ -385,7 +385,8 @@ function PreviewControl(parent, image, metadata) {
             preview.scrollbox.horizontalScrollPosition = preview.scrolling.orgScroll.x - (x - preview.scrolling.orgCursor.x);
             preview.scrollbox.verticalScrollPosition = preview.scrolling.orgScroll.y - (y - preview.scrolling.orgCursor.y);
             preview.scrolling = null;
-            this.cursor = new Cursor(StdCursor_UpArrow);
+            // Setting the cursor does not work. Don't know why.
+            // this.cursor = new Cursor(StdCursor_Arrow);
         }
     };
 
@@ -445,7 +446,7 @@ function PreviewControl(parent, image, metadata) {
     
     this.ok_Button = new PushButton();
     this.ok_Button.text = "OK";
-    this.ok_Button.cursor = new Cursor(StdCursor_Checkmark);
+    this.ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
 
     this.zoomButton_Sizer = new HorizontalSizer();
     this.zoomButton_Sizer.margin = 4;
