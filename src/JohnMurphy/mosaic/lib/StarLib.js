@@ -392,12 +392,13 @@ function removeStarPairOutlier(starPairs, linearFit){
     let removeStarPairIdx = -1;
     for (let i=0; i<starPairs.length; i++){
         let starPair = starPairs[i];
-        // y = ref; x = tgt
-        // TODO should calculate perpendicular distance from line
-        let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
-        let dif = Math.abs(y - starPair.refStar.flux);
-        if (dif > maxErr){
-            maxErr = dif;
+        // Calculate the perpendicular distance of this point from the best fit line
+        let x = starPair.tgtStar.flux;
+        let y = starPair.refStar.flux;
+        let perpDist = Math.abs(
+                (y - linearFit.m * x + linearFit.b) / Math.sqrt(linearFit.m * linearFit.m + 1));
+        if (perpDist > maxErr){
+            maxErr = perpDist;
             removeStarPairIdx = i;
         }
     }
@@ -483,8 +484,7 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
 function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
     {   // Constructor
         // Display graph in script dialog
-        GraphDialog.prototype = new Dialog;
-        let graphDialog = new GraphDialog("Photometry Graph", createZoomedGraph);
+        let graphDialog = new GraphDialog("Photometry Graph", data.graphHeight, data.graphHeight, createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let isColor = refView.image.isColor;
@@ -502,10 +502,13 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
      * Callback function for GraphDialog to provide a zoomed graph.
      * GraphDialog uses Graph.getGraphBitmap() and the function pointer Graph.screenToWorld
      * @param {Number} factor
+     * @param {Number} width
+     * @param {Number} height
      * @returns {Graph}
      */
-    function createZoomedGraph(factor){
-        let graph = createGraph(refView, tgtView, data.graphHeight, colorStarPairs, scaleFactors, factor);
+    function createZoomedGraph(factor, width, height){
+        let graph = createGraph(refView.fullId, tgtView.fullId, width, height, 
+            colorStarPairs, scaleFactors, factor);
         return graph;
     }
     
@@ -545,17 +548,16 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
     
     /**
      * 
-     * @param {View} refView
-     * @param {View} tgtView
+     * @param {String} targetName
+     * @param {String} referenceName
+     * @param {Number} width 
      * @param {Number} height
      * @param {StarPair[][]} colorStarPairs StarPair[] for each color
      * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
      * @param {Number} zoomFactor
      * @returns {Graph}
      */
-    function createGraph(refView, tgtView, height, colorStarPairs, scaleFactors, zoomFactor){
-        let targetName = tgtView.fullId;
-        let referenceName = refView.fullId;
+    function createGraph(referenceName, targetName, width, height, colorStarPairs, scaleFactors, zoomFactor){
         let targetLabel = "Target (" + targetName + ")";
         let referenceLabel = "Reference (" + referenceName + ")";
 
@@ -586,8 +588,7 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
         }
         let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
                                       minMax.maxTgtFlux, minMax.maxRefFlux);
-        graphWithAxis.setYAxisLength(height);
-        graphWithAxis.createGraph(targetLabel, referenceLabel);
+        graphWithAxis.createGraph(targetLabel, referenceLabel, width, height, true);
 
         // Now add the data to the graph...
         if (colorStarPairs.length === 1){ // B&W

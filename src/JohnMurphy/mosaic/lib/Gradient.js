@@ -1025,8 +1025,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
     
     function construct(){
         // Display graph in script dialog
-        GraphDialog.prototype = new Dialog;
-        let graphDialog = new GraphDialog("Gradient Graph", createZoomedGraph);
+        let graphDialog = new GraphDialog("Gradient Graph", data.graphWidth, data.graphHeight, createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
@@ -1041,17 +1040,21 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * Callback function for GraphDialog to provide a zoomed graph.
      * GraphDialog uses Graph.getGraphBitmap() and the function pointer Graph.screenToWorld
      * @param {Number} factor
+     * @param {Number} width
+     * @param {Number} height
      * @returns {Graph}
      */
-    function createZoomedGraph(factor){
+    function createZoomedGraph(factor, width, height){
         // Using GradientGraph function call parameters
-        let graph = createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
+        let graph = createGraph(tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isExtrapolateGraph, factor);
         return graph;
     }
     
     /**
      * @param {Image} tgtImage 
+     * @param {Number} width
+     * @param {Number} height
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
      * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
@@ -1062,7 +1065,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Graph function(float zoomFactor)} zoomFactor Zoom factor for vertical axis only zooming.
      * @returns {Graph}
      */
-    function createGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
+    function createGraph(tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isExtrapolateGraph, zoomFactor){
         let xMaxCoordinate;
         let xLabel;
@@ -1081,7 +1084,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor);
         
         return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
-                tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
+                tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isExtrapolateGraph);
     }
     
@@ -1148,6 +1151,8 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Number} xMaxCoordinate
      * @param {SamplePairDifMinMax} yCoordinateRange
      * @param {Image} tgtImage 
+     * @param {Number} width 
+     * @param {Number} height 
      * @param {Boolean} isHorizontal
      * @param {Boolean} isTargetAfterRef
      * @param {SurfaceSpline[]} surfaceSplines
@@ -1158,14 +1163,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @returns {Graph}
      */
     function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
-            tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
+            tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
             data, isExtrapolateGraph){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
-        let axisWidth = Math.min(data.graphWidth, xMaxCoordinate);
         let graph = new Graph(0, minY, xMaxCoordinate, maxY);
-        graph.setAxisLength(axisWidth + 2, data.graphHeight);
-        graph.createGraph(xLabel, yLabel);
+        graph.createGraph(xLabel, yLabel, width, height, false);
 
         let graphLines;
         if (isExtrapolateGraph){

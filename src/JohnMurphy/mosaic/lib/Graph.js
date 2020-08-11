@@ -47,45 +47,6 @@ function Graph(x0, y0, x1, y1) {
     // End of module data
     
     /**
-     * Sets the x & y axis lengths and calculates the scales for both axis
-     * @param {Number} xLength x-Axis length
-     * @param {Number} yLength y-Axis length
-     * @returns {undefined}
-     */
-    this.setAxisLength = function(xLength, yLength){
-        xAxisLength_ = xLength;
-        yAxisLength_ = yLength;
-        xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
-        yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
-    };
-    
-    /**
-     * Sets the x axis length and calculates the scale for the x axis
-     * The y axis is set to the same scale and the y axis length is calculated
-     * @param {Number} xLength x-Axis length
-     * @returns {undefined}
-     */
-    this.setXAxisLength = function(xLength){
-        xAxisLength_ = xLength;
-        xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
-        yScale_ = xScale_;
-        yAxisLength_ = calculateAxisLength(yScale_, yMax_ - yMin_);
-    };
-    
-    /**
-     * Sets the y axis length and calculates the scale for the y axis
-     * The x axis is set to the same scale and the x axis length is calculated
-     * @param {Number} yLength y-Axis length
-     * @returns {undefined}
-     */
-    this.setYAxisLength = function(yLength){
-        yAxisLength_ = yLength;
-        yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
-        xScale_ = yScale_;
-        xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
-    };
-    
-    /**
      * Converts screen (x,y) into graph coordinates.
      * @param {Number} x Screen x coordinate
      * @param {Number} y Screen y coordinate
@@ -104,11 +65,14 @@ function Graph(x0, y0, x1, y1) {
      * At this stage the graph contains no data.
      * @param {String} xLabel Text to display beneath the X-axis
      * @param {String} yLabel Text to rotate and display on the Y-axis
+     * @param {Number} imageWidth Graph width
+     * @param {Number} imageHeight Graph height
+     * @param {Boolean} preserveAspectRatio If true use same scale for both axis
      */
-    this.createGraph = function (xLabel, yLabel) {
+    this.createGraph = function (xLabel, yLabel, imageWidth, imageHeight, preserveAspectRatio) {
         let g = new Graphics();
         let font = g.font;
-        let maxNumberLength = font.width("8.88e+88");
+        let maxNumberLength = font.width("88.88e+88");
         let minDistBetweenTicks = maxNumberLength * 1.3;
         let fontHeight = font.ascent + font.descent;
         let tickLength = 4;
@@ -117,12 +81,25 @@ function Graph(x0, y0, x1, y1) {
         let bottomMargin = fontHeight * 2 + tickLength + 10;
         let leftMargin = maxNumberLength + fontHeight + tickLength + 5;
         let rightMargin = maxNumberLength / 2;
+       
+        xAxisLength_ = imageWidth - leftMargin - rightMargin;
+        yAxisLength_ = imageHeight - topMargin - bottomMargin;
+        
+        xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
+        yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
+        if (preserveAspectRatio){
+            if (xScale_ < yScale_){
+                yScale_ = xScale_;
+                yAxisLength_ = calculateAxisLength(yScale_, yMax_ - yMin_);
+            } else {
+                xScale_ = yScale_;
+                xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
+            }
+        }
         
         xOrigin_ = leftMargin;
         yOrigin_ = topMargin + yAxisLength_ - 1;
-       
-        let imageWidth = leftMargin + xAxisLength_ + rightMargin;
-        let imageHeight = topMargin + yAxisLength_ + bottomMargin;
+        
         bitmap_ = new Bitmap(imageWidth, imageHeight);
         bitmap_.fill(0xFF000000);    // AARRGGBB
         
@@ -130,11 +107,10 @@ function Graph(x0, y0, x1, y1) {
         graphics.transparentBackground = true;
         graphics.textAntialiasing = true;
         graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
-        drawXAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
+        drawXAxis(graphics, tickLength, minDistBetweenTicks, xLabel, this.axisColor);
         drawYAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
-        drawXAxisLabel(graphics, imageWidth, imageHeight, xLabel, this.axisColor);
         graphics.end();
-        drawYAxisLabel(font, imageHeight, yLabel, this.axisColor);
+        drawYAxisLabel(font, yLabel, this.axisColor);
     };
     
     /**
@@ -319,10 +295,11 @@ function Graph(x0, y0, x1, y1) {
      * @param {Graphics} g
      * @param {Number} tickLength
      * @param {Number} minDistBetweenTicks
+     * @param {String} axisLabel
      * @param {Number} axisColor
      * @returns {undefined}
      */
-    function drawXAxis(g, tickLength, minDistBetweenTicks, axisColor){
+    function drawXAxis(g, tickLength, minDistBetweenTicks, axisLabel, axisColor){
         const y1 = yOrigin_;
         const xTickInterval = calculateTickIncrement(xMax_ - xMin_, xAxisLength_ / minDistBetweenTicks);
         const firstTickX = calculateFirstTick(xMin_, xTickInterval);
@@ -346,13 +323,18 @@ function Graph(x0, y0, x1, y1) {
                 let n = Math.abs(x) > 1e-15 ? x : 0;
                 let text = n.toExponential(2);
                 let width = g.font.width(text);
-                g.drawText(x1 - width/2, y1 + tickLength + g.font.ascent + 2, text);
+                g.drawText(x1 - width/2, y1 + tickLength + fontHeight + 2, text);
             } else {
                 let text = "" + x;
                 let width = g.font.width(text);
                 g.drawText(x1 - width/2, y1 + tickLength + fontHeight + 2, text);
             }
         }
+
+        // Draw X-axis label
+        let x = (xOrigin_ + xAxisLength_)/2 - g.font.width(axisLabel)/2;
+        let y = y1 + tickLength + fontHeight * 2 + 4;
+        g.drawText(x, y, axisLabel);
     }
     
     /**
@@ -395,32 +377,16 @@ function Graph(x0, y0, x1, y1) {
     }
     
     /**
-     * @param {Graphics} g
-     * @param {Number} imageWidth
-     * @param {Number} imageHeight
-     * @param {String} text
-     * @param {Number} axisColor
-     * @returns {undefined}
-     */
-    function drawXAxisLabel(g, imageWidth, imageHeight, text, axisColor){
-        let x = imageWidth/2 - g.font.width(text)/2;
-        let y = imageHeight - 5;
-        g.pen = new Pen(axisColor);
-        g.drawText(x, y, text);
-    }
-    
-    /**
      * @param {Font} font
-     * @param {Number} imageHeight
      * @param {String} text
      * @param {Number} axisColor
      * @returns {undefined}
      */
-    function drawYAxisLabel(font, imageHeight, text, axisColor){
+    function drawYAxisLabel(font, text, axisColor){
         // draw into a small bitmap
         // rotate the bitmap by 90 degrees
         // copy bitmap into graph right hand margin
-        let w = Math.min(imageHeight, font.width(text));
+        let w = Math.min(yOrigin_, font.width(text));
         let h = font.ascent + font.descent;
         let textBitmap = new Bitmap(w, h);
         textBitmap.fill(0xFF000000);    // AARRGGBB
@@ -432,7 +398,7 @@ function Graph(x0, y0, x1, y1) {
         graphics.drawText(0, h - font.descent, text);
         graphics.end();
         let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
-        let y = Math.max(0, imageHeight/2 - w/2);
+        let y = Math.max(0, yOrigin_/2 - w/2);
         bitmap_.copy(new Point(0, y), rotatedBitmap);
     }
     
@@ -482,20 +448,22 @@ function Graph(x0, y0, x1, y1) {
  * The GraphDialog is initialised with the Graph returned from createZoomedGraph, 
  * with a zoom factor of 1
  * @param {String} title Window title
- * @param {Graph function(Number zoomFactor)} createZoomedGraph Callback function used
+ * @param {Number} width Dialog window width
+ * @param {Number} height Dialog window height
+ * @param {Graph function({Number} zoomFactor, {Number} width, {Number} height)} createZoomedGraph
+ * Callback function used
  * to create a zoomed graph
  * @returns {GraphDialog}
  */
-function GraphDialog(title, createZoomedGraph)
+function GraphDialog(title, width, height, createZoomedGraph)
 {
     this.__base__ = Dialog;
     this.__base__();
     let self = this;
     let zoom_ = 1;
     let createZoomedGraph_ = createZoomedGraph;
-    let graph_ = createZoomedGraph_(zoom_);
-    let bitmap_ = graph_.getGraphBitmap();
-    let screenToWorld_ = graph_.screenToWorld;
+    let graph_ = createZoomedGraph_(zoom_, 
+        this.logicalPixelsToPhysical(width), this.logicalPixelsToPhysical(height));
     
     /**
      * Provided to give access to the zoomed graph. This is used when saving
@@ -513,15 +481,16 @@ function GraphDialog(title, createZoomedGraph)
      * @returns {String} Output string in format "( x, y )"
      */
     function displayXY(x, y){
-        self.windowTitle = title + getZoomString() + "  " + screenToWorld_(x, y);
+        self.windowTitle = title + getZoomString() + "  " + graph_.screenToWorld(x, y);
     };
     
     // Draw bitmap into this component
     let bitmapControl = new Control(this);
-    bitmapControl.setScaledMinSize(bitmap_.width, bitmap_.height);
+    
     bitmapControl.onPaint = function (){
         let g = new Graphics(this);
-        g.drawBitmap(0, 0, bitmap_);
+        g.clipRect = new Rect(0, 0, this.width, this.height);
+        g.drawBitmap(0, 0, graph_.getGraphBitmap());
         g.end();
     };
     
@@ -555,16 +524,26 @@ function GraphDialog(title, createZoomedGraph)
                 zoom_ += 1;   
             }
         } else {
-            if (zoom_ > -98){
+            if (zoom_ > -3){
                 zoom_ -= 1;
             }
         }
-        graph_ = createZoomedGraph_(getZoomFactor());
-        bitmap_ = graph_.getGraphBitmap();
-        screenToWorld_ = graph_.screenToWorld;  // (x,y) pixel to graph coordinates
-        bitmapControl.repaint();    // display the zoomed graph bitmap
+        update(bitmapControl.width, bitmapControl.height);
         self.windowTitle = title + getZoomString();   // display zoom factor in title bar
     };
+    
+    bitmapControl.onResize = function (wNew, hNew, wOld, hOld) {
+        update(wNew, hNew);
+    };
+    
+    function update(width, height){
+        try {
+            graph_ = createZoomedGraph_(getZoomFactor(), width, height);
+            bitmapControl.repaint();    // display the zoomed graph bitmap
+        } catch (e) {
+            console.criticalln("Graph update error: " + e);
+        }
+    }
     
     /**
      * If zoom_ is positive, return zoom_ (1 to 100)
@@ -597,11 +576,13 @@ function GraphDialog(title, createZoomedGraph)
             "<p>Left click: Display (x,y) in title bar</p>" +
             "<p>Right click: Create a PixInsight image of the graph</p>";
 
-    this.sizer = new HorizontalSizer(this);
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
     this.sizer.add(bitmapControl, 100);
-    this.adjustToContents();
-    this.dialog.setFixedSize();
+    this.width = width;
+    this.height = height;
+    this.setScaledMinSize(300, 300);
     this.windowTitle = title + " 1:1";
-            //"(Esc: Close,  Left click: (x,y),  Right click: Save,  Mouse wheel: zoom)";
 }
+
+GraphDialog.prototype = new Dialog;
