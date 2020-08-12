@@ -483,8 +483,15 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
  */
 function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
     {   // Constructor
+        // The ideal width and height ratio depends on the graph line's gradient
+        let height = data.graphHeight;
+        let width = height;
+        let tmpGraph = createZoomedGraph(1, width, height);
+        width = tmpGraph.preferredWidth;
+        height = tmpGraph.preferredHeight;
+        
         // Display graph in script dialog
-        let graphDialog = new GraphDialog("Photometry Graph", data.graphHeight, data.graphHeight, createZoomedGraph);
+        let graphDialog = new GraphDialog("Photometry Graph", width, height, createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let isColor = refView.image.isColor;

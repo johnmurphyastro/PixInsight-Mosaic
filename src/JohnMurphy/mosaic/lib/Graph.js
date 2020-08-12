@@ -84,6 +84,8 @@ function Graph(x0, y0, x1, y1) {
        
         xAxisLength_ = imageWidth - leftMargin - rightMargin;
         yAxisLength_ = imageHeight - topMargin - bottomMargin;
+        this.preferredWidth = imageWidth;
+        this.preferredHeight = imageHeight;
         
         xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
         yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
@@ -91,9 +93,11 @@ function Graph(x0, y0, x1, y1) {
             if (xScale_ < yScale_){
                 yScale_ = xScale_;
                 yAxisLength_ = calculateAxisLength(yScale_, yMax_ - yMin_);
+                this.preferredHeight = yAxisLength_ + topMargin + bottomMargin;
             } else {
                 xScale_ = yScale_;
                 xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
+                this.preferredWidth = xAxisLength_ + leftMargin + rightMargin;
             }
         }
         
