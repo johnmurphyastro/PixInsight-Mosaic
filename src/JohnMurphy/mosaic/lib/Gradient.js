@@ -1025,7 +1025,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
     
     function construct(){
         // Display graph in script dialog
-        let graphDialog = new GraphDialog("Gradient Graph", data.graphWidth, data.graphHeight, createZoomedGraph);
+        let graphDialog = new GradientGraphDialog("Gradient Graph", data.graphWidth, data.graphHeight, createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";

@@ -477,12 +477,14 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
  * Display photometry graph of reference flux against target flux
  * @param {String} refView
  * @param {String} tgtView
- * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
- * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
- * @param {PhotometricMosaicData} data User settings used to create FITS header
+ * @param {StarsDetected} detectedStars
+ * @param {PhotometricMosaicData} data Values from user interface
+ * @param {PhotometricMosaicDialog} photometricMosaicDialog
  */
-function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
+function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosaicDialog){
+    let nChannels = refView.image.isColor ? 3 : 1;
     {   // Constructor
+        detectedStars.showConsoleInfo = false;
         // The ideal width and height ratio depends on the graph line's gradient
         let height = data.graphHeight;
         let width = height;
@@ -491,7 +493,8 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
         height = tmpGraph.preferredHeight;
         
         // Display graph in script dialog
-        let graphDialog = new GraphDialog("Photometry Graph", width, height, createZoomedGraph);
+        let graphDialog = new PhotometryGraphDialog("Photometry Graph", width, height, 
+            data, photometricMosaicDialog, createZoomedGraph);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let isColor = refView.image.isColor;
@@ -499,10 +502,12 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
             let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
             let zoomedGraph = graphDialog.getGraph();
             let imageWindow = zoomedGraph.createWindow(windowTitle, isColor);
+            let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
             starGraphFitsHeader(imageWindow, colorStarPairs, data);
             imageWindow.show();
             imageWindow.zoomToFit();
         }
+        detectedStars.showConsoleInfo = true;
     }
     
     /**
@@ -514,9 +519,24 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
      * @returns {Graph}
      */
     function createZoomedGraph(factor, width, height){
+        let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
+        let scaleFactors = getScaleFactors(colorStarPairs);
         let graph = createGraph(refView.fullId, tgtView.fullId, width, height, 
             colorStarPairs, scaleFactors, factor);
         return graph;
+    }
+    
+    /**
+     * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
+     * @returns {LinearFitData[]}
+     */
+    function getScaleFactors(colorStarPairs){
+        let scaleFactors = [];
+        for (let starPairs of colorStarPairs){
+            let linearFitData = calculateScale(starPairs);
+            scaleFactors.push(linearFitData);
+        }
+        return scaleFactors;
     }
     
     /**
@@ -533,6 +553,7 @@ function displayStarGraph(refView, tgtView, colorStarPairs, scaleFactors, data){
         fitsHeaderImages(keywords, data);
         fitsHeaderStarDetection(keywords, data);
         fitsHeaderPhotometry(keywords, data);
+        let scaleFactors = getScaleFactors(colorStarPairs);
         addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, null);
         graphWindow.keywords = keywords;
         view.endProcess();

@@ -30,6 +30,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/Cache.js"
 #include "lib/StarLib.js"
 #include "lib/Gradient.js"
+#include "lib/GradientGraphDialog.js"
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"
 #include "lib/PreviewControl.js"
@@ -37,6 +38,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/BinnedSampleGridDialog.js"
 #include "lib/DetectedStarsDialog.js"
 #include "lib/PhotometryStarsDialog.js"
+#include "lib/PhotometryGraphDialog.js"
 #include "lib/MaskStarsDialog.js"
 
 // To stop my IDE from generating warnings...
@@ -236,7 +238,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
         console.hide(); // Allow user to compare with other open windows
-        displayStarGraph(referenceView, targetView, colorStarPairs, scaleFactors, data);
+        displayStarGraph(referenceView, targetView, detectedStars, data, photometricMosaicDialog);
         return;
     }
     
