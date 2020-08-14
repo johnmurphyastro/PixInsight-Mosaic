@@ -55,12 +55,12 @@ function StarsDetected(){
      */
     this.detectStars = function (refView, tgtView, logSensitivity, cache) {
         let nChannels = refView.image.isColor ? 3 : 1;
-        writeln("<b><u>Detecting stars</u></b>");
-        processEvents();
         const overlapBox = cache.overlap.overlapBox;
-        let detectStarTime = new Date().getTime();
         // Reference and target image stars
         if (cache.refColorStars === null || cache.tgtColorStars === null){
+            let detectStarTime = new Date().getTime();
+            writeln("<b><u>Detecting stars</u></b>");
+            processEvents();
             cache.allStars = null;
             cache.refColorStars = [];
             cache.tgtColorStars = [];
@@ -77,6 +77,8 @@ function StarsDetected(){
                 processEvents();
             }
             overlapMask.free();
+            writeln(getElapsedTime(detectStarTime) + "\n");
+            processEvents();
         }
         this.refColorStars = cache.refColorStars;
         this.tgtColorStars = cache.tgtColorStars;
@@ -86,10 +88,6 @@ function StarsDetected(){
             cache.allStars = combienStarArrays(cache.refColorStars, cache.tgtColorStars);
         }
         this.allStars = cache.allStars;
-
-        writeln("\n<b>Star cache:</b>\n" + cache.getStatus() + 
-                "\n    (" + getElapsedTime(detectStarTime) + ")\n");
-        processEvents();
     };
     
     /**
@@ -105,7 +103,7 @@ function StarsDetected(){
             // Remove outliers
             for (let i=0; i<data.outlierRemoval; i++){
                 if (starPairs.length < 4){
-                    warningln("Channel[" + channel + "]: Only " + starPairs.length +
+                    console.warningln("Channel[" + channel + "]: Only " + starPairs.length +
                         " photometry stars. Keeping outlier.");
                     break;
                 }
@@ -361,12 +359,6 @@ function StarsDetected(){
             console.writeln(consoleMsg);
         }
     }
-    
-    function warningln(consoleMsg){
-        if (self.showConsoleInfo){
-            console.warningln(consoleMsg);
-        }
-    }
 }
 
 /**
@@ -484,7 +476,6 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
 function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosaicDialog){
     let nChannels = refView.image.isColor ? 3 : 1;
     {   // Constructor
-        detectedStars.showConsoleInfo = false;
         // The ideal width and height ratio depends on the graph line's gradient
         let height = data.graphHeight;
         let width = height;
@@ -507,7 +498,6 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
             imageWindow.show();
             imageWindow.zoomToFit();
         }
-        detectedStars.showConsoleInfo = true;
     }
     
     /**

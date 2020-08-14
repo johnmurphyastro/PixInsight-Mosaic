@@ -24,13 +24,12 @@
  * @param {Bitmap} refBitmap Background image of the reference overlap area at 1:1 scale
  * @param {Bitmap} tgtBitmap Background image of the target overlap area at 1:1 scale
  * @param {Number} nChannels
- * @param {StarPair[][]} colorStarPairs Contains all the detected starPairs
  * @param {StarsDetected} detectedStars
  * @param {PhotometricMosaicData} data Values from user interface
  * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {PhotometryStarsDialog}
  */
-function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels, colorStarPairs,
+function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         detectedStars, data, photometricMosaicDialog)
 {
     this.__base__ = Dialog;
@@ -46,6 +45,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels, colorStar
     let selectedChannel = 3;    // 0=R, 1=G, 2=B, 3 = all
     let bitmapOffset = getBitmapOffset(data);
     let bitmap = getBitmap(selectedBitmap);
+    let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
     let starPairs = getStarPairs(selectedChannel);
     
     /**

@@ -1596,6 +1596,7 @@ PhotometricMosaicDialog.prototype = new Dialog;
 
 // Photometric Mosaic main process
 function main() {
+    console.writeln("\n\n=== <b>" + TITLE() + " ", VERSION(), "</b> ===");
     const MAJOR = 1;
     const MINOR = 8;
     const RELEASE = 8;
@@ -1623,7 +1624,6 @@ function main() {
             break;
         console.show();
         console.abortEnabled = false; // Allowing abort would complicate cache strategy
-        console.writeln("\n\n=== <b>" + TITLE() + " ", VERSION(), "</b> ===");
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {

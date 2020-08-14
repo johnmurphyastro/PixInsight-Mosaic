@@ -79,21 +79,4 @@ function MosaicCache() {
         this.tgtColorStars = null;
         this.allStars = null;
     };
-    
-    /**
-     * @returns {String} Cache content details
-     */
-    this.getStatus = function(){
-        let allStarsN = this.allStars.length;
-        let nChannels = this.refColorStars.length;
-        let nRefStars = 0;
-        let nTgtStars = 0;
-        for (let c=0; c<nChannels; c++){
-            nRefStars += this.refColorStars[c].length;
-            nTgtStars += this.tgtColorStars[c].length;
-        }
-        return "    Detected stars: " + allStarsN +
-                "\n    Reference stars: " + nRefStars +
-                "\n    Target stars: " + nTgtStars;
-    };
 }

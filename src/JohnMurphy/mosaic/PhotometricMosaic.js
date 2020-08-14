@@ -42,7 +42,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/MaskStarsDialog.js"
 
 // To stop my IDE from generating warnings...
-function VERSION(){return  "2.1";}
+function VERSION(){return  "2.2";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimMosaicTile";}
@@ -71,6 +71,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     let referenceView = data.referenceView;
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
     let overlap;
+    let showJoinDirection = false;
     
     // let the MosaicCache know about any relevant input parameter changes
     // If any of these inputs have changed, the cache will be invalidated
@@ -78,6 +79,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     // Overlap bounding box and overlap bitmap
     if (data.cache.overlap === null){
+        showJoinDirection = true;
         // Create ref/tgt overlap bitmap (overlapMask) and its bounding box (ovelapBox)
         let overlapTime = new Date().getTime();
         // Add trim warning check here so it is only displayed once
@@ -118,7 +120,7 @@ function photometricMosaic(data, photometricMosaicDialog)
             return;
         }
         let intersectRect = joinAreaPreview.intersection(overlapBox);
-        isHorizontal = isJoinHorizontal(data, intersectRect);
+        isHorizontal = isJoinHorizontal(data, intersectRect, showJoinDirection);
         if (data.cropTargetToJoinRegionFlag){
             joinRect = intersectRect;
         } else {
@@ -127,7 +129,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         // Show the join area in a preview
         createPreview(targetView, joinRect, "JoinRegion");
     } else if (data.hasJoinSize){
-        isHorizontal = isJoinHorizontal(data, overlapBox);
+        isHorizontal = isJoinHorizontal(data, overlapBox, showJoinDirection);
         let halfSize = data.joinSize / 2;
         if (isHorizontal){
             let middle = (overlapBox.y0 + overlapBox.y1) / 2;
@@ -142,7 +144,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         }
         createPreview(targetView, joinRect, "JoinRegion");
     } else {
-        isHorizontal = isJoinHorizontal(data, overlapBox);
+        isHorizontal = isJoinHorizontal(data, overlapBox, showJoinDirection);
         joinRect = overlapBox;
     }
 
@@ -156,6 +158,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
+        console.writeln("\n<b><u>Displaying detected stars</u></b>");
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
@@ -163,12 +166,32 @@ function photometricMosaic(data, photometricMosaicDialog)
         dialog.execute();
         return;
     }
-    
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
+        console.writeln("\n<b><u>Displaying photometry stars</u></b>");
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        detectedStars.showConsoleInfo = false;
+        let dialog = new PhotometryStarsDialog("Photometry Stars", refBitmap, tgtBitmap, nChannels, 
+                detectedStars, data, photometricMosaicDialog);
+        dialog.execute();
+        detectedStars.showConsoleInfo = true;
+        return;
+    }
+    if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
+        console.writeln("\n<b><u>Displaying photometry graph</u></b>");
+        detectedStars.showConsoleInfo = false;
+        displayStarGraph(referenceView, targetView, detectedStars, data, photometricMosaicDialog);
+        detectedStars.showConsoleInfo = true;
+        return;
+    }
     if (data.viewFlag === CREATE_MOSAIC_MASK()){
+        console.writeln("\n<b><u>Creating mosaic mask</u></b>");
         displayMask(targetView, joinRect, detectedStars, data);
         return;
     }
     if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
+        console.writeln("\n<b><u>Displaying mosaic mask stars</u></b>");
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
@@ -176,6 +199,12 @@ function photometricMosaic(data, photometricMosaicDialog)
                 detectedStars, data, photometricMosaicDialog);
         dialog.execute();
         return;
+    }
+    if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
+        console.writeln("\n<b><u>Displaying gradient graph</u></b>");
+    }
+    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
+        console.writeln("\n<b><u>Displaying extrapolated gradient graph</u></b>");
     }
     
     // Photometry stars
@@ -225,23 +254,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         processEvents();
     }
     
-    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
-        let overlap = data.cache.overlap;
-        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        detectedStars.showConsoleInfo = false;
-        let dialog = new PhotometryStarsDialog("Photometry Stars", refBitmap, tgtBitmap, nChannels, 
-                colorStarPairs, detectedStars, data, photometricMosaicDialog);
-        dialog.execute();
-        detectedStars.showConsoleInfo = true;
-        return;
-    }
-    if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){
-        console.hide(); // Allow user to compare with other open windows
-        displayStarGraph(referenceView, targetView, detectedStars, data, photometricMosaicDialog);
-        return;
-    }
-    
     let maxSampleSize = Math.floor(Math.min(overlapBox.height, overlapBox.width)/2);
     if (data.sampleSize > maxSampleSize){
         new MessageBox("Sample Size is too big for the overlap area.\n" +
@@ -255,6 +267,7 @@ function photometricMosaic(data, photometricMosaicDialog)
             detectedStars.allStars, overlapBox, data);
             
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
+        console.writeln("\n<b><u>Displaying sample grid</u></b>");
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
@@ -279,6 +292,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     if (data.viewFlag === DISPLAY_BINNED_SAMPLES()){
+        console.writeln("\n<b><u>Displaying binned sample grid</u></b>");
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let dialog = new BinnedSampleGridDialog("Binned Sample Grid", refBitmap, 
@@ -314,8 +328,8 @@ function photometricMosaic(data, photometricMosaicDialog)
     // Calculate the gradient for each channel
     console.writeln("\n<b><u>Calculating surface spline</u></b>");
     if (binnedColorSamplePairs[0].length < colorSamplePairs[0].length){
-        console.writeln("Reduced number of samples from ", binnedColorSamplePairs[0].length, 
-                " to ", colorSamplePairs[0].length);
+        console.writeln("Reduced number of samples from ", colorSamplePairs[0].length, 
+                " to ", binnedColorSamplePairs[0].length);
     }
     let createSurfaceSplineTime = new Date().getTime();
     let propagateSurfaceSplines;
@@ -333,7 +347,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         }
         
         if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
-            console.hide(); // Allow user to compare with other open windows
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
                     propagateSurfaceSplines, joinRect, binnedColorSamplePairs, data, true);
@@ -358,7 +371,6 @@ function photometricMosaic(data, photometricMosaicDialog)
             " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
-        console.hide(); // Allow user to compare with other open windows
         // This gradient is important at the join
         GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
                 surfaceSplines, joinRect, binnedColorSamplePairs, data, false);
@@ -478,16 +490,19 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
  *
  * @param {PhotometricMosaicData} data
  * @param {Rect} joinRect
+ * @param {Boolean} showConsoleInfo 
  * @returns {Boolean} True if the mosaic join is mostly horizontal
  */
-function isJoinHorizontal(data, joinRect){
+function isJoinHorizontal(data, joinRect, showConsoleInfo){
     let isHorizontal = joinRect.width > joinRect.height;
-    if (data.cropTargetToJoinRegionFlag){
-        console.writeln("<b>Mode: Crop target image to Join Region</b>");
-    } else if (isHorizontal) {
-        console.writeln("<b>Mode auto selected: Horizontal join</b>");
-    } else {
-        console.writeln("<b>Mode auto selected: Vertical join</b>");
+    if (showConsoleInfo){
+        if (data.cropTargetToJoinRegionFlag){
+            console.writeln("<b>Mode: Crop target image to Join Region</b>");
+        } else if (isHorizontal) {
+            console.writeln("<b>Horizontal join</b>");
+        } else {
+            console.writeln("<b>Vertical join</b>");
+        }
     }
     return isHorizontal;
 }

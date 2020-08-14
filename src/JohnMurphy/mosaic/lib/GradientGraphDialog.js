@@ -158,7 +158,6 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     }
     
     bitmapControl.toolTip = 
-            "<p>Esc: Close graph window</p>" +
             "<p>Mouse wheel: Zoom</p>" +
             "<p>Left click: Display (x,y) in title bar</p>" +
             "<p>Right click: Create a PixInsight image of the graph</p>";
