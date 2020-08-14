@@ -42,8 +42,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let self = this;
     let zoom_ = 1;
     let createZoomedGraph_ = createZoomedGraph;
-    let graph_ = createZoomedGraph_(zoom_, 
-        this.logicalPixelsToPhysical(width), this.logicalPixelsToPhysical(height));
+    let graph_ = createZoomedGraph_(zoom_, width, height);
     
     /**
      * Provided to give access to the zoomed graph. This is used when saving

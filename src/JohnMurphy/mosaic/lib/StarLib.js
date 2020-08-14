@@ -477,7 +477,7 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
     let nChannels = refView.image.isColor ? 3 : 1;
     {   // Constructor
         // The ideal width and height ratio depends on the graph line's gradient
-        let height = data.graphHeight;
+        let height = photometricMosaicDialog.logicalPixelsToPhysical(data.graphHeight);
         let width = height;
         let tmpGraph = createZoomedGraph(1, width, height);
         width = tmpGraph.preferredWidth;
