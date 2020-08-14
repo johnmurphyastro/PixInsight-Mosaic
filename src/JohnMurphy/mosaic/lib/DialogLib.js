@@ -95,8 +95,6 @@ function createTitleLabel(text){
  * @returns {HorizontalSizer}
  */
 function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptName, okToolTip){
-    let newInstanceIcon = dialog.scaledResource(":/process-interface/new-instance.png");
-    
     let ok_Button = new PushButton();
     ok_Button.text = "OK";
     ok_Button.icon = dialog.scaledResource( ":/icons/ok.png" );
@@ -119,7 +117,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
 
     // New Instance button
     let newInstance_Button = new ToolButton();
-    newInstance_Button.icon = newInstanceIcon;
+    newInstance_Button.icon = dialog.scaledResource(":/process-interface/new-instance.png");
     newInstance_Button.setScaledFixedSize(24, 24);
     newInstance_Button.toolTip = "Save as Process Icon";
     newInstance_Button.onMousePress = function () {
@@ -130,7 +128,8 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     };
 
     let browseDocumentationButton = new ToolButton();
-    browseDocumentationButton.icon = ":/process-interface/browse-documentation.png";
+    browseDocumentationButton.icon = dialog.scaledResource(":/process-interface/browse-documentation.png");
+    browseDocumentationButton.setScaledFixedSize(24, 24);
     browseDocumentationButton.toolTip =
             "<p>Opens a browser to view the script's documentation.</p>";
     browseDocumentationButton.onClick = function () {
@@ -151,7 +150,8 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
 
     let resetButton = new ToolButton();
 
-    resetButton.icon = ":/images/icons/reset.png";
+    resetButton.icon = dialog.scaledResource(":/images/icons/reset.png");
+    resetButton.setScaledFixedSize(24, 24);
     resetButton.toolTip = "<p>Resets the dialog's parameters.";
     resetButton.onClick = function () {
         data.resetParameters(dialog);
