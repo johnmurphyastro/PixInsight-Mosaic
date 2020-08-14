@@ -300,8 +300,8 @@ function PhotometricMosaicData() {
         this.mosaicRandomFlag = true;
         this.mosaicAverageFlag = false;
         
-        this.graphWidth = 1200; // Gradient graph width
-        this.graphHeight = 900; // Photometric and Gradient graph height
+        this.graphWidth = 1600; // gradient and photometry graph width
+        this.graphHeight = 800; // gradient and photometry graph height
         
         // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
         this.testFlag = 0;

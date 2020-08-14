@@ -120,6 +120,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             firstNstars = stars.length;
         }
         graphics.antialiasing = true;
+        graphics.pen = new Pen(0xffff0000, 1.5);
         for (let i = 0; i < firstNstars; ++i){
             let star = stars[i];
             let radius = Math.sqrt(star.size)/2;

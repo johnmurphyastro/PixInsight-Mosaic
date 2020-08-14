@@ -475,13 +475,18 @@ function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, r
  */
 function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosaicDialog){
     let nChannels = refView.image.isColor ? 3 : 1;
+    let preserveAspectRatio = true;
     {   // Constructor
         // The ideal width and height ratio depends on the graph line's gradient
         let height = photometricMosaicDialog.logicalPixelsToPhysical(data.graphHeight);
-        let width = height;
+        let width = photometricMosaicDialog.logicalPixelsToPhysical(data.graphWidth);
         let tmpGraph = createZoomedGraph(1, width, height);
-        width = tmpGraph.preferredWidth;
-        height = tmpGraph.preferredHeight;
+        if (tmpGraph.preferredWidth < width){
+            width = tmpGraph.preferredWidth;
+            height = tmpGraph.preferredHeight;
+        } else {
+            preserveAspectRatio = false;
+        }
         
         // Display graph in script dialog
         let graphDialog = new PhotometryGraphDialog("Photometry Graph", width, height, 
@@ -512,7 +517,7 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
         let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
         let scaleFactors = getScaleFactors(colorStarPairs);
         let graph = createGraph(refView.fullId, tgtView.fullId, width, height, 
-            colorStarPairs, scaleFactors, factor);
+            colorStarPairs, scaleFactors, factor, preserveAspectRatio);
         return graph;
     }
     
@@ -573,9 +578,11 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
      * @param {StarPair[][]} colorStarPairs StarPair[] for each color
      * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
      * @param {Number} zoomFactor
+     * @param {Boolean} preserveAspectRatio 
      * @returns {Graph}
      */
-    function createGraph(referenceName, targetName, width, height, colorStarPairs, scaleFactors, zoomFactor){
+    function createGraph(referenceName, targetName, width, height, colorStarPairs, 
+            scaleFactors, zoomFactor, preserveAspectRatio){
         let targetLabel = "Target (" + targetName + ")";
         let referenceLabel = "Reference (" + referenceName + ")";
 
@@ -606,7 +613,7 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
         }
         let graphWithAxis = new Graph(minMax.minTgtFlux - startOffsetX, minMax.minRefFlux - startOffsetY,
                                       minMax.maxTgtFlux, minMax.maxRefFlux);
-        graphWithAxis.createGraph(targetLabel, referenceLabel, width, height, true);
+        graphWithAxis.createGraph(targetLabel, referenceLabel, width, height, preserveAspectRatio);
 
         // Now add the data to the graph...
         if (colorStarPairs.length === 1){ // B&W

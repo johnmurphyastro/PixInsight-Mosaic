@@ -113,7 +113,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
      * @param {Number} zoom
      */
     function updateZoom (zoom) {
-        if (zoom < 101 && zoom > -4){
+        if (zoom < 101 && zoom > -99){
             zoom_ = zoom;
             update(bitmapControl.width, bitmapControl.height);
             self.windowTitle = title + getZoomString();   // display zoom factor in title bar

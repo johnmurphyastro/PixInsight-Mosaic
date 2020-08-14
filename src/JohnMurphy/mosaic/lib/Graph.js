@@ -89,16 +89,10 @@ function Graph(x0, y0, x1, y1) {
         
         xScale_ = calculateScale(xAxisLength_, xMax_ - xMin_);
         yScale_ = calculateScale(yAxisLength_, yMax_ - yMin_);
-        if (preserveAspectRatio){
-            if (xScale_ < yScale_){
-                yScale_ = xScale_;
-                yAxisLength_ = calculateAxisLength(yScale_, yMax_ - yMin_);
-                this.preferredHeight = yAxisLength_ + topMargin + bottomMargin;
-            } else {
-                xScale_ = yScale_;
-                xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
-                this.preferredWidth = xAxisLength_ + leftMargin + rightMargin;
-            }
+        if (preserveAspectRatio) {
+            xScale_ = yScale_;
+            xAxisLength_ = calculateAxisLength(xScale_, xMax_ - xMin_);
+            this.preferredWidth = xAxisLength_ + leftMargin + rightMargin;
         }
         
         xOrigin_ = leftMargin;

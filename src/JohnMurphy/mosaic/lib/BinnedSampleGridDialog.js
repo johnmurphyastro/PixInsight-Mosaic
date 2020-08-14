@@ -110,7 +110,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
             } else {
                 firstNstars = stars.length;
             }
-            graphics.pen = new Pen(0xffff0000);
+            graphics.pen = new Pen(0xffff0000, 1.5);
             graphics.antialiasing = true;
             for (let i = 0; i < firstNstars; ++i){
                 let star = stars[i];

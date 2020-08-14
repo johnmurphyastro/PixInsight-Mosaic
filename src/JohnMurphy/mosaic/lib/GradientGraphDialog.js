@@ -40,6 +40,8 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     let self = this;
     let zoom_ = 1;
     let createZoomedGraph_ = createZoomedGraph;
+    width = this.logicalPixelsToPhysical(width);
+    height = this.logicalPixelsToPhysical(height);
     let graph_ = createZoomedGraph_(zoom_, width, height);
     
     /**
@@ -111,7 +113,7 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
      * @param {Number} zoom
      */
     function updateZoom (zoom) {
-        if (zoom < 101 && zoom > -4){
+        if (zoom < 101 && zoom > -99){
             zoom_ = zoom;
             update(bitmapControl.width, bitmapControl.height);
             self.windowTitle = title + getZoomString();   // display zoom factor in title bar

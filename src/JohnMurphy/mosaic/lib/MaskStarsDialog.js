@@ -120,6 +120,7 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
         graphics.scaleTransformation(scale, scale);
         graphics.pen = new Pen(0xffff0000);
         graphics.drawRect(clipRect);
+        graphics.pen = new Pen(0xffff0000, 1.5);
         graphics.antialiasing = true;
         graphics.clipRect = clipRect;
         let allStars = detectedStars.allStars;
