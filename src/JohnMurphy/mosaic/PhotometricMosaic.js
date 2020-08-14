@@ -310,18 +310,34 @@ function photometricMosaic(data, photometricMosaicDialog)
         let isRefAfterTarget = isImageBelowOverlap(referenceView.image, overlapBox, nChannels);
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
-            let messageBox = new MessageBox("Is the reference frame above the target frame?",
-                    "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
-            isTargetAfterRef = (StdButton_Yes === messageBox.execute());
+            let msg = "Reference:\t'" + referenceView.fullId + 
+                    "'\nTarget:\t'" + targetView.fullId +
+                    "'\n\nIs the reference frame above the target frame?";
+            let messageBox = new MessageBox(msg,
+                    "Failed to auto detect tile order", 
+                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Abort);
+            let response = messageBox.execute();
+            if (response === StdButton_Abort){
+                return;
+            }
+            isTargetAfterRef = (StdButton_Yes === response);
         }
     } else {
         isTargetAfterRef = isImageRightOfOverlap(targetView.image, overlapBox, nChannels);
         let isRefAfterTarget = isImageRightOfOverlap(referenceView.image, overlapBox, nChannels);
         if (isTargetAfterRef === isRefAfterTarget){
             // Ambiguous case, let user decide
-            let messageBox = new MessageBox("Is the reference frame to the left of the target frame?",
-                    "Failed to auto detect tile order", StdIcon_Question, StdButton_Yes, StdButton_No);
-            isTargetAfterRef = (StdButton_Yes === messageBox.execute());
+            let msg = "Reference:\t'" + referenceView.fullId + 
+                    "'\nTarget:\t'" + targetView.fullId +
+                    "'\n\nIs the reference frame to the left of the target frame?";
+            let messageBox = new MessageBox(msg,
+                    "Failed to auto detect tile order", 
+                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Abort);
+            let response = messageBox.execute();
+            if (response === StdButton_Abort){
+                return;
+            }
+            isTargetAfterRef = (StdButton_Yes === response);
         }
     }
 
