@@ -484,9 +484,8 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
         if (tmpGraph.preferredWidth < width){
             width = tmpGraph.preferredWidth;
             height = tmpGraph.preferredHeight;
-        } else {
-            preserveAspectRatio = false;
-        }
+        } 
+        preserveAspectRatio = false;
         
         // Display graph in script dialog
         let graphDialog = new PhotometryGraphDialog("Photometry Graph", width, height, 
