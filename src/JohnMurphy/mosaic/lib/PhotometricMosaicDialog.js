@@ -614,11 +614,7 @@ function PhotometricMosaicDialog(data) {
             "<ul><li>Found in both target and reference images.</li>" +
             "<li>Amongst the brightest 'Limit stars %' stars.</li>" +
             "<li>Within the specified 'Linear range'.</li>" +
-            "<li>Not rejected by 'Outlier removal'.</li></ul></p>" +
-            "<p>The color represents the color channel. " +
-            "Hence a white square indicates the star was found in the red, green and blue channels.</p>" +
-            "<p>Useful data is also saved to the FITS header, " +
-            "including the position of the star that has the largest error.</p>";
+            "<li>Not rejected by 'Outlier removal'.</li></ul></p>";
     photometryStarsButton.onClick = function () {
         data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
         this.dialog.ok();
@@ -1440,9 +1436,7 @@ function createOutlierRemovalControl(dialog, data, strLength){
             "<p>The photometric measurement of some stars can be suspect. " +
             "For example, a star's size may be underestimated causing some of " +
             "its flux to contribute to the background measurement. " +
-            "Removing a few outliers can improve accuracy, but don't over do it.</p>" +
-            "<p>Use the 'Photometry graph' button to see the " +
-            "photometry data points and their best fit line.</p>";
+            "Removing a few outliers can improve accuracy, but don't over do it.</p>";
     outlierRemoval_Control.setRange(0, 50);
     outlierRemoval_Control.slider.setRange(0, 50);
     outlierRemoval_Control.slider.minWidth = 221;
@@ -1485,7 +1479,6 @@ function createSampleStarRadiusMultControl(dialog, data, labelLength){
     sampleStarRadiusMult_Control.label.minWidth = labelLength;
     sampleStarRadiusMult_Control.toolTip =
             "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>" +
             "<p>Read the Help sections on 'Join Region' to learn when these " +
             "samples should be rejected.</p>";
     sampleStarRadiusMult_Control.setPrecision(1);
@@ -1504,8 +1497,7 @@ function createSampleSizeControl(dialog, data, labelLength){
     sampleSize_Control.toolTip =
             "<p>Specifies the size of the sample squares.</p>" +
             "<p>Ideally, the samples should be about 1.5x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>" +
-            "<p>Use the 'Sample grid' button to visualize the grid of samples.</p>";
+            "star that's not rejected by 'Limit stars %'.</p>";
     sampleSize_Control.setRange(3, 50);
     sampleSize_Control.slider.setRange(3, 50);
     sampleSize_Control.slider.minWidth = 50;
@@ -1527,8 +1519,7 @@ function createMaxSamplesControl(dialog, data){
             "small unbinned samples are noisier and require more smoothing. " +
             "The default value is usually a good compromise.</p>" +
             "<p>The time required to initialize the surface spline approximately " +
-            "doubles every 1300 samples.</p>" +
-            "<p>Use the 'Binned grid' button to visualize the binned samples.</p>";
+            "doubles every 1300 samples.</p>";
     
     maxSamples_Control.setRange(1000, 5000);
     maxSamples_Control.slider.setRange(100, 500);

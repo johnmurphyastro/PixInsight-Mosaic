@@ -175,7 +175,8 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     // ========================================
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
-    refCheckBox.toolTip = "<p>Display the reference or target stars and background image</p>";
+    refCheckBox.toolTip = "Display either reference background and stars, or " +
+            "target background and stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
         selectedBitmap = checked ? REF : TGT;
@@ -187,7 +188,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
-    redRadioButton.toolTip = "Display the photometry stars within the red channel";
+    redRadioButton.toolTip = "Display the photometry stars detected within the red channel";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
         selectedChannel = 0;
@@ -197,7 +198,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
-    greenRadioButton.toolTip = "Display the photometry stars within the green channel";
+    greenRadioButton.toolTip = "Display the photometry stars detected within the green channel";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
         selectedChannel = 1;
@@ -207,7 +208,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
-    blueRadioButton.toolTip = "Display the photometry stars within the blue channel";
+    blueRadioButton.toolTip = "Display the photometry stars detected within the blue channel";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
         selectedChannel = 2;
@@ -217,7 +218,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     
     let allRadioButton = new RadioButton(this);
     allRadioButton.text = "All";
-    allRadioButton.toolTip = "Display the photometry stars from all channels";
+    allRadioButton.toolTip = "Display the photometry stars detected within all channels";
     allRadioButton.checked = true;
     allRadioButton.onClick = function (checked) {
         selectedChannel = 3;

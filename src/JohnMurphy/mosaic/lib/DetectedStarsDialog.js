@@ -161,7 +161,8 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     // ========================================
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
-    refCheckBox.toolTip = "If selected show reference stars. Otherwise show target stars.";
+    refCheckBox.toolTip = "Display either reference background and stars, or " +
+            "target background and stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
         selectedBitmap = checked ? REF : TGT;
@@ -173,7 +174,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
-    redRadioButton.toolTip = "Display the detected stars within the red channel";
+    redRadioButton.toolTip = "Display the stars detected within the red channel";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
         selectedChannel = 0;
@@ -183,7 +184,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
-    greenRadioButton.toolTip = "Display the detected stars within the green channel";
+    greenRadioButton.toolTip = "Display the stars detected within the green channel";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
         selectedChannel = 1;
@@ -193,7 +194,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
-    blueRadioButton.toolTip = "Display the detected stars within the blue channel";
+    blueRadioButton.toolTip = "Display the stars detected within the blue channel";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
         selectedChannel = 2;
@@ -203,7 +204,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     
     let allRadioButton = new RadioButton(this);
     allRadioButton.text = "All";
-    allRadioButton.toolTip = "Display the detected stars from all channels";
+    allRadioButton.toolTip = "Display the stars detected within all channels";
     allRadioButton.checked = true;
     allRadioButton.onClick = function (checked) {
         selectedChannel = 3;

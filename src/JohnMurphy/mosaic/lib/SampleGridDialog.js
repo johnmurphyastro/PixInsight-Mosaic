@@ -156,7 +156,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     // ========================================
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
-    refCheckBox.toolTip = "If selected show reference background. Otherwise show target background.";
+    refCheckBox.toolTip = "Display either the reference or target background.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
         selectedBitmap = checked ? REF : TGT;
