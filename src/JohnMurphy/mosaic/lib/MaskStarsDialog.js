@@ -114,33 +114,39 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
      * @param {Number} y1
      */
     function drawMaskStars(viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        let graphics = new VectorGraphics(viewport);
-        graphics.clipRect = new Rect(x0, y0, x1, y1);
-        graphics.translateTransformation(translateX, translateY);
-        graphics.scaleTransformation(scale, scale);
-        graphics.pen = new Pen(0xffff0000);
-        graphics.drawRect(clipRect);
-        graphics.pen = new Pen(0xffff0000, 1.5);
-        graphics.antialiasing = true;
-        graphics.clipRect = clipRect;
-        let allStars = detectedStars.allStars;
-        let firstNstars;
-        if (data.limitMaskStarsPercent < 100){
-            firstNstars = Math.floor(allStars.length * data.limitMaskStarsPercent / 100);
-        } else {
-            firstNstars = allStars.length;
-        }
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000);
+            graphics.drawRect(clipRect);
+            graphics.pen = new Pen(0xffff0000, 1.5);
+            graphics.antialiasing = true;
+            graphics.clipRect = clipRect;
+            let allStars = detectedStars.allStars;
+            let firstNstars;
+            if (data.limitMaskStarsPercent < 100){
+                firstNstars = Math.floor(allStars.length * data.limitMaskStarsPercent / 100);
+            } else {
+                firstNstars = allStars.length;
+            }
 
-        for (let i = 0; i < firstNstars; ++i){
-            let star = allStars[i];
-            // size is the area. sqrt gives box side length. Half gives circle radius
-            let starDiameter = Math.sqrt(star.size);
-            let x = star.pos.x - bitmapOffset.x;
-            let y = star.pos.y - bitmapOffset.y;
-            let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
-            graphics.strokeCircle(x, y, starRadius + data.maskStarRadiusAdd);
+            for (let i = 0; i < firstNstars; ++i){
+                let star = allStars[i];
+                // size is the area. sqrt gives box side length. Half gives circle radius
+                let starDiameter = Math.sqrt(star.size);
+                let x = star.pos.x - bitmapOffset.x;
+                let y = star.pos.y - bitmapOffset.y;
+                let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
+                graphics.strokeCircle(x, y, starRadius + data.maskStarRadiusAdd);
+            }
+        } catch (e) {
+            console.criticalln("drawMaskStars error: " + e);
+        } finally {
+            graphics.end();
         }
-        graphics.end();
     }
     
     // =================================
@@ -178,7 +184,8 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
     };
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 4;
+    optionsSizer.margin = 0;
+    optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
     optionsSizer.addStretch();
 
@@ -213,19 +220,21 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 4;
-    this.sizer.spacing = 4;
+    this.sizer.margin = 2;
+    this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(optionsSizer);
     this.sizer.add(limitMaskStars_Control);
     this.sizer.add(maskStarRadiusMult_Control);
     this.sizer.add(maskStarRadiusAdd_Control);
+    this.sizer.add(optionsSizer);
+    this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
-    let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 5 + 
-            refCheckBox.height + limitMaskStars_Control.height * 3;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
+            this.sizer.spacing * 5 + this.sizer.margin * 2 +
+            refCheckBox.height + limitMaskStars_Control.height * 3 + 20;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

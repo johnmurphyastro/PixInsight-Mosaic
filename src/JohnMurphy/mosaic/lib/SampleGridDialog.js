@@ -98,37 +98,43 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * @param {Number} y1
      */
     function drawSampleGrid(viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        let graphics = new VectorGraphics(viewport);
-        graphics.clipRect = new Rect(x0, y0, x1, y1);
-        graphics.translateTransformation(translateX, translateY);
-        graphics.scaleTransformation(scale, scale);
-        graphics.pen = new Pen(0xffff0000);
-        graphics.antialiasing = false;
-        // Draw the sample grid
-        for (let binRect of sampleGridMap.getBinRectArray(0)){
-            let rect = new Rect(binRect);
-            rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
-            graphics.drawRect(rect);
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000);
+            graphics.antialiasing = false;
+            // Draw the sample grid
+            for (let binRect of sampleGridMap.getBinRectArray(0)){
+                let rect = new Rect(binRect);
+                rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
+                graphics.drawRect(rect);
+            }
+
+            // Draw circles around the stars used to reject grid sample squares
+            let stars = detectedStars.allStars;
+            let firstNstars;
+            if (data.limitSampleStarsPercent < 100){
+                firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
+            } else {
+                firstNstars = stars.length;
+            }
+            graphics.antialiasing = true;
+            graphics.pen = new Pen(0xffff0000, 1.5);
+            for (let i = 0; i < firstNstars; ++i){
+                let star = stars[i];
+                let radius = Math.sqrt(star.size)/2;
+                let x = star.pos.x - bitmapOffset.x;
+                let y = star.pos.y - bitmapOffset.y;
+                graphics.strokeCircle(x, y, radius);
+            }
+        } catch (e) {
+            console.criticalln("drawSampleGrid error: " + e);
+        } finally {
+            graphics.end();
         }
-        
-        // Draw circles around the stars used to reject grid sample squares
-        let stars = detectedStars.allStars;
-        let firstNstars;
-        if (data.limitSampleStarsPercent < 100){
-            firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
-        } else {
-            firstNstars = stars.length;
-        }
-        graphics.antialiasing = true;
-        graphics.pen = new Pen(0xffff0000, 1.5);
-        for (let i = 0; i < firstNstars; ++i){
-            let star = stars[i];
-            let radius = Math.sqrt(star.size)/2;
-            let x = star.pos.x - bitmapOffset.x;
-            let y = star.pos.y - bitmapOffset.y;
-            graphics.strokeCircle(x, y, radius);
-        }
-        graphics.end();
     }
     
     // =================================
@@ -166,8 +172,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 2;
-    optionsSizer.addSpacing(8);
+    optionsSizer.margin = 0;
+    optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
     optionsSizer.addStretch();
     
@@ -207,20 +213,22 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 4;
-    this.sizer.spacing = 4;
+    this.sizer.margin = 2;
+    this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(optionsSizer);
     this.sizer.add(limitSampleStarsPercent_Control);
     this.sizer.add(sampleStarRadiusMult_Control);
     this.sizer.add(sampleSize_Control);
+    this.sizer.add(optionsSizer);
+    this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the bitmap
     // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
-    let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 5 + 
-            refCheckBox.height + limitSampleStarsPercent_Control.height * 3;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
+            this.sizer.spacing * 5 + this.sizer.margin * 2 +
+            refCheckBox.height + limitSampleStarsPercent_Control.height * 3 + 20;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

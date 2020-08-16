@@ -687,21 +687,27 @@ function displayMask(tgtView, joinArea, detectedStars, data){
     
     let clipRect = new Rect(joinArea);
     clipRect.deflateBy(3); // to allow for the 3 pixel soft edge growth
-    let G = new VectorGraphics(bmp);
-    G.antialiasing = true;
-    G.brush = new Brush();
-    G.clipRect = clipRect;
-    
-    for (let i = 0; i < firstNstars; ++i){
-        let star = detectedStars.allStars[i];
-        // size is the area. sqrt gives box side length. Half gives circle radius
-        // Double the star radius for bright stars
-        let starDiameter = Math.sqrt(star.size);
-        let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
-        let radius = starRadius + data.maskStarRadiusAdd;
-        G.fillCircle(star.pos, radius);
+    let graphics;
+    try {
+        graphics = new VectorGraphics(bmp);
+        graphics.antialiasing = true;
+        graphics.brush = new Brush();
+        graphics.clipRect = clipRect;
+
+        for (let i = 0; i < firstNstars; ++i){
+            let star = detectedStars.allStars[i];
+            // size is the area. sqrt gives box side length. Half gives circle radius
+            // Double the star radius for bright stars
+            let starDiameter = Math.sqrt(star.size);
+            let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
+            let radius = starRadius + data.maskStarRadiusAdd;
+            graphics.fillCircle(star.pos, radius);
+        }
+    } catch (e) {
+        console.criticalln("StarLib displayMask error: " + e);
+    } finally {
+        graphics.end();
     }
-    G.end();
     bmp.invert();
 
     // Create new window and copy bitmap to its image.

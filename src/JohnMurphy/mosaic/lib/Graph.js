@@ -70,18 +70,17 @@ function Graph(x0, y0, x1, y1) {
      * @param {Boolean} preserveAspectRatio If true use same scale for both axis
      */
     this.createGraph = function (xLabel, yLabel, imageWidth, imageHeight, preserveAspectRatio) {
-        let g = new Graphics();
+        let g = new Graphics(new Bitmap(1, 1));
         let font = g.font;
         let maxNumberLength = font.width("88.88e+88");
         let minDistBetweenTicks = maxNumberLength * 1.3;
         let fontHeight = font.ascent + font.descent;
         let tickLength = 4;
-        
         let topMargin = font.ascent + 2;
         let bottomMargin = fontHeight * 2 + tickLength + 10;
         let leftMargin = maxNumberLength + fontHeight + tickLength + 5;
         let rightMargin = maxNumberLength / 2;
-       
+        
         xAxisLength_ = imageWidth - leftMargin - rightMargin;
         yAxisLength_ = imageHeight - topMargin - bottomMargin;
         this.preferredWidth = imageWidth;
@@ -101,14 +100,21 @@ function Graph(x0, y0, x1, y1) {
         bitmap_ = new Bitmap(imageWidth, imageHeight);
         bitmap_.fill(0xFF000000);    // AARRGGBB
         
-        let graphics = new Graphics(bitmap_);
-        graphics.transparentBackground = true;
-        graphics.textAntialiasing = true;
-        graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
-        drawXAxis(graphics, tickLength, minDistBetweenTicks, xLabel, this.axisColor);
-        drawYAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
-        graphics.end();
+        let graphics;
+        try {
+            graphics = new Graphics(bitmap_);
+            graphics.transparentBackground = true;
+            graphics.textAntialiasing = true;
+            graphics.clipRect = new Rect(0, 0, imageWidth, imageHeight);
+            drawXAxis(graphics, tickLength, minDistBetweenTicks, xLabel, this.axisColor);
+            drawYAxis(graphics, tickLength, minDistBetweenTicks, this.axisColor);
+        } catch (e) {
+            console.criticalln("Graph createGraph error: " + e);
+        } finally {
+            graphics.end();  
+        }
         drawYAxisLabel(font, yLabel, this.axisColor);
+        g.end();
     };
     
     /**
@@ -173,15 +179,21 @@ function Graph(x0, y0, x1, y1) {
      * @param {Number} x1 Specifies line's right limit
      */
     this.drawLineSegment = function(m, b, color, antiAlias, x0, x1){
-        let g = new Graphics(bitmap_);
-        g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
-        g.transparentBackground = true;
-        g.antialiasing = antiAlias;
-        g.pen = new Pen(color);
-        let y0 = eqnOfLineCalcY(x0, m, b);
-        let y1 = eqnOfLineCalcY(x1, m, b);
-        g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
-        g.end();
+        let g;
+        try {
+            g = new Graphics(bitmap_);
+            g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
+            g.transparentBackground = true;
+            g.antialiasing = antiAlias;
+            g.pen = new Pen(color);
+            let y0 = eqnOfLineCalcY(x0, m, b);
+            let y1 = eqnOfLineCalcY(x1, m, b);
+            g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
+        } catch (e) {
+            console.criticalln("Graph drawLineSegment error: " + e);
+        } finally {
+            g.end();
+        }
     };
     
     /**
@@ -192,21 +204,27 @@ function Graph(x0, y0, x1, y1) {
      * @param {Boolean} antiAlias If true draw an antialiased line
      */
     this.drawCurve = function(curvePoints, firstCoord, color, antiAlias){
-        let g = new Graphics(bitmap_);
-        g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
-        g.transparentBackground = true;
-        g.antialiasing = antiAlias;
-        g.pen = new Pen(color);
-        for (let x=1; x < curvePoints.length; x++){
-            let x0 = x - 1;
-            let x1 = x;
-            let y0 = curvePoints[x0];
-            let y1 = curvePoints[x1];
-            x0 += firstCoord;
-            x1 += firstCoord;
-            g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
+        let g;
+        try {
+            g = new Graphics(bitmap_);
+            g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
+            g.transparentBackground = true;
+            g.antialiasing = antiAlias;
+            g.pen = new Pen(color);
+            for (let x=1; x < curvePoints.length; x++){
+                let x0 = x - 1;
+                let x1 = x;
+                let y0 = curvePoints[x0];
+                let y1 = curvePoints[x1];
+                x0 += firstCoord;
+                x1 += firstCoord;
+                g.drawLine(xToScreenX(x0), yToScreenY(y0), xToScreenX(x1), yToScreenY(y1));
+            }
+        } catch (e) {
+            console.criticalln("Graph drawCurve error: " + e);
+        } finally {
+            g.end();
         }
-        g.end();
     };
     
     /**
@@ -388,16 +406,27 @@ function Graph(x0, y0, x1, y1) {
         let h = font.ascent + font.descent;
         let textBitmap = new Bitmap(w, h);
         textBitmap.fill(0xFF000000);    // AARRGGBB
-        let graphics = new Graphics(textBitmap);
-        graphics.clipRect = new Rect(0, 0, w, h);
-        graphics.transparentBackground = true;
-        graphics.textAntialiasing = true;
-        graphics.pen = new Pen(axisColor);
-        graphics.drawText(0, h - font.descent, text);
-        graphics.end();
-        let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
-        let y = Math.max(0, yOrigin_/2 - w/2);
-        bitmap_.copy(new Point(0, y), rotatedBitmap);
+        let graphics;
+        try {
+            graphics = new Graphics(textBitmap);
+            graphics.clipRect = new Rect(0, 0, w, h);
+            graphics.transparentBackground = true;
+            graphics.textAntialiasing = true;
+            graphics.pen = new Pen(axisColor);
+            graphics.drawText(0, h - font.descent, text);
+        } catch (e) {
+            console.criticalln("Graph drawYAxisLabel error: " + e);
+        } finally {
+            graphics.end();
+        }
+        
+        try {
+            let rotatedBitmap = textBitmap.rotated(-Math.PI/2);
+            let y = Math.max(0, yOrigin_/2 - w/2);
+            bitmap_.copy(new Point(0, y), rotatedBitmap);
+        } catch (e){
+            console.criticalln("Graph rotate bitmap error: " + e);
+        }
     }
     
     /**

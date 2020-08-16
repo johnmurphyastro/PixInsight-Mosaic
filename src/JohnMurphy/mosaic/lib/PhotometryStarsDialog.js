@@ -120,33 +120,40 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
      * @param {Number} y1
      */
     function drawPhotometryStars(viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        let graphics = new VectorGraphics(viewport);
-        graphics.clipRect = new Rect(x0, y0, x1, y1);
-        graphics.translateTransformation(translateX, translateY);
-        graphics.scaleTransformation(scale, scale);
-        graphics.pen = new Pen(0xffff0000);
-        // Draw inner star flux square and outer background sky flux square
-        for (let i = 0; i < starPairs.length; ++i){
-            let starPair = starPairs[i];
-            let tgtStar = starPair.tgtStar;
-            let refStar = starPair.refStar;
-            let x;
-            let y;
-            let s;
-            if (selectedBitmap === REF){
-                x = refStar.pos.x - bitmapOffset.x;
-                y = refStar.pos.y - bitmapOffset.y;
-                s = Math.sqrt(refStar.size); // size is area of the square. s is length of side.
-            } else {
-                x = tgtStar.pos.x - bitmapOffset.x;
-                y = tgtStar.pos.y - bitmapOffset.y;
-                s = Math.sqrt(tgtStar.size); // size is area of the square. s is length of side.
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000);
+            // Draw inner star flux square and outer background sky flux square
+            for (let i = 0; i < starPairs.length; ++i){
+                let starPair = starPairs[i];
+                let tgtStar = starPair.tgtStar;
+                let refStar = starPair.refStar;
+                let x;
+                let y;
+                let s;
+                if (selectedBitmap === REF){
+                    x = refStar.pos.x - bitmapOffset.x;
+                    y = refStar.pos.y - bitmapOffset.y;
+                    s = Math.sqrt(refStar.size); // size is area of the square. s is length of side.
+                } else {
+                    x = tgtStar.pos.x - bitmapOffset.x;
+                    y = tgtStar.pos.y - bitmapOffset.y;
+                    s = Math.sqrt(tgtStar.size); // size is area of the square. s is length of side.
+                }
+                let rect = new Rect(s, s);
+                rect.center = new Point(x, y);
+                graphics.strokeRect(rect);
+                let bg = rect.inflatedBy( detectedStars.bkgDelta );
+                graphics.strokeRect(bg);
             }
-            let rect = new Rect(s, s);
-            rect.center = new Point(x, y);
-            graphics.strokeRect(rect);
-            let bg = rect.inflatedBy( detectedStars.bkgDelta );
-            graphics.strokeRect(bg);
+        } catch(e) {
+            console.criticalln("PhotometryStarsDialog drawPhotometryStars error: " + e);
+        } finally {
+            graphics.end();
         }
     }
     
@@ -233,8 +240,9 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     }
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 4;
+    optionsSizer.margin = 0;
     optionsSizer.spacing = 10;
+    optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
     optionsSizer.addSpacing(20);
     optionsSizer.add(redRadioButton);
@@ -281,19 +289,21 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 4;
-    this.sizer.spacing = 4;
+    this.sizer.margin = 2;
+    this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(optionsSizer);
     this.sizer.add(limitPhotoStarsPercent_Control);
     this.sizer.add(rejectHigh_Control);
     this.sizer.add(outlierRemoval_Control);
+    this.sizer.add(optionsSizer);
+    this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
-    let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 6 + 
-            refCheckBox.height + rejectHigh_Control.height * 3;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
+            this.sizer.spacing * 5 + this.sizer.margin * 2 +
+            refCheckBox.height + rejectHigh_Control.height * 3 + 20;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

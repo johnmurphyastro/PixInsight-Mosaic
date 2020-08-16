@@ -89,45 +89,51 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
      * @param {Number} y1
      */
     function drawBinnedSampleGrid(viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        let graphics = new VectorGraphics(viewport);
-        graphics.clipRect = new Rect(x0, y0, x1, y1);
-        graphics.translateTransformation(translateX, translateY);
-        graphics.scaleTransformation(scale, scale);
-        graphics.pen = new Pen(0xffff0000);
-        // Draw the sample grid
-        if (showUnbinnedSamples){
-            graphics.pen = new Pen(0xff0000ff);
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000);
+            // Draw the sample grid
+            if (showUnbinnedSamples){
+                graphics.pen = new Pen(0xff0000ff);
+                graphics.antialiasing = false;
+                samplePairs.forEach(function (samplePair) {
+                    let rect = new Rect(samplePair.rect);
+                    rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
+                    graphics.drawRect(rect);
+                });
+                let stars = detectedStars.allStars;
+                let firstNstars;
+                if (data.limitSampleStarsPercent < 100){
+                    firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
+                } else {
+                    firstNstars = stars.length;
+                }
+                graphics.pen = new Pen(0xffff0000, 1.5);
+                graphics.antialiasing = true;
+                for (let i = 0; i < firstNstars; ++i){
+                    let star = stars[i];
+                    let radius = Math.sqrt(star.size)/2;
+                    let x = star.pos.x - bitmapOffset.x;
+                    let y = star.pos.y - bitmapOffset.y;
+                    graphics.strokeCircle(x, y, radius);
+                }
+            }
+            graphics.pen = new Pen(0xffff0000);
             graphics.antialiasing = false;
-            samplePairs.forEach(function (samplePair) {
+            binnedSamplePairs.forEach(function (samplePair) {
                 let rect = new Rect(samplePair.rect);
                 rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
                 graphics.drawRect(rect);
             });
-            let stars = detectedStars.allStars;
-            let firstNstars;
-            if (data.limitSampleStarsPercent < 100){
-                firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
-            } else {
-                firstNstars = stars.length;
-            }
-            graphics.pen = new Pen(0xffff0000, 1.5);
-            graphics.antialiasing = true;
-            for (let i = 0; i < firstNstars; ++i){
-                let star = stars[i];
-                let radius = Math.sqrt(star.size)/2;
-                let x = star.pos.x - bitmapOffset.x;
-                let y = star.pos.y - bitmapOffset.y;
-                graphics.strokeCircle(x, y, radius);
-            }
+        } catch (e) {
+            console.criticalln("drawBinnedSampleGrid error: " + e);
+        } finally {
+            graphics.end();
         }
-        graphics.pen = new Pen(0xffff0000);
-        graphics.antialiasing = false;
-        binnedSamplePairs.forEach(function (samplePair) {
-            let rect = new Rect(samplePair.rect);
-            rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
-            graphics.drawRect(rect);
-        });
-        graphics.end();
     }
     
     // =================================
@@ -163,7 +169,8 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     };
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 2;
+    optionsSizer.margin = 0;
+    optionsSizer.addSpacing(4);
     optionsSizer.add(unbinnedCheckBox);
     optionsSizer.addStretch();
     
@@ -195,18 +202,20 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 4;
-    this.sizer.spacing = 4;
+    this.sizer.margin = 2;
+    this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(optionsSizer);
     this.sizer.add(maxSamples_Control);
+    this.sizer.add(optionsSizer);
+    this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the refBitmap
     // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
-    let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 3 + 
-            unbinnedCheckBox.height + maxSamples_Control.height;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
+            this.sizer.spacing * 3 + this.sizer.margin * 2 +
+            unbinnedCheckBox.height + maxSamples_Control.height + 20;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

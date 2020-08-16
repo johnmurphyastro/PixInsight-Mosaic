@@ -67,10 +67,16 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let bitmapControl = new Control(this);
     
     bitmapControl.onPaint = function (){
-        let g = new Graphics(this);
-        g.clipRect = new Rect(0, 0, this.width, this.height);
-        g.drawBitmap(0, 0, graph_.getGraphBitmap());
-        g.end();
+        let g;
+        try {
+            g = new Graphics(this);
+            g.clipRect = new Rect(0, 0, this.width, this.height);
+            g.drawBitmap(0, 0, graph_.getGraphBitmap());
+        } catch (e) {
+            console.criticalln("PhotometryGraphDialog bitmapControl.onPaint error: " + e);
+        } finally {
+            g.end();
+        }
     };
     
     bitmapControl.onMousePress = function ( x, y, button, buttonState, modifiers ){
@@ -198,13 +204,14 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     };
 
     let zoomButton_Sizer = new HorizontalSizer();
-    zoomButton_Sizer.margin = 2;
+    zoomButton_Sizer.margin = 0;
     zoomButton_Sizer.spacing = 4;
     zoomButton_Sizer.add(zoomIn_Button);
     zoomButton_Sizer.add(zoomOut_Button);
     zoomButton_Sizer.add(zoom11_Button);
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
+    zoomButton_Sizer.addSpacing(10);
     
     // ============================
     // Photometry controls
@@ -237,18 +244,17 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     //-------------
     this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
-    this.sizer.spacing = 4;
+    this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
     this.sizer.add(limitPhotoStarsPercent_Control);
     this.sizer.add(rejectHigh_Control);
     this.sizer.add(outlierRemoval_Control);
     this.sizer.add(zoomButton_Sizer);
-    this.sizer.addSpacing(2);
     
     this.userResizable = true;
     let preferredWidth = width + this.sizer.margin * 2;
     let preferredHeight = height + this.sizer.spacing * 4 + this.sizer.margin * 2 +
-           rejectHigh_Control.height * 4 + 2 + 8;
+           rejectHigh_Control.height * 4 + 4;
     this.resize(preferredWidth, preferredHeight);
     
     this.setScaledMinSize(300, 300);

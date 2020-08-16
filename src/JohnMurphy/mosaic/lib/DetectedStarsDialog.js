@@ -120,20 +120,26 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
      * @param {Number} y1
      */
     function drawDetectedStars(viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        let graphics = new VectorGraphics(viewport);
-        graphics.clipRect = new Rect(x0, y0, x1, y1);
-        graphics.translateTransformation(translateX, translateY);
-        graphics.scaleTransformation(scale, scale);
-        graphics.pen = new Pen(0xffff0000, 1.5);
-        graphics.antialiasing = true;
-        for (let i = 0; i < stars.length; ++i){
-            let star = stars[i];
-            let radius = Math.sqrt(star.size)/2 + 4;
-            let x = star.pos.x - bitmapOffset.x;
-            let y = star.pos.y - bitmapOffset.y;
-            graphics.strokeCircle(x, y, radius);
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000, 1.5);
+            graphics.antialiasing = true;
+            for (let i = 0; i < stars.length; ++i){
+                let star = stars[i];
+                let radius = Math.sqrt(star.size)/2 + 4;
+                let x = star.pos.x - bitmapOffset.x;
+                let y = star.pos.y - bitmapOffset.y;
+                graphics.strokeCircle(x, y, radius);
+            }
+        } catch (e){
+            console.criticalln("drawDetectedStars error: " + e);
+        } finally {
+            graphics.end();
         }
-        graphics.end();
     }
     
     // =================================
@@ -219,8 +225,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     }
     
     let optionsSizer = new HorizontalSizer();
-    optionsSizer.margin = 4;
+    optionsSizer.margin = 0;
     optionsSizer.spacing = 10;
+    optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
     optionsSizer.addSpacing(20);
     optionsSizer.add(redRadioButton);
@@ -238,15 +245,18 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
 
     // Global sizer
     this.sizer = new VerticalSizer;
-    this.sizer.margin = 4;
-    this.sizer.spacing = 4;
+    this.sizer.margin = 2;
+    this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
+    this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
-    let preferredWidth = previewControl.width + 50;
-    let preferredHeight = previewControl.height + 50 + 4 * 3 + refCheckBox.height;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
+            this.sizer.spacing * 2 + this.sizer.margin * 2 +
+            refCheckBox.height + 20;
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();
