@@ -231,10 +231,10 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
-    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
             this.sizer.spacing * 5 + this.sizer.margin * 2 +
-            refCheckBox.height + limitMaskStars_Control.height * 3 + 20;
+            refCheckBox.height + limitMaskStars_Control.height * 3 + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

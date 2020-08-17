@@ -253,10 +253,10 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
-    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
             this.sizer.spacing * 2 + this.sizer.margin * 2 +
-            refCheckBox.height + 20;
+            refCheckBox.height + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();

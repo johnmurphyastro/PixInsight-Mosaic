@@ -212,10 +212,10 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     // The PreviewControl size is determined by the size of the refBitmap
     // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
-    let preferredWidth = previewControl.width + this.sizer.margin * 2 + 20;
+    let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
             this.sizer.spacing * 3 + this.sizer.margin * 2 +
-            unbinnedCheckBox.height + maxSamples_Control.height + 20;
+            unbinnedCheckBox.height + maxSamples_Control.height + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();
