@@ -150,9 +150,10 @@ function calcSurfaceSpline(samplePairs, logSmoothing){
     processEvents();
     ss.initialize(xVector, yVector, zVector, wVector);
     if (!ss.isValid){
-        // TODO throw exception
-        (new MessageBox("Error: SurfaceSpline is invalid.", "calcSuraceSpline", StdIcon_Error, StdButton_Ok)).execute();
-        return null;
+        throw new function () {
+            this.message = 'Invalid SurfaceSpline';
+            this.name = 'SurfaceSplineInvalid';
+        };
     }
     return ss;
 }

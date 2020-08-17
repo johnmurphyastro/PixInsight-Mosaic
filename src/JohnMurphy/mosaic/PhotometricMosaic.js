@@ -279,10 +279,11 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     let colorSamplePairs = createSamplePairs(
             sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal);
-    if (colorSamplePairs[0].length < 3) {
-        // TODO check all channels?
-        new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        return;
+    for (let samplePairs of colorSamplePairs){
+        if (samplePairs.length < 3) {
+            new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
+        }
     }
     
     let binnedColorSamplePairs = [];
