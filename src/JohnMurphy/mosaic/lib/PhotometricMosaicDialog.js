@@ -16,6 +16,8 @@
 // =================================================================================
 //"use strict";
 #include "DialogLib.js"
+
+function EXTRA_CONTROLS(){return false;}
 /**
  * Default the Reference view to a view that contains "Mosaic" in its name, but
  * doesn't start with "PM_" (e.g. graph windows).
@@ -279,7 +281,7 @@ function PhotometricMosaicData() {
         this.limitSampleStarsPercent = 10;
         this.sampleStarRadiusMult = 5;
         this.sampleSize = 15;
-        this.maxSamples = 2000;
+        this.maxSamples = 3000;
         
         // Gradient Tapered Correction
         this.overlapGradientSmoothness = -1;
@@ -318,9 +320,11 @@ function PhotometricMosaicData() {
         // Star Detection
         photometricMosaicDialog.starDetectionControl.setValue(this.logStarDetection);
         
-        // Photometric Star Search
-        photometricMosaicDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
-        photometricMosaicDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
+        if (EXTRA_CONTROLS()){
+            // Photometric Star Search
+            photometricMosaicDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
+            photometricMosaicDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
+        }
         
         // Photometric Scale
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
@@ -344,7 +348,9 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(this.sampleStarRadiusMult);
         photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
-        photometricMosaicDialog.maxSamples_Control.setValue(this.maxSamples);
+        if (EXTRA_CONTROLS()){
+            photometricMosaicDialog.maxSamples_Control.setValue(this.maxSamples);
+        }
         
         // Gradient Tapered Correction
         photometricMosaicDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
@@ -508,65 +514,67 @@ function PhotometricMosaicDialog(data) {
             "<p>The default settings usually work well.</p>";
     // SectionBar "Star Detection" End
     
-    // =======================================
-    // SectionBar: "Photometric Star Search"
-    // =======================================
-    const labelWidth = Math.max(
-            this.font.width("Star flux tolerance:"), 
-            this.font.width("Star search radius:"));
-    this.starFluxTolerance_Control = new NumericControl(this);
-    this.starFluxTolerance_Control.real = true;
-    this.starFluxTolerance_Control.label.text = "Star flux tolerance:";
-    this.starFluxTolerance_Control.toolTip =
-            "<p>Star flux tolerance is used to prevent invalid target to reference " +
-            "star matches. Smaller values reject more matches.</p>" +
-            "<p>Star matches are rejected if the difference in star flux " +
-            "is larger than expected. The algorithm first calculates the average scale difference, " +
-            "and then rejects matches if their brightness ratio is greater than " +
-            "(expected ratio * tolerance) or smaller than (expected ratio / tolerance)</p>" +
-            "<p>1.0 implies the star flux ratio must exactly match the expected ratio.</p>" +
-            "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>" +
-            "<p>You usually don't need to modify this parameter.</p>";
-    this.starFluxTolerance_Control.label.minWidth = labelWidth;
-    this.starFluxTolerance_Control.setRange(1.01, 2);
-    this.starFluxTolerance_Control.slider.setRange(100, 200);
-    this.starFluxTolerance_Control.setPrecision(2);
-    this.starFluxTolerance_Control.slider.minWidth = 100;
-    this.starFluxTolerance_Control.setValue(data.starFluxTolerance);
-    this.starFluxTolerance_Control.onValueUpdated = function (value) {
-        data.starFluxTolerance = value;
-    };
-    
-    this.starSearchRadius_Control = new NumericControl(this);
-    this.starSearchRadius_Control.real = true;
-    this.starSearchRadius_Control.label.text = "Star search radius:";
-    this.starSearchRadius_Control.toolTip =
-            "<p>Search radius used to match the reference and target stars. " +
-            "Larger values find more photometric stars but at the risk of matching " +
-            "the wrong star or even matching noise.</p>" +
-            "<p>You usually don't need to modify this parameter.</p>";
+    if (EXTRA_CONTROLS()){
+        // =======================================
+        // SectionBar: "Photometric Star Search"
+        // =======================================
+        const labelWidth = Math.max(
+                this.font.width("Star flux tolerance:"), 
+                this.font.width("Star search radius:"));
+        this.starFluxTolerance_Control = new NumericControl(this);
+        this.starFluxTolerance_Control.real = true;
+        this.starFluxTolerance_Control.label.text = "Star flux tolerance:";
+        this.starFluxTolerance_Control.toolTip =
+                "<p>Star flux tolerance is used to prevent invalid target to reference " +
+                "star matches. Smaller values reject more matches.</p>" +
+                "<p>Star matches are rejected if the difference in star flux " +
+                "is larger than expected. The algorithm first calculates the average scale difference, " +
+                "and then rejects matches if their brightness ratio is greater than " +
+                "(expected ratio * tolerance) or smaller than (expected ratio / tolerance)</p>" +
+                "<p>1.0 implies the star flux ratio must exactly match the expected ratio.</p>" +
+                "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>" +
+                "<p>You usually don't need to modify this parameter.</p>";
+        this.starFluxTolerance_Control.label.minWidth = labelWidth;
+        this.starFluxTolerance_Control.setRange(1.01, 2);
+        this.starFluxTolerance_Control.slider.setRange(100, 200);
+        this.starFluxTolerance_Control.setPrecision(2);
+        this.starFluxTolerance_Control.slider.minWidth = 100;
+        this.starFluxTolerance_Control.setValue(data.starFluxTolerance);
+        this.starFluxTolerance_Control.onValueUpdated = function (value) {
+            data.starFluxTolerance = value;
+        };
 
-    this.starSearchRadius_Control.label.minWidth = labelWidth;
-    this.starSearchRadius_Control.setRange(1, 10);
-    this.starSearchRadius_Control.slider.setRange(1, 100);
-    this.starSearchRadius_Control.setPrecision(1);
-    this.starSearchRadius_Control.slider.minWidth = 100;
-    this.starSearchRadius_Control.setValue(data.starSearchRadius);
-    this.starSearchRadius_Control.onValueUpdated = function (value) {
-        data.starSearchRadius = value;
-    };
-    
-    let photometrySearchSection = new Control(this);
-    photometrySearchSection.sizer = new VerticalSizer;
-    photometrySearchSection.sizer.spacing = 4;
-    photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
-    photometrySearchSection.sizer.add(this.starSearchRadius_Control);
-    let photometrySearchBar = new SectionBar(this, "Photometric Star Search");
-    photometrySearchBar.setSection(photometrySearchSection);
-    photometrySearchBar.onToggleSection = this.onToggleSection;
-    photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
-            "<p>The default settings usually work well.</p>";
-    // SectionBar: "Photometric Star Search" End
+        this.starSearchRadius_Control = new NumericControl(this);
+        this.starSearchRadius_Control.real = true;
+        this.starSearchRadius_Control.label.text = "Star search radius:";
+        this.starSearchRadius_Control.toolTip =
+                "<p>Search radius used to match the reference and target stars. " +
+                "Larger values find more photometric stars but at the risk of matching " +
+                "the wrong star or even matching noise.</p>" +
+                "<p>You usually don't need to modify this parameter.</p>";
+
+        this.starSearchRadius_Control.label.minWidth = labelWidth;
+        this.starSearchRadius_Control.setRange(1, 10);
+        this.starSearchRadius_Control.slider.setRange(1, 100);
+        this.starSearchRadius_Control.setPrecision(1);
+        this.starSearchRadius_Control.slider.minWidth = 100;
+        this.starSearchRadius_Control.setValue(data.starSearchRadius);
+        this.starSearchRadius_Control.onValueUpdated = function (value) {
+            data.starSearchRadius = value;
+        };
+
+        let photometrySearchSection = new Control(this);
+        photometrySearchSection.sizer = new VerticalSizer;
+        photometrySearchSection.sizer.spacing = 4;
+        photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
+        photometrySearchSection.sizer.add(this.starSearchRadius_Control);
+        let photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+        photometrySearchBar.setSection(photometrySearchSection);
+        photometrySearchBar.onToggleSection = this.onToggleSection;
+        photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
+                "<p>The default settings usually work well.</p>";
+        // SectionBar: "Photometric Star Search" End
+    }
     
     // =======================================
     // SectionBar: "Photometric Scale"
@@ -917,35 +925,37 @@ function PhotometricMosaicDialog(data) {
     sampleGridSizer.addSpacing(20);
     sampleGridSizer.add(displaySamplesButton);
     
-    this.maxSamples_Control = createMaxSamplesControl(this, data);
-    this.maxSamples_Control.onValueUpdated = function (value) {
-        data.maxSamples = value;
-    };
-    this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
-    
-    let displayBinnedSamplesButton = new PushButton();
-    displayBinnedSamplesButton.text = "Binned grid ";
-    displayBinnedSamplesButton.toolTip =
-            "<p>Displays the binned samples used to construct the surface spline " +
-            "that models the relative gradient between the reference and target images.</p>" +
-            "<p>Samples are binned to improve performance if the number of " +
-            "samples exceeds the specified limit.</p>" +
-            "<p>The area of each binned sample represents the number of samples " +
-            "it was created from.</p>" +
-            "<p>Each binned sample's center is calculated from " +
-            "the center of mass of the samples it was created from.</p>" +
-            "<p>To see which of the unbinned samples were rejected due to stars, " +
-            "use 'Sample grid'.</p>";
-    displayBinnedSamplesButton.onClick = function () {
-        data.viewFlag = DISPLAY_BINNED_SAMPLES();
-        this.dialog.ok();
-    };
-    
-    let maxSamplesSizer = new HorizontalSizer;
-    maxSamplesSizer.spacing = 4;
-    maxSamplesSizer.add(this.maxSamples_Control);
-    maxSamplesSizer.addSpacing(20);
-    maxSamplesSizer.add(displayBinnedSamplesButton);
+    if (EXTRA_CONTROLS()){
+        this.maxSamples_Control = createMaxSamplesControl(this, data);
+        this.maxSamples_Control.onValueUpdated = function (value) {
+            data.maxSamples = value;
+        };
+        this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
+
+        let displayBinnedSamplesButton = new PushButton();
+        displayBinnedSamplesButton.text = "Binned grid ";
+        displayBinnedSamplesButton.toolTip =
+                "<p>Displays the binned samples used to construct the surface spline " +
+                "that models the relative gradient between the reference and target images.</p>" +
+                "<p>Samples are binned to improve performance if the number of " +
+                "samples exceeds the specified limit.</p>" +
+                "<p>The area of each binned sample represents the number of samples " +
+                "it was created from.</p>" +
+                "<p>Each binned sample's center is calculated from " +
+                "the center of mass of the samples it was created from.</p>" +
+                "<p>To see which of the unbinned samples were rejected due to stars, " +
+                "use 'Sample grid'.</p>";
+        displayBinnedSamplesButton.onClick = function () {
+            data.viewFlag = DISPLAY_BINNED_SAMPLES();
+            this.dialog.ok();
+        };
+
+        let maxSamplesSizer = new HorizontalSizer;
+        maxSamplesSizer.spacing = 4;
+        maxSamplesSizer.add(this.maxSamples_Control);
+        maxSamplesSizer.addSpacing(20);
+        maxSamplesSizer.add(displayBinnedSamplesButton);
+    }
     
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
@@ -953,7 +963,9 @@ function PhotometricMosaicDialog(data) {
     sampleGenerationSection.sizer.add(this.limitSampleStarsPercent_Control);
     sampleGenerationSection.sizer.add(this.sampleStarRadiusMult_Control);
     sampleGenerationSection.sizer.add(sampleGridSizer);
-    sampleGenerationSection.sizer.add(maxSamplesSizer);
+    if (EXTRA_CONTROLS()){
+        sampleGenerationSection.sizer.add(maxSamplesSizer);
+    }
     let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
     sampleGenerationBar.setSection(sampleGenerationSection);
     sampleGenerationBar.onToggleSection = this.onToggleSection;
@@ -1349,8 +1361,11 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(selectViewSection);
     this.sizer.add(starDetectionBar);
     this.sizer.add(starDetectionSection);
-    this.sizer.add(photometrySearchBar);
-    this.sizer.add(photometrySearchSection);
+    if (EXTRA_CONTROLS()){
+        this.sizer.add(photometrySearchBar);
+        this.sizer.add(photometrySearchSection);
+        photometrySearchSection.hide();
+    }
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
     this.sizer.add(sampleGenerationBar);
@@ -1371,7 +1386,6 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(buttons_Sizer);
     
     starDetectionSection.hide();
-    photometrySearchSection.hide();
     joinAreaSection.hide();
     joinSizeSection.hide();
     sampleGenerationSection.hide();
@@ -1521,8 +1535,8 @@ function createMaxSamplesControl(dialog, data){
             "<p>The time required to initialize the surface spline approximately " +
             "doubles every 1300 samples.</p>";
     
-    maxSamples_Control.setRange(1000, 5000);
-    maxSamples_Control.slider.setRange(100, 500);
+    maxSamples_Control.setRange(2000, 5000);
+    maxSamples_Control.slider.setRange(200, 500);
     maxSamples_Control.slider.minWidth = 200;
     maxSamples_Control.setValue(data.maxSamples);
     return maxSamples_Control;
