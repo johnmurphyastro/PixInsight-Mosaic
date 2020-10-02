@@ -196,6 +196,25 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         updateZoom( 1 );
     };
     
+    let liveUpdate_control = new CheckBox();
+    liveUpdate_control.text = "Live update";
+    liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+    liveUpdate_control.onCheck = function (checked){
+        update_Button.enabled = !checked;
+        if (checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
+    };
+    liveUpdate_control.checked = true;
+    
+    let update_Button = new PushButton();
+    update_Button.text = "Update";
+    update_Button.toolTip = "<p>Update display</p>";
+    update_Button.onClick = function(){
+        update(bitmapControl.width, bitmapControl.height);
+    };
+    update_Button.enabled = !liveUpdate_control.checked;
+    
     let ok_Button = new PushButton();
     ok_Button.text = "OK";
     ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
@@ -209,6 +228,11 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     zoomButton_Sizer.add(zoomIn_Button);
     zoomButton_Sizer.add(zoomOut_Button);
     zoomButton_Sizer.add(zoom11_Button);
+    zoomButton_Sizer.addSpacing(17);
+    zoomButton_Sizer.add(liveUpdate_control);
+    zoomButton_Sizer.addSpacing(10);
+    zoomButton_Sizer.add(update_Button);
+    zoomButton_Sizer.addSpacing(17);
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);
@@ -221,22 +245,28 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             createLimitPhotoStarsPercentControl(this, data, OUTLIER_REMOVAL_STRLEN);
     limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
         data.limitPhotoStarsPercent = value;
-        update(bitmapControl.width, bitmapControl.height);
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
     };
     
     let rejectHigh_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
     rejectHigh_Control.onValueUpdated = function (value) {
         data.linearRange = value;
-        update(bitmapControl.width, bitmapControl.height);
         photometricMosaicDialog.rejectHigh_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
     };
 
     let outlierRemoval_Control = createOutlierRemovalControl(this, data, OUTLIER_REMOVAL_STRLEN);
     outlierRemoval_Control.onValueUpdated = function (value) {
         data.outlierRemoval = value;
-        update(bitmapControl.width, bitmapControl.height);
         photometricMosaicDialog.outlierRemoval_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
     };
     
     //-------------

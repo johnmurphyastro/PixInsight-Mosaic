@@ -42,7 +42,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/MaskStarsDialog.js"
 
 // To stop my IDE from generating warnings...
-function VERSION(){return  "2.2";}
+function VERSION(){return  "2.3";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimMosaicTile";}
@@ -54,7 +54,6 @@ function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
 function DISPLAY_GRADIENT_SAMPLES(){return 8;}
 function DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH(){return 16;}
 function DISPLAY_OVERLAP_GRADIENT_GRAPH(){return 32;}
-function CREATE_MOSAIC_MASK(){return 64;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 function CREATE_JOIN_MASK(){return 256;}
 function DISPLAY_BINNED_SAMPLES(){return 512;}
@@ -185,17 +184,9 @@ function photometricMosaic(data, photometricMosaicDialog)
         detectedStars.showConsoleInfo = true;
         return;
     }
-    if (data.viewFlag === CREATE_MOSAIC_MASK()){
-        console.writeln("\n<b><u>Creating mosaic mask</u></b>");
-        displayMask(targetView, joinRect, detectedStars, data);
-        return;
-    }
     if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
         console.writeln("\n<b><u>Displaying mosaic mask stars</u></b>");
-        let overlap = data.cache.overlap;
-        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new MaskStarsDialog("Mask Stars", refBitmap, tgtBitmap, joinRect, 
+        let dialog = new MaskStarsDialog(referenceView, targetView, joinRect, 
                 detectedStars, data, photometricMosaicDialog);
         dialog.execute();
         return;

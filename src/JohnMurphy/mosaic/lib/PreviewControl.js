@@ -128,9 +128,10 @@ function extractOverlapImage(refView, imageRect, maskSamples){
  * @param {UIObject} parent
  * @param {Bitmap} image image The unscaled bitmap to display. It is not modified.
  * @param {width:, height:} metadata Specifies dimensions of drawing region if image = null
+ * @param {Function(HorizontalSizer)} customControls e.g. add 'Live update' and 'Update' controls
  * @returns {PreviewControl}
  */
-function PreviewControl(parent, image, metadata) {
+function PreviewControl(parent, image, metadata, customControls) {
     this.__base__ = Frame;
     this.__base__(parent);
     
@@ -243,7 +244,7 @@ function PreviewControl(parent, image, metadata) {
             console.criticalln("PreviewControl updateZoom error: " + e);
         }
     };
-
+    
     this.zoomIn_Button = new ToolButton(this);
     this.zoomIn_Button.icon = this.scaledResource(":/icons/zoom-in.png");
     this.zoomIn_Button.setScaledFixedSize(24, 24);
@@ -465,6 +466,9 @@ function PreviewControl(parent, image, metadata) {
         zoomButton_Sizer.add(this.zoomIn_Button);
         zoomButton_Sizer.add(this.zoomOut_Button);
         zoomButton_Sizer.add(this.zoom11_Button);
+        if (customControls){
+            customControls(zoomButton_Sizer);
+        }
         zoomButton_Sizer.addStretch();
         zoomButton_Sizer.add(this.ok_Button);
         zoomButton_Sizer.addSpacing(10);

@@ -360,11 +360,6 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.extrapolatedGradientSmoothness_Control.setValue(this.extrapolatedGradientSmoothness);
         photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
         
-        // Mosaic Star Mask
-        photometricMosaicDialog.limitMaskStars_Control.setValue(this.limitMaskStarsPercent);
-        photometricMosaicDialog.maskStarRadiusMult_Control.setValue(this.maskStarRadiusMult);
-        photometricMosaicDialog.maskStarRadiusAdd_Control.setValue(this.maskStarRadiusAdd);
-        
         // Create Mosaic
         photometricMosaicDialog.setCreateMosaicFlag(this.createMosaicFlag);
         photometricMosaicDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
@@ -514,6 +509,8 @@ function PhotometricMosaicDialog(data) {
             "<p>The default settings usually work well.</p>";
     // SectionBar "Star Detection" End
     
+    let photometrySearchSection;
+    let photometrySearchBar;
     if (EXTRA_CONTROLS()){
         // =======================================
         // SectionBar: "Photometric Star Search"
@@ -563,12 +560,12 @@ function PhotometricMosaicDialog(data) {
             data.starSearchRadius = value;
         };
 
-        let photometrySearchSection = new Control(this);
+        photometrySearchSection = new Control(this);
         photometrySearchSection.sizer = new VerticalSizer;
         photometrySearchSection.sizer.spacing = 4;
         photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
         photometrySearchSection.sizer.add(this.starSearchRadius_Control);
-        let photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+        photometrySearchBar = new SectionBar(this, "Photometric Star Search");
         photometrySearchBar.setSection(photometrySearchSection);
         photometrySearchBar.onToggleSection = this.onToggleSection;
         photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
@@ -579,30 +576,50 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Photometric Scale"
     // =======================================
-    this.limitPhotoStarsPercent_Control = 
-            createLimitPhotoStarsPercentControl(this, data, OUTLIER_REMOVAL_STRLEN);
-    this.limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
-        data.limitPhotoStarsPercent = value;
-    };
+    this.limitPhotoStarsPercent_Control = new NumericEdit();
+    this.limitPhotoStarsPercent_Control.setReal(true);
+    this.limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
+    this.limitPhotoStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of detected stars used for photometry. " +
+            "The faintest stars are rejected.</p>" +
+            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
+            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
+            "<p>0% implies no stars will be used. The scale will default to one.</p>";
+    this.limitPhotoStarsPercent_Control.setPrecision(2);
+    this.limitPhotoStarsPercent_Control.setRange(0, 100);
+    this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+    this.limitPhotoStarsPercent_Control.enabled = false;
     
-    this.rejectHigh_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
-    this.rejectHigh_Control.onValueUpdated = function (value) {
-        data.linearRange = value;
-    };
-
-    let photometricScaleHorizSizer1 = new HorizontalSizer;
-    photometricScaleHorizSizer1.spacing = 4;
-    photometricScaleHorizSizer1.add(this.rejectHigh_Control);
-    photometricScaleHorizSizer1.addStretch();
+    this.rejectHigh_Control = new NumericEdit();
+    this.rejectHigh_Control.setReal(true);
+    this.rejectHigh_Control.label.text = "Linear range:";
+    this.rejectHigh_Control.toolTip =
+            "<p>Restricts the stars used for photometry to those " +
+            "that have a peak pixel value less than the specified value.</p>" +
+            "<p>Use this to reject stars that are outside the " +
+            "camera's linear response range.</p>";
+    this.rejectHigh_Control.setPrecision(3);
+    this.rejectHigh_Control.setRange(0.001, 1.0);
+    this.rejectHigh_Control.setValue(data.linearRange);
+    this.rejectHigh_Control.enabled = false;
     
-    this.outlierRemoval_Control = createOutlierRemovalControl(this, data, OUTLIER_REMOVAL_STRLEN);
-    this.outlierRemoval_Control.onValueUpdated = function (value) {
-        data.outlierRemoval = value;
-    };
+    this.outlierRemoval_Control = new NumericEdit();
+    this.outlierRemoval_Control.setReal(false);
+    this.outlierRemoval_Control.label.text = "Outlier removal:";
+    this.outlierRemoval_Control.toolTip =
+            "<p>Determines the number of outlier stars to remove.</p>" +
+            "<p>The photometric measurement of some stars can be suspect. " +
+            "For example, a star's size may be underestimated causing some of " +
+            "its flux to contribute to the background measurement. " +
+            "Removing a few outliers can improve accuracy, but don't over do it.</p>";
+    this.outlierRemoval_Control.setRange(0, 50);
+    this.outlierRemoval_Control.setValue(data.outlierRemoval);
+    this.outlierRemoval_Control.enabled = false;
     
     let photometryGraphButton = new PushButton();
-    photometryGraphButton.text = "Photometry graph";
+    photometryGraphButton.text = "Edit and display graph";
     photometryGraphButton.toolTip =
+            "<p>Edit parameters and display linear fit graph.</p>" +
             "<p>For each star detected within the overlap area, " +
             "provided the star meets the photometry criteria, the star's reference flux " +
             "is plotted against its target flux.</p>" +
@@ -614,6 +631,14 @@ function PhotometricMosaicDialog(data) {
         data.viewFlag = DISPLAY_PHOTOMETRY_GRAPH();
         this.dialog.ok();
     };
+    
+    let photometricScaleHorizSizer1 = new HorizontalSizer;
+    photometricScaleHorizSizer1.spacing = 10;
+    photometricScaleHorizSizer1.add(this.limitPhotoStarsPercent_Control);
+    photometricScaleHorizSizer1.add(this.rejectHigh_Control);
+    photometricScaleHorizSizer1.add(this.outlierRemoval_Control);
+    photometricScaleHorizSizer1.addStretch();
+    photometricScaleHorizSizer1.add(photometryGraphButton);
     
     let photometryStarsButton = new PushButton();
     photometryStarsButton.text = "Photometry stars";
@@ -628,20 +653,16 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let photometricScaleHorizSizer2 = new HorizontalSizer;
-    photometricScaleHorizSizer2.spacing = 4;
-    photometricScaleHorizSizer2.add(this.outlierRemoval_Control);
-    photometricScaleHorizSizer2.addStretch();
-    photometricScaleHorizSizer2.add(photometryGraphButton);
-    photometricScaleHorizSizer2.addSpacing(2);
-    photometricScaleHorizSizer2.add(photometryStarsButton);
-    
     let photometrySection = new Control(this);
     photometrySection.sizer = new VerticalSizer;
     photometrySection.sizer.spacing = 4;
-    photometrySection.sizer.add(this.limitPhotoStarsPercent_Control);
     photometrySection.sizer.add(photometricScaleHorizSizer1);
-    photometrySection.sizer.add(photometricScaleHorizSizer2);
+    if (EXTRA_CONTROLS()){
+        let photometricScaleHorizSizer2 = new HorizontalSizer;
+        photometricScaleHorizSizer2.addStretch();
+        photometricScaleHorizSizer2.add(photometryStarsButton);
+        photometrySection.sizer.add(photometricScaleHorizSizer2);
+    }
     let photometryBar = new SectionBar(this, "Photometric Scale");
     photometryBar.setSection(photometrySection);
     photometryBar.onToggleSection = this.onToggleSection;
@@ -887,25 +908,53 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     const sampleGenerationStrLen = this.font.width("Multiply star radius:");
     
-    this.limitSampleStarsPercent_Control = 
-            createLimitSampleStarsPercentControl(this, data, sampleGenerationStrLen);
-    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-        data.limitSampleStarsPercent = value;
-    };
+    this.limitSampleStarsPercent_Control = new NumericEdit();
+    this.limitSampleStarsPercent_Control.real = true;
+    this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
+    this.limitSampleStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples.</p>" +
+            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
+            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
+            "<li>Bright stars can have significantly different profiles between " +
+            "the reference and target images. This can affect how many of the " +
+            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "<p>It is only necessary to reject bright stars. This script uses the " +
+            "median value from each sample, so any star that takes up less than " +
+            "half the sample area will have little effect. It is more important to " +
+            "include most of the samples than to reject faint stars.</p>";
+    this.limitSampleStarsPercent_Control.setPrecision(2);
+    this.limitSampleStarsPercent_Control.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);        
+    this.limitSampleStarsPercent_Control.enabled = false;
     
-    this.sampleStarRadiusMult_Control = 
-            createSampleStarRadiusMultControl(this, data, sampleGenerationStrLen);
-    this.sampleStarRadiusMult_Control.onValueUpdated = function (value) {
-        data.sampleStarRadiusMult = value;
-    };
+    this.sampleStarRadiusMult_Control = new NumericEdit();
+    this.sampleStarRadiusMult_Control.real = true;
+    this.sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
+    this.sampleStarRadiusMult_Control.toolTip =
+            "<p>Increase to reject more samples around saturated stars.</p>" +
+            "<p>Read the Help sections on 'Join Region' to learn when these " +
+            "samples should be rejected.</p>";
+    this.sampleStarRadiusMult_Control.setPrecision(1);
+    this.sampleStarRadiusMult_Control.setRange(1, 25);
+    this.sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);     
+    this.sampleStarRadiusMult_Control.enabled = false;
     
-    this.sampleSize_Control = createSampleSizeControl(this, data, sampleGenerationStrLen);
-    this.sampleSize_Control.onValueUpdated = function (value) {
-        data.sampleSize = value;
-    };
+    this.sampleSize_Control = new NumericEdit();
+    this.sampleSize_Control.real = false;
+    this.sampleSize_Control.label.text = "Sample size:";
+    this.sampleSize_Control.toolTip =
+            "<p>Specifies the size of the sample squares.</p>" +
+            "<p>Ideally, the samples should be about 1.5x the size of the largest " +
+            "star that's not rejected by 'Limit stars %'.</p>";
+    this.sampleSize_Control.setRange(3, 50);
+    this.sampleSize_Control.setValue(data.sampleSize);
+    this.sampleSize_Control.enabled = false;
     
     let displaySamplesButton = new PushButton();
-    displaySamplesButton.text = "Sample grid";
+    displaySamplesButton.text = "Edit and display samples";
     displaySamplesButton.toolTip =
             "<p>Displays the grid of samples used to construct the surface spline " +
             "that models the relative gradient between the reference and target images.</p>" +
@@ -920,17 +969,33 @@ function PhotometricMosaicDialog(data) {
     };
     
     let sampleGridSizer = new HorizontalSizer;
-    sampleGridSizer.spacing = 4;
+    sampleGridSizer.spacing = 10;
+    sampleGridSizer.add(this.limitSampleStarsPercent_Control);
+    sampleGridSizer.add(this.sampleStarRadiusMult_Control);
     sampleGridSizer.add(this.sampleSize_Control);
-    sampleGridSizer.addSpacing(20);
+    sampleGridSizer.addStretch();
     sampleGridSizer.add(displaySamplesButton);
     
+    let maxSamplesSizer;
     if (EXTRA_CONTROLS()){
-        this.maxSamples_Control = createMaxSamplesControl(this, data);
-        this.maxSamples_Control.onValueUpdated = function (value) {
-            data.maxSamples = value;
-        };
-        this.maxSamples_Control.label.minWidth = sampleGenerationStrLen;
+        this.maxSamples_Control = new NumericEdit();
+        this.maxSamples_Control.real = false;
+        this.maxSamples_Control.label.text = "Max samples:";
+        this.maxSamples_Control.label.minWidth = this.font.width("Limit stars %:");
+        this.maxSamples_Control.toolTip =
+            "<p>Limits the number of samples used to create the surface spline. " +
+            "If the number of samples exceed this limit, they are combined " +
+            "(binned) to create super samples.</p>" +
+            "<p>Increase if the overlap area is very large. " +
+            "A larger number of samples increases the " +
+            "theoretical maximum resolution of the surface spline. However, " +
+            "small unbinned samples are noisier and require more smoothing. " +
+            "The default value is usually a good compromise.</p>" +
+            "<p>The time required to initialize the surface spline approximately " +
+            "doubles every 1300 samples.</p>";
+        this.maxSamples_Control.setRange(2000, 5000);
+        this.maxSamples_Control.setValue(data.maxSamples);
+        this.maxSamples_Control.enabled = false;
 
         let displayBinnedSamplesButton = new PushButton();
         displayBinnedSamplesButton.text = "Binned grid ";
@@ -950,18 +1015,16 @@ function PhotometricMosaicDialog(data) {
             this.dialog.ok();
         };
 
-        let maxSamplesSizer = new HorizontalSizer;
+        maxSamplesSizer = new HorizontalSizer;
         maxSamplesSizer.spacing = 4;
         maxSamplesSizer.add(this.maxSamples_Control);
-        maxSamplesSizer.addSpacing(20);
+        maxSamplesSizer.addStretch();
         maxSamplesSizer.add(displayBinnedSamplesButton);
     }
     
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
     sampleGenerationSection.sizer.spacing = 4;
-    sampleGenerationSection.sizer.add(this.limitSampleStarsPercent_Control);
-    sampleGenerationSection.sizer.add(this.sampleStarRadiusMult_Control);
     sampleGenerationSection.sizer.add(sampleGridSizer);
     if (EXTRA_CONTROLS()){
         sampleGenerationSection.sizer.add(maxSamplesSizer);
@@ -1168,73 +1231,6 @@ function PhotometricMosaicDialog(data) {
     this.extrapolatedGradientBar.onToggleSection = this.onToggleSection;
     this.setExtrapolateGradientFlag(data.extrapolatedGradientFlag);
     // SectionBar: "Propagated Gradient Correction" End
-    
-    // =======================================
-    // SectionBar: "Mosaic Star Mask"
-    // =======================================
-    let starMaskLabelSize = this.font.width("Multiply star radius:");
-    this.limitMaskStars_Control = createLimitMaskStarsControl(this, data, starMaskLabelSize);
-    this.limitMaskStars_Control.onValueUpdated = function (value) {
-        data.limitMaskStarsPercent = value;
-    };
-    
-    this.maskStarRadiusMult_Control = createMaskStarRadiusMultControl(this, data, starMaskLabelSize);
-    this.maskStarRadiusMult_Control.onValueUpdated = function (value) {
-        data.maskStarRadiusMult = value;
-    };
-    
-    this.maskStarRadiusAdd_Control = createMaskStarRadiusAddControl(this, data, starMaskLabelSize);
-    this.maskStarRadiusAdd_Control.onValueUpdated = function (value) {
-        data.maskStarRadiusAdd = value;
-    };
-    
-    let createMaskButton = new PushButton();
-    createMaskButton.text = "Create mask";
-    createMaskButton.toolTip =
-            "<p>Creates a star mask that reveals bright stars.</p>" +
-            "<p>It is often difficult to match bright stars without creating " +
-            "artifacts. Stars within the overlapping region can be fixed by " +
-            "using PixelMath to apply the reference image to the mosaic through " +
-            "a mask.</p>";
-    createMaskButton.onClick = function () {
-        data.viewFlag = CREATE_MOSAIC_MASK();
-        this.dialog.ok();
-    };
-    
-    let maskStarsButton = new PushButton();
-    maskStarsButton.text = "Stars";
-    maskStarsButton.toolTip =
-            "<p>Displays the stars used to create the mosaic star mask.</p>";
-    maskStarsButton.onClick = function () {
-        data.viewFlag = DISPLAY_MOSAIC_MASK_STARS();
-        this.dialog.ok();
-    };
-    
-    let mask_Sizer = new HorizontalSizer;
-    mask_Sizer.spacing = 4;
-    mask_Sizer.addStretch();
-    mask_Sizer.add(createMaskButton);
-    mask_Sizer.addSpacing(2);
-    mask_Sizer.add(maskStarsButton);
-    
-    
-    let starMaskSection = new Control(this);
-    starMaskSection.sizer = new VerticalSizer;
-    starMaskSection.sizer.spacing = 4;
-    starMaskSection.sizer.add(this.limitMaskStars_Control);
-    starMaskSection.sizer.add(this.maskStarRadiusMult_Control);
-    starMaskSection.sizer.add(this.maskStarRadiusAdd_Control);
-    starMaskSection.sizer.add(mask_Sizer);
-    let starMaskBar = new SectionBar(this, "Mosaic Star Mask");
-    starMaskBar.setSection(starMaskSection);
-    starMaskBar.onToggleSection = this.onToggleSection;
-    starMaskBar.toolTip = 
-            "<p>This section creates a star mask that reveals bright stars.</p>" +
-            "<p>It is often difficult to match bright stars without creating " +
-            "artifacts. Stars within the overlapping region can be fixed by " +
-            "using PixelMath to apply the reference image to the mosaic through " +
-            "a mask.</p>";
-    // SectionBar: "Mosaic Star Mask" End
 
     // =======================================
     // SectionBar: "Create Mosaic"
@@ -1296,11 +1292,27 @@ function PhotometricMosaicDialog(data) {
         mosaicSection.enabled = checked;
     };
     
+    let starsMaskButton = new PushButton();
+    starsMaskButton.text = "Star mask";
+    starsMaskButton.toolTip =
+            "<p>Creates a star mask.</p>" + 
+            "<p>The 'Random' combine mode can leave speckle artifacts around stars. " +
+            "The generated mask can be used to replace these stars with stars " +
+            "from the reference frame (Do NOT use the target frame).</p>" +
+            "<p>The required Pixel Math expression is simply the name of the reference image.</p>";
+    starsMaskButton.onClick = function () {
+        data.viewFlag = DISPLAY_MOSAIC_MASK_STARS();
+        this.dialog.ok();
+    };
+    
     let joinMaskButton = new PushButton();
     joinMaskButton.text = "Join mask";
     joinMaskButton.toolTip =
             "<p>Creates a mask of the mosaic join. " +
             "This mask indicates the pixels used to create the mosaic join.</p>" +
+            "<p>If the mask extends into the 'black', this indicates this area " +
+            "is slightly above zero. To correct, use Pixel Math expression similar to:</p>" +
+            "<p>iif($T &lt; 0.0005, 0, $T)</p>" +
             "<p>If a 'Join Region' has not been defined, the join area is " +
             "simply the overlapping pixels. However, if it has been specified, " +
             "the join extends along the full length of the join but it is " +
@@ -1318,6 +1330,8 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer.add(this.mosaicRandomControl);
     mosaicSection.sizer.add(this.mosaicAverageControl);
     mosaicSection.sizer.addStretch();
+    mosaicSection.sizer.add(starsMaskButton);
+    mosaicSection.sizer.spacing = 6;
     mosaicSection.sizer.add(joinMaskButton);
     this.mosaicBar = new SectionBar(this, "Create Mosaic");
     this.mosaicBar.setSection(mosaicSection);
@@ -1378,8 +1392,6 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(overlapGradientSection);
     this.sizer.add(this.extrapolatedGradientBar);
     this.sizer.add(extrapolatedGradientSection);
-    this.sizer.add(starMaskBar);
-    this.sizer.add(starMaskSection);
     this.sizer.add(this.mosaicBar);
     this.sizer.add(mosaicSection);
     this.sizer.addSpacing(5);
@@ -1390,7 +1402,6 @@ function PhotometricMosaicDialog(data) {
     joinSizeSection.hide();
     sampleGenerationSection.hide();
     extrapolatedGradientSection.hide();
-    starMaskSection.hide();
 
     //-------------------------------------------------------
     // Set all the window data

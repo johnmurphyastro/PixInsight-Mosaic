@@ -20,16 +20,15 @@
 /**
  * Display the Mask Stars in a Dialog that contains a scrolled window and 
  * controls to adjust the Mask Star parameters.
- * @param {String} title Window title
- * @param {Bitmap} refBitmap Background image of the reference overlap area at 1:1 scale
- * @param {Bitmap} tgtBitmap Background image of the target overlap area at 1:1 scale
+ * @param {View} refView Background image of the reference overlap area at 1:1 scale
+ * @param {View} tgtView Background image of the target overlap area at 1:1 scale
  * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
  * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
-function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, data,
+function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
         photometricMosaicDialog)
 {
     this.__base__ = Dialog;
@@ -43,6 +42,11 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
     let coordText;
     setCoordText(null);
     let selectedBitmap = REF;
+    
+    let overlap = data.cache.overlap;
+    let refBitmap = extractOverlapImage(refView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+    let tgtBitmap = extractOverlapImage(tgtView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+    
     let bitmapOffset = getBitmapOffset(data);
     let bitmap = getBitmap(selectedBitmap);
     let clipRect = getClipRect();
@@ -84,7 +88,7 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
      * Set dialog title, including the current zoom and cursor coordinates
      */
     function setTitle(){
-        self.windowTitle = title + " " + zoomText + " " + coordText;
+        self.windowTitle = "Star Mask " + zoomText + " " + coordText;
     };
     
     /**
@@ -148,11 +152,53 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
             graphics.end();
         }
     }
+    let liveUpdate = true;
+    
+    /**
+     * @param {HorizontalSizer} horizontalSizer
+     */
+    function customControls (horizontalSizer){
+        let liveUpdate_control = new CheckBox();
+        liveUpdate_control.text = "Live update";
+        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+        liveUpdate_control.onCheck = function (checked){
+            liveUpdate = checked;
+            update_Button.enabled = !checked;
+            if (checked){
+                update();
+            }
+        };
+        liveUpdate_control.checked = liveUpdate;
+
+        let update_Button = new PushButton();
+        update_Button.text = "Update";
+        update_Button.toolTip = "<p>Update display</p>";
+        update_Button.onClick = function(){
+            update();
+        };
+        update_Button.enabled = !liveUpdate_control.checked;
+        
+        let createMask_Button = new PushButton();
+        createMask_Button.text = "Create";
+        createMask_Button.toolTip = "<p>Create mask</p>";
+        createMask_Button.onClick = function(){
+            console.writeln("\n<b><u>Creating mosaic mask</u></b>");
+            update();
+            createStarMask(tgtView, joinArea, detectedStars, data);
+        };
+        
+        horizontalSizer.addSpacing(20);
+        horizontalSizer.add(liveUpdate_control);
+        horizontalSizer.addSpacing(10);
+        horizontalSizer.add(update_Button);
+        horizontalSizer.addSpacing(30);
+        horizontalSizer.add(createMask_Button);
+    }
     
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null);
+    let previewControl = new PreviewControl(this, bitmap, null, customControls);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -165,6 +211,8 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
         drawMaskStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
     };
+    previewControl.ok_Button.text = "Close";
+    previewControl.ok_Button.icon = null;
     previewControl.ok_Button.onClick = function(){
         self.ok();
     };
@@ -193,22 +241,25 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
     let limitMaskStars_Control = createLimitMaskStarsControl(this, data, starMaskLabelSize);
     limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
-        update();
-        photometricMosaicDialog.limitMaskStars_Control.setValue(value);
+        if (liveUpdate) {
+            update();
+        }
     };
     
     let maskStarRadiusMult_Control = createMaskStarRadiusMultControl(this, data, starMaskLabelSize);
     maskStarRadiusMult_Control.onValueUpdated = function (value) {
         data.maskStarRadiusMult = value;
-        update();
-        photometricMosaicDialog.maskStarRadiusMult_Control.setValue(value);
+        if (liveUpdate) {
+            update();
+        }
     };
     
     let maskStarRadiusAdd_Control = createMaskStarRadiusAddControl(this, data, starMaskLabelSize);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
-        update();
-        photometricMosaicDialog.maskStarRadiusAdd_Control.setValue(value);
+        if (liveUpdate) {
+            update();
+        }
     };
 
     /**
@@ -236,6 +287,14 @@ function MaskStarsDialog(title, refBitmap, tgtBitmap, joinArea, detectedStars, d
             this.sizer.spacing * 5 + this.sizer.margin * 2 +
             refCheckBox.height + limitMaskStars_Control.height * 3 + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
+    
+    {
+        // Scroll to center of join region
+        let x = joinArea.center.x - bitmapOffset.x;
+        let y = joinArea.center.y - bitmapOffset.y;
+        previewControl.scrollbox.horizontalScrollPosition = Math.max(0, x - previewControl.width / 2);
+        previewControl.scrollbox.verticalScrollPosition = Math.max(0, y - previewControl.height / 2);
+    }
     
     setTitle();
 }

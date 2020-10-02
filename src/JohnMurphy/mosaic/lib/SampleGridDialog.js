@@ -137,10 +137,43 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     }
     
+    let liveUpdate = true;
+    
+    /**
+     * @param {HorizontalSizer} horizontalSizer
+     */
+    function customControls (horizontalSizer){
+        let liveUpdate_control = new CheckBox();
+        liveUpdate_control.text = "Live update";
+        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+        liveUpdate_control.onCheck = function (checked){
+            liveUpdate = checked;
+            update_Button.enabled = !checked;
+            if (checked){
+                updateSampleGrid();
+            }
+        };
+        liveUpdate_control.checked = liveUpdate;
+
+        let update_Button = new PushButton();
+        update_Button.text = "Update";
+        update_Button.toolTip = "<p>Update display</p>";
+        update_Button.onClick = function(){
+            updateSampleGrid();
+        };
+        update_Button.enabled = !liveUpdate_control.checked;
+        
+        horizontalSizer.addSpacing(20);
+        horizontalSizer.add(liveUpdate_control);
+        horizontalSizer.addSpacing(10);
+        horizontalSizer.add(update_Button);
+        horizontalSizer.addSpacing(20);
+    }
+    
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null);
+    let previewControl = new PreviewControl(this, bitmap, null, customControls);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -182,23 +215,29 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
                 createLimitSampleStarsPercentControl(this, data, labelLength);
             limitSampleStarsPercent_Control.onValueUpdated = function (value) {
             data.limitSampleStarsPercent = value;
-            updateSampleGrid();
             photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
+            if (liveUpdate){
+                updateSampleGrid();
+            }
         };
 
     let sampleStarRadiusMult_Control =
                 createSampleStarRadiusMultControl(this, data, labelLength);
         sampleStarRadiusMult_Control.onValueUpdated = function (value){
             data.sampleStarRadiusMult = value;
-            updateSampleGrid();
             photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(value);
+            if (liveUpdate){
+                updateSampleGrid();
+            }
         };
 
     let sampleSize_Control = createSampleSizeControl(this, data, labelLength);
         sampleSize_Control.onValueUpdated = function (value) {
             data.sampleSize = value;
-            updateSampleGrid();
             photometricMosaicDialog.sampleSize_Control.setValue(value);
+            if (liveUpdate){
+                updateSampleGrid();
+            }
         };
     
     /**

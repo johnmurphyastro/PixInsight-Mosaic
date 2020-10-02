@@ -670,7 +670,7 @@ function createJoinMask(tgtView, overlap, joinRect){
  * @param {StarsDetected} detectedStars
  * @param {PhotometricMosaicData} data User settings used to create FITS header
  */
-function displayMask(tgtView, joinArea, detectedStars, data){
+function createStarMask(tgtView, joinArea, detectedStars, data){
     let postfix = "Mask";
     let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__" + data.limitMaskStarsPercent + "_" + postfix;
     let imageWidth = tgtView.image.width;
@@ -704,7 +704,7 @@ function displayMask(tgtView, joinArea, detectedStars, data){
             graphics.fillCircle(star.pos, radius);
         }
     } catch (e) {
-        console.criticalln("StarLib displayMask error: " + e);
+        console.criticalln("StarLib createStarMask error: " + e);
     } finally {
         graphics.end();
     }

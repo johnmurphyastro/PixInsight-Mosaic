@@ -136,10 +136,43 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
         }
     }
     
+    let liveUpdate = true;
+    
+    /**
+     * @param {HorizontalSizer} horizontalSizer
+     */
+    function customControls (horizontalSizer){
+        let liveUpdate_control = new CheckBox();
+        liveUpdate_control.text = "Live update";
+        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+        liveUpdate_control.onCheck = function (checked){
+            liveUpdate = checked;
+            update_Button.enabled = !checked;
+            if (checked){
+                updateSampleGrid();
+            }
+        };
+        liveUpdate_control.checked = liveUpdate;
+
+        let update_Button = new PushButton();
+        update_Button.text = "Update";
+        update_Button.toolTip = "<p>Update display</p>";
+        update_Button.onClick = function(){
+            updateSampleGrid();
+        };
+        update_Button.enabled = !liveUpdate_control.checked;
+        
+        horizontalSizer.addSpacing(20);
+        horizontalSizer.add(liveUpdate_control);
+        horizontalSizer.addSpacing(10);
+        horizontalSizer.add(update_Button);
+        horizontalSizer.addSpacing(20);
+    }
+    
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, refBitmap, null);
+    let previewControl = new PreviewControl(this, refBitmap, null, customControls);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -165,6 +198,10 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     unbinnedCheckBox.checked = showUnbinnedSamples;
     unbinnedCheckBox.onClick = function (checked) {
         showUnbinnedSamples = checked;
+        if (!liveUpdate){
+            // Ensure binning has been updated before drawing unbinned samples
+            updateSampleGrid();
+        }
         previewControl.forceRedraw();
     };
     
@@ -177,8 +214,10 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     let maxSamples_Control = createMaxSamplesControl(this, data);
     maxSamples_Control.onValueUpdated = function (value) {
         data.maxSamples = value;
-        updateSampleGrid();
         photometricMosaicDialog.maxSamples_Control.setValue(value);
+        if (liveUpdate){
+            updateSampleGrid();
+        }
     };
     
     /**
