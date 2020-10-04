@@ -245,7 +245,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * on top of the background bitmap within the scrolled window.
      */
     function updateSampleGrid(){
-        sampleGridMap = createSampleGridMap(data.targetView.image, data.referenceView.image,
+        sampleGridMap = data.cache.getSampleGridMap(data.targetView.image, data.referenceView.image,
             detectedStars.allStars, data.cache.overlap.overlapBox, data);
         previewControl.forceRedraw();
     }

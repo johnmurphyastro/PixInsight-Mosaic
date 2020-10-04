@@ -254,7 +254,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     //targetImage, referenceImage, stars, sampleRect, data
-    let sampleGridMap = createSampleGridMap(targetView.image, referenceView.image,
+    let sampleGridMap = data.cache.getSampleGridMap(targetView.image, referenceView.image,
             detectedStars.allStars, overlapBox, data);
             
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
@@ -268,8 +268,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
     
-    let colorSamplePairs = createSamplePairs(
-            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal);
+    let colorSamplePairs = data.cache.getSamplePairs(
+            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal, data);
     for (let samplePairs of colorSamplePairs){
         if (samplePairs.length < 3) {
             new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -346,7 +346,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         try {
             for (let c = 0; c < nChannels; c++) {
                 let samplePairs = binnedColorSamplePairs[c];
-                propagateSurfaceSplines[c] = calcSurfaceSpline(samplePairs, data.extrapolatedGradientSmoothness);        
+                propagateSurfaceSplines[c] = data.cache.getSurfaceSpline(
+                        data, samplePairs, data.extrapolatedGradientSmoothness, c);
             }
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
@@ -355,6 +356,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         }
         
         if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
+            console.writeln(binnedColorSamplePairs[0].length,
+                    " samples, ", getElapsedTime(createSurfaceSplineTime));
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
                     propagateSurfaceSplines, joinRect, binnedColorSamplePairs, data, true);
@@ -368,7 +371,8 @@ function photometricMosaic(data, photometricMosaicDialog)
     try {
         for (let c = 0; c < nChannels; c++) {
             let samplePairs = binnedColorSamplePairs[c];
-            surfaceSplines[c] = calcSurfaceSpline(samplePairs, data.overlapGradientSmoothness);
+            surfaceSplines[c] = data.cache.getSurfaceSpline(
+                    data, samplePairs, data.overlapGradientSmoothness, c);
         }
     } catch (ex){
         new MessageBox("Gradient Surface Spline error.\n" + ex.message, 

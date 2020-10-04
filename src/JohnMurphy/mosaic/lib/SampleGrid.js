@@ -260,13 +260,29 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
         let nChannels = binRectMapArray_.length;
         let binRect = new Rect(binSize_, binSize_);
         binRect.moveTo(getX(xKey), getY(yKey));
+        let samples = new Float64Array(binRect.area);
         for (let c=0; c < nChannels; c++){
             // Don't add sample if it contains 1 or more pixels that are black
-            if (tgtImage.minimum(binRect, c, c) === 0 || refImage.minimum(binRect, c, c) === 0){
-                // exclude this sample from this channel.
-                continue;
+            let addBinRect = true;
+            refImage.getSamples(samples, binRect, c);
+            for (let i = 0; i < samples.length; i++) {
+                if (samples[i] === 0){
+                    addBinRect = false;
+                    break;
+                }
             }
-            binRectMapArray_[c].set(createKey(xKey, yKey), binRect);
+            if (addBinRect){
+                tgtImage.getSamples(samples, binRect, c);
+                for (let i = 0; i < samples.length; i++) {
+                    if (samples[i] === 0){
+                        addBinRect = false;
+                        break;
+                    }
+                }
+            }
+            if (addBinRect){
+                binRectMapArray_[c].set(createKey(xKey, yKey), binRect);
+            }
         }
     }
     
