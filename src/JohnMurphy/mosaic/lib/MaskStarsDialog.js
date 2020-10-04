@@ -299,4 +299,58 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
     setTitle();
 }
 
+// ----------------------------
+// Star mask controls
+// ----------------------------
+function createLimitMaskStarsControl(dialog, data, labelLength){
+    let limitMaskStars_Control = new NumericControl(dialog);
+    limitMaskStars_Control.real = false;
+    limitMaskStars_Control.label.text = "Limit stars %:";
+    limitMaskStars_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to " +
+            "create the star mask.</p>" +
+            "<p>0% will produce a solid mask with no stars.<br />" +
+            "100% will produce a mask that includes all detected stars.</p>" +
+            "<p>Small faint stars are usually free of artifacts, so normally " +
+            "only a small percentage of the detected stars need to be used.</p>";
+    limitMaskStars_Control.label.setFixedWidth(labelLength);
+    limitMaskStars_Control.setRange(0, 100);
+    limitMaskStars_Control.slider.setRange(0, 100);
+    limitMaskStars_Control.slider.minWidth = 200;
+    limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
+    return limitMaskStars_Control;
+}
+
+function createMaskStarRadiusMultControl(dialog, data, labelLength){
+    let maskStarRadiusMult_Control = new NumericControl(dialog);
+    maskStarRadiusMult_Control.real = true;
+    maskStarRadiusMult_Control.label.text = "Multiply star radius:";
+    maskStarRadiusMult_Control.toolTip =
+            "<p>Increases the size of the brightest stars.</p>" +
+            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
+    maskStarRadiusMult_Control.label.setFixedWidth(labelLength);
+    maskStarRadiusMult_Control.setRange(1, 25);
+    maskStarRadiusMult_Control.slider.setRange(1, 250);
+    maskStarRadiusMult_Control.setPrecision(1);
+    maskStarRadiusMult_Control.slider.minWidth = 250;
+    maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
+    return maskStarRadiusMult_Control;
+}
+
+function createMaskStarRadiusAddControl(dialog, data, labelLength){
+    let maskStarRadiusAdd_Control = new NumericControl(dialog);
+    maskStarRadiusAdd_Control.real = true;
+    maskStarRadiusAdd_Control.label.text = "Add to star radius:";
+    maskStarRadiusAdd_Control.toolTip =
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply star radius'.</p>";
+    maskStarRadiusAdd_Control.label.setFixedWidth(labelLength);
+    maskStarRadiusAdd_Control.setRange(0, 10);
+    maskStarRadiusAdd_Control.slider.setRange(0, 100);
+    maskStarRadiusAdd_Control.setPrecision(1);
+    maskStarRadiusAdd_Control.slider.minWidth = 100;
+    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
+    return maskStarRadiusAdd_Control;
+}
+
 MaskStarsDialog.prototype = new Dialog;

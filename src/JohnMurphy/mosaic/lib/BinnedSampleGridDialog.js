@@ -260,4 +260,27 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     setTitle();
 }
 
+function createMaxSamplesControl(dialog, data){
+    let maxSamples_Control = new NumericControl(this);
+    maxSamples_Control.real = false;
+    maxSamples_Control.label.text = "Max samples:";
+    maxSamples_Control.toolTip =
+            "<p>Limits the number of samples used to create the surface spline. " +
+            "If the number of samples exceed this limit, they are combined " +
+            "(binned) to create super samples.</p>" +
+            "<p>Increase if the overlap area is very large. " +
+            "A larger number of samples increases the " +
+            "theoretical maximum resolution of the surface spline. However, " +
+            "small unbinned samples are noisier and require more smoothing. " +
+            "The default value is usually a good compromise.</p>" +
+            "<p>The time required to initialize the surface spline approximately " +
+            "doubles every 1300 samples.</p>";
+    
+    maxSamples_Control.setRange(2000, 5000);
+    maxSamples_Control.slider.setRange(200, 500);
+    maxSamples_Control.slider.minWidth = 200;
+    maxSamples_Control.setValue(data.maxSamples);
+    return maxSamples_Control;
+}
+
 BinnedSampleGridDialog.prototype = new Dialog;

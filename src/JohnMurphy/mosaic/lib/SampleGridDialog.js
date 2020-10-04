@@ -273,4 +273,66 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     setTitle();
 }
 
+//-------------------------------------------------------
+// Sample Grid Controls
+//-------------------------------------------------------
+function createLimitSampleStarsPercentControl(dialog, data, sampleGenerationStrLen){
+    let limitSampleStarsPercent_Control = new NumericControl(dialog);
+    limitSampleStarsPercent_Control.real = false;
+    limitSampleStarsPercent_Control.label.text = "Limit stars %:";
+    limitSampleStarsPercent_Control.label.minWidth = sampleGenerationStrLen;
+    limitSampleStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples.</p>" +
+            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
+            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
+            "<li>Bright stars can have significantly different profiles between " +
+            "the reference and target images. This can affect how many of the " +
+            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "<p>It is only necessary to reject bright stars. This script uses the " +
+            "median value from each sample, so any star that takes up less than " +
+            "half the sample area will have little effect. It is more important to " +
+            "include most of the samples than to reject faint stars.</p>";
+    limitSampleStarsPercent_Control.setRange(0, 100);
+    limitSampleStarsPercent_Control.slider.setRange(0, 100);
+    limitSampleStarsPercent_Control.slider.minWidth = 101;
+    limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
+    return limitSampleStarsPercent_Control;
+}
+ 
+function createSampleStarRadiusMultControl(dialog, data, labelLength){
+    let sampleStarRadiusMult_Control = new NumericControl(dialog);
+    sampleStarRadiusMult_Control.real = true;
+    sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
+    sampleStarRadiusMult_Control.label.minWidth = labelLength;
+    sampleStarRadiusMult_Control.toolTip =
+            "<p>Increase to reject more samples around saturated stars.</p>" +
+            "<p>Read the Help sections on 'Join Region' to learn when these " +
+            "samples should be rejected.</p>";
+    sampleStarRadiusMult_Control.setPrecision(1);
+    sampleStarRadiusMult_Control.setRange(1, 25);
+    sampleStarRadiusMult_Control.slider.setRange(1, 250);
+    sampleStarRadiusMult_Control.slider.minWidth = 250;
+    sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);
+    return sampleStarRadiusMult_Control;
+}
+ 
+function createSampleSizeControl(dialog, data, labelLength){
+    let sampleSize_Control = new NumericControl(dialog);
+    sampleSize_Control.real = false;
+    sampleSize_Control.label.text = "Sample size:";
+    sampleSize_Control.label.minWidth = labelLength;
+    sampleSize_Control.toolTip =
+            "<p>Specifies the size of the sample squares.</p>" +
+            "<p>Ideally, the samples should be about 1.5x the size of the largest " +
+            "star that's not rejected by 'Limit stars %'.</p>";
+    sampleSize_Control.setRange(3, 50);
+    sampleSize_Control.slider.setRange(3, 50);
+    sampleSize_Control.slider.minWidth = 50;
+    sampleSize_Control.setValue(data.sampleSize);
+    return sampleSize_Control;
+}
+
 SampleGridDialog.prototype = new Dialog;
