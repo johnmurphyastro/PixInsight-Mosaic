@@ -139,7 +139,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     }
     
-    let liveUpdate = true;
+    let liveUpdate = false;
     
     /**
      * @param {HorizontalSizer} horizontalSizer

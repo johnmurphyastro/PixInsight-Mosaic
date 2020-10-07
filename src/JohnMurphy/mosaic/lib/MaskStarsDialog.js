@@ -152,7 +152,7 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
             graphics.end();
         }
     }
-    let liveUpdate = true;
+    let liveUpdate = false;
     
     /**
      * @param {HorizontalSizer} horizontalSizer

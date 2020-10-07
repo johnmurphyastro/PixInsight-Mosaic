@@ -157,7 +157,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         }
     }
     
-    let liveUpdate = true;
+    let liveUpdate = false;
     
     /**
      * @param {HorizontalSizer} horizontalSizer

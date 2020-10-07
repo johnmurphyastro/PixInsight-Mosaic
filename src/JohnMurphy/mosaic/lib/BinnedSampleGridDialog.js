@@ -136,7 +136,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
         }
     }
     
-    let liveUpdate = true;
+    let liveUpdate = false;
     
     /**
      * @param {HorizontalSizer} horizontalSizer

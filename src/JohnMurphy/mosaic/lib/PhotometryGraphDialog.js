@@ -205,7 +205,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
-    liveUpdate_control.checked = true;
+    liveUpdate_control.checked = false;
     
     let update_Button = new PushButton();
     update_Button.text = "Update";
