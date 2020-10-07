@@ -26,10 +26,12 @@
  * @param {SampleGridMap} sampleGridMap Specifies the grid samples
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
+ * @param {Number} maxSampleSize maximum allowed sample size
  * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
-function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedStars, data, photometricMosaicDialog)
+function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedStars, data,
+        maxSampleSize, photometricMosaicDialog)
 {
     this.__base__ = Dialog;
     this.__base__();
@@ -231,7 +233,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             }
         };
 
-    let sampleSize_Control = createSampleSizeControl(this, data, labelLength);
+    let sampleSize_Control = createSampleSizeControl(this, data, maxSampleSize, labelLength);
         sampleSize_Control.onValueUpdated = function (value) {
             data.sampleSize = value;
             photometricMosaicDialog.sampleSize_Control.setValue(value);
@@ -256,8 +258,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(limitSampleStarsPercent_Control);
-    this.sizer.add(sampleStarRadiusMult_Control);
     this.sizer.add(sampleSize_Control);
+    this.sizer.add(sampleStarRadiusMult_Control);
     this.sizer.add(optionsSizer);
     this.sizer.add(previewControl.getButtonSizer());
 
@@ -319,17 +321,17 @@ function createSampleStarRadiusMultControl(dialog, data, labelLength){
     return sampleStarRadiusMult_Control;
 }
  
-function createSampleSizeControl(dialog, data, labelLength){
+function createSampleSizeControl(dialog, data, maxSampleSize, labelLength){
     let sampleSize_Control = new NumericControl(dialog);
     sampleSize_Control.real = false;
     sampleSize_Control.label.text = "Sample size:";
     sampleSize_Control.label.minWidth = labelLength;
     sampleSize_Control.toolTip =
             "<p>Specifies the size of the sample squares.</p>" +
-            "<p>Ideally, the samples should be about 1.5x the size of the largest " +
+            "<p>The sample size should be greater than 2x the size of the largest " +
             "star that's not rejected by 'Limit stars %'.</p>";
-    sampleSize_Control.setRange(3, 50);
-    sampleSize_Control.slider.setRange(3, 50);
+    sampleSize_Control.setRange(2, Math.min(maxSampleSize, 50));
+    sampleSize_Control.slider.setRange(2, 50);
     sampleSize_Control.slider.minWidth = 50;
     sampleSize_Control.setValue(data.sampleSize);
     return sampleSize_Control;

@@ -245,12 +245,16 @@ function photometricMosaic(data, photometricMosaicDialog)
         processEvents();
     }
     
-    let maxSampleSize = Math.floor(Math.min(overlapBox.height, overlapBox.width)/2);
+    let overlapThickness = Math.min(overlapBox.height, overlapBox.width);
+    let maxSampleSize = Math.floor(overlapThickness/2);
     if (data.sampleSize > maxSampleSize){
-        new MessageBox("Sample Size is too big for the overlap area.\n" +
-                "Sample Size must be less than or equal to " + maxSampleSize, 
-                TITLE(), StdIcon_Error, StdButton_Ok).execute();
-        return;
+        let recommendedSize = Math.floor(overlapThickness/3);
+        new MessageBox("Sample Size '" + data.sampleSize + "' is too big for the overlap area.\n" +
+                "Sample Size must be less than or equal to " + maxSampleSize +
+                "\nReducing sample size to: " + recommendedSize, 
+                TITLE(), StdIcon_Warning, StdButton_Ok).execute();
+        data.sampleSize = recommendedSize;
+        photometricMosaicDialog.sampleSize_Control.setValue(data.sampleSize);  
     }
     
     //targetImage, referenceImage, stars, sampleRect, data
@@ -263,7 +267,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let dialog = new SampleGridDialog("SampleGrid", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
-                data, photometricMosaicDialog);
+                data, maxSampleSize, photometricMosaicDialog);
         dialog.execute();
         return;
     }
