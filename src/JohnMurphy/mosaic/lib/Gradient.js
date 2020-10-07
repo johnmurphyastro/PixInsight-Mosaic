@@ -176,6 +176,7 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
     this.overlapStart = 0;
     this.joinStart = 0;
     this.joinEnd = 0;
+    this.joinMiddle = 0;
     this.overlapEnd = 0;
     this.secondTaperEnd = 0;
     let overlapBox = overlap.overlapBox;
@@ -188,10 +189,12 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
         this.joinEnd = Math.min(joinRect.x1, overlapBox.x1);    // joinRect.x1, limited by overlap.x1
     }
     
+    this.joinMiddle = Math.floor((this.joinStart + this.joinEnd) / 2);
+    
     if (data.mosaicOverlayTgtFlag){
         // In overlay mode, the join has zero thickness and is runs along middle of join region
-        this.joinStart = Math.floor((this.joinStart + this.joinEnd) / 2);
-        this.joinEnd = this.joinStart;
+        this.joinStart = this.joinMiddle;
+        this.joinEnd = this.joinMiddle;
     }
     
     if (isHorizontal){
@@ -1068,14 +1071,11 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      */
     function createGraph(tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isExtrapolateGraph, zoomFactor){
-        let xMaxCoordinate;
         let xLabel;
         if (isHorizontal){
             xLabel = "Mosaic tile join X-coordinate";
-            xMaxCoordinate = data.targetView.image.width;
         } else {
             xLabel = "Mosaic tile join Y-coordinate";
-            xMaxCoordinate = data.targetView.image.height;
         }
         let yLabel = "(" + data.targetView.fullId + ") - (" + data.referenceView.fullId + ")";
         // Graph scale
@@ -1084,7 +1084,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         const minScaleDif = 5e-5;
         let yCoordinateRange = new SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor);
         
-        return createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
+        return createAndDrawGraph(xLabel, yLabel, yCoordinateRange,
                 tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, 
                 joinRect, colorSamplePairs, data, isExtrapolateGraph);
     }
@@ -1149,7 +1149,6 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * 
      * @param {String} xLabel
      * @param {String} yLabel
-     * @param {Number} xMaxCoordinate
      * @param {SamplePairDifMinMax} yCoordinateRange
      * @param {Image} tgtImage 
      * @param {Number} width 
@@ -1163,12 +1162,21 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Boolean} isExtrapolateGraph
      * @returns {Graph}
      */
-    function createAndDrawGraph(xLabel, yLabel, xMaxCoordinate, yCoordinateRange,
+    function createAndDrawGraph(xLabel, yLabel, yCoordinateRange,
             tgtImage, width, height, isHorizontal, isTargetAfterRef, surfaceSplines, joinRect, colorSamplePairs,
             data, isExtrapolateGraph){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
-        let graph = new Graph(0, minY, xMaxCoordinate, maxY);
+        let minX;
+        let maxX;
+        if (isHorizontal){
+            minX = joinRect.x0;
+            maxX = joinRect.x1;
+        } else {
+            minX = joinRect.y0;
+            maxX = joinRect.y1;
+        }
+        let graph = new Graph(minX, minY, maxX, maxY);
         graph.createGraph(xLabel, yLabel, width, height, false);
 
         let graphLines;
@@ -1231,40 +1239,16 @@ function GraphLinePath(path, bold){
 function createOverlapGradientPaths(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
-    let overlapBox = overlap.overlapBox;
-    let joinStartPath;
-    let joinEndPath;
-    let overlapPath;
+    let joinMidPath;
     if (isHorizontal){
-        joinStartPath = overlap.calcHorizOutlinePath(regions.joinStart);
-        joinEndPath = overlap.calcHorizOutlinePath(regions.joinEnd);
-        if (isTargetAfterRef){
-            overlapPath = createHorizontalPath(regions.overlapEnd, overlapBox);
-        } else {
-            overlapPath = createHorizontalPath(regions.overlapStart, overlapBox);
-        }
+        joinMidPath = overlap.calcHorizOutlinePath(regions.joinMiddle);
     } else {
-        joinStartPath = overlap.calcVerticalOutlinePath(regions.joinStart);
-        joinEndPath = overlap.calcVerticalOutlinePath(regions.joinEnd);
-        if (isTargetAfterRef){
-            overlapPath = createVerticalPath(regions.overlapEnd, overlapBox);
-        } else {
-            overlapPath = createVerticalPath(regions.overlapStart, overlapBox);
-        }
+        joinMidPath = overlap.calcVerticalOutlinePath(regions.joinMiddle);
     }
     
     let graphLinePaths = [];
-    if (data.mosaicAverageFlag || data.mosaicRandomFlag || isTargetAfterRef === null){
-        // Draw join lines bold for average, random and insert modes
-        graphLinePaths.push(new GraphLinePath(overlapPath, false));
-        graphLinePaths.push(new GraphLinePath(joinStartPath, true));
-        graphLinePaths.push(new GraphLinePath(joinEndPath, true));
-    } else {
-        // Overlay so joinStartPath == joinEndPath
-        // draw join path bold
-        graphLinePaths.push(new GraphLinePath(overlapPath, false));
-        graphLinePaths.push(new GraphLinePath(joinEndPath, true));   
-    }
+    // draw join path bold
+    graphLinePaths.push(new GraphLinePath(joinMidPath, true));   
     return graphLinePaths;
 }
     
