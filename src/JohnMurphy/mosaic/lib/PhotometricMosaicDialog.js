@@ -260,7 +260,7 @@ function PhotometricMosaicData() {
         this.logStarDetection = -1;
         
         // Photometric Star Search
-        this.starFluxTolerance = 1.25;
+        this.starFluxTolerance = 1.2;
         this.starSearchRadius = 2.5;
         
         // Photometric Scale
@@ -338,8 +338,10 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
         photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
         photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
-        photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
         photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
+        if (EXTRA_CONTROLS()){
+            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
+        }
         
         // Join Size
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
@@ -944,38 +946,44 @@ function PhotometricMosaicDialog(data) {
         self.rectangleWidth_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
         self.rectangleHeight_Control.enabled = checked;
-        self.taperFromJoin_Control.enabled = checked;
         self.cropTarget_Control.enabled = checked;
         if (checked){
             self.setHasJoinSize(false);
         } else {
-            data.taperFromJoin = false;
-            self.taperFromJoin_Control.checked = false;
             data.cropTargetToJoinRegionFlag = false;
             self.cropTarget_Control.checked = false; 
         }
+        if (EXTRA_CONTROLS()){
+            self.taperFromJoin_Control.enabled = checked;
+            if (!checked){
+                data.taperFromJoin = false;
+                self.taperFromJoin_Control.checked = false;
+            }
+        }
     };
     
-    this.taperFromJoin_Control = new CheckBox();
-    this.taperFromJoin_Control.text = "Taper from join";
-    this.taperFromJoin_Control.toolTip =
-            "<p>This is an advanced option and should usually be left unchecked.</p>" +
-            "<p>This option moves the taper from the target side of the " +
-            "Overlap bounding box to the target side of the Join Region.</p>" +
-            "<p>The target image's offset and gradient are fully corrected within the join region, " +
-            "but outside the Overlap bounding box the gradient can only be partially " +
-            "corrected. A taper is applied to blend these two regions together.</p>" +
-            "<p>This option is one of several strategies used to prevent a bright star " +
-            "near the start of the taper zone from causing a bright or dark shadow " +
-            "within the zone.</p>" +
-            "To learn more about the available strategies, read the Help sections:" +
-            "<ul><li>Join Region: Taking control of the join</li>" +
-            "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
-            
-    this.taperFromJoin_Control.onCheck = function (checked){
-        data.taperFromJoin = checked;
-    };
-    this.taperFromJoin_Control.checked = data.taperFromJoin;
+    if (EXTRA_CONTROLS()){
+        this.taperFromJoin_Control = new CheckBox();
+        this.taperFromJoin_Control.text = "Taper from join";
+        this.taperFromJoin_Control.toolTip =
+                "<p>This is an advanced option and should usually be left unchecked.</p>" +
+                "<p>This option moves the taper from the target side of the " +
+                "Overlap bounding box to the target side of the Join Region.</p>" +
+                "<p>The target image's offset and gradient are fully corrected within the join region, " +
+                "but outside the Overlap bounding box the gradient can only be partially " +
+                "corrected. A taper is applied to blend these two regions together.</p>" +
+                "<p>This option is one of several strategies used to prevent a bright star " +
+                "near the start of the taper zone from causing a bright or dark shadow " +
+                "within the zone.</p>" +
+                "To learn more about the available strategies, read the Help sections:" +
+                "<ul><li>Join Region: Taking control of the join</li>" +
+                "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
+
+        this.taperFromJoin_Control.onCheck = function (checked){
+            data.taperFromJoin = checked;
+        };
+        this.taperFromJoin_Control.checked = data.taperFromJoin;
+    }
     
     this.cropTarget_Control = new CheckBox();
     this.cropTarget_Control.text = "Crop target";
@@ -992,8 +1000,10 @@ function PhotometricMosaicDialog(data) {
     let joinAreaFlagsHorizSizer = new HorizontalSizer;
     joinAreaFlagsHorizSizer.addSpacing(GET_AREA_FROM_PREVIEW_STRLEN + 4);
     joinAreaFlagsHorizSizer.add(this.cropTarget_Control);
-    joinAreaFlagsHorizSizer.addSpacing(20);
-    joinAreaFlagsHorizSizer.add(this.taperFromJoin_Control);
+    if (EXTRA_CONTROLS()){
+        joinAreaFlagsHorizSizer.addSpacing(20);
+        joinAreaFlagsHorizSizer.add(this.taperFromJoin_Control);
+    }
     
     joinAreaFlagsHorizSizer.addStretch();
     
