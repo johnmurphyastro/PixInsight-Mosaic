@@ -30,6 +30,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/Cache.js"
 #include "lib/StarLib.js"
 #include "lib/Gradient.js"
+#include "lib/GradientGraph.js"
 #include "lib/GradientGraphDialog.js"
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"

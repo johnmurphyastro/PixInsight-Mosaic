@@ -322,36 +322,6 @@ function Overlap(refImage, tgtImage){
     };
     
     /**
-     * @param {Point[]} minAtXArray
-     * @param {Point[]} maxAtXArray
-     * @returns {Point[]}
-     */
-    this.getMidOutlineAtXArray = function(minAtXArray, maxAtXArray){
-        let length = minAtXArray.length;
-        let midAtX = new Array(length);
-        for (let i=0; i<length; i++){
-            let avgY = (minAtXArray[i].y + maxAtXArray[i].y) / 2;
-            midAtX[i] = new Point(minAtXArray[i].x, avgY);
-        }
-        return midAtX;
-    };
-    
-    /**
-     * @param {Point[]} minAtYArray
-     * @param {Point[]} maxAtYArray
-     * @returns {Point[]}
-     */
-    this.getMidOutlineAtYArray = function(minAtYArray, maxAtYArray){
-        let length = minAtYArray.length;
-        let midAtY = new Array(length);
-        for (let i=0; i<length; i++){
-            let avgX = (minAtYArray[i].x + maxAtYArray[i].x) / 2;
-            midAtY[i] = new Point(avgX, minAtYArray[i].y);
-        }
-        return midAtY;
-    };
-    
-    /**
      * @param {Image} refImage
      * @param {Image} tgtImage
      * @param {Rect} refBox Bounding box of non zero area
