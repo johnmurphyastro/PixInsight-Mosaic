@@ -365,7 +365,7 @@ function photometricMosaic(data, photometricMosaicDialog)
                     " samples, ", getElapsedTime(createSurfaceSplineTime));
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                    propagateSurfaceSplines, joinRect, binnedColorSamplePairs, data, true);
+                    propagateSurfaceSplines, joinRect, colorSamplePairs, data, true);
             return;
         }
     } else {
@@ -390,7 +390,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         // This gradient is important at the join
         GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                surfaceSplines, joinRect, binnedColorSamplePairs, data, false);
+                surfaceSplines, joinRect, colorSamplePairs, data, false);
         return;
     }
 

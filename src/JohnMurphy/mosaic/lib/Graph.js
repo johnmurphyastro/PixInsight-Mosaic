@@ -228,8 +228,7 @@ function Graph(x0, y0, x1, y1) {
     };
     
     /**
-     * Draw a point on the graph. If the point is outside the graph's data range,
-     * an error is reported on the Console.
+     * Draw a point on the graph.
      * @param {Number} xWorld
      * @param {Number} yWorld
      * @param {Number} color
@@ -239,6 +238,30 @@ function Graph(x0, y0, x1, y1) {
         let y = yToScreenY(yWorld);
         if (x >= xOrigin_ && y >= 0 && x < bitmap_.width && y <= yOrigin_){
             bitmap_.setPixel(x, y, color);
+        }
+    };
+    
+    /**
+     * Draw a '+' on the graph
+     * @param {Number} xWorld
+     * @param {Number} yWorld
+     * @param {Number} color
+     */
+    this.drawCross = function(xWorld, yWorld, color){
+        let g;
+        try {
+            g = new Graphics(bitmap_);
+            g.clipRect = new Rect(xOrigin_, yOrigin_ - yAxisLength_, xOrigin_ + xAxisLength_, yOrigin_);
+            g.transparentBackground = true;
+            g.pen = new Pen(color);
+            let x = xToScreenX(xWorld);
+            let y = yToScreenY(yWorld);
+            g.drawLine(x-1, y, x+1, y);
+            g.drawLine(x, y-1, x, y+1);
+        } catch (e) {
+            console.criticalln("Graph drawCross error: " + e);
+        } finally {
+            g.end();
         }
     };
     
