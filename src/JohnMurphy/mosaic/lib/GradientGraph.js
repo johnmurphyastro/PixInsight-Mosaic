@@ -82,7 +82,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
             title += " (Overlap region)";
         }
         // Get a the SamplePairs that are closest to the line path
-        dataSamplePairs_ = getDataSamplePairs(graphLinePath_, colorSamplePairs, isHorizontal);
+        dataSamplePairs_ = getDataSamplePairs(graphLinePath_, colorSamplePairs, data.sampleSize, isHorizontal);
         
         // Display graph in script dialog
         let graphDialog = new GradientGraphDialog(title, data.graphWidth, data.graphHeight, createZoomedGraph);
@@ -146,10 +146,11 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * Returns the SamplePairs that are closest to the graphLinePath
      * @param {Point[]} graphLinePath
      * @param {SamplePair[][]} colorSamplePairs
+     * @param {Number} sampleSize 
      * @param {Boolean} isHorizontal
      * @returns {SamplePair[][]}
      */
-    function getDataSamplePairs(graphLinePath, colorSamplePairs, isHorizontal){
+    function getDataSamplePairs(graphLinePath, colorSamplePairs, sampleSize, isHorizontal){
         /**
          * @param {SamplePair} samplePair
          * @param {Point[]} path 
@@ -158,13 +159,13 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
          */
         function MapEntry (samplePair, path, isHorizontal){
             this.samplePair = samplePair;
-            this.dif = Number.POSITIVE_INFINITY;
+            this.dist = Number.POSITIVE_INFINITY;
             this.pathIdx = -1;
             if (isHorizontal){
                 let minCoord = path[0].x;
                 this.pathIdx = Math.round(samplePair.rect.center.x) - minCoord;
                 if (this.pathIdx >= 0 && this.pathIdx < path.length){
-                    this.dif = samplePair.rect.center.y - path[this.pathIdx].y;
+                    this.dist = Math.abs(samplePair.rect.center.y - path[this.pathIdx].y);
                 } else {
                     console.criticalln("getDataSamplePairs: Out of range!");
                 }
@@ -172,7 +173,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
                 let minCoord = path[0].y;
                 this.pathIdx = Math.round(samplePair.rect.center.y) - minCoord;
                 if (this.pathIdx >= 0 && this.pathIdx < path.length){
-                    this.dif = samplePair.rect.center.x - path[this.pathIdx].x;
+                    this.dist = Math.abs(samplePair.rect.center.x - path[this.pathIdx].x);
                 } else {
                     console.criticalln("getDataSamplePairs: Out of range!");
                 }
@@ -181,21 +182,24 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         
         let dataSamplePairs = [];
         let nChannels = colorSamplePairs.length;
+        let maxDist = sampleSize * 2;
         for (let c=0; c<nChannels; c++){
             dataSamplePairs[c] = [];
             let pathMap = new Map();
             for (let i=0; i<colorSamplePairs[c].length; i++){
                 let samplePairs = colorSamplePairs[c];
                 let value = new MapEntry(samplePairs[i], graphLinePath, isHorizontal);
-                let key = value.pathIdx;
-                if (pathMap.has(key)){
-                    let mapValue = pathMap.get(key);
-                    if (Math.abs(value.dif) < Math.abs(mapValue.dif)){
-                        // closer to path
+                if (value.dist < maxDist){
+                    let key = value.pathIdx;
+                    if (pathMap.has(key)){
+                        let mapValue = pathMap.get(key);
+                        if (value.dist < mapValue.dist){
+                            // closer to path
+                            pathMap.set(key, value);
+                        }
+                    } else {
                         pathMap.set(key, value);
                     }
-                } else {
-                    pathMap.set(key, value);
                 }
             }
             
