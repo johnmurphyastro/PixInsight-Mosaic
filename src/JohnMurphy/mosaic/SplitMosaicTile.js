@@ -1,4 +1,4 @@
-/* global HORIZONTAL, TITLE, ImageWindow, UndoFlag_NoSwapFile, Parameters, View, VERTICAL, Dialog, VERSION, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok */
+/* global HORIZONTAL, TITLE, ImageWindow, UndoFlag_NoSwapFile, Parameters, View, VERTICAL, Dialog, VERSION, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, DataType_Int32, Settings, KEYPREFIX */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -22,12 +22,14 @@
 Copyright &copy; 2019-2020 John Murphy.<br/>
 
 #include <pjsr/UndoFlag.jsh>
+#include <pjsr/DataType.jsh>
 #include "lib/DialogLib.js"
 
 #define VERSION  "1.1"
 #define TITLE "SplitMosaicTile"
 #define HORIZONTAL 0
 #define VERTICAL 1
+#define KEYPREFIX "SplitMosaicTile"
 
 /**
  * Controller. Processing starts here!
@@ -124,7 +126,7 @@ function SplitData() {
         if (Parameters.has("orientation"))
             this.orientation = Parameters.getInteger("orientation");
         if (Parameters.has("overlap"))
-            this.overlap = Parameters.getReal("overlap");
+            this.overlap = Parameters.getInteger("overlap");
         if (Parameters.has("coordinate"))
             this.coordinate = Parameters.getInteger("coordinate");
         if (Parameters.has("targetView")) {
@@ -154,6 +156,41 @@ function SplitData() {
     }
     // Initialise the script's data
     this.setParameters();
+}
+
+/**
+ * Save all script parameters as settings keys.
+ * @param {TrimImageData} data 
+ */
+function saveSettings(data){
+    // Star Detection
+    Settings.write( KEYPREFIX+"/orientation", DataType_Int32, data.orientation );
+    Settings.write( KEYPREFIX+"/overlap", DataType_Int32, data.overlap );
+    Settings.write( KEYPREFIX+"/coordinate", DataType_Int32, data.coordinate );
+    console.writeln("\nSaved settings");
+}
+
+// A function to delete all previously stored settings keys for this script.
+function resetSettings(){
+   Settings.remove( KEYPREFIX );
+}
+
+/**
+ * Restore all script parameters from settings keys.
+ * @param {PhotometricMosaicData} data 
+ */
+function restoreSettings(data){
+    var keyValue;
+    // Star Detection
+    keyValue = Settings.read( KEYPREFIX+"/orientation", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.orientation = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/overlap", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.overlap = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/coordinate", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.coordinate = keyValue;
 }
 
 // The main dialog function
@@ -337,6 +374,8 @@ function main() {
 
     if (Parameters.isGlobalTarget || Parameters.isViewTarget) {
         data.loadParameters();
+    } else {
+        restoreSettings(data);
     }
 
     let splitDialog = new SplitDialog(data);

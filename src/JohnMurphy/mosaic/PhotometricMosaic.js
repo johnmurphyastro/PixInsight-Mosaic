@@ -344,16 +344,15 @@ function photometricMosaic(data, photometricMosaicDialog)
         console.writeln("Reduced number of samples from ", colorSamplePairs[0].length, 
                 " to ", binnedColorSamplePairs[0].length);
     }
-    let createSurfaceSplineTime = new Date().getTime();
+    
     let propagateSurfaceSplines;
     if (data.extrapolatedGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         propagateSurfaceSplines = [];
         try {
-            for (let c = 0; c < nChannels; c++) {
-                let samplePairs = binnedColorSamplePairs[c];
-                propagateSurfaceSplines[c] = data.cache.getSurfaceSpline(
-                        data, samplePairs, data.extrapolatedGradientSmoothness, c);
-            }
+            let smoothness = data.extrapolatedGradientSmoothness;
+            let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, 3);
+            propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3);
+            consoleInfo.end();
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
                     TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -361,11 +360,10 @@ function photometricMosaic(data, photometricMosaicDialog)
         }
         
         if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
-            console.writeln(binnedColorSamplePairs[0].length,
-                    " samples, ", getElapsedTime(createSurfaceSplineTime));
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                    propagateSurfaceSplines, joinRect, colorSamplePairs, data, true);
+                    joinRect, colorSamplePairs, photometricMosaicDialog,
+                    data, binnedColorSamplePairs);
             return;
         }
     } else {
@@ -374,23 +372,21 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     let surfaceSplines = [];
     try {
-        for (let c = 0; c < nChannels; c++) {
-            let samplePairs = binnedColorSamplePairs[c];
-            surfaceSplines[c] = data.cache.getSurfaceSpline(
-                    data, samplePairs, data.overlapGradientSmoothness, c);
-        }
+        let smoothness = data.overlapGradientSmoothness;
+        let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, 3);
+        surfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3);
+        consoleInfo.end();
     } catch (ex){
         new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
                 TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
-    console.writeln(binnedColorSamplePairs[0].length,
-            " samples, ", getElapsedTime(createSurfaceSplineTime));
 
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         // This gradient is important at the join
         GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                surfaceSplines, joinRect, colorSamplePairs, data, false);
+                joinRect, colorSamplePairs, photometricMosaicDialog,
+                data, binnedColorSamplePairs);
         return;
     }
 
@@ -406,6 +402,50 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     console.writeln("\n" + TITLE() + ": Total time ", getElapsedTime(startTime));
     processEvents();
+}
+
+/**
+ * @param {PhotometricMosaicData} data
+ * @param {SamplePair[][]} binnedColorSamplePairs
+ * @param {Number} smoothness
+ * @param {Number} selectedChannel R=0, G=1, B=2, All=3
+ * @returns {SurfaceSpline[]}
+ */
+function getSurfaceSplines(data, binnedColorSamplePairs, smoothness, selectedChannel){
+    let nChannels = binnedColorSamplePairs.length;
+    let surfaceSplines = [];
+    for (let c = 0; c < nChannels; c++) {
+        if (selectedChannel === c || selectedChannel === 3){
+            let samplePairs = binnedColorSamplePairs[c];
+            surfaceSplines[c] = data.cache.getSurfaceSpline(data, samplePairs, smoothness, c);
+        } else {
+            surfaceSplines[c] = null;
+        }
+    }
+    return surfaceSplines;
+}
+
+/**
+ * @param {SamplePair[][]} binnedColorSamplePairs
+ * @param {Number} smoothness
+ * @param {Number} selectedChannel
+ * @returns {Number}
+ */
+function SurfaceSplineInfo(binnedColorSamplePairs, smoothness, selectedChannel){
+    this.startTime = new Date().getTime();
+    let color = ["Red  ", "Green", "Blue ", "RGB  "];
+    let nSamples;
+    if (selectedChannel < 3){
+        nSamples = binnedColorSamplePairs[selectedChannel].length;
+    } else {
+        nSamples = binnedColorSamplePairs[0].length;
+    }
+    console.write("Surface spline (", color[selectedChannel], " ", nSamples, " samples, ",
+            smoothness.toPrecision(2), " smoothness");
+    
+    this.end = function (){
+        console.writeln(", ", getElapsedTime(this.startTime), ")");
+    };
 }
 
 /**

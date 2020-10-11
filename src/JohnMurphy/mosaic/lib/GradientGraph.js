@@ -53,39 +53,65 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
 }
 
 /**
+ * 
+ * @param {SamplePair[][]} samplePairsOnPath
+ * @param {Number} minRange
+ * @returns {Number}
+ */
+function getNoiseRange(samplePairsOnPath, minRange){
+    let rangeArray = [];
+    for (let c=0; c<samplePairsOnPath.length; c++) {
+        let samplePairs = samplePairsOnPath[c];
+        for (let i = 0; i < samplePairs.length - 10; i += 10){
+            let max = samplePairs[i].getDifference();
+            let min = max;
+            for (let j = 1; j<10; j++){
+                let difference = samplePairs[i+j].getDifference();
+                max = Math.max(difference, max);
+                min = Math.min(difference, min);
+            }
+            rangeArray.push(max - min);
+        }
+    }
+    let range = rangeArray.length > 0 ? Math.median(rangeArray) : minRange;
+    return range;
+}
+
+/**
  * Display graph of (difference between images) / (pixel distance across image)
  * @param {Image} tgtImage 
  * @param {Boolean} isHorizontal
  * @param {Boolean} isTargetAfterRef true if target is below reference or target is right of reference 
- * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
  * @param {Rect} joinRect Create dif arrays at either side of this rectangle 
  * @param {SamplePair[][]} colorSamplePairs The SamplePair points to be displayed for each channel
+ * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @param {PhotometricMosaicData} data User settings used to create FITS header
- * @param {Boolean} isExtrapolateGraph If true, display single line for target side of overlap bounding box
+ * @param {SamplePair[][]} binnedColorSamplePairs
  * @returns {undefined}
  */
-function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines, 
-        joinRect, colorSamplePairs, data, isExtrapolateGraph){
+function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, 
+        joinRect, colorSamplePairs, photometricMosaicDialog, data, binnedColorSamplePairs){
     
     let dataSamplePairs_;    // Sample Pairs that are closest to the graphLinePath
     let graphLinePath_;      // Display the gradient along this line
     
     function construct(){
         let title = "Gradient Graph";
-        if (isExtrapolateGraph){
-            // This path is along the side of the overlap bounding box
-            graphLinePath_ = createExtrapolateGradientPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
-            title += " (Target image)";
-        } else {
+        if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
             // This path is along the center of the joinRect, but constrained by the overlap area
             graphLinePath_ = createOverlapGradientPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
             title += " (Overlap region)";
+        } else {
+            // This path is along the side of the overlap bounding box
+            graphLinePath_ = createExtrapolateGradientPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            title += " (Target image)";
         }
         // Get a the SamplePairs that are closest to the line path
         dataSamplePairs_ = getDataSamplePairs(graphLinePath_, colorSamplePairs, data.sampleSize, isHorizontal);
         
         // Display graph in script dialog
-        let graphDialog = new GradientGraphDialog(title, data.graphWidth, data.graphHeight, createZoomedGraph);
+        let isColor = colorSamplePairs.length > 1;
+        let graphDialog = new GradientGraphDialog(title, data, isColor, createZoomedGraph, photometricMosaicDialog);
         if (graphDialog.execute() === StdButton_Yes){
             // User requested graph saved to PixInsight View
             let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
@@ -102,12 +128,28 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Number} factor
      * @param {Number} width
      * @param {Number} height
+     * @param {Number} selectedChannel R=0, G=1, B=2, All=3
+     * @param {Boolean} info If true, provide progress feedback in console
      * @returns {Graph}
      */
-    function createZoomedGraph(factor, width, height){
+    function createZoomedGraph(factor, width, height, selectedChannel, info){
+        let smoothness;
+        if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
+            smoothness = data.overlapGradientSmoothness;
+        } else {
+            smoothness = data.extrapolatedGradientSmoothness;
+        }
+        let consoleInfo;
+        if (info){
+            consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, selectedChannel);
+        }      
+        let surfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, selectedChannel);
+        if (info){
+            consoleInfo.end();
+        }
         // Using GradientGraph function call parameters
         let graph = createGraph(width, height, isHorizontal, surfaceSplines, graphLinePath_,
-                joinRect, dataSamplePairs_, data, factor);
+                joinRect, dataSamplePairs_, data, factor, selectedChannel);
         return graph;
     }
     
@@ -120,11 +162,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Rect} joinRect Join region or overlap bounding box 
      * @param {SamplePair[][]} dataSamplePairs The SamplePair points to be displayed for each channel
      * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @param {Graph function(float zoomFactor)} zoomFactor Zoom factor for vertical axis only zooming.
+     * @param {Number} zoomFactor Zoom factor for vertical axis only zooming.
+     * @param {Number} selectedChannel R=0, G=1, B=2, All=3
      * @returns {Graph}
      */
     function createGraph(width, height, isHorizontal, surfaceSplines, graphLinePath,
-                joinRect, dataSamplePairs, data, zoomFactor){
+                joinRect, dataSamplePairs, data, zoomFactor, selectedChannel){
         let xLabel;
         if (isHorizontal){
             xLabel = "Mosaic tile join X-coordinate";
@@ -135,11 +178,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
         // Graph scale
         // gradientArray stores min / max of fitted lines.
         // also need min / max of sample points.
-        const minScaleDif = 5e-5;
+        let minScaleDif = 1e-9;
+        minScaleDif = 3 * getNoiseRange(colorSamplePairs, minScaleDif) ;
         let yCoordinateRange = new SamplePairDifMinMax(dataSamplePairs, minScaleDif, zoomFactor);
         
         return createAndDrawGraph(xLabel, yLabel, yCoordinateRange, width, height, isHorizontal, 
-                surfaceSplines, graphLinePath, joinRect, dataSamplePairs);
+                surfaceSplines, graphLinePath, joinRect, dataSamplePairs, selectedChannel);
     }
     
     /**
@@ -269,10 +313,11 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
      * @param {Point[]} graphLinePath
      * @param {Rect} joinRect
      * @param {SamplePair[][]} dataSamplePairs
+     * @param {Number} selectedChannel R=0, G=1, B=2, All=3
      * @returns {Graph}
      */
     function createAndDrawGraph(xLabel, yLabel, yCoordinateRange, width, height, 
-            isHorizontal, surfaceSplines, graphLinePath, joinRect, dataSamplePairs){
+            isHorizontal, surfaceSplines, graphLinePath, joinRect, dataSamplePairs, selectedChannel){
         let maxY = yCoordinateRange.maxDif;
         let minY = yCoordinateRange.minDif;
         let minX;
@@ -299,11 +344,13 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef, surfaceSplines,
             let lineColors = [0xFF990000, 0xFF009900, 0xFF000099]; // r, g, b
             let pointColors = [0xFFCC0000, 0xFF00CC00, 0xFF0000CC]; // r, g, b
             for (let c = 0; c < dataSamplePairs.length; c++){
-                let difArray = surfaceSplines[c].evaluate(graphLinePath).toArray();
-                let graphAreaOnly = graph.createGraphAreaOnly();
-                drawLineAndPoints(graphAreaOnly, isHorizontal,
-                    difArray, difArrayOffset, lineColors[c], dataSamplePairs[c], pointColors[c]);
-                graph.mergeWithGraphAreaOnly(graphAreaOnly);
+                if (selectedChannel === 3 || selectedChannel === c){
+                    let difArray = surfaceSplines[c].evaluate(graphLinePath).toArray();
+                    let graphAreaOnly = graph.createGraphAreaOnly();
+                    drawLineAndPoints(graphAreaOnly, isHorizontal,
+                        difArray, difArrayOffset, lineColors[c], dataSamplePairs[c], pointColors[c]);
+                    graph.mergeWithGraphAreaOnly(graphAreaOnly);
+                }
             }
         }
         return graph;

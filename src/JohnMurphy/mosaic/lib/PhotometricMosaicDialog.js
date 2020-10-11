@@ -303,7 +303,7 @@ function PhotometricMosaicData() {
         this.mosaicRandomFlag = false;
         this.mosaicAverageFlag = false;
         
-        this.graphWidth = 1600; // gradient and photometry graph width
+        this.graphWidth = 1200; // gradient and photometry graph width
         this.graphHeight = 800; // gradient and photometry graph height
         
         // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
@@ -380,8 +380,7 @@ function PhotometricMosaicData() {
  * Save all script parameters as settings keys.
  * @param {PhotometricMosaicData} data 
  */
-function saveSettings(data)
-{
+function saveSettings(data){
     // Star Detection
     Settings.write( KEYPREFIX+"/starDetection", DataType_Float, data.logStarDetection );
     
@@ -428,17 +427,22 @@ function saveSettings(data)
     
     Settings.write( KEYPREFIX+"/graphWidth", DataType_Int32, data.graphWidth );
     Settings.write( KEYPREFIX+"/graphHeight", DataType_Int32, data.graphHeight );
-   
+    
+    console.writeln("\nSaved settings");
+}
+
+// A function to delete all previously stored settings keys for this script.
+function resetSettings(){
+   Settings.remove( KEYPREFIX );
 }
 
 /**
  * Restore all script parameters from settings keys.
  * @param {PhotometricMosaicData} data 
  */
-function restoreSettings(data)
-{
-   var keyValue;
-   // Star Detection
+function restoreSettings(data){
+    var keyValue;
+    // Star Detection
     keyValue = Settings.read( KEYPREFIX+"/starDetection", DataType_Float );
     if ( Settings.lastReadOK )
         data.logStarDetection = keyValue;
@@ -1235,8 +1239,7 @@ function PhotometricMosaicDialog(data) {
         "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
         "the gradient but not the noise.</p>" +
         "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>" +
-        "<p>Use the 'Gradient graph' to determine the optimum smoothness.</p>";
+        "Larger values apply more smoothing.</p>";
     this.overlapGradientSmoothnessControl.onValueUpdated = function (value) {
         data.overlapGradientSmoothness = value;
     };
@@ -1246,7 +1249,7 @@ function PhotometricMosaicDialog(data) {
     this.overlapGradientSmoothnessControl.setValue(data.overlapGradientSmoothness);
     
     let overlapGradientGraphButton = new PushButton();
-    overlapGradientGraphButton.text = "Gradient graph";
+    overlapGradientGraphButton.text = "Edit and display gradient";
     overlapGradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
@@ -1335,8 +1338,7 @@ function PhotometricMosaicDialog(data) {
         "gradient correction only follows the gradient trend, rather than " +
         "these local variations.</p>" +
         "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>" +
-        "<p>Use the 'Gradient graph' to determine the optimum smoothness.</p>";
+        "Larger values apply more smoothing.</p>";
     this.extrapolatedGradientSmoothness_Control.onValueUpdated = function (value) {
         data.extrapolatedGradientSmoothness = value;
     };
@@ -1346,7 +1348,7 @@ function PhotometricMosaicDialog(data) {
     this.extrapolatedGradientSmoothness_Control.setValue(data.extrapolatedGradientSmoothness);
     
     let extrapolatedGradientGraphButton = new PushButton();
-    extrapolatedGradientGraphButton.text = "Gradient graph";
+    extrapolatedGradientGraphButton.text = "Edit and display gradient";
     extrapolatedGradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
@@ -1707,7 +1709,6 @@ function main() {
         // Run the script
         photometricMosaic(data, photometricMosaicDialog);
         data.saveParameters();  // Save script parameters to the history.
-        saveSettings(data);
         console.hide();
     }
     

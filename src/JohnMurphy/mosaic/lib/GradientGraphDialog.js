@@ -26,23 +26,24 @@
  * The GraphDialog is initialised with the Graph returned from createZoomedGraph, 
  * with a zoom factor of 1
  * @param {String} title Window title
- * @param {Number} width Dialog window width
- * @param {Number} height Dialog window height
- * @param {Graph function({Number} zoomFactor, {Number} width, {Number} height)} createZoomedGraph
- * Callback function used
- * to create a zoomed graph
+ * @param {PhotometricMosaicData} data
+ * @param {Boolean} isColor
+ * @param {Graph function({Number} zoomFactor, {Number} width, {Number} height, {Number} channel, {Boolean} info)} createZoomedGraph
+ * Callback function used to create a zoomed graph
+ * @param {PhotometricMosaicDialog} photometricMosaicDialog 
  * @returns {GradientGraphDialog}
  */
-function GradientGraphDialog(title, width, height, createZoomedGraph)
+function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometricMosaicDialog)
 {
     this.__base__ = Dialog;
     this.__base__();
     let self = this;
     let zoom_ = 1;
+    let selectedChannel_ = 3;
     let createZoomedGraph_ = createZoomedGraph;
-    width = this.logicalPixelsToPhysical(width);
-    height = this.logicalPixelsToPhysical(height);
-    let graph_ = createZoomedGraph_(zoom_, width, height);
+    let width = this.logicalPixelsToPhysical(data.graphWidth);
+    let height = this.logicalPixelsToPhysical(data.graphHeight);
+    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel_, false);
     
     /**
      * Provided to give access to the zoomed graph. This is used when saving
@@ -112,7 +113,7 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     };
     
     bitmapControl.onResize = function (wNew, hNew, wOld, hOld) {
-        update(wNew, hNew);
+        update(wNew, hNew, false);
     };
     
     /**
@@ -121,7 +122,7 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     function updateZoom (zoom) {
         if (zoom < 101 && zoom > -99){
             zoom_ = zoom;
-            update(bitmapControl.width, bitmapControl.height);
+            update(bitmapControl.width, bitmapControl.height, false);
             self.windowTitle = title + getZoomString();   // display zoom factor in title bar
         }
     }
@@ -129,10 +130,11 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     /**
      * @param {Number} width Graph bitmap width (
      * @param {Number} height Graph bitmap height
+     * @param {Boolean} info If true, write to console
      */
-    function update(width, height){
+    function update(width, height, info){
         try {
-            graph_ = createZoomedGraph_(getZoomFactor(), width, height);
+            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel_, info);
             bitmapControl.repaint();    // display the zoomed graph bitmap
         } catch (e) {
             console.criticalln("Graph update error: " + e);
@@ -169,6 +171,100 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
             "<p>Left click: Display (x,y) in title bar</p>" +
             "<p>Right click: Create a PixInsight image of the graph</p>";
     
+    // Gradient controls
+    let control;
+    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
+        control = photometricMosaicDialog.extrapolatedGradientSmoothness_Control;
+    } else {
+        control = photometricMosaicDialog.overlapGradientSmoothnessControl;
+    }
+    let smoothnessControl = new NumericControl(this);
+    smoothnessControl.real = true;
+    smoothnessControl.setPrecision(1);
+    smoothnessControl.label.text = "Smoothness:";
+    smoothnessControl.toolTip = control.toolTip;
+    smoothnessControl.onValueUpdated = function (value) {
+        if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
+            data.extrapolatedGradientSmoothness = value;
+        } else {
+            data.overlapGradientSmoothness = value;
+        }
+        control.setValue(value);
+    };
+    smoothnessControl.setRange(control.lowerBound, control.upperBound);
+    smoothnessControl.slider.setRange(control.slider.minValue, control.slider.maxValue);
+    smoothnessControl.slider.minWidth = 280;
+    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
+        smoothnessControl.setValue(data.extrapolatedGradientSmoothness);
+    } else {
+        smoothnessControl.setValue(data.overlapGradientSmoothness);
+    }
+    
+    // ===========================
+    // Color toggles
+    // ===========================
+    let redRadioButton = new RadioButton(this);
+    redRadioButton.text = "Red";
+    redRadioButton.toolTip = "Display the red channel gradient";
+    redRadioButton.checked = false;
+    redRadioButton.onClick = function (checked) {
+        selectedChannel_ = 0;
+        self.enabled = false;
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let greenRadioButton = new RadioButton(this);
+    greenRadioButton.text = "Green";
+    greenRadioButton.toolTip = "Display the green channel gradient";
+    greenRadioButton.checked = false;
+    greenRadioButton.onClick = function (checked) {
+        selectedChannel_ = 1;
+        self.enabled = false;
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let blueRadioButton = new RadioButton(this);
+    blueRadioButton.text = "Blue";
+    blueRadioButton.toolTip = "Display the blue channel gradient";
+    blueRadioButton.checked = false;
+    blueRadioButton.onClick = function (checked) {
+        selectedChannel_ = 2;
+        self.enabled = false;
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let allRadioButton = new RadioButton(this);
+    allRadioButton.text = "All";
+    allRadioButton.toolTip = "Display the gradient for all channels";
+    allRadioButton.checked = true;
+    allRadioButton.onClick = function (checked) {
+        selectedChannel_ = 3;
+        self.enabled = false;
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    if (!isColor){
+        redRadioButton.enabled = false;
+        greenRadioButton.enabled = false;
+        blueRadioButton.enabled = false;
+    }
+
+    let optionsSizer = new HorizontalSizer();
+    optionsSizer.margin = 0;
+    optionsSizer.spacing = 10;
+    optionsSizer.addSpacing(4);
+    optionsSizer.add(smoothnessControl);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(redRadioButton);
+    optionsSizer.add(greenRadioButton);
+    optionsSizer.add(blueRadioButton);
+    optionsSizer.add(allRadioButton);
+    optionsSizer.addStretch();
+    
     // ===========================
     // Zoom controls and OK button
     // ===========================
@@ -196,6 +292,15 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
         updateZoom( 1 );
     };
     
+    let update_Button = new PushButton();
+    update_Button.text = "Update";
+    update_Button.toolTip = "<p>Update display</p>";
+    update_Button.onClick = function(){
+        self.enabled = false;
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
     let ok_Button = new PushButton();
     ok_Button.text = "OK";
     ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
@@ -209,6 +314,8 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     zoomButton_Sizer.add(zoomIn_Button);
     zoomButton_Sizer.add(zoomOut_Button);
     zoomButton_Sizer.add(zoom11_Button);
+    zoomButton_Sizer.addSpacing(20);
+    zoomButton_Sizer.add(update_Button);
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);
@@ -220,12 +327,13 @@ function GradientGraphDialog(title, width, height, createZoomedGraph)
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
+    this.sizer.add(optionsSizer);
     this.sizer.add(zoomButton_Sizer);
     
     this.userResizable = true;
     let preferredWidth = width + this.sizer.margin * 2;
-    let preferredHeight = height + this.sizer.margin * 2 + this.sizer.spacing + 
-           zoomIn_Button.height + 4;
+    let preferredHeight = height + this.sizer.margin * 2 + this.sizer.spacing * 2 + 
+           zoomIn_Button.height * 2 + 4;
     this.resize(preferredWidth, preferredHeight);
     
     this.setScaledMinSize(300, 300);

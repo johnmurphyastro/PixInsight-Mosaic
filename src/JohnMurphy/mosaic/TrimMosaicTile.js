@@ -1,4 +1,4 @@
-/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, UndoFlag_Keywords, UndoFlag_PixelData, CoreApplication */
+/* global UndoFlag_All, Parameters, View, ImageWindow, Dialog, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, UndoFlag_Keywords, UndoFlag_PixelData, CoreApplication, DataType_Int32, Settings, KEYPREFIX */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -22,10 +22,11 @@
 Copyright &copy; 2019-2020 John Murphy.<br/>
 
 #include <pjsr/UndoFlag.jsh>
-//#include <pjsr/DataType.jsh>
+#include <pjsr/DataType.jsh>
 #include "lib/DialogLib.js"
 #include "lib/FitsHeader.js"
 #include "lib/Geometry.js"
+#define KEYPREFIX "TrimMosaicTile"
 
 function VERSION(){return "1.1";}
 function TITLE(){return "Trim Mosaic Tile";}
@@ -307,6 +308,45 @@ function TrimImageData() {
 }
 
 /**
+ * Save all script parameters as settings keys.
+ * @param {TrimImageData} data 
+ */
+function saveSettings(data){
+    // Star Detection
+    Settings.write( KEYPREFIX+"/left", DataType_Int32, data.left );
+    Settings.write( KEYPREFIX+"/right", DataType_Int32, data.right );
+    Settings.write( KEYPREFIX+"/top", DataType_Int32, data.top );
+    Settings.write( KEYPREFIX+"/bottom", DataType_Int32, data.bottom );
+    console.writeln("\nSaved settings");
+}
+
+// A function to delete all previously stored settings keys for this script.
+function resetSettings(){
+   Settings.remove( KEYPREFIX );
+}
+
+/**
+ * Restore all script parameters from settings keys.
+ * @param {PhotometricMosaicData} data 
+ */
+function restoreSettings(data){
+    var keyValue;
+    // Star Detection
+    keyValue = Settings.read( KEYPREFIX+"/left", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.left = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/right", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.right = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/top", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.top = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/bottom", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.bottom = keyValue;
+}
+
+/**
  * Trim Control
  * @param {String} label    trim label (e.g. 'Left:')
  * @param {Number} labelWidth
@@ -440,6 +480,8 @@ function main() {
 
     if (Parameters.isGlobalTarget || Parameters.isViewTarget) {
         data.loadParameters();
+    } else {
+        restoreSettings(data);
     }
 
     let trimDialog = new trimImageDialog(data);

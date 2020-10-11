@@ -149,15 +149,28 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     buttons_Sizer.add(browseDocumentationButton);
 
     let resetButton = new ToolButton();
-
     resetButton.icon = dialog.scaledResource(":/images/icons/reset.png");
     resetButton.setScaledFixedSize(24, 24);
-    resetButton.toolTip = "<p>Resets the dialog's parameters.";
+    resetButton.toolTip = 
+            "<p>Resets the dialog's parameters.</p>" +
+            "<p>Saved settings are also cleared.</p>";
     resetButton.onClick = function () {
         data.resetParameters(dialog);
+        resetSettings();
+    };
+    
+    let saveSettingsButton = new ToolButton();
+    saveSettingsButton.icon = dialog.scaledResource(":icons/save.png");
+    saveSettingsButton.setScaledFixedSize(24, 24);
+    saveSettingsButton.toolTip = 
+            "<p>Saves settings between sessions.</p>" +
+            "<p>Use 'Reset' to clear the saved settings.</p>";
+    saveSettingsButton.onClick = function () {
+        saveSettings(data);
     };
 
     buttons_Sizer.add(resetButton);
+    buttons_Sizer.add(saveSettingsButton);
     buttons_Sizer.addStretch();
     buttons_Sizer.add(ok_Button);
     buttons_Sizer.add(cancel_Button);
