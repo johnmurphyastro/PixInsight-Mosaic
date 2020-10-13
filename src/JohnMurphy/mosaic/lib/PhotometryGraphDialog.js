@@ -251,10 +251,10 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
     
-    let rejectHigh_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
-    rejectHigh_Control.onValueUpdated = function (value) {
+    let linearRange_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
+    linearRange_Control.onValueUpdated = function (value) {
         data.linearRange = value;
-        photometricMosaicDialog.rejectHigh_Control.setValue(value);
+        photometricMosaicDialog.linearRange_Control.setValue(value);
         if (liveUpdate_control.checked){
             update(bitmapControl.width, bitmapControl.height);
         }
@@ -277,14 +277,14 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
     this.sizer.add(limitPhotoStarsPercent_Control);
-    this.sizer.add(rejectHigh_Control);
+    this.sizer.add(linearRange_Control);
     this.sizer.add(outlierRemoval_Control);
     this.sizer.add(zoomButton_Sizer);
     
     this.userResizable = true;
     let preferredWidth = width + this.sizer.margin * 2;
     let preferredHeight = height + this.sizer.spacing * 4 + this.sizer.margin * 2 +
-           rejectHigh_Control.height * 4 + 4;
+           linearRange_Control.height * 4 + 4;
     this.resize(preferredWidth, preferredHeight);
     
     this.setScaledMinSize(300, 300);

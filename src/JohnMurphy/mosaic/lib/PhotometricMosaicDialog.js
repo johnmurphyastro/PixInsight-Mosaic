@@ -325,7 +325,7 @@ function PhotometricMosaicData() {
         
         // Photometric Scale
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
-        photometricMosaicDialog.rejectHigh_Control.setValue(this.linearRange);
+        photometricMosaicDialog.linearRange_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
         // Gradient Sample Generation
@@ -751,19 +751,19 @@ function PhotometricMosaicDialog(data) {
     };
     
     let LINEAR_RANGE_STRLEN = this.font.width("Linear range:");
-    this.rejectHigh_Control = new NumericEdit();
-    this.rejectHigh_Control.setReal(true);
-    this.rejectHigh_Control.label.text = "Linear range:";
-    this.rejectHigh_Control.label.minWidth = LINEAR_RANGE_STRLEN;
-    this.rejectHigh_Control.toolTip =
+    this.linearRange_Control = new NumericEdit();
+    this.linearRange_Control.setReal(true);
+    this.linearRange_Control.label.text = "Linear range:";
+    this.linearRange_Control.label.minWidth = LINEAR_RANGE_STRLEN;
+    this.linearRange_Control.toolTip =
             "<p>Restricts the stars used for photometry to those " +
             "that have a peak pixel value less than the specified value.</p>" +
             "<p>Use this to reject stars that are outside the " +
             "camera's linear response range.</p>";
-    this.rejectHigh_Control.setPrecision(3);
-    this.rejectHigh_Control.setRange(0.001, 1.0);
-    this.rejectHigh_Control.setValue(data.linearRange);
-    this.rejectHigh_Control.onValueUpdated = function (value){
+    this.linearRange_Control.setPrecision(3);
+    this.linearRange_Control.setRange(0.001, 1.0);
+    this.linearRange_Control.setValue(data.linearRange);
+    this.linearRange_Control.onValueUpdated = function (value){
         data.linearRange = value;
     };
     
@@ -798,7 +798,7 @@ function PhotometricMosaicDialog(data) {
     let photometricScaleHorizSizer1 = new HorizontalSizer;
     photometricScaleHorizSizer1.spacing = 10;
     photometricScaleHorizSizer1.add(this.limitPhotoStarsPercent_Control);
-    photometricScaleHorizSizer1.add(this.rejectHigh_Control);
+    photometricScaleHorizSizer1.add(this.linearRange_Control);
     photometricScaleHorizSizer1.add(this.outlierRemoval_Control);
     photometricScaleHorizSizer1.addStretch();
     photometricScaleHorizSizer1.add(photometryGraphButton);
@@ -1588,21 +1588,21 @@ function createLimitPhotoStarsPercentControl(dialog, data, strLength){
 }
 
 function createLinearRangeControl(dialog, data, strLength){
-    let rejectHigh_Control = new NumericControl(dialog);
-    rejectHigh_Control.real = true;
-    rejectHigh_Control.label.text = "Linear range:";
-    rejectHigh_Control.label.minWidth = strLength;
-    rejectHigh_Control.toolTip =
+    let linearRange_Control = new NumericControl(dialog);
+    linearRange_Control.real = true;
+    linearRange_Control.label.text = "Linear range:";
+    linearRange_Control.label.minWidth = strLength;
+    linearRange_Control.toolTip =
             "<p>Restricts the stars used for photometry to those " +
             "that have a peak pixel value less than the specified value.</p>" +
             "<p>Use this to reject stars that are outside the " +
             "camera's linear response range.</p>";
-    rejectHigh_Control.setRange(0.001, 1.0);
-    rejectHigh_Control.slider.setRange(0, 500);
-    rejectHigh_Control.setPrecision(3);
-    rejectHigh_Control.slider.minWidth = 200;
-    rejectHigh_Control.setValue(data.linearRange);
-    return rejectHigh_Control;
+    linearRange_Control.setRange(0.001, 1.0);
+    linearRange_Control.slider.setRange(0, 500);
+    linearRange_Control.setPrecision(3);
+    linearRange_Control.slider.minWidth = 200;
+    linearRange_Control.setValue(data.linearRange);
+    return linearRange_Control;
 }
 
 function createOutlierRemovalControl(dialog, data, strLength){

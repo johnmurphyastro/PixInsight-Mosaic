@@ -298,10 +298,10 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         }
     };
     
-    let rejectHigh_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
-    rejectHigh_Control.onValueUpdated = function (value) {
+    let linearRange_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
+    linearRange_Control.onValueUpdated = function (value) {
         data.linearRange = value;
-        photometricMosaicDialog.rejectHigh_Control.setValue(value);
+        photometricMosaicDialog.linearRange_Control.setValue(value);
         if (liveUpdate) {
             update();
         }
@@ -332,7 +332,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(limitPhotoStarsPercent_Control);
-    this.sizer.add(rejectHigh_Control);
+    this.sizer.add(linearRange_Control);
     this.sizer.add(outlierRemoval_Control);
     this.sizer.add(optionsSizer);
     this.sizer.add(previewControl.getButtonSizer());
@@ -342,7 +342,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
             this.sizer.spacing * 5 + this.sizer.margin * 2 +
-            refCheckBox.height + rejectHigh_Control.height * 3 + this.logicalPixelsToPhysical(20);
+            refCheckBox.height + linearRange_Control.height * 3 + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     
     setTitle();
