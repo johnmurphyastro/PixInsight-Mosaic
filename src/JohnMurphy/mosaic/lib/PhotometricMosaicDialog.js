@@ -315,7 +315,7 @@ function PhotometricMosaicData() {
         this.setParameters();
         
         // Star Detection
-        photometricMosaicDialog.starDetectionControl.setValue(this.logStarDetection);
+        photometricMosaicDialog.starDetection_Control.setValue(this.logStarDetection);
         
         if (EXTRA_CONTROLS()){
             // Photometric Star Search
@@ -337,7 +337,7 @@ function PhotometricMosaicData() {
         }
         
         // Gradient Correction (Overlap region)
-        photometricMosaicDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
+        photometricMosaicDialog.overlapGradientSmoothness_Control.setValue(this.overlapGradientSmoothness);
         photometricMosaicDialog.taperLength_Control.setValue(this.taperLength);
         
         // Gradient Correction (Target image)
@@ -360,9 +360,9 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
         
         // Create Mosaic
-        photometricMosaicDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
-        photometricMosaicDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
-        photometricMosaicDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
+        photometricMosaicDialog.mosaicOverlayTgt_Control.checked = this.mosaicOverlayTgtFlag;
+        photometricMosaicDialog.mosaicRandom_Control.checked = this.mosaicRandomFlag;
+        photometricMosaicDialog.mosaicAverage_Control.checked = this.mosaicAverageFlag;
     };
     
     // Initialise the script's data
@@ -627,21 +627,21 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Star Detection"
     // =======================================
     let STAR_DETECTION_STR_LEN = this.font.width("Star detection:");
-    this.starDetectionControl = new NumericControl(this);
-    this.starDetectionControl.real = true;
-    this.starDetectionControl.label.text = "Star detection:";
-    this.starDetectionControl.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.starDetectionControl.toolTip = "<p>Logarithm of the star detection " +
+    this.starDetection_Control = new NumericControl(this);
+    this.starDetection_Control.real = true;
+    this.starDetection_Control.label.text = "Star detection:";
+    this.starDetection_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.starDetection_Control.toolTip = "<p>Logarithm of the star detection " +
             "sensitivity. Increase this value to detect less stars.</p>" +
             "<p>You usually don't need to modify this parameter.</p>";
-    this.starDetectionControl.onValueUpdated = function (value) {
+    this.starDetection_Control.onValueUpdated = function (value) {
         data.logStarDetection = value;
     };
-    this.starDetectionControl.setPrecision(1);
-    this.starDetectionControl.setRange(-2, 2);
-    this.starDetectionControl.slider.setRange(0, 50);
-    this.starDetectionControl.slider.minWidth = 50;
-    this.starDetectionControl.setValue(data.logStarDetection);
+    this.starDetection_Control.setPrecision(1);
+    this.starDetection_Control.setRange(-2, 2);
+    this.starDetection_Control.slider.setRange(0, 50);
+    this.starDetection_Control.slider.minWidth = 50;
+    this.starDetection_Control.setValue(data.logStarDetection);
     
     let detectedStarsButton = new PushButton();
     detectedStarsButton.text = "Detected stars";
@@ -656,7 +656,7 @@ function PhotometricMosaicDialog(data) {
     
     let starDetectionSection = new Control(this);
     starDetectionSection.sizer = new HorizontalSizer;
-    starDetectionSection.sizer.add(this.starDetectionControl);
+    starDetectionSection.sizer.add(this.starDetection_Control);
     starDetectionSection.sizer.addStretch();
     starDetectionSection.sizer.add(detectedStarsButton);
     let starDetectionBar = new SectionBar(this, "Star Detection");
@@ -989,25 +989,25 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Gradient Correction (Overlap region)"
     // ==================================================
     // Gradient controls
-    this.overlapGradientSmoothnessControl = new NumericControl(this);
-    this.overlapGradientSmoothnessControl.real = true;
-    this.overlapGradientSmoothnessControl.setPrecision(1);
-    this.overlapGradientSmoothnessControl.label.text = "Smoothness:";
-    this.overlapGradientSmoothnessControl.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.overlapGradientSmoothnessControl.toolTip =
+    this.overlapGradientSmoothness_Control = new NumericControl(this);
+    this.overlapGradientSmoothness_Control.real = true;
+    this.overlapGradientSmoothness_Control.setPrecision(1);
+    this.overlapGradientSmoothness_Control.label.text = "Smoothness:";
+    this.overlapGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.overlapGradientSmoothness_Control.toolTip =
         "<p>A surface spline is created to model the relative " +
         "gradient over the whole of the overlap region.</p>" +
         "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
         "the gradient but not the noise.</p>" +
         "<p>This control specifies the logarithm of the smoothness. " +
         "Larger values apply more smoothing.</p>";
-    this.overlapGradientSmoothnessControl.onValueUpdated = function (value) {
+    this.overlapGradientSmoothness_Control.onValueUpdated = function (value) {
         data.overlapGradientSmoothness = value;
     };
-    this.overlapGradientSmoothnessControl.setRange(-4, 3);
-    this.overlapGradientSmoothnessControl.slider.setRange(-400, 300);
-    this.overlapGradientSmoothnessControl.slider.minWidth = 140;
-    this.overlapGradientSmoothnessControl.setValue(data.overlapGradientSmoothness);
+    this.overlapGradientSmoothness_Control.setRange(-4, 3);
+    this.overlapGradientSmoothness_Control.slider.setRange(-400, 300);
+    this.overlapGradientSmoothness_Control.slider.minWidth = 140;
+    this.overlapGradientSmoothness_Control.setValue(data.overlapGradientSmoothness);
     
     let overlapGradientGraphButton = new PushButton();
     overlapGradientGraphButton.text = "Edit and display gradient";
@@ -1063,7 +1063,7 @@ function PhotometricMosaicDialog(data) {
     
     let overlapGradientSizer = new HorizontalSizer;
     overlapGradientSizer.spacing = 4;
-    overlapGradientSizer.add(this.overlapGradientSmoothnessControl);
+    overlapGradientSizer.add(this.overlapGradientSmoothness_Control);
     overlapGradientSizer.addSpacing(20);
     overlapGradientSizer.add(overlapGradientGraphButton);
     
@@ -1410,25 +1410,25 @@ function PhotometricMosaicDialog(data) {
     overlay_Label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
     overlay_Label.minWidth = this.font.width("Overlay:");
     
-    this.mosaicOverlayTgtControl = new RadioButton(this);
-    this.mosaicOverlayTgtControl.text = "Overlay";
-    this.mosaicOverlayTgtControl.toolTip =
+    this.mosaicOverlayTgt_Control = new RadioButton(this);
+    this.mosaicOverlayTgt_Control.text = "Overlay";
+    this.mosaicOverlayTgt_Control.toolTip =
             "The Join Region is divided in half along its length:" +
             "<ul><li>On the target side, target pixels are drawn on top.</li>" +
             "<li>On the reference side, reference pixels " +
             "are drawn on top.</li></ul>" +
             "<p>For a pure 'target overlay' or 'reference overlay', create " +
             "a Join Region at one side of the overlap region.</p>";
-    this.mosaicOverlayTgtControl.checked = data.mosaicOverlayTgtFlag;
-    this.mosaicOverlayTgtControl.onClick = function (checked) {
+    this.mosaicOverlayTgt_Control.checked = data.mosaicOverlayTgtFlag;
+    this.mosaicOverlayTgt_Control.onClick = function (checked) {
         data.mosaicOverlayTgtFlag = checked;
         data.mosaicRandomFlag = !checked;
         data.mosaicAverageFlag = !checked;
     };
 
-    this.mosaicRandomControl = new RadioButton(this);
-    this.mosaicRandomControl.text = "Random";
-    this.mosaicRandomControl.toolTip = "<p>Over the join region, pixels " +
+    this.mosaicRandom_Control = new RadioButton(this);
+    this.mosaicRandom_Control.text = "Random";
+    this.mosaicRandom_Control.toolTip = "<p>Over the join region, pixels " +
             "are randomly chosen from the reference and target images.</p>" +
             "<p>This mode is particularly effective at hiding the join, but if " +
             "the star profiles in the reference and target images don't match, " +
@@ -1437,20 +1437,20 @@ function PhotometricMosaicDialog(data) {
             "to apply either the reference or target image to the mosaic through " +
             "a mask that only reveals the bright stars. The 'Mosaic Star Mask' " +
             "section has been provided for this purpose.</p>";
-    this.mosaicRandomControl.checked = data.mosaicRandomFlag;
-    this.mosaicRandomControl.onClick = function (checked) {
+    this.mosaicRandom_Control.checked = data.mosaicRandomFlag;
+    this.mosaicRandom_Control.onClick = function (checked) {
         data.mosaicRandomFlag = checked;
         data.mosaicOverlayTgtFlag = !checked;
         data.mosaicAverageFlag = !checked;
     };
-    this.mosaicAverageControl = new RadioButton(this);
-    this.mosaicAverageControl.text = "Average";
-    this.mosaicAverageControl.toolTip = "<p>Over the join region, " +
+    this.mosaicAverage_Control = new RadioButton(this);
+    this.mosaicAverage_Control.text = "Average";
+    this.mosaicAverage_Control.toolTip = "<p>Over the join region, " +
             "pixels are set to the average of the reference and target pixels.</p>" +
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
             "over the join, but this can also make the join more visible.</p>";
-    this.mosaicAverageControl.checked = data.mosaicAverageFlag;
-    this.mosaicAverageControl.onClick = function (checked) {
+    this.mosaicAverage_Control.checked = data.mosaicAverageFlag;
+    this.mosaicAverage_Control.onClick = function (checked) {
         data.mosaicAverageFlag = checked;
         data.mosaicRandomFlag = !checked;
         data.mosaicOverlayTgtFlag = !checked;
@@ -1491,9 +1491,9 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer = new HorizontalSizer;
     mosaicSection.sizer.spacing = 10;
     mosaicSection.sizer.add(overlay_Label);
-    mosaicSection.sizer.add(this.mosaicOverlayTgtControl);
-    mosaicSection.sizer.add(this.mosaicRandomControl);
-    mosaicSection.sizer.add(this.mosaicAverageControl);
+    mosaicSection.sizer.add(this.mosaicOverlayTgt_Control);
+    mosaicSection.sizer.add(this.mosaicRandom_Control);
+    mosaicSection.sizer.add(this.mosaicAverage_Control);
     mosaicSection.sizer.addStretch();
     mosaicSection.sizer.add(starsMaskButton);
     mosaicSection.sizer.spacing = 6;

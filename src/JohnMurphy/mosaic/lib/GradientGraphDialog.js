@@ -176,7 +176,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
         control = photometricMosaicDialog.targetGradientSmoothness_Control;
     } else {
-        control = photometricMosaicDialog.overlapGradientSmoothnessControl;
+        control = photometricMosaicDialog.overlapGradientSmoothness_Control;
     }
     let smoothnessControl = new NumericControl(this);
     smoothnessControl.real = true;
