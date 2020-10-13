@@ -173,8 +173,8 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     
     // Gradient controls
     let control;
-    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
-        control = photometricMosaicDialog.extrapolatedGradientSmoothness_Control;
+    if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
+        control = photometricMosaicDialog.targetGradientSmoothness_Control;
     } else {
         control = photometricMosaicDialog.overlapGradientSmoothnessControl;
     }
@@ -184,8 +184,8 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     smoothnessControl.label.text = "Smoothness:";
     smoothnessControl.toolTip = control.toolTip;
     smoothnessControl.onValueUpdated = function (value) {
-        if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
-            data.extrapolatedGradientSmoothness = value;
+        if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
+            data.targetGradientSmoothness = value;
         } else {
             data.overlapGradientSmoothness = value;
         }
@@ -194,8 +194,8 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     smoothnessControl.setRange(control.lowerBound, control.upperBound);
     smoothnessControl.slider.setRange(control.slider.minValue, control.slider.maxValue);
     smoothnessControl.slider.minWidth = 280;
-    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()){
-        smoothnessControl.setValue(data.extrapolatedGradientSmoothness);
+    if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
+        smoothnessControl.setValue(data.targetGradientSmoothness);
     } else {
         smoothnessControl.setValue(data.overlapGradientSmoothness);
     }

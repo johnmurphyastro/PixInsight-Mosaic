@@ -53,7 +53,7 @@ function DISPLAY_DETECTED_STARS(){return 1;}
 function DISPLAY_PHOTOMETRY_STARS(){return 2;}
 function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
 function DISPLAY_GRADIENT_SAMPLES(){return 8;}
-function DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH(){return 16;}
+function DISPLAY_TARGET_GRADIENT_GRAPH(){return 16;}
 function DISPLAY_OVERLAP_GRADIENT_GRAPH(){return 32;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
 function CREATE_JOIN_MASK(){return 256;}
@@ -186,10 +186,10 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
-        console.writeln("\n<b><u>Displaying gradient graph</u></b>");
+        console.writeln("\n<b><u>Displaying overlap gradient graph</u></b>");
     }
-    if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
-        console.writeln("\n<b><u>Displaying extrapolated gradient graph</u></b>");
+    if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()) {
+        console.writeln("\n<b><u>Displaying target image gradient graph</u></b>");
     }
     
     // Photometry stars
@@ -347,10 +347,10 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     let propagateSurfaceSplines;
-    if (data.extrapolatedGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
+    if (data.targetGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         propagateSurfaceSplines = [];
         try {
-            let smoothness = data.extrapolatedGradientSmoothness;
+            let smoothness = data.targetGradientSmoothness;
             let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, 3);
             propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3);
             consoleInfo.end();
@@ -360,7 +360,7 @@ function photometricMosaic(data, photometricMosaicDialog)
             return;
         }
         
-        if (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH()) {
+        if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()) {
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
                     joinRect, colorSamplePairs, photometricMosaicDialog,
@@ -488,7 +488,7 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
-        if (data.extrapolatedGradientFlag){
+        if (data.targetGradientFlag){
             propagateSurfaceSpline = propagateSurfaceSplines[channel];
         }
         let surfaceSpline = surfaceSplines[channel];

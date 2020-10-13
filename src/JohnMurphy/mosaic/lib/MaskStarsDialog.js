@@ -161,7 +161,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             isHorizontal, isTargetAfterRef, scaleFactors)
     {
         let propagateSurfaceSplines = 
-                getSurfaceSplines(data, binnedColorSamplePairs, data.extrapolatedGradientSmoothness, 3);
+                getSurfaceSplines(data, binnedColorSamplePairs, data.targetGradientSmoothness, 3);
         let surfaceSplines = 
                 getSurfaceSplines(data, binnedColorSamplePairs, data.overlapGradientSmoothness, 3);
         

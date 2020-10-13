@@ -139,7 +139,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
             smoothness = data.overlapGradientSmoothness;
         } else {
-            smoothness = data.extrapolatedGradientSmoothness;
+            smoothness = data.targetGradientSmoothness;
         }
         let consoleInfo;
         if (info){
@@ -276,7 +276,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         fitsHeaderStarDetection(keywords, data);
         fitsHeaderPhotometry(keywords, data);
         let includeGradient = (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH());
-        let includePropagate = (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH());
+        let includePropagate = (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH());
         fitsHeaderGradient(keywords, data, includeGradient, includePropagate);
         fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
         graphWindow.keywords = keywords;
@@ -399,7 +399,7 @@ function createOverlapOutlinePath(tgtImage, overlap, joinRect, isHorizontal, isT
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
     let path;
-    // Extrapolated gradient region is target side of overlap
+    // Target gradient region is target side of overlap
     if (isHorizontal){
         let y = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
         path = overlap.calcHorizOutlinePath(y);
@@ -426,7 +426,7 @@ function createOverlapBoundingBoxPath(tgtImage, overlap, joinRect, isHorizontal,
     let overlapBox = overlap.overlapBox;
 
     let graphLinePath;
-    // Extrapolated gradient region is target side of overlap
+    // Target gradient region is target side of overlap
     if (isHorizontal){
         let y = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
         graphLinePath = createHorizontalPath(y, overlapBox);

@@ -113,8 +113,8 @@ function PhotometricMosaicData() {
         Parameters.set("taperLength", this.taperLength);
         
         // Gradient Correction (Target image)
-        Parameters.set("extrapolatedGradientFlag", this.extrapolatedGradientFlag);
-        Parameters.set("extrapolatedGradientSmoothness", this.extrapolatedGradientSmoothness);
+        Parameters.set("targetGradientFlag", this.targetGradientFlag);
+        Parameters.set("targetGradientSmoothness", this.targetGradientSmoothness);
         
         // Join Region
         Parameters.set("hasJoinSize", this.hasJoinSize);
@@ -189,10 +189,10 @@ function PhotometricMosaicData() {
             this.taperLength = Parameters.getInteger("taperLength");
         
         // Gradient Correction (Target image)
-        if (Parameters.has("extrapolatedGradientFlag"))
-            this.extrapolatedGradientFlag = Parameters.getBoolean("extrapolatedGradientFlag");
-        if (Parameters.has("extrapolatedGradientSmoothness"))
-            this.extrapolatedGradientSmoothness = Parameters.getReal("extrapolatedGradientSmoothness");
+        if (Parameters.has("targetGradientFlag"))
+            this.targetGradientFlag = Parameters.getBoolean("targetGradientFlag");
+        if (Parameters.has("targetGradientSmoothness"))
+            this.targetGradientSmoothness = Parameters.getReal("targetGradientSmoothness");
         
         // Join Region
         if (Parameters.has("hasJoinSize"))
@@ -276,8 +276,8 @@ function PhotometricMosaicData() {
         this.taperLength = 100;
         
         // Gradient Correction (Target image)
-        this.extrapolatedGradientFlag = true;
-        this.extrapolatedGradientSmoothness = 2;
+        this.targetGradientFlag = true;
+        this.targetGradientSmoothness = 2;
         
         // Join Region
         this.hasJoinSize = true;
@@ -341,8 +341,8 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.taperLength_Control.setValue(this.taperLength);
         
         // Gradient Correction (Target image)
-        photometricMosaicDialog.extrapolatedGradientSmoothness_Control.setValue(this.extrapolatedGradientSmoothness);
-        photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
+        photometricMosaicDialog.targetGradientSmoothness_Control.setValue(this.targetGradientSmoothness);
+        photometricMosaicDialog.setTargetGradientFlag(this.targetGradientFlag);
         
         // Join Region
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
@@ -403,8 +403,8 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/taperLength", DataType_Int32, data.taperLength );
     
     // Gradient Correction (Target image)
-    Settings.write( KEYPREFIX+"/extrapolatedGradientFlag", DataType_Boolean, data.extrapolatedGradientFlag );
-    Settings.write( KEYPREFIX+"/extrapolatedGradientSmoothness", DataType_Float, data.extrapolatedGradientSmoothness );
+    Settings.write( KEYPREFIX+"/targetGradientFlag", DataType_Boolean, data.targetGradientFlag );
+    Settings.write( KEYPREFIX+"/targetGradientSmoothness", DataType_Float, data.targetGradientSmoothness );
     
     // Join Region
     Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
@@ -487,12 +487,12 @@ function restoreSettings(data){
         data.taperLength = keyValue;
     
     // Gradient Correction (Target image)
-    keyValue = Settings.read( KEYPREFIX+"/extrapolatedGradientFlag", DataType_Boolean );
+    keyValue = Settings.read( KEYPREFIX+"/targetGradientFlag", DataType_Boolean );
     if ( Settings.lastReadOK )
-        data.extrapolatedGradientFlag = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/extrapolatedGradientSmoothness", DataType_Float );
+        data.targetGradientFlag = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/targetGradientSmoothness", DataType_Float );
     if ( Settings.lastReadOK )
-        data.extrapolatedGradientSmoothness = keyValue;
+        data.targetGradientSmoothness = keyValue;
     
     // Join Region
     keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
@@ -1084,12 +1084,12 @@ function PhotometricMosaicDialog(data) {
     // ===============================================
     // SectionBar: "Gradient Correction (Target image)"
     // ===============================================
-    this.extrapolatedGradientSmoothness_Control = new NumericControl(this);
-    this.extrapolatedGradientSmoothness_Control.real = true;
-    this.extrapolatedGradientSmoothness_Control.setPrecision(1);
-    this.extrapolatedGradientSmoothness_Control.label.text = "Smoothness:";
-    this.extrapolatedGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.extrapolatedGradientSmoothness_Control.toolTip =
+    this.targetGradientSmoothness_Control = new NumericControl(this);
+    this.targetGradientSmoothness_Control.real = true;
+    this.targetGradientSmoothness_Control.setPrecision(1);
+    this.targetGradientSmoothness_Control.label.text = "Smoothness:";
+    this.targetGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.targetGradientSmoothness_Control.toolTip =
         "<p>The target image gradient correction is extrapolated from the gradient " +
         "along the target side edge of the Overlap bounding box.</p>" +
         "<p>However, this gradient will contain local variations " +
@@ -1100,17 +1100,17 @@ function PhotometricMosaicDialog(data) {
         "these local variations.</p>" +
         "<p>This control specifies the logarithm of the smoothness. " +
         "Larger values apply more smoothing.</p>";
-    this.extrapolatedGradientSmoothness_Control.onValueUpdated = function (value) {
-        data.extrapolatedGradientSmoothness = value;
+    this.targetGradientSmoothness_Control.onValueUpdated = function (value) {
+        data.targetGradientSmoothness = value;
     };
-    this.extrapolatedGradientSmoothness_Control.setRange(-1, 6);
-    this.extrapolatedGradientSmoothness_Control.slider.setRange(-100, 600);
-    this.extrapolatedGradientSmoothness_Control.slider.minWidth = 140;
-    this.extrapolatedGradientSmoothness_Control.setValue(data.extrapolatedGradientSmoothness);
+    this.targetGradientSmoothness_Control.setRange(-1, 6);
+    this.targetGradientSmoothness_Control.slider.setRange(-100, 600);
+    this.targetGradientSmoothness_Control.slider.minWidth = 140;
+    this.targetGradientSmoothness_Control.setValue(data.targetGradientSmoothness);
     
-    let extrapolatedGradientGraphButton = new PushButton();
-    extrapolatedGradientGraphButton.text = "Edit and display gradient";
-    extrapolatedGradientGraphButton.toolTip =
+    let targetGradientGraphButton = new PushButton();
+    targetGradientGraphButton.text = "Edit and display gradient";
+    targetGradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
@@ -1128,35 +1128,35 @@ function PhotometricMosaicDialog(data) {
         "<p>The graphs produced for color images use red, green and blue dots " +
         "and lines for each channel. The colors add together. " +
         "For example: red, green and blue add up to white.</p>";
-    extrapolatedGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH();
+    targetGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_TARGET_GRADIENT_GRAPH();
         this.dialog.ok();
     };
     
-    this.setExtrapolateGradientFlag = function (checked){
-        data.extrapolatedGradientFlag = checked;
-        self.extrapolatedGradientBar.checkBox.checked = checked;
-        self.extrapolatedGradientSmoothness_Control.enabled = checked;
-        extrapolatedGradientGraphButton.enabled = checked;
+    this.setTargetGradientFlag = function (checked){
+        data.targetGradientFlag = checked;
+        self.targetGradientBar.checkBox.checked = checked;
+        self.targetGradientSmoothness_Control.enabled = checked;
+        targetGradientGraphButton.enabled = checked;
     };
     
-    let extrapolatedGradientSection = new Control(this);
-    extrapolatedGradientSection.sizer = new HorizontalSizer;
-    extrapolatedGradientSection.sizer.spacing = 10;
-    extrapolatedGradientSection.sizer.add(this.extrapolatedGradientSmoothness_Control);
-    extrapolatedGradientSection.sizer.addSpacing(20);
-    extrapolatedGradientSection.sizer.add(extrapolatedGradientGraphButton);
-    this.extrapolatedGradientBar = new SectionBar(this, "Gradient Correction (Target image)");
-    this.extrapolatedGradientBar.setSection(extrapolatedGradientSection);
-    this.extrapolatedGradientBar.enableCheckBox();
-    this.extrapolatedGradientBar.toolTip = 
+    let targetGradientSection = new Control(this);
+    targetGradientSection.sizer = new HorizontalSizer;
+    targetGradientSection.sizer.spacing = 10;
+    targetGradientSection.sizer.add(this.targetGradientSmoothness_Control);
+    targetGradientSection.sizer.addSpacing(20);
+    targetGradientSection.sizer.add(targetGradientGraphButton);
+    this.targetGradientBar = new SectionBar(this, "Gradient Correction (Target image)");
+    this.targetGradientBar.setSection(targetGradientSection);
+    this.targetGradientBar.enableCheckBox();
+    this.targetGradientBar.toolTip = 
             "<p>If selected, an extrapolated gradient correction is applied " +
             "to the rest of the target image.</p>" +
             "<p>If not selected, only the average background offset is applied.</p>" +
             "<p>In most situations, this option should be selected.</p>";
-    this.extrapolatedGradientBar.checkBox.onClick = this.setExtrapolateGradientFlag;
-    this.extrapolatedGradientBar.onToggleSection = this.onToggleSection;
-    this.setExtrapolateGradientFlag(data.extrapolatedGradientFlag);
+    this.targetGradientBar.checkBox.onClick = this.setTargetGradientFlag;
+    this.targetGradientBar.onToggleSection = this.onToggleSection;
+    this.setTargetGradientFlag(data.targetGradientFlag);
     // SectionBar: "Propagated Gradient Correction" End
 
     // ===========================================
@@ -1544,8 +1544,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
     this.sizer.add(overlapGradientSection);
-    this.sizer.add(this.extrapolatedGradientBar);
-    this.sizer.add(extrapolatedGradientSection);
+    this.sizer.add(this.targetGradientBar);
+    this.sizer.add(targetGradientSection);
     this.sizer.add(this.joinSizeBar);
     this.sizer.add(joinSizeSection);
     this.sizer.add(this.joinAreaBar);
@@ -1687,7 +1687,7 @@ function main() {
             (new MessageBox("ERROR: Target and Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.extrapolatedGradientFlag && data.extrapolatedGradientSmoothness < data.overlapGradientSmoothness){
+        if (data.targetGradientFlag && data.targetGradientSmoothness < data.overlapGradientSmoothness){
             (new MessageBox("'Gradient Correction (Target image)' Smoothness must be less than or equal to 'Gradient Correction (Overlap Region)' Smoothness", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;

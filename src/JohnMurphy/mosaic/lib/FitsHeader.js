@@ -166,9 +166,9 @@ function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     if (includePropagate){
-        if (data.extrapolatedGradientFlag){
+        if (data.targetGradientFlag){
             keywords.push(new FITSKeyword("HISTORY", "", 
-                SCRIPT_NAME() + ".extrapolatedGradientSmoothness: " + data.extrapolatedGradientSmoothness));
+                SCRIPT_NAME() + ".targetGradientSmoothness: " + data.targetGradientSmoothness));
         }
     }
     if (includeGradient){
