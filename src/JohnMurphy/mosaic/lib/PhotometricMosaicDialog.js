@@ -102,7 +102,25 @@ function PhotometricMosaicData() {
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
         
+        // Gradient Sample Generation
+        Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
+        Parameters.set("sampleSize", this.sampleSize);
+        Parameters.set("sampleStarRadiusMult", this.sampleStarRadiusMult);
+        Parameters.set("maxSamples", this.maxSamples);
+        
+        // Gradient Correction (Overlap region)
+        Parameters.set("overlapGradientSmoothness", this.overlapGradientSmoothness);
+        Parameters.set("taperLength", this.taperLength);
+        
+        // Gradient Correction (Target image)
+        Parameters.set("extrapolatedGradientFlag", this.extrapolatedGradientFlag);
+        Parameters.set("extrapolatedGradientSmoothness", this.extrapolatedGradientSmoothness);
+        
         // Join Region
+        Parameters.set("hasJoinSize", this.hasJoinSize);
+        Parameters.set("joinSize", this.joinSize);
+        
+        // Join Region (Advanced settings)
         Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
         Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
         Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
@@ -110,24 +128,6 @@ function PhotometricMosaicData() {
         Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
         Parameters.set("taperFromJoin", this.taperFromJoin);
         Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
-        
-        // Join Size
-        Parameters.set("hasJoinSize", this.hasJoinSize);
-        Parameters.set("joinSize", this.joinSize);
-        
-        // Gradient Sample Generation
-        Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
-        Parameters.set("sampleStarRadiusMult", this.sampleStarRadiusMult);
-        Parameters.set("sampleSize", this.sampleSize);
-        Parameters.set("maxSamples", this.maxSamples);
-        
-        // Overlap Area Gradient
-        Parameters.set("overlapGradientSmoothness", this.overlapGradientSmoothness);
-        Parameters.set("taperLength", this.taperLength);
-        
-        // Extrapolated Gradient
-        Parameters.set("extrapolatedGradientFlag", this.extrapolatedGradientFlag);
-        Parameters.set("extrapolatedGradientSmoothness", this.extrapolatedGradientSmoothness);
         
         // Mosaic Star Mask
         Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
@@ -172,7 +172,35 @@ function PhotometricMosaicData() {
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         
+        // Gradient Sample Generation
+        if (Parameters.has("limitSampleStarsPercent"))
+            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
+        if (Parameters.has("sampleSize"))
+            this.sampleSize = Parameters.getInteger("sampleSize");
+        if (Parameters.has("sampleStarRadiusMult"))
+            this.sampleStarRadiusMult = Parameters.getReal("sampleStarRadiusMult");
+        if (Parameters.has("maxSamples"))
+            this.maxSamples = Parameters.getInteger("maxSamples");
+        
+        // Gradient Correction (Overlap region)
+        if (Parameters.has("overlapGradientSmoothness"))
+            this.overlapGradientSmoothness = Parameters.getReal("overlapGradientSmoothness");
+        if (Parameters.has("taperLength"))
+            this.taperLength = Parameters.getInteger("taperLength");
+        
+        // Gradient Correction (Target image)
+        if (Parameters.has("extrapolatedGradientFlag"))
+            this.extrapolatedGradientFlag = Parameters.getBoolean("extrapolatedGradientFlag");
+        if (Parameters.has("extrapolatedGradientSmoothness"))
+            this.extrapolatedGradientSmoothness = Parameters.getReal("extrapolatedGradientSmoothness");
+        
         // Join Region
+        if (Parameters.has("hasJoinSize"))
+            this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
+        if (Parameters.has("joinSize"))
+            this.joinSize = Parameters.getInteger("joinSize");
+        
+        // Join Region (Advanced settings)
         {
             let x = 0;
             let y = 0;
@@ -200,34 +228,6 @@ function PhotometricMosaicData() {
             if (Parameters.has("cropTargetToJoinRegionFlag"))
                 this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         }
-        
-        // Join Size
-        if (Parameters.has("hasJoinSize"))
-            this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
-        if (Parameters.has("joinSize"))
-            this.joinSize = Parameters.getInteger("joinSize");
-        
-        // Gradient Sample Generation
-        if (Parameters.has("limitSampleStarsPercent"))
-            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
-        if (Parameters.has("sampleStarRadiusMult"))
-            this.sampleStarRadiusMult = Parameters.getReal("sampleStarRadiusMult");
-        if (Parameters.has("sampleSize"))
-            this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("maxSamples"))
-            this.maxSamples = Parameters.getInteger("maxSamples");
-        
-        // Overlap Gradient Correction
-        if (Parameters.has("overlapGradientSmoothness"))
-            this.overlapGradientSmoothness = Parameters.getReal("overlapGradientSmoothness");
-        if (Parameters.has("taperLength"))
-            this.taperLength = Parameters.getInteger("taperLength");
-        
-        // Gradient Propagated Correction
-        if (Parameters.has("extrapolatedGradientFlag"))
-            this.extrapolatedGradientFlag = Parameters.getBoolean("extrapolatedGradientFlag");
-        if (Parameters.has("extrapolatedGradientSmoothness"))
-            this.extrapolatedGradientSmoothness = Parameters.getReal("extrapolatedGradientSmoothness");
         
         // Mosaic Star Mask
         if (Parameters.has("limitMaskStarsPercent"))
@@ -265,29 +265,29 @@ function PhotometricMosaicData() {
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
         
-        // Limit Gradient Sample Area
+        // Gradient Sample Generation
+        this.limitSampleStarsPercent = 10;
+        this.sampleSize = 15;
+        this.sampleStarRadiusMult = 5;
+        this.maxSamples = 3000;
+        
+        // Gradient Correction (Overlap region)
+        this.overlapGradientSmoothness = -1;
+        this.taperLength = 100;
+        
+        // Gradient Correction (Target image)
+        this.extrapolatedGradientFlag = true;
+        this.extrapolatedGradientSmoothness = 2;
+        
+        // Join Region
+        this.hasJoinSize = true;
+        this.joinSize = 20;
+        
+        // Join Region (Advanced settings)
         this.hasJoinAreaPreview = false;
         this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
         this.taperFromJoin = false;
         this.cropTargetToJoinRegionFlag = false;
-        
-        // Join Size
-        this.hasJoinSize = true;
-        this.joinSize = 20;
-        
-        // Gradient Sample Generation
-        this.limitSampleStarsPercent = 10;
-        this.sampleStarRadiusMult = 5;
-        this.sampleSize = 15;
-        this.maxSamples = 3000;
-        
-        // Gradient Tapered Correction
-        this.overlapGradientSmoothness = -1;
-        this.taperLength = 100;
-        
-        // Gradient Propagated Correction
-        this.extrapolatedGradientFlag = true;
-        this.extrapolatedGradientSmoothness = 2;
         
         // Mosaic Star Mask
         this.limitMaskStarsPercent = 10;
@@ -328,36 +328,36 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.rejectHigh_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
-        // Join Region
-        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
-        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
-        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
-        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
-        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
-        if (EXTRA_CONTROLS()){
-            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
-        }
-        
-        // Join Size
-        photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
-        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
-        
         // Gradient Sample Generation
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
-        photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(this.sampleStarRadiusMult);
         photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
+        photometricMosaicDialog.sampleStarRadiusMult_Control.setValue(this.sampleStarRadiusMult);
         if (EXTRA_CONTROLS()){
             photometricMosaicDialog.maxSamples_Control.setValue(this.maxSamples);
         }
         
-        // Gradient Tapered Correction
+        // Gradient Correction (Overlap region)
         photometricMosaicDialog.overlapGradientSmoothnessControl.setValue(this.overlapGradientSmoothness);
         photometricMosaicDialog.taperLength_Control.setValue(this.taperLength);
         
-        // Gradient Propagated Correction
+        // Gradient Correction (Target image)
         photometricMosaicDialog.extrapolatedGradientSmoothness_Control.setValue(this.extrapolatedGradientSmoothness);
         photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
+        
+        // Join Region
+        photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
+        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
+        
+        // Join Region (Advanced settings)
+        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
+        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
+        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
+        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
+        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
+        if (EXTRA_CONTROLS()){
+            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
+        }
+        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
         
         // Create Mosaic
         photometricMosaicDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
@@ -390,24 +390,24 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/linearRange", DataType_Float, data.linearRange );
     Settings.write( KEYPREFIX+"/outlierRemoval", DataType_Int32, data.outlierRemoval );
 
-    // Join Size
-    Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
-
     // Gradient Sample Generation
     Settings.write( KEYPREFIX+"/limitSampleStarsPercent", DataType_Int32, data.limitSampleStarsPercent );
-    Settings.write( KEYPREFIX+"/sampleStarRadiusMult", DataType_Float, data.sampleStarRadiusMult );
     Settings.write( KEYPREFIX+"/sampleSize", DataType_Int32, data.sampleSize );
+    Settings.write( KEYPREFIX+"/sampleStarRadiusMult", DataType_Float, data.sampleStarRadiusMult );
     if (EXTRA_CONTROLS()){
         Settings.write( KEYPREFIX+"/maxSamples", DataType_Int32, data.maxSamples );
     }
    
-    // Overlap Gradient Correction
+    // Gradient Correction (Overlap region)
     Settings.write( KEYPREFIX+"/overlapGradientSmoothness", DataType_Float, data.overlapGradientSmoothness );
     Settings.write( KEYPREFIX+"/taperLength", DataType_Int32, data.taperLength );
     
-    // Gradient Propagated Correction
+    // Gradient Correction (Target image)
     Settings.write( KEYPREFIX+"/extrapolatedGradientFlag", DataType_Boolean, data.extrapolatedGradientFlag );
     Settings.write( KEYPREFIX+"/extrapolatedGradientSmoothness", DataType_Float, data.extrapolatedGradientSmoothness );
+    
+    // Join Region
+    Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
     
     // Mosaic Star Mask
     Settings.write( KEYPREFIX+"/limitMaskStarsPercent", DataType_Int32, data.limitMaskStarsPercent );
@@ -462,28 +462,23 @@ function restoreSettings(data){
     if ( Settings.lastReadOK )
         data.outlierRemoval = keyValue;
     
-    // Join Size
-    keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
-    if ( Settings.lastReadOK )
-        data.joinSize = keyValue;
-    
     // Gradient Sample Generation
     keyValue = Settings.read( KEYPREFIX+"/limitSampleStarsPercent", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.limitSampleStarsPercent = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/sampleStarRadiusMult", DataType_Float );
-    if ( Settings.lastReadOK )
-        data.sampleStarRadiusMult = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/sampleSize", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.sampleSize = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/sampleStarRadiusMult", DataType_Float );
+    if ( Settings.lastReadOK )
+        data.sampleStarRadiusMult = keyValue;
     if (EXTRA_CONTROLS()){
         keyValue = Settings.read( KEYPREFIX+"/maxSamples", DataType_Int32 );
         if ( Settings.lastReadOK )
             data.maxSamples = keyValue;
     }
     
-    // Overlap Gradient Correction
+    // Gradient Correction (Overlap region)
     keyValue = Settings.read( KEYPREFIX+"/overlapGradientSmoothness", DataType_Float );
     if ( Settings.lastReadOK )
         data.overlapGradientSmoothness = keyValue;
@@ -491,13 +486,18 @@ function restoreSettings(data){
     if ( Settings.lastReadOK )
         data.taperLength = keyValue;
     
-    // Gradient Propagated Correction
+    // Gradient Correction (Target image)
     keyValue = Settings.read( KEYPREFIX+"/extrapolatedGradientFlag", DataType_Boolean );
     if ( Settings.lastReadOK )
         data.extrapolatedGradientFlag = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/extrapolatedGradientSmoothness", DataType_Float );
     if ( Settings.lastReadOK )
         data.extrapolatedGradientSmoothness = keyValue;
+    
+    // Join Region
+    keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.joinSize = keyValue;
     
     // Mosaic Star Mask
     keyValue = Settings.read( KEYPREFIX+"/limitMaskStarsPercent", DataType_Int32 );
@@ -836,8 +836,332 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Photometric Scale" End
 
     // =======================================
-    // SectionBar: "Join Region (from preview)"
+    // SectionBar: "Gradient Sample Generation"
     // =======================================
+    const sampleGenerationStrLen = this.font.width("Multiply star radius:");
+    
+    this.limitSampleStarsPercent_Control = new NumericEdit();
+    this.limitSampleStarsPercent_Control.real = true;
+    this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
+    this.limitSampleStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.limitSampleStarsPercent_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
+            "<p>0% implies that no samples are rejected due to stars. This is " +
+            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>100% implies that all detected stars are used to reject samples.</p>" +
+            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
+            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
+            "<li>Bright stars can have significantly different profiles between " +
+            "the reference and target images. This can affect how many of the " +
+            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "<p>It is only necessary to reject bright stars. This script uses the " +
+            "median value from each sample, so any star that takes up less than " +
+            "half the sample area will have little effect. It is more important to " +
+            "include most of the samples than to reject faint stars.</p>";
+    this.limitSampleStarsPercent_Control.setPrecision(2);
+    this.limitSampleStarsPercent_Control.setRange(0, 100);
+    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);        
+    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
+    };
+    
+    this.sampleStarRadiusMult_Control = new NumericEdit();
+    this.sampleStarRadiusMult_Control.real = true;
+    this.sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
+    this.sampleStarRadiusMult_Control.toolTip =
+            "<p>Increase to reject more samples around saturated stars.</p>" +
+            "<p>Read the Help sections on 'Join Region' to learn when these " +
+            "samples should be rejected.</p>";
+    this.sampleStarRadiusMult_Control.setPrecision(1);
+    this.sampleStarRadiusMult_Control.setRange(1, 25);
+    this.sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);     
+    this.sampleStarRadiusMult_Control.onValueUpdated = function (value){
+        data.sampleStarRadiusMult = value;
+    };
+    
+    this.sampleSize_Control = new NumericEdit();
+    this.sampleSize_Control.real = false;
+    this.sampleSize_Control.label.text = "Sample size:";
+    this.sampleSize_Control.label.minWidth = LINEAR_RANGE_STRLEN;
+    this.sampleSize_Control.toolTip =
+            "<p>Specifies the size of the sample squares.</p>" +
+            "<p>The sample size should be greater than 2x the size of the largest " +
+            "star that's not rejected by 'Limit stars %'.</p>";
+    this.sampleSize_Control.setRange(2, 50);
+    this.sampleSize_Control.setValue(data.sampleSize);
+    this.sampleSize_Control.onValueUpdated = function (value) {
+        data.sampleSize = value;
+    };
+    
+    let displaySamplesButton = new PushButton();
+    displaySamplesButton.text = "Edit and display samples";
+    displaySamplesButton.toolTip =
+            "<p>Edit parameters and view the grid of samples in real time.</p>" +
+            "<p>A surface spline is constructed from these samples to " +
+            "model the relative gradient between the reference and target images.</p>" +
+            "<p>Samples are rejected if they: " +
+            "<ul><li>Contain one or more zero pixels in either image.</li>" +
+            "<li>Are too close to a star included in the 'Limit stars %' list.</li></ul>" +
+            "The surviving samples are drawn as squares. The stars used to " +
+            "reject samples are indicated by circles.</p>";
+    displaySamplesButton.onClick = function () {
+        data.viewFlag = DISPLAY_GRADIENT_SAMPLES();
+        this.dialog.ok();
+    };
+    
+    let sampleGridSizer = new HorizontalSizer;
+    sampleGridSizer.spacing = 10;
+    sampleGridSizer.add(this.limitSampleStarsPercent_Control);
+    sampleGridSizer.add(this.sampleSize_Control);
+    sampleGridSizer.add(this.sampleStarRadiusMult_Control);
+    sampleGridSizer.addStretch();
+    sampleGridSizer.add(displaySamplesButton);
+    
+    let maxSamplesSizer;
+    if (EXTRA_CONTROLS()){
+        this.maxSamples_Control = new NumericEdit();
+        this.maxSamples_Control.real = false;
+        this.maxSamples_Control.label.text = "Max samples:";
+        this.maxSamples_Control.label.minWidth = this.font.width("Limit stars %:");
+        this.maxSamples_Control.toolTip =
+            "<p>Limits the number of samples used to create the surface spline. " +
+            "If the number of samples exceed this limit, they are combined " +
+            "(binned) to create super samples.</p>" +
+            "<p>Increase if the overlap region is very large. " +
+            "A larger number of samples increases the " +
+            "theoretical maximum resolution of the surface spline. However, " +
+            "small unbinned samples are noisier and require more smoothing. " +
+            "The default value is usually a good compromise.</p>" +
+            "<p>The time required to initialize the surface spline approximately " +
+            "doubles every 1300 samples.</p>";
+        this.maxSamples_Control.setRange(2000, 5000);
+        this.maxSamples_Control.setValue(data.maxSamples);
+        this.maxSamples_Control.enabled = false;
+
+        let displayBinnedSamplesButton = new PushButton();
+        displayBinnedSamplesButton.text = "Binned grid ";
+        displayBinnedSamplesButton.toolTip =
+                "<p>Displays the binned samples used to construct the surface spline " +
+                "that models the relative gradient between the reference and target images.</p>" +
+                "<p>Samples are binned to improve performance if the number of " +
+                "samples exceeds the specified limit.</p>" +
+                "<p>The area of each binned sample represents the number of samples " +
+                "it was created from.</p>" +
+                "<p>Each binned sample's center is calculated from " +
+                "the center of mass of the samples it was created from.</p>" +
+                "<p>To see which of the unbinned samples were rejected due to stars, " +
+                "use 'Sample grid'.</p>";
+        displayBinnedSamplesButton.onClick = function () {
+            data.viewFlag = DISPLAY_BINNED_SAMPLES();
+            this.dialog.ok();
+        };
+
+        maxSamplesSizer = new HorizontalSizer;
+        maxSamplesSizer.spacing = 4;
+        maxSamplesSizer.add(this.maxSamples_Control);
+        maxSamplesSizer.addStretch();
+        maxSamplesSizer.add(displayBinnedSamplesButton);
+    }
+    
+    let sampleGenerationSection = new Control(this);
+    sampleGenerationSection.sizer = new VerticalSizer;
+    sampleGenerationSection.sizer.spacing = 4;
+    sampleGenerationSection.sizer.add(sampleGridSizer);
+    if (EXTRA_CONTROLS()){
+        sampleGenerationSection.sizer.add(maxSamplesSizer);
+    }
+    let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
+    sampleGenerationBar.setSection(sampleGenerationSection);
+    sampleGenerationBar.onToggleSection = this.onToggleSection;
+    sampleGenerationBar.toolTip = 
+            "<p>This section generates samples used to construct a surface spline " +
+            "that models the relative gradient between the reference and target pixels " +
+            "within the overlap region.</p>" +
+            "<p>The overlap region is divided up into a grid of sample squares. " +
+            "A sample's value is the median of the pixels it contains.</p>" +
+            "<p>Samples are rejected if they contain one or more zero pixels in " +
+            "either image or if they are too close to a bright star.</p>" +
+            "<p>The surface spline resolution will depend on the sample size, " +
+            "how noisy each sample is, and how much smoothing is applied.</p>";
+    // SectionBar: "Gradient Sample Generation" End
+
+    // ==================================================
+    // SectionBar: "Gradient Correction (Overlap region)"
+    // ==================================================
+    // Gradient controls
+    this.overlapGradientSmoothnessControl = new NumericControl(this);
+    this.overlapGradientSmoothnessControl.real = true;
+    this.overlapGradientSmoothnessControl.setPrecision(1);
+    this.overlapGradientSmoothnessControl.label.text = "Smoothness:";
+    this.overlapGradientSmoothnessControl.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.overlapGradientSmoothnessControl.toolTip =
+        "<p>A surface spline is created to model the relative " +
+        "gradient over the whole of the overlap region.</p>" +
+        "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
+        "the gradient but not the noise.</p>" +
+        "<p>This control specifies the logarithm of the smoothness. " +
+        "Larger values apply more smoothing.</p>";
+    this.overlapGradientSmoothnessControl.onValueUpdated = function (value) {
+        data.overlapGradientSmoothness = value;
+    };
+    this.overlapGradientSmoothnessControl.setRange(-4, 3);
+    this.overlapGradientSmoothnessControl.slider.setRange(-400, 300);
+    this.overlapGradientSmoothnessControl.slider.minWidth = 140;
+    this.overlapGradientSmoothnessControl.setValue(data.overlapGradientSmoothness);
+    
+    let overlapGradientGraphButton = new PushButton();
+    overlapGradientGraphButton.text = "Edit and display gradient";
+    overlapGradientGraphButton.toolTip =
+        "<p>The vertical axis represents the difference between the two images, " +
+        "the horizontal axis the join's X-Coordinate (horizontal join) " +
+        "or Y-Coordinate (vertical join).</p>" +
+        "<p>The plotted dots represent the difference between each paired target and " +
+        "reference sample within the whole of the overlap region. " +
+        "These points are typically scattered vertically. This is partly due to gradients " +
+        "perpendicular to the join, and partly due to noise.<\p>" +
+        "<p>The bold curve(s) shows the gradient along the primary join path(s):" +
+        "<ul><li>Overlay mode: The primary join is at the transition between the " +
+        "reference and target images. Its path is along the center of the Join Region.</li>" +
+        "<li>Random or Average mode: The first primary join is at the transition " +
+        "between the reference image and the reference side of the Join Region. " +
+        "The second is at the transition between the target side of the Join Region " +
+        "and the target image. (The Random or Average algorithm is applied within " +
+        "the Join Region).</li></ul>" +
+        "(if a Join Region has not been defined, it defaults to the overlap bounding box).</p>" +
+        "<p>The thinner darker line is the gradient correction along the path of the " +
+        "secondary join. This path is the target side of the overlap region's bounding box, " +
+        "or if 'Taper from join' is selected, the target side of the 'Join Region'.</p>" +
+        "<p>The graphs produced for color images use red, green and blue dots " +
+        "and lines for each channel. The colors add together. " +
+        "For example: red, green and blue add up to white.</p>";
+    overlapGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_OVERLAP_GRADIENT_GRAPH();
+        this.dialog.ok();
+    };
+    
+    let taperTooltip = "<p>The gradient within the overlap region can be accurately " +
+        "calculated, and only requires a small amount of smoothing to remove noise.</p>" +
+        "<p>The gradient over the rest of the target frame is only an estimate, so " +
+        "it is normal to apply a greater level of smoothing to this region " +
+        "(see 'Gradient Correction (Target image)' section).</p>" +
+        "<p>The taper length provides a tapered transition between these two different " +
+        "levels of smoothing. This transition zone is in the Target image area, " +
+        "starting from the edge of the overlap's bounding box.</p>";
+    
+    this.taperLength_Control = new NumericControl(this);
+    this.taperLength_Control.real = false;
+    this.taperLength_Control.label.text = "Taper length:";
+    this.taperLength_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.taperLength_Control.toolTip = taperTooltip;
+    this.taperLength_Control.onValueUpdated = function (value) {
+        data.taperLength = value;
+    };
+    this.taperLength_Control.setRange(0, 500);
+    this.taperLength_Control.slider.setRange(0, 500);
+    this.taperLength_Control.slider.minWidth = 500;
+    this.taperLength_Control.setValue(data.taperLength);
+    
+    let overlapGradientSizer = new HorizontalSizer;
+    overlapGradientSizer.spacing = 4;
+    overlapGradientSizer.add(this.overlapGradientSmoothnessControl);
+    overlapGradientSizer.addSpacing(20);
+    overlapGradientSizer.add(overlapGradientGraphButton);
+    
+    let overlapGradientSection = new Control(this);
+    overlapGradientSection.sizer = new VerticalSizer;
+    overlapGradientSection.sizer.spacing = 4;
+    overlapGradientSection.sizer.add(overlapGradientSizer);
+    overlapGradientSection.sizer.add(this.taperLength_Control);
+    let gradientBar = new SectionBar(this, "Gradient Correction (Overlap region)");
+    gradientBar.setSection(overlapGradientSection);
+    gradientBar.onToggleSection = this.onToggleSection;
+    gradientBar.toolTip = "<p>A surface spline is created to model the relative " +
+            "gradient over the whole of the overlap region.</p>" +
+            "<p>Smoothing is applied to this surface spline to ensure it follows " +
+            "the gradient but not the noise.</p>";
+    //SectionBar: "Gradient Correction" End
+    
+    // ===============================================
+    // SectionBar: "Gradient Correction (Target image)"
+    // ===============================================
+    this.extrapolatedGradientSmoothness_Control = new NumericControl(this);
+    this.extrapolatedGradientSmoothness_Control.real = true;
+    this.extrapolatedGradientSmoothness_Control.setPrecision(1);
+    this.extrapolatedGradientSmoothness_Control.label.text = "Smoothness:";
+    this.extrapolatedGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.extrapolatedGradientSmoothness_Control.toolTip =
+        "<p>The target image gradient correction is extrapolated from the gradient " +
+        "along the target side edge of the Overlap bounding box.</p>" +
+        "<p>However, this gradient will contain local variations " +
+        "(e.g. diffuse light around bright stars) that should not " +
+        "be extrapolated across the target image.</p>" +
+        "<p>Sufficient Smoothness should be applied to ensure that the " +
+        "gradient correction only follows the gradient trend, rather than " +
+        "these local variations.</p>" +
+        "<p>This control specifies the logarithm of the smoothness. " +
+        "Larger values apply more smoothing.</p>";
+    this.extrapolatedGradientSmoothness_Control.onValueUpdated = function (value) {
+        data.extrapolatedGradientSmoothness = value;
+    };
+    this.extrapolatedGradientSmoothness_Control.setRange(-1, 6);
+    this.extrapolatedGradientSmoothness_Control.slider.setRange(-100, 600);
+    this.extrapolatedGradientSmoothness_Control.slider.minWidth = 140;
+    this.extrapolatedGradientSmoothness_Control.setValue(data.extrapolatedGradientSmoothness);
+    
+    let extrapolatedGradientGraphButton = new PushButton();
+    extrapolatedGradientGraphButton.text = "Edit and display gradient";
+    extrapolatedGradientGraphButton.toolTip =
+        "<p>The vertical axis represents the difference between the two images, " +
+        "the horizontal axis the join's X-Coordinate (horizontal join) " +
+        "or Y-Coordinate (vertical join).</p>" +
+        "<p>The plotted dots represent the difference between each paired target and " +
+        "reference sample within the whole of the overlap region. " +
+        "These points are typically scattered vertically. This is partly due to gradients " +
+        "perpendicular to the join, and partly due to noise.<\p>" +
+        "<p>The curve is the gradient correction along the path of the " +
+        "secondary join. " +
+        "This path is the target side of the overlap region's bounding box " +
+        "or, if 'Taper from join' is selected, the target side of the 'Join Region'. " +
+        "This gradient will be applied to the rest of the target image.</p>" +
+        "<p>If there is a gradient perpendicular to the join, the curve will " +
+        "tend to follow the top or bottom envelope of the plotted points.</p>" +
+        "<p>The graphs produced for color images use red, green and blue dots " +
+        "and lines for each channel. The colors add together. " +
+        "For example: red, green and blue add up to white.</p>";
+    extrapolatedGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH();
+        this.dialog.ok();
+    };
+    
+    this.setExtrapolateGradientFlag = function (checked){
+        data.extrapolatedGradientFlag = checked;
+        self.extrapolatedGradientBar.checkBox.checked = checked;
+        self.extrapolatedGradientSmoothness_Control.enabled = checked;
+        extrapolatedGradientGraphButton.enabled = checked;
+    };
+    
+    let extrapolatedGradientSection = new Control(this);
+    extrapolatedGradientSection.sizer = new HorizontalSizer;
+    extrapolatedGradientSection.sizer.spacing = 10;
+    extrapolatedGradientSection.sizer.add(this.extrapolatedGradientSmoothness_Control);
+    extrapolatedGradientSection.sizer.addSpacing(20);
+    extrapolatedGradientSection.sizer.add(extrapolatedGradientGraphButton);
+    this.extrapolatedGradientBar = new SectionBar(this, "Gradient Correction (Target image)");
+    this.extrapolatedGradientBar.setSection(extrapolatedGradientSection);
+    this.extrapolatedGradientBar.enableCheckBox();
+    this.extrapolatedGradientBar.toolTip = 
+            "<p>If selected, an extrapolated gradient correction is applied " +
+            "to the rest of the target image.</p>" +
+            "<p>If not selected, only the average background offset is applied.</p>" +
+            "<p>In most situations, this option should be selected.</p>";
+    this.extrapolatedGradientBar.checkBox.onClick = this.setExtrapolateGradientFlag;
+    this.extrapolatedGradientBar.onToggleSection = this.onToggleSection;
+    this.setExtrapolateGradientFlag(data.extrapolatedGradientFlag);
+    // SectionBar: "Propagated Gradient Correction" End
+
+    // ===========================================
+    // SectionBar: Join Region (Advanced settings)
+    // ============================================
     const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
     const JoinRegionTooltip =
@@ -1023,7 +1347,7 @@ function PhotometricMosaicDialog(data) {
     // SectionBar "Join Region" End
 
     // =======================================
-    // SectionBar: "Join Region (from size)"
+    // SectionBar: "Join Region"
     // =======================================
     let joinSizeTooltip = 
         "<p>Limits the Join Region to a long thin rectangle that is centered within the overlap region.</p>" +
@@ -1077,329 +1401,6 @@ function PhotometricMosaicDialog(data) {
     this.setHasJoinAreaPreview(data.hasJoinAreaPreview); 
     // SectionBar "Join Region" End
 
-    // =======================================
-    // SectionBar: "Gradient Sample Generation"
-    // =======================================
-    const sampleGenerationStrLen = this.font.width("Multiply star radius:");
-    
-    this.limitSampleStarsPercent_Control = new NumericEdit();
-    this.limitSampleStarsPercent_Control.real = true;
-    this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitSampleStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.limitSampleStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
-            "<p>100% implies that all detected stars are used to reject samples.</p>" +
-            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
-            "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can affect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is only necessary to reject bright stars. This script uses the " +
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. It is more important to " +
-            "include most of the samples than to reject faint stars.</p>";
-    this.limitSampleStarsPercent_Control.setPrecision(2);
-    this.limitSampleStarsPercent_Control.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);        
-    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-        data.limitSampleStarsPercent = value;
-    };
-    
-    this.sampleStarRadiusMult_Control = new NumericEdit();
-    this.sampleStarRadiusMult_Control.real = true;
-    this.sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
-    this.sampleStarRadiusMult_Control.toolTip =
-            "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Read the Help sections on 'Join Region' to learn when these " +
-            "samples should be rejected.</p>";
-    this.sampleStarRadiusMult_Control.setPrecision(1);
-    this.sampleStarRadiusMult_Control.setRange(1, 25);
-    this.sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);     
-    this.sampleStarRadiusMult_Control.onValueUpdated = function (value){
-        data.sampleStarRadiusMult = value;
-    };
-    
-    this.sampleSize_Control = new NumericEdit();
-    this.sampleSize_Control.real = false;
-    this.sampleSize_Control.label.text = "Sample size:";
-    this.sampleSize_Control.label.minWidth = LINEAR_RANGE_STRLEN;
-    this.sampleSize_Control.toolTip =
-            "<p>Specifies the size of the sample squares.</p>" +
-            "<p>The sample size should be greater than 2x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>";
-    this.sampleSize_Control.setRange(2, 50);
-    this.sampleSize_Control.setValue(data.sampleSize);
-    this.sampleSize_Control.onValueUpdated = function (value) {
-        data.sampleSize = value;
-    };
-    
-    let displaySamplesButton = new PushButton();
-    displaySamplesButton.text = "Edit and display samples";
-    displaySamplesButton.toolTip =
-            "<p>Edit parameters and view the grid of samples in real time.</p>" +
-            "<p>A surface spline is constructed from these samples to " +
-            "model the relative gradient between the reference and target images.</p>" +
-            "<p>Samples are rejected if they: " +
-            "<ul><li>Contain one or more zero pixels in either image.</li>" +
-            "<li>Are too close to a star included in the 'Limit stars %' list.</li></ul>" +
-            "The surviving samples are drawn as squares. The stars used to " +
-            "reject samples are indicated by circles.</p>";
-    displaySamplesButton.onClick = function () {
-        data.viewFlag = DISPLAY_GRADIENT_SAMPLES();
-        this.dialog.ok();
-    };
-    
-    let sampleGridSizer = new HorizontalSizer;
-    sampleGridSizer.spacing = 10;
-    sampleGridSizer.add(this.limitSampleStarsPercent_Control);
-    sampleGridSizer.add(this.sampleSize_Control);
-    sampleGridSizer.add(this.sampleStarRadiusMult_Control);
-    sampleGridSizer.addStretch();
-    sampleGridSizer.add(displaySamplesButton);
-    
-    let maxSamplesSizer;
-    if (EXTRA_CONTROLS()){
-        this.maxSamples_Control = new NumericEdit();
-        this.maxSamples_Control.real = false;
-        this.maxSamples_Control.label.text = "Max samples:";
-        this.maxSamples_Control.label.minWidth = this.font.width("Limit stars %:");
-        this.maxSamples_Control.toolTip =
-            "<p>Limits the number of samples used to create the surface spline. " +
-            "If the number of samples exceed this limit, they are combined " +
-            "(binned) to create super samples.</p>" +
-            "<p>Increase if the overlap region is very large. " +
-            "A larger number of samples increases the " +
-            "theoretical maximum resolution of the surface spline. However, " +
-            "small unbinned samples are noisier and require more smoothing. " +
-            "The default value is usually a good compromise.</p>" +
-            "<p>The time required to initialize the surface spline approximately " +
-            "doubles every 1300 samples.</p>";
-        this.maxSamples_Control.setRange(2000, 5000);
-        this.maxSamples_Control.setValue(data.maxSamples);
-        this.maxSamples_Control.enabled = false;
-
-        let displayBinnedSamplesButton = new PushButton();
-        displayBinnedSamplesButton.text = "Binned grid ";
-        displayBinnedSamplesButton.toolTip =
-                "<p>Displays the binned samples used to construct the surface spline " +
-                "that models the relative gradient between the reference and target images.</p>" +
-                "<p>Samples are binned to improve performance if the number of " +
-                "samples exceeds the specified limit.</p>" +
-                "<p>The area of each binned sample represents the number of samples " +
-                "it was created from.</p>" +
-                "<p>Each binned sample's center is calculated from " +
-                "the center of mass of the samples it was created from.</p>" +
-                "<p>To see which of the unbinned samples were rejected due to stars, " +
-                "use 'Sample grid'.</p>";
-        displayBinnedSamplesButton.onClick = function () {
-            data.viewFlag = DISPLAY_BINNED_SAMPLES();
-            this.dialog.ok();
-        };
-
-        maxSamplesSizer = new HorizontalSizer;
-        maxSamplesSizer.spacing = 4;
-        maxSamplesSizer.add(this.maxSamples_Control);
-        maxSamplesSizer.addStretch();
-        maxSamplesSizer.add(displayBinnedSamplesButton);
-    }
-    
-    let sampleGenerationSection = new Control(this);
-    sampleGenerationSection.sizer = new VerticalSizer;
-    sampleGenerationSection.sizer.spacing = 4;
-    sampleGenerationSection.sizer.add(sampleGridSizer);
-    if (EXTRA_CONTROLS()){
-        sampleGenerationSection.sizer.add(maxSamplesSizer);
-    }
-    let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
-    sampleGenerationBar.setSection(sampleGenerationSection);
-    sampleGenerationBar.onToggleSection = this.onToggleSection;
-    sampleGenerationBar.toolTip = 
-            "<p>This section generates samples used to construct a surface spline " +
-            "that models the relative gradient between the reference and target pixels " +
-            "within the overlap region.</p>" +
-            "<p>The overlap region is divided up into a grid of sample squares. " +
-            "A sample's value is the median of the pixels it contains.</p>" +
-            "<p>Samples are rejected if they contain one or more zero pixels in " +
-            "either image or if they are too close to a bright star.</p>" +
-            "<p>The surface spline resolution will depend on the sample size, " +
-            "how noisy each sample is, and how much smoothing is applied.</p>";
-    // SectionBar: "Gradient Sample Generation" End
-    
-    // ==================================================
-    // SectionBar: "Gradient Correction (Overlap region)"
-    // ==================================================
-    // Gradient controls
-    this.overlapGradientSmoothnessControl = new NumericControl(this);
-    this.overlapGradientSmoothnessControl.real = true;
-    this.overlapGradientSmoothnessControl.setPrecision(1);
-    this.overlapGradientSmoothnessControl.label.text = "Smoothness:";
-    this.overlapGradientSmoothnessControl.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.overlapGradientSmoothnessControl.toolTip =
-        "<p>A surface spline is created to model the relative " +
-        "gradient over the whole of the overlap region.</p>" +
-        "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
-        "the gradient but not the noise.</p>" +
-        "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>";
-    this.overlapGradientSmoothnessControl.onValueUpdated = function (value) {
-        data.overlapGradientSmoothness = value;
-    };
-    this.overlapGradientSmoothnessControl.setRange(-4, 3);
-    this.overlapGradientSmoothnessControl.slider.setRange(-400, 300);
-    this.overlapGradientSmoothnessControl.slider.minWidth = 140;
-    this.overlapGradientSmoothnessControl.setValue(data.overlapGradientSmoothness);
-    
-    let overlapGradientGraphButton = new PushButton();
-    overlapGradientGraphButton.text = "Edit and display gradient";
-    overlapGradientGraphButton.toolTip =
-        "<p>The vertical axis represents the difference between the two images, " +
-        "the horizontal axis the join's X-Coordinate (horizontal join) " +
-        "or Y-Coordinate (vertical join).</p>" +
-        "<p>The plotted dots represent the difference between each paired target and " +
-        "reference sample within the whole of the overlap region. " +
-        "These points are typically scattered vertically. This is partly due to gradients " +
-        "perpendicular to the join, and partly due to noise.<\p>" +
-        "<p>The bold curve(s) shows the gradient along the primary join path(s):" +
-        "<ul><li>Overlay mode: The primary join is at the transition between the " +
-        "reference and target images. Its path is along the center of the Join Region.</li>" +
-        "<li>Random or Average mode: The first primary join is at the transition " +
-        "between the reference image and the reference side of the Join Region. " +
-        "The second is at the transition between the target side of the Join Region " +
-        "and the target image. (The Random or Average algorithm is applied within " +
-        "the Join Region).</li></ul>" +
-        "(if a Join Region has not been defined, it defaults to the overlap bounding box).</p>" +
-        "<p>The thinner darker line is the gradient correction along the path of the " +
-        "secondary join. This path is the target side of the overlap region's bounding box, " +
-        "or if 'Taper from join' is selected, the target side of the 'Join Region'.</p>" +
-        "<p>The graphs produced for color images use red, green and blue dots " +
-        "and lines for each channel. The colors add together. " +
-        "For example: red, green and blue add up to white.</p>";
-    overlapGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_OVERLAP_GRADIENT_GRAPH();
-        this.dialog.ok();
-    };
-    
-    let taperTooltip = "<p>The gradient within the overlap region can be accurately " +
-        "calculated, and only requires a small amount of smoothing to remove noise.</p>" +
-        "<p>The gradient over the rest of the target frame is only an estimate, so " +
-        "it is normal to apply a greater level of smoothing to this region " +
-        "(see 'Gradient Correction (Target image)' section).</p>" +
-        "<p>The taper length provides a tapered transition between these two different " +
-        "levels of smoothing. This transition zone is in the Target image area, " +
-        "starting from the edge of the overlap's bounding box.</p>";
-    
-    this.taperLength_Control = new NumericControl(this);
-    this.taperLength_Control.real = false;
-    this.taperLength_Control.label.text = "Taper length:";
-    this.taperLength_Control.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.taperLength_Control.toolTip = taperTooltip;
-    this.taperLength_Control.onValueUpdated = function (value) {
-        data.taperLength = value;
-    };
-    this.taperLength_Control.setRange(0, 500);
-    this.taperLength_Control.slider.setRange(0, 500);
-    this.taperLength_Control.slider.minWidth = 500;
-    this.taperLength_Control.setValue(data.taperLength);
-    
-    let overlapGradientSizer = new HorizontalSizer;
-    overlapGradientSizer.spacing = 4;
-    overlapGradientSizer.add(this.overlapGradientSmoothnessControl);
-    overlapGradientSizer.addSpacing(20);
-    overlapGradientSizer.add(overlapGradientGraphButton);
-    
-    let overlapGradientSection = new Control(this);
-    overlapGradientSection.sizer = new VerticalSizer;
-    overlapGradientSection.sizer.spacing = 4;
-    overlapGradientSection.sizer.add(overlapGradientSizer);
-    overlapGradientSection.sizer.add(this.taperLength_Control);
-    let gradientBar = new SectionBar(this, "Gradient Correction (Overlap region)");
-    gradientBar.setSection(overlapGradientSection);
-    gradientBar.onToggleSection = this.onToggleSection;
-    gradientBar.toolTip = "<p>A surface spline is created to model the relative " +
-            "gradient over the whole of the overlap region.</p>" +
-            "<p>Smoothing is applied to this surface spline to ensure it follows " +
-            "the gradient but not the noise.</p>";
-    //SectionBar: "Gradient Correction" End
-    
-    // ===============================================
-    // SectionBar: "Gradient Correction (Target image)"
-    // ===============================================
-    this.extrapolatedGradientSmoothness_Control = new NumericControl(this);
-    this.extrapolatedGradientSmoothness_Control.real = true;
-    this.extrapolatedGradientSmoothness_Control.setPrecision(1);
-    this.extrapolatedGradientSmoothness_Control.label.text = "Smoothness:";
-    this.extrapolatedGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
-    this.extrapolatedGradientSmoothness_Control.toolTip =
-        "<p>The target image gradient correction is extrapolated from the gradient " +
-        "along the target side edge of the Overlap bounding box.</p>" +
-        "<p>However, this gradient will contain local variations " +
-        "(e.g. diffuse light around bright stars) that should not " +
-        "be extrapolated across the target image.</p>" +
-        "<p>Sufficient Smoothness should be applied to ensure that the " +
-        "gradient correction only follows the gradient trend, rather than " +
-        "these local variations.</p>" +
-        "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>";
-    this.extrapolatedGradientSmoothness_Control.onValueUpdated = function (value) {
-        data.extrapolatedGradientSmoothness = value;
-    };
-    this.extrapolatedGradientSmoothness_Control.setRange(-1, 6);
-    this.extrapolatedGradientSmoothness_Control.slider.setRange(-100, 600);
-    this.extrapolatedGradientSmoothness_Control.slider.minWidth = 140;
-    this.extrapolatedGradientSmoothness_Control.setValue(data.extrapolatedGradientSmoothness);
-    
-    let extrapolatedGradientGraphButton = new PushButton();
-    extrapolatedGradientGraphButton.text = "Edit and display gradient";
-    extrapolatedGradientGraphButton.toolTip =
-        "<p>The vertical axis represents the difference between the two images, " +
-        "the horizontal axis the join's X-Coordinate (horizontal join) " +
-        "or Y-Coordinate (vertical join).</p>" +
-        "<p>The plotted dots represent the difference between each paired target and " +
-        "reference sample within the whole of the overlap region. " +
-        "These points are typically scattered vertically. This is partly due to gradients " +
-        "perpendicular to the join, and partly due to noise.<\p>" +
-        "<p>The curve is the gradient correction along the path of the " +
-        "secondary join. " +
-        "This path is the target side of the overlap region's bounding box " +
-        "or, if 'Taper from join' is selected, the target side of the 'Join Region'. " +
-        "This gradient will be applied to the rest of the target image.</p>" +
-        "<p>If there is a gradient perpendicular to the join, the curve will " +
-        "tend to follow the top or bottom envelope of the plotted points.</p>" +
-        "<p>The graphs produced for color images use red, green and blue dots " +
-        "and lines for each channel. The colors add together. " +
-        "For example: red, green and blue add up to white.</p>";
-    extrapolatedGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH();
-        this.dialog.ok();
-    };
-    
-    this.setExtrapolateGradientFlag = function (checked){
-        data.extrapolatedGradientFlag = checked;
-        self.extrapolatedGradientBar.checkBox.checked = checked;
-        self.extrapolatedGradientSmoothness_Control.enabled = checked;
-        extrapolatedGradientGraphButton.enabled = checked;
-    };
-    
-    let extrapolatedGradientSection = new Control(this);
-    extrapolatedGradientSection.sizer = new HorizontalSizer;
-    extrapolatedGradientSection.sizer.spacing = 10;
-    extrapolatedGradientSection.sizer.add(this.extrapolatedGradientSmoothness_Control);
-    extrapolatedGradientSection.sizer.addSpacing(20);
-    extrapolatedGradientSection.sizer.add(extrapolatedGradientGraphButton);
-    this.extrapolatedGradientBar = new SectionBar(this, "Gradient Correction (Target image)");
-    this.extrapolatedGradientBar.setSection(extrapolatedGradientSection);
-    this.extrapolatedGradientBar.enableCheckBox();
-    this.extrapolatedGradientBar.toolTip = 
-            "<p>If selected, an extrapolated gradient correction is applied " +
-            "to the rest of the target image.</p>" +
-            "<p>If not selected, only the average background offset is applied.</p>" +
-            "<p>In most situations, this option should be selected.</p>";
-    this.extrapolatedGradientBar.checkBox.onClick = this.setExtrapolateGradientFlag;
-    this.extrapolatedGradientBar.onToggleSection = this.onToggleSection;
-    this.setExtrapolateGradientFlag(data.extrapolatedGradientFlag);
-    // SectionBar: "Propagated Gradient Correction" End
 
     // =======================================
     // SectionBar: "Create Mosaic"
