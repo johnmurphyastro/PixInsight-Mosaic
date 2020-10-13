@@ -185,7 +185,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         
         horizontalSizer.addSpacing(20);
         horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(10);
+        horizontalSizer.addSpacing(6);
         horizontalSizer.add(update_Button);
         horizontalSizer.addSpacing(20);
     }
@@ -193,7 +193,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, customControls);
+    let previewControl = new PreviewControl(this, bitmap, null, customControls, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();

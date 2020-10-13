@@ -135,7 +135,6 @@ function PhotometricMosaicData() {
         Parameters.set("maskStarRadiusAdd", this.maskStarRadiusAdd);
         
         // Create Mosaic
-        Parameters.set("createMosaicFlag", this.createMosaicFlag);
         Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
         Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
         Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag); 
@@ -239,8 +238,6 @@ function PhotometricMosaicData() {
             this.maskStarRadiusAdd = Parameters.getReal("maskStarRadiusAdd");
         
         // Create Mosaic
-        if (Parameters.has("createMosaicFlag"))
-            this.createMosaicFlag = Parameters.getBoolean("createMosaicFlag");
         if (Parameters.has("mosaicOverlayTgtFlag"))
             this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
         if (Parameters.has("mosaicRandomFlag"))
@@ -298,7 +295,6 @@ function PhotometricMosaicData() {
         this.maskStarRadiusAdd = 2;
         
         // Create Mosaic
-        this.createMosaicFlag = true;
         this.mosaicOverlayTgtFlag = true;
         this.mosaicRandomFlag = false;
         this.mosaicAverageFlag = false;
@@ -364,7 +360,6 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.setExtrapolateGradientFlag(this.extrapolatedGradientFlag);
         
         // Create Mosaic
-        photometricMosaicDialog.setCreateMosaicFlag(this.createMosaicFlag);
         photometricMosaicDialog.mosaicOverlayTgtControl.checked = this.mosaicOverlayTgtFlag;
         photometricMosaicDialog.mosaicRandomControl.checked = this.mosaicRandomFlag;
         photometricMosaicDialog.mosaicAverageControl.checked = this.mosaicAverageFlag;
@@ -420,7 +415,6 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/maskStarRadiusAdd", DataType_Float, data.maskStarRadiusAdd );
     
     // Create Mosaic
-    Settings.write( KEYPREFIX+"/createMosaicFlag", DataType_Boolean, data.createMosaicFlag );
     Settings.write( KEYPREFIX+"/mosaicOverlayTgtFlag", DataType_Boolean, data.mosaicOverlayTgtFlag );
     Settings.write( KEYPREFIX+"/mosaicRandomFlag", DataType_Boolean, data.mosaicRandomFlag );
     Settings.write( KEYPREFIX+"/mosaicAverageFlag", DataType_Boolean, data.mosaicAverageFlag );
@@ -517,9 +511,6 @@ function restoreSettings(data){
         data.maskStarRadiusAdd = keyValue;
     
     // Create Mosaic
-    keyValue = Settings.read( KEYPREFIX+"/createMosaicFlag", DataType_Boolean );
-    if ( Settings.lastReadOK )
-        data.createMosaicFlag = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/mosaicOverlayTgtFlag", DataType_Boolean );
     if ( Settings.lastReadOK )
         data.mosaicOverlayTgtFlag = keyValue;
@@ -755,7 +746,9 @@ function PhotometricMosaicDialog(data) {
     this.limitPhotoStarsPercent_Control.setPrecision(2);
     this.limitPhotoStarsPercent_Control.setRange(0, 100);
     this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
-    this.limitPhotoStarsPercent_Control.enabled = false;
+    this.limitPhotoStarsPercent_Control.onValueUpdated = function (value){
+        data.limitPhotoStarsPercent = value;
+    };
     
     let LINEAR_RANGE_STRLEN = this.font.width("Linear range:");
     this.rejectHigh_Control = new NumericEdit();
@@ -770,7 +763,9 @@ function PhotometricMosaicDialog(data) {
     this.rejectHigh_Control.setPrecision(3);
     this.rejectHigh_Control.setRange(0.001, 1.0);
     this.rejectHigh_Control.setValue(data.linearRange);
-    this.rejectHigh_Control.enabled = false;
+    this.rejectHigh_Control.onValueUpdated = function (value){
+        data.linearRange = value;
+    };
     
     this.outlierRemoval_Control = new NumericEdit();
     this.outlierRemoval_Control.setReal(false);
@@ -781,7 +776,9 @@ function PhotometricMosaicDialog(data) {
             "<p>Removing a few outliers can improve accuracy, but don't over do it.</p>";
     this.outlierRemoval_Control.setRange(0, 50);
     this.outlierRemoval_Control.setValue(data.outlierRemoval);
-    this.outlierRemoval_Control.enabled = false;
+    this.outlierRemoval_Control.onValueUpdated = function (value){
+        data.outlierRemoval = value;
+    };
     
     let photometryGraphButton = new PushButton();
     photometryGraphButton.text = "Edit and display graph";
@@ -1106,7 +1103,9 @@ function PhotometricMosaicDialog(data) {
     this.limitSampleStarsPercent_Control.setPrecision(2);
     this.limitSampleStarsPercent_Control.setRange(0, 100);
     this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);        
-    this.limitSampleStarsPercent_Control.enabled = false;
+    this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
+    };
     
     this.sampleStarRadiusMult_Control = new NumericEdit();
     this.sampleStarRadiusMult_Control.real = true;
@@ -1118,7 +1117,9 @@ function PhotometricMosaicDialog(data) {
     this.sampleStarRadiusMult_Control.setPrecision(1);
     this.sampleStarRadiusMult_Control.setRange(1, 25);
     this.sampleStarRadiusMult_Control.setValue(data.sampleStarRadiusMult);     
-    this.sampleStarRadiusMult_Control.enabled = false;
+    this.sampleStarRadiusMult_Control.onValueUpdated = function (value){
+        data.sampleStarRadiusMult = value;
+    };
     
     this.sampleSize_Control = new NumericEdit();
     this.sampleSize_Control.real = false;
@@ -1130,7 +1131,9 @@ function PhotometricMosaicDialog(data) {
             "star that's not rejected by 'Limit stars %'.</p>";
     this.sampleSize_Control.setRange(2, 50);
     this.sampleSize_Control.setValue(data.sampleSize);
-    this.sampleSize_Control.enabled = false;
+    this.sampleSize_Control.onValueUpdated = function (value) {
+        data.sampleSize = value;
+    };
     
     let displaySamplesButton = new PushButton();
     displaySamplesButton.text = "Edit and display samples";
@@ -1452,11 +1455,6 @@ function PhotometricMosaicDialog(data) {
         data.mosaicOverlayTgtFlag = !checked;
     };
     
-    this.setCreateMosaicFlag = function(checked){
-        self.mosaicBar.checkBox.checked = checked;
-        data.createMosaicFlag = checked;
-        mosaicSection.enabled = checked;
-    };
     
     let starsMaskButton = new PushButton();
     starsMaskButton.text = "Star mask";
@@ -1501,14 +1499,7 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer.add(joinMaskButton);
     this.mosaicBar = new SectionBar(this, "Create Mosaic");
     this.mosaicBar.setSection(mosaicSection);
-    this.mosaicBar.enableCheckBox();
-    this.mosaicBar.toolTip = "<p>If selected, the reference and target frames are " +
-            "combined and displayed in a window named: '" + MOSAIC_NAME() + "'</p>" +
-            "<p>Otherwise, the corrections will be " +
-            "applied to a copy of the target image instead.</p>";
-    this.mosaicBar.checkBox.onClick = this.setCreateMosaicFlag;
     this.mosaicBar.onToggleSection = this.onToggleSection;
-    this.setCreateMosaicFlag(data.createMosaicFlag);
     // SectionBar: "Create Mosaic" End
     
 
@@ -1700,7 +1691,7 @@ function main() {
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.createMosaicFlag && data.cropTargetToJoinRegionFlag && data.mosaicRandomFlag){
+        if (data.cropTargetToJoinRegionFlag && data.mosaicRandomFlag){
             (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nOverlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;

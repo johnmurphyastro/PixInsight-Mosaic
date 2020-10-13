@@ -20,16 +20,17 @@
 /**
  * Display the Mask Stars in a Dialog that contains a scrolled window and 
  * controls to adjust the Mask Star parameters.
- * @param {View} refView Background image of the reference overlap area at 1:1 scale
- * @param {View} tgtView Background image of the target overlap area at 1:1 scale
  * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
- * @param {PhotometricMosaicDialog} photometricMosaicDialog
+ * @param {SamplePair[][]} binnedColorSamplePairs 
+ * @param {Boolean} isHorizontal 
+ * @param {Boolean} isTargetAfterRef 
+ * @param {LinearFitData[]} scaleFactors 
  * @returns {SampleGridDialog}
  */
-function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
-        photometricMosaicDialog)
+function MaskStarsDialog(joinArea, detectedStars, data, 
+    binnedColorSamplePairs, isHorizontal, isTargetAfterRef, scaleFactors)
 {
     this.__base__ = Dialog;
     this.__base__();
@@ -37,6 +38,9 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
     const REF = 10;
     const TGT = 20;
     let self = this;
+    
+    let refView = data.referenceView;
+    let tgtView = data.targetView;
     
     let zoomText = "1:1";
     let coordText;
@@ -88,7 +92,7 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
      * Set dialog title, including the current zoom and cursor coordinates
      */
     function setTitle(){
-        self.windowTitle = "Star Mask " + zoomText + " " + coordText;
+        self.windowTitle = "Create Star Mask " + zoomText + " " + coordText;
     };
     
     /**
@@ -152,53 +156,28 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
             graphics.end();
         }
     }
-    let liveUpdate = false;
     
-    /**
-     * @param {HorizontalSizer} horizontalSizer
-     */
-    function customControls (horizontalSizer){
-        let liveUpdate_control = new CheckBox();
-        liveUpdate_control.text = "Live update";
-        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
-        liveUpdate_control.onCheck = function (checked){
-            liveUpdate = checked;
-            update_Button.enabled = !checked;
-            if (checked){
-                update();
-            }
-        };
-        liveUpdate_control.checked = liveUpdate;
-
-        let update_Button = new PushButton();
-        update_Button.text = "Update";
-        update_Button.toolTip = "<p>Update display</p>";
-        update_Button.onClick = function(){
-            update();
-        };
-        update_Button.enabled = !liveUpdate_control.checked;
+    function createCorrectedTarget(data, joinArea, binnedColorSamplePairs,
+            isHorizontal, isTargetAfterRef, scaleFactors)
+    {
+        let propagateSurfaceSplines = 
+                getSurfaceSplines(data, binnedColorSamplePairs, data.extrapolatedGradientSmoothness, 3);
+        let surfaceSplines = 
+                getSurfaceSplines(data, binnedColorSamplePairs, data.overlapGradientSmoothness, 3);
         
-        let createMask_Button = new PushButton();
-        createMask_Button.text = "Create";
-        createMask_Button.toolTip = "<p>Create mask</p>";
-        createMask_Button.onClick = function(){
-            console.writeln("\n<b><u>Creating mosaic mask</u></b>");
-            update();
-            createStarMask(tgtView, joinArea, detectedStars, data);
-        };
-        
-        horizontalSizer.addSpacing(20);
-        horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(10);
-        horizontalSizer.add(update_Button);
-        horizontalSizer.addSpacing(30);
-        horizontalSizer.add(createMask_Button);
+        let imageWindow = createCorrectedView(isHorizontal, isTargetAfterRef, 
+                scaleFactors, propagateSurfaceSplines, surfaceSplines, false, joinArea, data);
+        imageWindow.show();
+        imageWindow.zoomToFit();
     }
+    
+    
+    let liveUpdate = false;
     
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, customControls);
+    let previewControl = new PreviewControl(this, bitmap, null, null, true);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -211,9 +190,16 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
         drawMaskStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
     };
-    previewControl.ok_Button.text = "Close";
-    previewControl.ok_Button.icon = null;
+
+    previewControl.ok_Button.toolTip = "<p>Create new mask image</p>";
     previewControl.ok_Button.onClick = function(){
+        console.writeln("\n<b><u>Creating mosaic mask</u></b>");
+        update();
+        createStarMask(tgtView, joinArea, detectedStars, data);    
+    };
+    
+    previewControl.cancel_Button.toolTip = "<p>Close dialog</p>";
+    previewControl.cancel_Button.onClick = function(){
         self.ok();
     };
 
@@ -231,14 +217,71 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
         update();
     };
     
+    let liveUpdate_control = new CheckBox();
+    liveUpdate_control.text = "Live update";
+    liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+    liveUpdate_control.onCheck = function (checked){
+        liveUpdate = checked;
+        update_Button.enabled = !checked;
+        if (checked){
+            update();
+        }
+    };
+    liveUpdate_control.checked = liveUpdate;
+
+    let update_Button = new PushButton();
+    update_Button.text = "Update";
+    update_Button.toolTip = "<p>Update display</p>";
+    update_Button.onClick = function(){
+        update();
+    };
+    update_Button.enabled = !liveUpdate_control.checked;
+    
+    let correctTarget_Button = new PushButton();
+    correctTarget_Button.text = "Correct target";
+    correctTarget_Button.toolTip = "<p>Create a corrected target image.</p>" +
+            "<p>The unedited reference image can be used to replace stars in a masked mosaic, " +
+            "but if you wish to use the target image instead, " +
+            "it must first be corrected (scale and gradient) before it " +
+            "can be used.</p>" +
+            "<p>This option creates a corrected target image " +
+            "that can be used with the star mask.</p>";
+    correctTarget_Button.onClick = function(){
+        console.writeln("\n<b><u>Creating corrected target image</u></b>");
+        update();
+        createCorrectedTarget(data, joinArea, binnedColorSamplePairs,
+            isHorizontal, isTargetAfterRef, scaleFactors);
+    };
+    
     let optionsSizer = new HorizontalSizer();
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(liveUpdate_control);
+    optionsSizer.addSpacing(6);
+    optionsSizer.add(update_Button);
+    optionsSizer.addSpacing(10);
     optionsSizer.addStretch();
+    optionsSizer.add(correctTarget_Button);
+    optionsSizer.addSpacing(10);
 
     let starMaskLabelSize = this.font.width("Multiply star radius:");
-    let limitMaskStars_Control = createLimitMaskStarsControl(this, data, starMaskLabelSize);
+    let limitMaskStars_Control = new NumericControl(this);
+    limitMaskStars_Control.real = false;
+    limitMaskStars_Control.label.text = "Limit stars %:";
+    limitMaskStars_Control.toolTip =
+            "<p>Specifies the percentage of the brightest detected stars that will be used to " +
+            "create the star mask.</p>" +
+            "<p>0% will produce a solid mask with no stars.<br />" +
+            "100% will produce a mask that includes all detected stars.</p>" +
+            "<p>Small faint stars are usually free of artifacts, so normally " +
+            "only a small percentage of the detected stars need to be used.</p>";
+    limitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
+    limitMaskStars_Control.setRange(0, 100);
+    limitMaskStars_Control.slider.setRange(0, 100);
+    limitMaskStars_Control.slider.minWidth = 200;
+    limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
     limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
         if (liveUpdate) {
@@ -246,7 +289,18 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
         }
     };
     
-    let maskStarRadiusMult_Control = createMaskStarRadiusMultControl(this, data, starMaskLabelSize);
+    let maskStarRadiusMult_Control = new NumericControl(this);
+    maskStarRadiusMult_Control.real = true;
+    maskStarRadiusMult_Control.label.text = "Multiply star radius:";
+    maskStarRadiusMult_Control.toolTip =
+            "<p>Increases the size of the brightest stars.</p>" +
+            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
+    maskStarRadiusMult_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarRadiusMult_Control.setRange(1, 25);
+    maskStarRadiusMult_Control.slider.setRange(1, 250);
+    maskStarRadiusMult_Control.setPrecision(1);
+    maskStarRadiusMult_Control.slider.minWidth = 250;
+    maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
     maskStarRadiusMult_Control.onValueUpdated = function (value) {
         data.maskStarRadiusMult = value;
         if (liveUpdate) {
@@ -254,7 +308,18 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
         }
     };
     
-    let maskStarRadiusAdd_Control = createMaskStarRadiusAddControl(this, data, starMaskLabelSize);
+    let maskStarRadiusAdd_Control = new NumericControl(this);
+    maskStarRadiusAdd_Control.real = true;
+    maskStarRadiusAdd_Control.label.text = "Add to star radius:";
+    maskStarRadiusAdd_Control.toolTip =
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply star radius'.</p>";
+    maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarRadiusAdd_Control.setRange(0, 10);
+    maskStarRadiusAdd_Control.slider.setRange(0, 100);
+    maskStarRadiusAdd_Control.setPrecision(1);
+    maskStarRadiusAdd_Control.slider.minWidth = 100;
+    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
         if (liveUpdate) {
@@ -297,60 +362,6 @@ function MaskStarsDialog(refView, tgtView, joinArea, detectedStars, data,
     }
     
     setTitle();
-}
-
-// ----------------------------
-// Star mask controls
-// ----------------------------
-function createLimitMaskStarsControl(dialog, data, labelLength){
-    let limitMaskStars_Control = new NumericControl(dialog);
-    limitMaskStars_Control.real = false;
-    limitMaskStars_Control.label.text = "Limit stars %:";
-    limitMaskStars_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to " +
-            "create the star mask.</p>" +
-            "<p>0% will produce a solid mask with no stars.<br />" +
-            "100% will produce a mask that includes all detected stars.</p>" +
-            "<p>Small faint stars are usually free of artifacts, so normally " +
-            "only a small percentage of the detected stars need to be used.</p>";
-    limitMaskStars_Control.label.setFixedWidth(labelLength);
-    limitMaskStars_Control.setRange(0, 100);
-    limitMaskStars_Control.slider.setRange(0, 100);
-    limitMaskStars_Control.slider.minWidth = 200;
-    limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
-    return limitMaskStars_Control;
-}
-
-function createMaskStarRadiusMultControl(dialog, data, labelLength){
-    let maskStarRadiusMult_Control = new NumericControl(dialog);
-    maskStarRadiusMult_Control.real = true;
-    maskStarRadiusMult_Control.label.text = "Multiply star radius:";
-    maskStarRadiusMult_Control.toolTip =
-            "<p>Increases the size of the brightest stars.</p>" +
-            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
-    maskStarRadiusMult_Control.label.setFixedWidth(labelLength);
-    maskStarRadiusMult_Control.setRange(1, 25);
-    maskStarRadiusMult_Control.slider.setRange(1, 250);
-    maskStarRadiusMult_Control.setPrecision(1);
-    maskStarRadiusMult_Control.slider.minWidth = 250;
-    maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
-    return maskStarRadiusMult_Control;
-}
-
-function createMaskStarRadiusAddControl(dialog, data, labelLength){
-    let maskStarRadiusAdd_Control = new NumericControl(dialog);
-    maskStarRadiusAdd_Control.real = true;
-    maskStarRadiusAdd_Control.label.text = "Add to star radius:";
-    maskStarRadiusAdd_Control.toolTip =
-            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply star radius'.</p>";
-    maskStarRadiusAdd_Control.label.setFixedWidth(labelLength);
-    maskStarRadiusAdd_Control.setRange(0, 10);
-    maskStarRadiusAdd_Control.slider.setRange(0, 100);
-    maskStarRadiusAdd_Control.setPrecision(1);
-    maskStarRadiusAdd_Control.slider.minWidth = 100;
-    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
-    return maskStarRadiusAdd_Control;
 }
 
 MaskStarsDialog.prototype = new Dialog;

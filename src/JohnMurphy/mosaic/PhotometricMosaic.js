@@ -185,13 +185,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         detectedStars.showConsoleInfo = true;
         return;
     }
-    if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
-        console.writeln("\n<b><u>Displaying mosaic mask stars</u></b>");
-        let dialog = new MaskStarsDialog(referenceView, targetView, joinRect, 
-                detectedStars, data, photometricMosaicDialog);
-        dialog.execute();
-        return;
-    }
     if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         console.writeln("\n<b><u>Displaying gradient graph</u></b>");
     }
@@ -345,6 +338,14 @@ function photometricMosaic(data, photometricMosaicDialog)
                 " to ", binnedColorSamplePairs[0].length);
     }
     
+    if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
+        console.writeln("\n<b><u>Displaying mosaic mask stars</u></b>");
+        let dialog = new MaskStarsDialog(joinRect, detectedStars, data,
+            binnedColorSamplePairs, isHorizontal, isTargetAfterRef, scaleFactors);
+        dialog.execute();
+        return;
+    }
+    
     let propagateSurfaceSplines;
     if (data.extrapolatedGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         propagateSurfaceSplines = [];
@@ -390,13 +391,10 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
 
-    if (data.createMosaicFlag){
-        console.writeln("\n<b><u>Creating Mosaic</u></b>");
-    } else {
-        console.writeln("\n<b><u>Applying scale and gradients</u></b>");
-    }
-    let imageWindow = createCorrectedView(referenceView, targetView, isHorizontal, isTargetAfterRef,
-            scaleFactors, propagateSurfaceSplines, surfaceSplines, overlap, joinRect, data);
+    console.writeln("\n<b><u>Creating Mosaic</u></b>");
+
+    let imageWindow = createCorrectedView(isHorizontal, isTargetAfterRef,
+            scaleFactors, propagateSurfaceSplines, surfaceSplines, true, joinRect, data);
     imageWindow.show();
     imageWindow.zoomToFit();
     
@@ -450,40 +448,42 @@ function SurfaceSplineInfo(binnedColorSamplePairs, smoothness, selectedChannel){
 
 /**
  * Appy scale and subtract the detected gradient from the target view
- * @param {View} refView Used to create mosaic. Read only.
- * @param {View} tgtView Used to create mosaic or to create corrected tgtView clone. Read only.
  * @param {Boolean} isHorizontal True if the join is horizontal
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
  * @param {LinearFitData[]} scaleFactors Scale for each color channel.
  * @param {SurfaceSpline[]} propagateSurfaceSplines SurfaceSpline for each color channel, propagated
  * @param {SurfaceSpline[]} surfaceSplines SurfaceSpline for each color channel, tapered
- * @param {Overlap} overlap represents overlap region
+ * @param {Boolean} createMosaicFlag If true, create mosaic. If not, create corrected target image.
  * @param {Rect} joinRect Bounding box of join region (preview extended to overlapBox)
- * @param {PhotometricMosaicData} data User settings for FITS header
+ * @param {PhotometricMosaicData} data
  * @returns {ImageWindow} Cloned image with corrections applied
  */
-function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef, 
-        scaleFactors, propagateSurfaceSplines, surfaceSplines, overlap, joinRect, data) {
+function createCorrectedView(isHorizontal, isTargetAfterRef, 
+        scaleFactors, propagateSurfaceSplines, surfaceSplines, createMosaicFlag, joinRect, data) {
     let applyScaleAndGradientTime = new Date().getTime();
+    let refView = data.referenceView;
+    let tgtView = data.targetView;
+    let overlap = data.cache.overlap;
+    
     let width = tgtView.image.width;
     let height = tgtView.image.height;
     let nChannels = scaleFactors.length;
     
     // Create a new view which will become either the mosaic view or the corrected target view
-    let viewId = data.createMosaicFlag ? MOSAIC_NAME() : tgtView.fullId + "_PM";
+    let viewId = createMosaicFlag ? MOSAIC_NAME() : tgtView.fullId + "_PM";
     let w = tgtView.window;
     let imgWindow = new ImageWindow(width, height, nChannels, w.bitsPerSample, 
             w.isFloatSample, nChannels > 1, viewId);    
     imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
     let view = imgWindow.mainView;
-    if (data.createMosaicFlag){
+    if (createMosaicFlag){
         // Start with the ref image and add then modify it with the target image
         view.image.assign(refView.image);
     } // Leave the image blank for a corrected target view
     
     // Apply scale and gradient to the cloned image
     let tgtCorrector = new ScaleAndGradientApplier(width, height, overlap, joinRect,
-            isHorizontal, data, isTargetAfterRef);
+            isHorizontal, data, isTargetAfterRef, createMosaicFlag);
     let tgtBox = overlap.tgtBox;                
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
@@ -504,7 +504,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     
     // FITS Header
     let keywords = imgWindow.keywords;
-    if (data.createMosaicFlag){
+    if (createMosaicFlag){
         copyFitsObservation(refView, keywords);
         copyFitsAstrometricSolution(refView, keywords);
         copyFitsKeywords(refView, keywords, TRIM_NAME(), SCRIPT_NAME());
@@ -520,7 +520,9 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     fitsHeaderPhotometry(keywords, data);
     fitsHeaderGradient(keywords, data, true, true);
     fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
-    fitsHeaderMosaic(keywords, data);
+    if (createMosaicFlag){
+        fitsHeaderMosaic(keywords, data);
+    }
     fitsHeaderScale(keywords, scaleFactors);
     if (minValue < 0 || maxValue > 1){
         let minMaxValues = ": min = " + minValue.toPrecision(5) + ", max = " + maxValue.toPrecision(5);
@@ -532,7 +534,7 @@ function createCorrectedView(refView, tgtView, isHorizontal, isTargetAfterRef,
     view.endProcess();
     view.stf = refView.stf;
 
-    if (data.createMosaicFlag){
+    if (createMosaicFlag){
         imgWindow.createPreview(joinRect, "JoinRegion");
     }
     // But show the main mosaic view.

@@ -145,7 +145,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, null);
+    let previewControl = new PreviewControl(this, bitmap, null, null, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();

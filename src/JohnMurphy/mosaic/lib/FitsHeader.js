@@ -202,18 +202,16 @@ function fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef){
  * @param {PhotometricMosaicData} data
  */
 function fitsHeaderMosaic(keywords, data){
-    if (data.createMosaicFlag){
-        let mode = "unknown";
-        if (data.mosaicAverageFlag){
-            mode = "Average";
-        } else if (data.mosaicOverlayTgtFlag){
-            mode = "Overlay";
-        } else if (data.mosaicRandomFlag){
-            mode = "Random";
-        }
-        keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".combinationMode: " + mode));
+    let mode = "unknown";
+    if (data.mosaicAverageFlag){
+        mode = "Average";
+    } else if (data.mosaicOverlayTgtFlag){
+        mode = "Overlay";
+    } else if (data.mosaicRandomFlag){
+        mode = "Random";
     }
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".combinationMode: " + mode));
 }
 
 /**

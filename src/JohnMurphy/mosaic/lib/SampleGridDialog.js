@@ -167,7 +167,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         
         horizontalSizer.addSpacing(20);
         horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(10);
+        horizontalSizer.addSpacing(6);
         horizontalSizer.add(update_Button);
         horizontalSizer.addSpacing(20);
     }
@@ -175,7 +175,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, customControls);
+    let previewControl = new PreviewControl(this, bitmap, null, customControls, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -215,7 +215,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     const labelLength = this.font.width("Multiply star radius:");
     let limitSampleStarsPercent_Control = 
                 createLimitSampleStarsPercentControl(this, data, labelLength);
-            limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        limitSampleStarsPercent_Control.onValueUpdated = function (value) {
             data.limitSampleStarsPercent = value;
             photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
             if (liveUpdate){

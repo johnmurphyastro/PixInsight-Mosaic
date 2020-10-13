@@ -236,13 +236,14 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
  * @param {Boolean} isHorizontal If true, the join is horizontal (one image is above the other)
  * @param {PhotometricMosaicData} data 
  * @param {Boolean} isTargetAfterRef True if target image is below or right of reference image
+ * @param {Boolean} createMosaic True if creating a mosaic, false if only correcting target
  * @returns {ScaleAndGradientApplier}
  */
 function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isHorizontal, 
-        data, isTargetAfterRef) {
+        data, isTargetAfterRef, createMosaic) {
     let imageWidth_ = imageWidth;
     let imageHeight_ = imageHeight;
-    let createMosaic_ = data.createMosaicFlag;
+    let createMosaic_ = createMosaic;
     let joinRect_ = joinRect;
     let isTargetAfterRef_ = isTargetAfterRef;
     let isHorizontal_ = isHorizontal;

@@ -164,7 +164,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
         
         horizontalSizer.addSpacing(20);
         horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(10);
+        horizontalSizer.addSpacing(6);
         horizontalSizer.add(update_Button);
         horizontalSizer.addSpacing(20);
     }
@@ -172,7 +172,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, refBitmap, null, customControls);
+    let previewControl = new PreviewControl(this, refBitmap, null, customControls, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();

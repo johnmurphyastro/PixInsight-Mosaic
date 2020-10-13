@@ -129,9 +129,10 @@ function extractOverlapImage(refView, imageRect, maskSamples){
  * @param {Bitmap} image image The unscaled bitmap to display. It is not modified.
  * @param {width:, height:} metadata Specifies dimensions of drawing region if image = null
  * @param {Function(HorizontalSizer)} customControls e.g. add 'Live update' and 'Update' controls
+ * @param {Boolean} includeCancelButton If true, add a cancel button after the OK button
  * @returns {PreviewControl}
  */
-function PreviewControl(parent, image, metadata, customControls) {
+function PreviewControl(parent, image, metadata, customControls, includeCancelButton) {
     this.__base__ = Frame;
     this.__base__(parent);
     
@@ -458,6 +459,13 @@ function PreviewControl(parent, image, metadata, customControls) {
     this.ok_Button = new PushButton();
     this.ok_Button.text = "OK";
     this.ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
+    
+    this.cancel_Button = null;
+    if (includeCancelButton){
+        this.cancel_Button = new PushButton();
+        this.cancel_Button.text = "Cancel";
+        this.cancel_Button.icon = this.scaledResource( ":/icons/cancel.png" );
+    }
 
     this.getButtonSizer = function(){
         let zoomButton_Sizer = new HorizontalSizer();
@@ -471,6 +479,9 @@ function PreviewControl(parent, image, metadata, customControls) {
         }
         zoomButton_Sizer.addStretch();
         zoomButton_Sizer.add(this.ok_Button);
+        if (includeCancelButton){
+            zoomButton_Sizer.add(this.cancel_Button);
+        }
         zoomButton_Sizer.addSpacing(10);
         return zoomButton_Sizer;
     };

@@ -230,7 +230,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     zoomButton_Sizer.add(zoom11_Button);
     zoomButton_Sizer.addSpacing(17);
     zoomButton_Sizer.add(liveUpdate_control);
-    zoomButton_Sizer.addSpacing(10);
+    zoomButton_Sizer.addSpacing(6);
     zoomButton_Sizer.add(update_Button);
     zoomButton_Sizer.addSpacing(17);
     zoomButton_Sizer.addStretch();

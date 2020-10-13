@@ -42,8 +42,9 @@ function SamplePairDifMinMax(colorSamplePairs, minScaleDif, zoomFactor) {
     }
     this.avgDif /= total;
     if (this.maxDif - this.minDif < minScaleDif){
-        this.maxDif = Math.max(this.maxDif, this.avgDif + minScaleDif);
-        this.minDif = Math.min(this.minDif, this.avgDif - minScaleDif);
+        let delta = (minScaleDif - (this.maxDif - this.minDif)) / 2;
+        this.maxDif += delta;
+        this.minDif -= delta;
     }
     if (zoomFactor !== 1){
         let totalDif = (this.maxDif - this.minDif) / zoomFactor;
@@ -94,20 +95,21 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
     
     let dataSamplePairs_;    // Sample Pairs that are closest to the graphLinePath
     let graphLinePath_;      // Display the gradient along this line
+    let pointPath_;          // Display points close to this path
     
     function construct(){
         let title = "Gradient Graph";
         if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
             // This path is along the center of the joinRect, but constrained by the overlap area
-            graphLinePath_ = createOverlapGradientPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            graphLinePath_ = createMidJoinPathLimittedByOverlap(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            pointPath_ = graphLinePath_;
             title += " (Overlap region)";
         } else {
             // This path is along the side of the overlap bounding box
-            graphLinePath_ = createExtrapolateGradientPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            graphLinePath_ = createOverlapBoundingBoxPath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            pointPath_ = createOverlapOutlinePath(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
             title += " (Target image)";
         }
-        // Get a the SamplePairs that are closest to the line path
-        dataSamplePairs_ = getDataSamplePairs(graphLinePath_, colorSamplePairs, data.sampleSize, isHorizontal);
         
         // Display graph in script dialog
         let isColor = colorSamplePairs.length > 1;
@@ -147,6 +149,10 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         if (info){
             consoleInfo.end();
         }
+        // Get a the SamplePairs that are closest to the line path
+        let maxDist = data.sampleSize * 2.5;
+        dataSamplePairs_ = getDataSamplePairs(pointPath_, colorSamplePairs, maxDist, isHorizontal);
+        
         // Using GradientGraph function call parameters
         let graph = createGraph(width, height, isHorizontal, surfaceSplines, graphLinePath_,
                 joinRect, dataSamplePairs_, data, factor, selectedChannel);
@@ -158,7 +164,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
      * @param {Number} height
      * @param {Boolean} isHorizontal
      * @param {SurfaceSpline[]} surfaceSplines Difference between reference and target images
-     * @param {Point[]} graphLinePath 
+     * @param {Point[]} graphLinePath The path of the join, or overlap bounding box edge
      * @param {Rect} joinRect Join region or overlap bounding box 
      * @param {SamplePair[][]} dataSamplePairs The SamplePair points to be displayed for each channel
      * @param {PhotometricMosaicData} data User settings used to create FITS header
@@ -179,7 +185,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         // gradientArray stores min / max of fitted lines.
         // also need min / max of sample points.
         let minScaleDif = 1e-9;
-        minScaleDif = 3 * getNoiseRange(colorSamplePairs, minScaleDif) ;
+        minScaleDif = 10 * getNoiseRange(colorSamplePairs, minScaleDif) ;
         let yCoordinateRange = new SamplePairDifMinMax(dataSamplePairs, minScaleDif, zoomFactor);
         
         return createAndDrawGraph(xLabel, yLabel, yCoordinateRange, width, height, isHorizontal, 
@@ -190,11 +196,11 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
      * Returns the SamplePairs that are closest to the graphLinePath
      * @param {Point[]} graphLinePath
      * @param {SamplePair[][]} colorSamplePairs
-     * @param {Number} sampleSize 
+     * @param {Number} maxDist If > 0 limit to samples less than this distance from join line
      * @param {Boolean} isHorizontal
      * @returns {SamplePair[][]}
      */
-    function getDataSamplePairs(graphLinePath, colorSamplePairs, sampleSize, isHorizontal){
+    function getDataSamplePairs(graphLinePath, colorSamplePairs, maxDist, isHorizontal){
         /**
          * @param {SamplePair} samplePair
          * @param {Point[]} path 
@@ -226,14 +232,13 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         
         let dataSamplePairs = [];
         let nChannels = colorSamplePairs.length;
-        let maxDist = sampleSize * 2;
         for (let c=0; c<nChannels; c++){
             dataSamplePairs[c] = [];
             let pathMap = new Map();
             for (let i=0; i<colorSamplePairs[c].length; i++){
                 let samplePairs = colorSamplePairs[c];
                 let value = new MapEntry(samplePairs[i], graphLinePath, isHorizontal);
-                if (value.dist < maxDist){
+                if (maxDist <= 0 || value.dist < maxDist){
                     let key = value.pathIdx;
                     if (pathMap.has(key)){
                         let mapValue = pathMap.get(key);
@@ -274,7 +279,6 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         let includePropagate = (data.viewFlag === DISPLAY_EXTRAPOLATED_GRADIENT_GRAPH());
         fitsHeaderGradient(keywords, data, includeGradient, includePropagate);
         fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
-        fitsHeaderMosaic(keywords, data);
         graphWindow.keywords = keywords;
         view.endProcess();
     }
@@ -368,7 +372,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
  * @param {PhotometricMosaicData} data
  * @returns {Point[]}
  */
-function createOverlapGradientPath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+function createMidJoinPathLimittedByOverlap(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
     let joinMidPath;
@@ -381,6 +385,30 @@ function createOverlapGradientPath(tgtImage, overlap, joinRect, isHorizontal, is
     // draw join path bold
     return joinMidPath;   
 }
+
+/**
+ * @param {Image} tgtImage 
+ * @param {Overlap} overlap
+ * @param {Rect} joinRect
+ * @param {Boolean} isHorizontal
+ * @param {Boolean} isTargetAfterRef
+ * @param {PhotometricMosaicData} data
+ * @returns {Point[]}
+ */
+function createOverlapOutlinePath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+    let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
+            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+    let path;
+    // Extrapolated gradient region is target side of overlap
+    if (isHorizontal){
+        let y = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
+        path = overlap.calcHorizOutlinePath(y);
+    } else {
+        let x = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
+        path = overlap.calcVerticalOutlinePath(x);   
+    }
+    return path;
+}
     
 /**
  * Creates a straight line path that follows the target side of the overlap bounding box.
@@ -392,7 +420,7 @@ function createOverlapGradientPath(tgtImage, overlap, joinRect, isHorizontal, is
  * @param {PhotometricMosaicData} data
  * @returns {Point[]}
  */
-function createExtrapolateGradientPath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+function createOverlapBoundingBoxPath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
             overlap, joinRect, isHorizontal, data, isTargetAfterRef);
     let overlapBox = overlap.overlapBox;
@@ -400,23 +428,12 @@ function createExtrapolateGradientPath(tgtImage, overlap, joinRect, isHorizontal
     let graphLinePath;
     // Extrapolated gradient region is target side of overlap
     if (isHorizontal){
-        if (isTargetAfterRef){
-            let overlapEndPath = createHorizontalPath(regions.overlapEnd, overlapBox);
-            graphLinePath = overlapEndPath;
-        } else {
-            let overlapStartPath = createHorizontalPath(regions.overlapStart, overlapBox);
-            graphLinePath = overlapStartPath;
-        }
+        let y = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
+        graphLinePath = createHorizontalPath(y, overlapBox);
     } else {
-        if (isTargetAfterRef){
-            let overlapEndPath = createVerticalPath(regions.overlapEnd, overlapBox);
-            graphLinePath = overlapEndPath;
-        } else {
-            let overlapStartPath = createVerticalPath(regions.overlapStart, overlapBox);
-            graphLinePath = overlapStartPath;
-        }        
+        let x = isTargetAfterRef ? regions.overlapEnd : regions.overlapStart;
+        graphLinePath = createVerticalPath(x, overlapBox);    
     }
-
     return graphLinePath;
 }
 
