@@ -239,59 +239,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         processEvents();
     }
     
-    let overlapThickness = Math.min(overlapBox.height, overlapBox.width);
-    let maxSampleSize = Math.floor(overlapThickness/2);
-    if (data.sampleSize > maxSampleSize){
-        let recommendedSize = Math.floor(overlapThickness/3);
-        new MessageBox("Sample Size '" + data.sampleSize + "' is too big for the overlap area.\n" +
-                "Sample Size must be less than or equal to " + maxSampleSize +
-                "\nReducing sample size to: " + recommendedSize, 
-                TITLE(), StdIcon_Warning, StdButton_Ok).execute();
-        data.sampleSize = recommendedSize;
-        photometricMosaicDialog.sampleSize_Control.setValue(data.sampleSize);  
-    }
-    
-    //targetImage, referenceImage, stars, sampleRect, data
-    let sampleGridMap = data.cache.getSampleGridMap(targetView.image, referenceView.image,
-            detectedStars.allStars, overlapBox, data);
-            
-    if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
-        console.writeln("\n<b><u>Displaying sample grid</u></b>");
-        let overlap = data.cache.overlap;
-        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new SampleGridDialog("SampleGrid", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
-                data, maxSampleSize, photometricMosaicDialog);
-        dialog.execute();
-        return;
-    }
-    
-    let colorSamplePairs = data.cache.getSamplePairs(
-            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal, data);
-    for (let samplePairs of colorSamplePairs){
-        if (samplePairs.length < 3) {
-            new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
-            return;
-        }
-    }
-    
-    let binnedColorSamplePairs = [];
-    for (let c=0; c<nChannels; c++){
-        binnedColorSamplePairs[c] = createBinnedSampleGrid(overlapBox, colorSamplePairs[c], 
-                isHorizontal, data.maxSamples);
-    }
-    
-    if (data.viewFlag === DISPLAY_BINNED_SAMPLES()){
-        console.writeln("\n<b><u>Displaying binned sample grid</u></b>");
-        let overlap = data.cache.overlap;
-        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new BinnedSampleGridDialog("Binned Sample Grid", refBitmap, 
-                colorSamplePairs[0], isHorizontal, 
-                detectedStars, data, photometricMosaicDialog);
-        dialog.execute();
-        return;
-    }
-
     let isTargetAfterRef;
     if (data.cropTargetToJoinRegionFlag){
         isTargetAfterRef = null;
@@ -329,6 +276,65 @@ function photometricMosaic(data, photometricMosaicDialog)
             }
             isTargetAfterRef = (StdButton_Yes === response);
         }
+    }
+    
+    let overlapThickness = Math.min(overlapBox.height, overlapBox.width);
+    let maxSampleSize = Math.floor(overlapThickness/2);
+    if (data.sampleSize > maxSampleSize){
+        let recommendedSize = Math.floor(overlapThickness/3);
+        new MessageBox("Sample Size '" + data.sampleSize + "' is too big for the overlap area.\n" +
+                "Sample Size must be less than or equal to " + maxSampleSize +
+                "\nReducing sample size to: " + recommendedSize, 
+                TITLE(), StdIcon_Warning, StdButton_Ok).execute();
+        data.sampleSize = recommendedSize;
+        photometricMosaicDialog.sampleSize_Control.setValue(data.sampleSize);  
+    }
+    
+    //targetImage, referenceImage, stars, sampleRect, data
+    let sampleGridMap = data.cache.getSampleGridMap(targetView.image, referenceView.image,
+            detectedStars.allStars, overlapBox, data);
+            
+    if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
+        console.writeln("\n<b><u>Displaying sample grid</u></b>");
+        
+        let joinPath = createMidJoinPathLimittedByOverlap(targetView.image,
+                data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+        let targetSide = createOverlapOutlinePath(targetView.image, 
+                data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+        
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new SampleGridDialog("SampleGrid", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
+                data, maxSampleSize, joinPath, targetSide, photometricMosaicDialog);
+        dialog.execute();
+        return;
+    }
+    
+    let colorSamplePairs = data.cache.getSamplePairs(
+            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal, data);
+    for (let samplePairs of colorSamplePairs){
+        if (samplePairs.length < 3) {
+            new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            return;
+        }
+    }
+    
+    let binnedColorSamplePairs = [];
+    for (let c=0; c<nChannels; c++){
+        binnedColorSamplePairs[c] = createBinnedSampleGrid(overlapBox, colorSamplePairs[c], 
+                isHorizontal, data.maxSamples);
+    }
+    
+    if (data.viewFlag === DISPLAY_BINNED_SAMPLES()){
+        console.writeln("\n<b><u>Displaying binned sample grid</u></b>");
+        let overlap = data.cache.overlap;
+        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
+        let dialog = new BinnedSampleGridDialog("Binned Sample Grid", refBitmap, 
+                colorSamplePairs[0], isHorizontal, 
+                detectedStars, data, photometricMosaicDialog);
+        dialog.execute();
+        return;
     }
 
     // Calculate the gradient for each channel

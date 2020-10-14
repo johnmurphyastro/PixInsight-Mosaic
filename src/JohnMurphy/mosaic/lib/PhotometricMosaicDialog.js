@@ -102,6 +102,19 @@ function PhotometricMosaicData() {
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
         
+        // Join Region
+        Parameters.set("hasJoinSize", this.hasJoinSize);
+        Parameters.set("joinSize", this.joinSize);
+        
+        // Join Region (Advanced settings)
+        Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
+        Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
+        Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
+        Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
+        Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
+        Parameters.set("taperFromJoin", this.taperFromJoin);
+        Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
+        
         // Gradient Sample Generation
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
@@ -115,19 +128,6 @@ function PhotometricMosaicData() {
         // Gradient Correction (Target image)
         Parameters.set("targetGradientFlag", this.targetGradientFlag);
         Parameters.set("targetGradientSmoothness", this.targetGradientSmoothness);
-        
-        // Join Region
-        Parameters.set("hasJoinSize", this.hasJoinSize);
-        Parameters.set("joinSize", this.joinSize);
-        
-        // Join Region (Advanced settings)
-        Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
-        Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
-        Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
-        Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
-        Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
-        Parameters.set("taperFromJoin", this.taperFromJoin);
-        Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
         
         // Mosaic Star Mask
         Parameters.set("limitMaskStarsPercent", this.limitMaskStarsPercent);
@@ -172,28 +172,6 @@ function PhotometricMosaicData() {
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
         
-        // Gradient Sample Generation
-        if (Parameters.has("limitSampleStarsPercent"))
-            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
-        if (Parameters.has("sampleSize"))
-            this.sampleSize = Parameters.getInteger("sampleSize");
-        if (Parameters.has("sampleStarRadiusMult"))
-            this.sampleStarRadiusMult = Parameters.getReal("sampleStarRadiusMult");
-        if (Parameters.has("maxSamples"))
-            this.maxSamples = Parameters.getInteger("maxSamples");
-        
-        // Gradient Correction (Overlap region)
-        if (Parameters.has("overlapGradientSmoothness"))
-            this.overlapGradientSmoothness = Parameters.getReal("overlapGradientSmoothness");
-        if (Parameters.has("taperLength"))
-            this.taperLength = Parameters.getInteger("taperLength");
-        
-        // Gradient Correction (Target image)
-        if (Parameters.has("targetGradientFlag"))
-            this.targetGradientFlag = Parameters.getBoolean("targetGradientFlag");
-        if (Parameters.has("targetGradientSmoothness"))
-            this.targetGradientSmoothness = Parameters.getReal("targetGradientSmoothness");
-        
         // Join Region
         if (Parameters.has("hasJoinSize"))
             this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
@@ -228,6 +206,28 @@ function PhotometricMosaicData() {
             if (Parameters.has("cropTargetToJoinRegionFlag"))
                 this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         }
+        
+        // Gradient Sample Generation
+        if (Parameters.has("limitSampleStarsPercent"))
+            this.limitSampleStarsPercent = Parameters.getInteger("limitSampleStarsPercent");
+        if (Parameters.has("sampleSize"))
+            this.sampleSize = Parameters.getInteger("sampleSize");
+        if (Parameters.has("sampleStarRadiusMult"))
+            this.sampleStarRadiusMult = Parameters.getReal("sampleStarRadiusMult");
+        if (Parameters.has("maxSamples"))
+            this.maxSamples = Parameters.getInteger("maxSamples");
+        
+        // Gradient Correction (Overlap region)
+        if (Parameters.has("overlapGradientSmoothness"))
+            this.overlapGradientSmoothness = Parameters.getReal("overlapGradientSmoothness");
+        if (Parameters.has("taperLength"))
+            this.taperLength = Parameters.getInteger("taperLength");
+        
+        // Gradient Correction (Target image)
+        if (Parameters.has("targetGradientFlag"))
+            this.targetGradientFlag = Parameters.getBoolean("targetGradientFlag");
+        if (Parameters.has("targetGradientSmoothness"))
+            this.targetGradientSmoothness = Parameters.getReal("targetGradientSmoothness");
         
         // Mosaic Star Mask
         if (Parameters.has("limitMaskStarsPercent"))
@@ -265,6 +265,16 @@ function PhotometricMosaicData() {
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
         
+        // Join Region
+        this.hasJoinSize = true;
+        this.joinSize = 20;
+        
+        // Join Region (Advanced settings)
+        this.hasJoinAreaPreview = false;
+        this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
+        this.taperFromJoin = false;
+        this.cropTargetToJoinRegionFlag = false;
+        
         // Gradient Sample Generation
         this.limitSampleStarsPercent = 10;
         this.sampleSize = 15;
@@ -278,16 +288,6 @@ function PhotometricMosaicData() {
         // Gradient Correction (Target image)
         this.targetGradientFlag = true;
         this.targetGradientSmoothness = 2;
-        
-        // Join Region
-        this.hasJoinSize = true;
-        this.joinSize = 20;
-        
-        // Join Region (Advanced settings)
-        this.hasJoinAreaPreview = false;
-        this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
-        this.taperFromJoin = false;
-        this.cropTargetToJoinRegionFlag = false;
         
         // Mosaic Star Mask
         this.limitMaskStarsPercent = 10;
@@ -328,6 +328,21 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.linearRange_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
         
+        // Join Region
+        photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
+        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
+        
+        // Join Region (Advanced settings)
+        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
+        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
+        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
+        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
+        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
+        if (EXTRA_CONTROLS()){
+            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
+        }
+        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
+        
         // Gradient Sample Generation
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
@@ -343,21 +358,6 @@ function PhotometricMosaicData() {
         // Gradient Correction (Target image)
         photometricMosaicDialog.targetGradientSmoothness_Control.setValue(this.targetGradientSmoothness);
         photometricMosaicDialog.setTargetGradientFlag(this.targetGradientFlag);
-        
-        // Join Region
-        photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
-        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
-        
-        // Join Region (Advanced settings)
-        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
-        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
-        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
-        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
-        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        if (EXTRA_CONTROLS()){
-            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
-        }
-        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
         
         // Create Mosaic
         photometricMosaicDialog.mosaicOverlayTgt_Control.checked = this.mosaicOverlayTgtFlag;
@@ -390,6 +390,9 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/linearRange", DataType_Float, data.linearRange );
     Settings.write( KEYPREFIX+"/outlierRemoval", DataType_Int32, data.outlierRemoval );
 
+    // Join Region
+    Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
+    
     // Gradient Sample Generation
     Settings.write( KEYPREFIX+"/limitSampleStarsPercent", DataType_Int32, data.limitSampleStarsPercent );
     Settings.write( KEYPREFIX+"/sampleSize", DataType_Int32, data.sampleSize );
@@ -405,9 +408,6 @@ function saveSettings(data){
     // Gradient Correction (Target image)
     Settings.write( KEYPREFIX+"/targetGradientFlag", DataType_Boolean, data.targetGradientFlag );
     Settings.write( KEYPREFIX+"/targetGradientSmoothness", DataType_Float, data.targetGradientSmoothness );
-    
-    // Join Region
-    Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
     
     // Mosaic Star Mask
     Settings.write( KEYPREFIX+"/limitMaskStarsPercent", DataType_Int32, data.limitMaskStarsPercent );
@@ -462,6 +462,11 @@ function restoreSettings(data){
     if ( Settings.lastReadOK )
         data.outlierRemoval = keyValue;
     
+    // Join Region
+    keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.joinSize = keyValue;
+    
     // Gradient Sample Generation
     keyValue = Settings.read( KEYPREFIX+"/limitSampleStarsPercent", DataType_Int32 );
     if ( Settings.lastReadOK )
@@ -493,11 +498,6 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/targetGradientSmoothness", DataType_Float );
     if ( Settings.lastReadOK )
         data.targetGradientSmoothness = keyValue;
-    
-    // Join Region
-    keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
-    if ( Settings.lastReadOK )
-        data.joinSize = keyValue;
     
     // Mosaic Star Mask
     keyValue = Settings.read( KEYPREFIX+"/limitMaskStarsPercent", DataType_Int32 );
@@ -803,24 +803,23 @@ function PhotometricMosaicDialog(data) {
     photometricScaleHorizSizer1.addStretch();
     photometricScaleHorizSizer1.add(photometryGraphButton);
     
-    let photometryStarsButton = new PushButton(this);
-    photometryStarsButton.text = "Photometry stars";
-    photometryStarsButton.toolTip =
-            "<p>Displays the stars that met the criteria for photometry, including: " +
-            "<ul><li>Found in both target and reference images.</li>" +
-            "<li>Amongst the brightest 'Limit stars %' stars.</li>" +
-            "<li>Within the specified 'Linear range'.</li>" +
-            "<li>Not rejected by 'Outlier removal'.</li></ul></p>";
-    photometryStarsButton.onClick = function () {
-        data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
-        this.dialog.ok();
-    };
-    
     let photometrySection = new Control(this);
     photometrySection.sizer = new VerticalSizer;
     photometrySection.sizer.spacing = 4;
     photometrySection.sizer.add(photometricScaleHorizSizer1);
     if (EXTRA_CONTROLS()){
+        let photometryStarsButton = new PushButton(this);
+        photometryStarsButton.text = "Photometry stars";
+        photometryStarsButton.toolTip =
+                "<p>Displays the stars that met the criteria for photometry, including: " +
+                "<ul><li>Found in both target and reference images.</li>" +
+                "<li>Amongst the brightest 'Limit stars %' stars.</li>" +
+                "<li>Within the specified 'Linear range'.</li>" +
+                "<li>Not rejected by 'Outlier removal'.</li></ul></p>";
+        photometryStarsButton.onClick = function () {
+            data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
+            this.dialog.ok();
+        };
         let photometricScaleHorizSizer2 = new HorizontalSizer;
         photometricScaleHorizSizer2.addStretch();
         photometricScaleHorizSizer2.add(photometryStarsButton);
@@ -1012,28 +1011,16 @@ function PhotometricMosaicDialog(data) {
     let overlapGradientGraphButton = new PushButton(this);
     overlapGradientGraphButton.text = "Edit and display gradient";
     overlapGradientGraphButton.toolTip =
+        "<p>Edit the 'Smoothness' parameter and view the gradient along the join.</p>" +
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
-        "<p>The plotted dots represent the difference between each paired target and " +
-        "reference sample within the whole of the overlap region. " +
-        "These points are typically scattered vertically. This is partly due to gradients " +
-        "perpendicular to the join, and partly due to noise.<\p>" +
-        "<p>The bold curve(s) shows the gradient along the primary join path(s):" +
-        "<ul><li>Overlay mode: The primary join is at the transition between the " +
-        "reference and target images. Its path is along the center of the Join Region.</li>" +
-        "<li>Random or Average mode: The first primary join is at the transition " +
-        "between the reference image and the reference side of the Join Region. " +
-        "The second is at the transition between the target side of the Join Region " +
-        "and the target image. (The Random or Average algorithm is applied within " +
-        "the Join Region).</li></ul>" +
-        "(if a Join Region has not been defined, it defaults to the overlap bounding box).</p>" +
-        "<p>The thinner darker line is the gradient correction along the path of the " +
-        "secondary join. This path is the target side of the overlap region's bounding box, " +
-        "or if 'Taper from join' is selected, the target side of the 'Join Region'.</p>" +
-        "<p>The graphs produced for color images use red, green and blue dots " +
-        "and lines for each channel. The colors add together. " +
-        "For example: red, green and blue add up to white.</p>";
+        "<p>The plotted dots represent samples close to the join path.</p>" +
+        "<p>The curve shows the gradient along the path of the join. " +
+        "This path follows the center line of the join region's bounding box, " +
+        "or the boundary of the overlapping pixels if the center line leaves the " +
+        "overlap.</p>" +
+        "<p>The join path can be displayed within the 'Gradient Sample Generation' dialog.</p>";
     overlapGradientGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_OVERLAP_GRADIENT_GRAPH();
         this.dialog.ok();
@@ -1090,8 +1077,8 @@ function PhotometricMosaicDialog(data) {
     this.targetGradientSmoothness_Control.label.text = "Smoothness:";
     this.targetGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
     this.targetGradientSmoothness_Control.toolTip =
-        "<p>The target image gradient correction is extrapolated from the gradient " +
-        "along the target side edge of the Overlap bounding box.</p>" +
+        "<p>The target image gradient correction is determined from the gradient " +
+        "along the target side edge of the Overlap's bounding box.</p>" +
         "<p>However, this gradient will contain local variations " +
         "(e.g. diffuse light around bright stars) that should not " +
         "be extrapolated across the target image.</p>" +
@@ -1111,23 +1098,14 @@ function PhotometricMosaicDialog(data) {
     let targetGradientGraphButton = new PushButton(this);
     targetGradientGraphButton.text = "Edit and display gradient";
     targetGradientGraphButton.toolTip =
+        "<p>Edit the 'Smoothness' parameter and view the gradient that will be " +
+        "applied to the rest of the target image (i.e. outside the overlap region).</p>" +
         "<p>The vertical axis represents the difference between the two images, " +
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
-        "<p>The plotted dots represent the difference between each paired target and " +
-        "reference sample within the whole of the overlap region. " +
-        "These points are typically scattered vertically. This is partly due to gradients " +
-        "perpendicular to the join, and partly due to noise.<\p>" +
-        "<p>The curve is the gradient correction along the path of the " +
-        "secondary join. " +
-        "This path is the target side of the overlap region's bounding box " +
-        "or, if 'Taper from join' is selected, the target side of the 'Join Region'. " +
-        "This gradient will be applied to the rest of the target image.</p>" +
-        "<p>If there is a gradient perpendicular to the join, the curve will " +
-        "tend to follow the top or bottom envelope of the plotted points.</p>" +
-        "<p>The graphs produced for color images use red, green and blue dots " +
-        "and lines for each channel. The colors add together. " +
-        "For example: red, green and blue add up to white.</p>";
+        "<p>The plotted dots represent samples close to the target side boundary of the " +
+        "overlapping pixels.</p>" +
+        "<p>The curve shows the gradient correction that will be applied to the target image.</p>";
     targetGradientGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_TARGET_GRADIENT_GRAPH();
         this.dialog.ok();
@@ -1150,8 +1128,8 @@ function PhotometricMosaicDialog(data) {
     this.targetGradientBar.setSection(targetGradientSection);
     this.targetGradientBar.enableCheckBox();
     this.targetGradientBar.toolTip = 
-            "<p>If selected, an extrapolated gradient correction is applied " +
-            "to the rest of the target image.</p>" +
+            "<p>If selected, a gradient correction is applied " +
+            "to the rest of the target image (i.e. outside the overlap region).</p>" +
             "<p>If not selected, only the average background offset is applied.</p>" +
             "<p>In most situations, this option should be selected.</p>";
     this.targetGradientBar.checkBox.onClick = this.setTargetGradientFlag;
@@ -1540,21 +1518,22 @@ function PhotometricMosaicDialog(data) {
     }
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
+    this.sizer.add(this.joinSizeBar);
+    this.sizer.add(joinSizeSection);
+    this.sizer.add(this.joinAreaBar);
+    this.sizer.add(joinAreaSection);
     this.sizer.add(sampleGenerationBar);
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
     this.sizer.add(overlapGradientSection);
     this.sizer.add(this.targetGradientBar);
     this.sizer.add(targetGradientSection);
-    this.sizer.add(this.joinSizeBar);
-    this.sizer.add(joinSizeSection);
-    this.sizer.add(this.joinAreaBar);
-    this.sizer.add(joinAreaSection);
     this.sizer.add(this.mosaicBar);
     this.sizer.add(mosaicSection);
     this.sizer.addSpacing(5);
     this.sizer.add(buttons_Sizer);
     
+    joinSizeSection.hide();
     joinAreaSection.hide();
 
     //-------------------------------------------------------

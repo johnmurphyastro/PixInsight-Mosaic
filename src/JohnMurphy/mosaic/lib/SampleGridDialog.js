@@ -27,11 +27,13 @@
  * @param {StarsDetected} detectedStars Contains all the detected stars
  * @param {PhotometricMosaicData} data Values from user interface
  * @param {Number} maxSampleSize maximum allowed sample size
+ * @param {Point[]} joinPath The path of the reference image - target image join
+ * @param {Point[]} targetSide The target side envelope of the overlapping pixels
  * @param {PhotometricMosaicDialog} photometricMosaicDialog
  * @returns {SampleGridDialog}
  */
 function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedStars, data,
-        maxSampleSize, photometricMosaicDialog)
+        maxSampleSize, joinPath, targetSide, photometricMosaicDialog)
 {
     this.__base__ = Dialog;
     this.__base__();
@@ -45,6 +47,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     let selectedBitmap = REF;
     let bitmap = getBitmap(selectedBitmap);
     let bitmapOffset = getBitmapOffset(data);
+    let drawPathFlag = false;
+    let drawTargetSideFlag = false;
     
     /**
      * Return bitmap of the reference or target image
@@ -132,6 +136,28 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
                 let y = star.pos.y - bitmapOffset.y;
                 graphics.strokeCircle(x, y, radius);
             }
+            
+            if (drawPathFlag){
+                graphics.pen = new Pen(0xff00ff00, 2.0);
+                for (let i=1; i < joinPath.length; i++){
+                    let x = joinPath[i-1].x - bitmapOffset.x;
+                    let x2 = joinPath[i].x - bitmapOffset.x;
+                    let y = joinPath[i-1].y - bitmapOffset.y;
+                    let y2 = joinPath[i].y - bitmapOffset.y;
+                    graphics.drawLine(x, y, x2, y2);
+                }
+            }
+            if (drawTargetSideFlag){
+                graphics.pen = new Pen(0xff0000ff, 2.0);
+                for (let i=1; i < targetSide.length; i++){
+                    let x = targetSide[i-1].x - bitmapOffset.x;
+                    let x2 = targetSide[i].x - bitmapOffset.x;
+                    let y = targetSide[i-1].y - bitmapOffset.y;
+                    let y2 = targetSide[i].y - bitmapOffset.y;
+                    graphics.drawLine(x, y, x2, y2);
+                }
+            }
+            
         } catch (e) {
             console.criticalln("drawSampleGrid error: " + e);
         } finally {
@@ -215,10 +241,43 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         self.enabled = true;
     };
     
+    let pathCheckBox = new CheckBox(this);
+    pathCheckBox.text = "Display join path";
+    pathCheckBox.toolTip = "<p>Displays the join path.</p>" +
+            "<p>Where possible the join should avoid image corners, bright stars and star halos.</p>" +
+            "<p>Use the 'Join Region (Advanced settings)' section " +
+            "to change the position of the join</p>";
+    pathCheckBox.checked = drawPathFlag;
+    pathCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        drawPathFlag = checked;
+        processEvents();
+        previewControl.forceRedraw();
+        self.enabled = true;
+    };
+    
+    let targetSideCheckBox = new CheckBox(this);
+    targetSideCheckBox.text = "Target side";
+    targetSideCheckBox.toolTip = "<p>Displays the target side of the overlapping pixels.</p>" +
+            "<p>The overlap side of this boundary is fully corrected. " +
+            "The Target side correction is extrapolated from the overlap data.</p>";
+    targetSideCheckBox.checked = drawTargetSideFlag;
+    targetSideCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        drawTargetSideFlag = checked;
+        processEvents();
+        previewControl.forceRedraw();
+        self.enabled = true;
+    };
+    
     let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(23);
+    optionsSizer.add(pathCheckBox);
+    optionsSizer.addSpacing(23);
+    optionsSizer.add(targetSideCheckBox);
     optionsSizer.addStretch();
     
     const labelLength = this.font.width("Multiply star radius:");

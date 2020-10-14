@@ -205,7 +205,9 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     // ===========================
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
-    redRadioButton.toolTip = "Display the red channel gradient";
+    redRadioButton.toolTip = "<p>Display the red channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The 'Smoothness' setting will be applied to all color channels.</p>";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
         selectedChannel_ = 0;
@@ -217,7 +219,9 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
-    greenRadioButton.toolTip = "Display the green channel gradient";
+    greenRadioButton.toolTip = "<p>Display the green channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The 'Smoothness' setting will be applied to all color channels.</p>";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
         selectedChannel_ = 1;
@@ -229,7 +233,9 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
-    blueRadioButton.toolTip = "Display the blue channel gradient";
+    blueRadioButton.toolTip = "<p>Display the blue channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The 'Smoothness' setting will be applied to all color channels.</p>";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
         selectedChannel_ = 2;
