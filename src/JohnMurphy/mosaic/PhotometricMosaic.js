@@ -240,42 +240,36 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     let isTargetAfterRef;
+    let isAmbiguousFlag = false;
     if (data.cropTargetToJoinRegionFlag){
         isTargetAfterRef = null;
     } else if (isHorizontal){
         isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);
         let isRefAfterTarget = isImageBelowOverlap(referenceView.image, overlapBox, nChannels);
-        if (isTargetAfterRef === isRefAfterTarget){
-            // Ambiguous case, let user decide
-            let msg = "Reference:\t'" + referenceView.fullId + 
-                    "'\nTarget:\t'" + targetView.fullId +
-                    "'\n\nIs the reference frame above the target frame?";
-            let messageBox = new MessageBox(msg,
-                    "Failed to auto detect tile order", 
-                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Abort);
-            let response = messageBox.execute();
-            if (response === StdButton_Abort){
-                return;
-            }
-            isTargetAfterRef = (StdButton_Yes === response);
-        }
+        isAmbiguousFlag = (isTargetAfterRef === isRefAfterTarget);
     } else {
         isTargetAfterRef = isImageRightOfOverlap(targetView.image, overlapBox, nChannels);
         let isRefAfterTarget = isImageRightOfOverlap(referenceView.image, overlapBox, nChannels);
-        if (isTargetAfterRef === isRefAfterTarget){
-            // Ambiguous case, let user decide
-            let msg = "Reference:\t'" + referenceView.fullId + 
-                    "'\nTarget:\t'" + targetView.fullId +
-                    "'\n\nIs the reference frame to the left of the target frame?";
-            let messageBox = new MessageBox(msg,
-                    "Failed to auto detect tile order", 
-                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Abort);
-            let response = messageBox.execute();
-            if (response === StdButton_Abort){
-                return;
-            }
-            isTargetAfterRef = (StdButton_Yes === response);
+        isAmbiguousFlag = (isTargetAfterRef === isRefAfterTarget);
+    }
+    if (isAmbiguousFlag){
+        // Ambiguous case, let user decide
+        let direction = isHorizontal ? "above" : "to the left of";
+        let msg = "Reference:\t'" + referenceView.fullId + 
+            "'\nTarget:\t'" + targetView.fullId +
+            "'\n\nUnable to auto detect tile order. " +
+            "One reason this can happen is if the target or reference image is a subset of the other. " +
+            "This might be because the target has not been registered to the reference image, " +
+            "or the wrong reference or target image has been selected. If this is the case, select 'Abort'." +
+            "\n\nIs the reference frame " + direction + " the target frame?";
+        let messageBox = new MessageBox(msg,
+                "Failed to auto detect tile order", 
+                StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Abort);
+        let response = messageBox.execute();
+        if (response === StdButton_Abort){
+            return;
         }
+        isTargetAfterRef = (StdButton_Yes === response);
     }
     
     let overlapThickness = Math.min(overlapBox.height, overlapBox.width);
