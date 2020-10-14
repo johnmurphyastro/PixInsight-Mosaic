@@ -145,23 +145,29 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
      * @param {HorizontalSizer} horizontalSizer
      */
     function customControls (horizontalSizer){
-        let liveUpdate_control = new CheckBox();
+        let liveUpdate_control = new CheckBox(self);
         liveUpdate_control.text = "Live update";
         liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
         liveUpdate_control.onCheck = function (checked){
             liveUpdate = checked;
             update_Button.enabled = !checked;
             if (checked){
+                self.enabled = false;
+                processEvents();
                 updateSampleGrid();
+                self.enabled = true;
             }
         };
         liveUpdate_control.checked = liveUpdate;
 
-        let update_Button = new PushButton();
+        let update_Button = new PushButton(self);
         update_Button.text = "Update";
         update_Button.toolTip = "<p>Update display</p>";
         update_Button.onClick = function(){
+            self.enabled = false;
+            processEvents();
             updateSampleGrid();
+            self.enabled = true;
         };
         update_Button.enabled = !liveUpdate_control.checked;
         
@@ -200,13 +206,16 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     refCheckBox.toolTip = "Display either the reference or target background.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         previewControl.updateBitmap(bitmap);
         updateSampleGrid();
+        self.enabled = true;
     };
     
-    let optionsSizer = new HorizontalSizer();
+    let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
@@ -253,7 +262,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     }
 
     // Global sizer
-    this.sizer = new VerticalSizer;
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);

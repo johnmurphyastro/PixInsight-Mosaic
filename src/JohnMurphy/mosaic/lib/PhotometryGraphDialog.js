@@ -196,33 +196,39 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         updateZoom( 1 );
     };
     
-    let liveUpdate_control = new CheckBox();
+    let liveUpdate_control = new CheckBox(this);
     liveUpdate_control.text = "Live update";
     liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
     liveUpdate_control.onCheck = function (checked){
         update_Button.enabled = !checked;
         if (checked){
+            self.enabled = false;
+            processEvents();
             update(bitmapControl.width, bitmapControl.height);
+            self.enabled = true;
         }
     };
     liveUpdate_control.checked = false;
     
-    let update_Button = new PushButton();
+    let update_Button = new PushButton(this);
     update_Button.text = "Update";
     update_Button.toolTip = "<p>Update display</p>";
     update_Button.onClick = function(){
+        self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height);
+        self.enabled = true;
     };
     update_Button.enabled = !liveUpdate_control.checked;
     
-    let ok_Button = new PushButton();
+    let ok_Button = new PushButton(this);
     ok_Button.text = "OK";
     ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
     ok_Button.onClick = function(){
         self.ok();
     };
 
-    let zoomButton_Sizer = new HorizontalSizer();
+    let zoomButton_Sizer = new HorizontalSizer(this);
     zoomButton_Sizer.margin = 0;
     zoomButton_Sizer.spacing = 4;
     zoomButton_Sizer.add(zoomIn_Button);

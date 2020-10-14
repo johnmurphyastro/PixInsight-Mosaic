@@ -210,6 +210,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     redRadioButton.onClick = function (checked) {
         selectedChannel_ = 0;
         self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height, true);
         self.enabled = true;
     };
@@ -221,6 +222,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     greenRadioButton.onClick = function (checked) {
         selectedChannel_ = 1;
         self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height, true);
         self.enabled = true;
     };
@@ -232,6 +234,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     blueRadioButton.onClick = function (checked) {
         selectedChannel_ = 2;
         self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height, true);
         self.enabled = true;
     };
@@ -243,6 +246,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     allRadioButton.onClick = function (checked) {
         selectedChannel_ = 3;
         self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height, true);
         self.enabled = true;
     };
@@ -253,7 +257,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
         blueRadioButton.enabled = false;
     }
 
-    let optionsSizer = new HorizontalSizer();
+    let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.spacing = 10;
     optionsSizer.addSpacing(4);
@@ -292,23 +296,24 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
         updateZoom( 1 );
     };
     
-    let update_Button = new PushButton();
+    let update_Button = new PushButton(this);
     update_Button.text = "Update";
     update_Button.toolTip = "<p>Update display</p>";
     update_Button.onClick = function(){
         self.enabled = false;
+        processEvents();
         update(bitmapControl.width, bitmapControl.height, true);
         self.enabled = true;
     };
     
-    let ok_Button = new PushButton();
+    let ok_Button = new PushButton(this);
     ok_Button.text = "OK";
     ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
     ok_Button.onClick = function(){
         self.ok();
     };
 
-    let zoomButton_Sizer = new HorizontalSizer();
+    let zoomButton_Sizer = new HorizontalSizer(this);
     zoomButton_Sizer.margin = 0;
     zoomButton_Sizer.spacing = 4;
     zoomButton_Sizer.add(zoomIn_Button);

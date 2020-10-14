@@ -584,7 +584,7 @@ function PhotometricMosaicDialog(data) {
         data.referenceView = view;
     };
 
-    let referenceImage_Sizer = new HorizontalSizer;
+    let referenceImage_Sizer = new HorizontalSizer(this);
     referenceImage_Sizer.spacing = 4;
     referenceImage_Sizer.add(referenceImage_Label);
     referenceImage_Sizer.add(referenceImage_ViewList, 100);
@@ -607,7 +607,7 @@ function PhotometricMosaicDialog(data) {
         data.targetView = view;
     };
 
-    let targetImage_Sizer = new HorizontalSizer;
+    let targetImage_Sizer = new HorizontalSizer(this);
     targetImage_Sizer.spacing = 4;
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(targetImage_ViewList, 100);
@@ -643,7 +643,7 @@ function PhotometricMosaicDialog(data) {
     this.starDetection_Control.slider.minWidth = 50;
     this.starDetection_Control.setValue(data.logStarDetection);
     
-    let detectedStarsButton = new PushButton();
+    let detectedStarsButton = new PushButton(this);
     detectedStarsButton.text = "Detected stars";
     detectedStarsButton.toolTip =
             "<p>Displays all the stars detected in the reference and target images.</p>" +
@@ -733,7 +733,7 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Photometric Scale"
     // =======================================
-    this.limitPhotoStarsPercent_Control = new NumericEdit();
+    this.limitPhotoStarsPercent_Control = new NumericEdit(this);
     this.limitPhotoStarsPercent_Control.setReal(true);
     this.limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
     this.limitPhotoStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
@@ -751,7 +751,7 @@ function PhotometricMosaicDialog(data) {
     };
     
     let LINEAR_RANGE_STRLEN = this.font.width("Linear range:");
-    this.linearRange_Control = new NumericEdit();
+    this.linearRange_Control = new NumericEdit(this);
     this.linearRange_Control.setReal(true);
     this.linearRange_Control.label.text = "Linear range:";
     this.linearRange_Control.label.minWidth = LINEAR_RANGE_STRLEN;
@@ -767,7 +767,7 @@ function PhotometricMosaicDialog(data) {
         data.linearRange = value;
     };
     
-    this.outlierRemoval_Control = new NumericEdit();
+    this.outlierRemoval_Control = new NumericEdit(this);
     this.outlierRemoval_Control.setReal(false);
     this.outlierRemoval_Control.label.text = "Outlier removal:";
     this.outlierRemoval_Control.toolTip =
@@ -780,7 +780,7 @@ function PhotometricMosaicDialog(data) {
         data.outlierRemoval = value;
     };
     
-    let photometryGraphButton = new PushButton();
+    let photometryGraphButton = new PushButton(this);
     photometryGraphButton.text = "Edit and display graph";
     photometryGraphButton.toolTip =
             "<p>Edit parameters and view a graph of the linear fit in real time.</p>" +
@@ -795,7 +795,7 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let photometricScaleHorizSizer1 = new HorizontalSizer;
+    let photometricScaleHorizSizer1 = new HorizontalSizer(this);
     photometricScaleHorizSizer1.spacing = 10;
     photometricScaleHorizSizer1.add(this.limitPhotoStarsPercent_Control);
     photometricScaleHorizSizer1.add(this.linearRange_Control);
@@ -803,7 +803,7 @@ function PhotometricMosaicDialog(data) {
     photometricScaleHorizSizer1.addStretch();
     photometricScaleHorizSizer1.add(photometryGraphButton);
     
-    let photometryStarsButton = new PushButton();
+    let photometryStarsButton = new PushButton(this);
     photometryStarsButton.text = "Photometry stars";
     photometryStarsButton.toolTip =
             "<p>Displays the stars that met the criteria for photometry, including: " +
@@ -840,7 +840,7 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     const sampleGenerationStrLen = this.font.width("Multiply star radius:");
     
-    this.limitSampleStarsPercent_Control = new NumericEdit();
+    this.limitSampleStarsPercent_Control = new NumericEdit(this);
     this.limitSampleStarsPercent_Control.real = true;
     this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
     this.limitSampleStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
@@ -865,7 +865,7 @@ function PhotometricMosaicDialog(data) {
         data.limitSampleStarsPercent = value;
     };
     
-    this.sampleStarRadiusMult_Control = new NumericEdit();
+    this.sampleStarRadiusMult_Control = new NumericEdit(this);
     this.sampleStarRadiusMult_Control.real = true;
     this.sampleStarRadiusMult_Control.label.text = "Multiply star radius:";
     this.sampleStarRadiusMult_Control.toolTip =
@@ -879,7 +879,7 @@ function PhotometricMosaicDialog(data) {
         data.sampleStarRadiusMult = value;
     };
     
-    this.sampleSize_Control = new NumericEdit();
+    this.sampleSize_Control = new NumericEdit(this);
     this.sampleSize_Control.real = false;
     this.sampleSize_Control.label.text = "Sample size:";
     this.sampleSize_Control.label.minWidth = LINEAR_RANGE_STRLEN;
@@ -893,7 +893,7 @@ function PhotometricMosaicDialog(data) {
         data.sampleSize = value;
     };
     
-    let displaySamplesButton = new PushButton();
+    let displaySamplesButton = new PushButton(this);
     displaySamplesButton.text = "Edit and display samples";
     displaySamplesButton.toolTip =
             "<p>Edit parameters and view the grid of samples in real time.</p>" +
@@ -909,7 +909,7 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let sampleGridSizer = new HorizontalSizer;
+    let sampleGridSizer = new HorizontalSizer(this);
     sampleGridSizer.spacing = 10;
     sampleGridSizer.add(this.limitSampleStarsPercent_Control);
     sampleGridSizer.add(this.sampleSize_Control);
@@ -919,7 +919,7 @@ function PhotometricMosaicDialog(data) {
     
     let maxSamplesSizer;
     if (EXTRA_CONTROLS()){
-        this.maxSamples_Control = new NumericEdit();
+        this.maxSamples_Control = new NumericEdit(this);
         this.maxSamples_Control.real = false;
         this.maxSamples_Control.label.text = "Max samples:";
         this.maxSamples_Control.label.minWidth = this.font.width("Limit stars %:");
@@ -938,7 +938,7 @@ function PhotometricMosaicDialog(data) {
         this.maxSamples_Control.setValue(data.maxSamples);
         this.maxSamples_Control.enabled = false;
 
-        let displayBinnedSamplesButton = new PushButton();
+        let displayBinnedSamplesButton = new PushButton(this);
         displayBinnedSamplesButton.text = "Binned grid ";
         displayBinnedSamplesButton.toolTip =
                 "<p>Displays the binned samples used to construct the surface spline " +
@@ -1009,7 +1009,7 @@ function PhotometricMosaicDialog(data) {
     this.overlapGradientSmoothness_Control.slider.minWidth = 140;
     this.overlapGradientSmoothness_Control.setValue(data.overlapGradientSmoothness);
     
-    let overlapGradientGraphButton = new PushButton();
+    let overlapGradientGraphButton = new PushButton(this);
     overlapGradientGraphButton.text = "Edit and display gradient";
     overlapGradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
@@ -1061,14 +1061,14 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
     
-    let overlapGradientSizer = new HorizontalSizer;
+    let overlapGradientSizer = new HorizontalSizer(this);
     overlapGradientSizer.spacing = 4;
     overlapGradientSizer.add(this.overlapGradientSmoothness_Control);
     overlapGradientSizer.addSpacing(20);
     overlapGradientSizer.add(overlapGradientGraphButton);
     
     let overlapGradientSection = new Control(this);
-    overlapGradientSection.sizer = new VerticalSizer;
+    overlapGradientSection.sizer = new VerticalSizer(this);
     overlapGradientSection.sizer.spacing = 4;
     overlapGradientSection.sizer.add(overlapGradientSizer);
     overlapGradientSection.sizer.add(this.taperLength_Control);
@@ -1108,7 +1108,7 @@ function PhotometricMosaicDialog(data) {
     this.targetGradientSmoothness_Control.slider.minWidth = 140;
     this.targetGradientSmoothness_Control.setValue(data.targetGradientSmoothness);
     
-    let targetGradientGraphButton = new PushButton();
+    let targetGradientGraphButton = new PushButton(this);
     targetGradientGraphButton.text = "Edit and display gradient";
     targetGradientGraphButton.toolTip =
         "<p>The vertical axis represents the difference between the two images, " +
@@ -1209,7 +1209,7 @@ function PhotometricMosaicDialog(data) {
         return new Rect(x, y, x + w, y + h);
     }
 
-    let joinAreaHorizSizer1 = new HorizontalSizer; 
+    let joinAreaHorizSizer1 = new HorizontalSizer(this); 
     joinAreaHorizSizer1.spacing = 10;
     joinAreaHorizSizer1.add(this.rectangleX0_Control);
     joinAreaHorizSizer1.add(this.rectangleY0_Control);
@@ -1246,7 +1246,7 @@ function PhotometricMosaicDialog(data) {
         previewUpdateActions(this.dialog);
     };
 
-    let previewUpdateButton = new PushButton();
+    let previewUpdateButton = new PushButton(this);
     previewUpdateButton.hasFocus = false;
     previewUpdateButton.text = "Update";
     previewUpdateButton.onClick = function () {
@@ -1257,7 +1257,7 @@ function PhotometricMosaicDialog(data) {
         previewUpdateActions(this.dialog);
     };
 
-    let joinAreaHorizSizer2 = new HorizontalSizer;
+    let joinAreaHorizSizer2 = new HorizontalSizer(this);
     joinAreaHorizSizer2.spacing = 4;
     joinAreaHorizSizer2.add(previewImage_Label);
     joinAreaHorizSizer2.add(this.previewImage_ViewList, 100);
@@ -1288,7 +1288,7 @@ function PhotometricMosaicDialog(data) {
     };
     
     if (EXTRA_CONTROLS()){
-        this.taperFromJoin_Control = new CheckBox();
+        this.taperFromJoin_Control = new CheckBox(this);
         this.taperFromJoin_Control.text = "Taper from join";
         this.taperFromJoin_Control.toolTip =
                 "<p>This is an advanced option and should usually be left unchecked.</p>" +
@@ -1310,7 +1310,7 @@ function PhotometricMosaicDialog(data) {
         this.taperFromJoin_Control.checked = data.taperFromJoin;
     }
     
-    this.cropTarget_Control = new CheckBox();
+    this.cropTarget_Control = new CheckBox(this);
     this.cropTarget_Control.text = "Crop target";
     this.cropTarget_Control.toolTip = 
         "<p>Restricts target image pixels to the user specified rectangle. " +
@@ -1322,7 +1322,7 @@ function PhotometricMosaicDialog(data) {
     };
     this.cropTarget_Control.checked = data.cropTargetToJoinRegionFlag;
     
-    let joinAreaFlagsHorizSizer = new HorizontalSizer;
+    let joinAreaFlagsHorizSizer = new HorizontalSizer(this);
     joinAreaFlagsHorizSizer.addSpacing(GET_AREA_FROM_PREVIEW_STRLEN + 4);
     joinAreaFlagsHorizSizer.add(this.cropTarget_Control);
     if (EXTRA_CONTROLS()){
@@ -1333,7 +1333,7 @@ function PhotometricMosaicDialog(data) {
     joinAreaFlagsHorizSizer.addStretch();
     
     let joinAreaSection = new Control(this);
-    joinAreaSection.sizer = new VerticalSizer;
+    joinAreaSection.sizer = new VerticalSizer(this);
     joinAreaSection.sizer.spacing = 4;
     joinAreaSection.sizer.add(joinAreaHorizSizer1);
     joinAreaSection.sizer.add(joinAreaHorizSizer2);
@@ -1457,7 +1457,7 @@ function PhotometricMosaicDialog(data) {
     };
     
     
-    let starsMaskButton = new PushButton();
+    let starsMaskButton = new PushButton(this);
     starsMaskButton.text = "Star mask";
     starsMaskButton.toolTip =
             "<p>Creates a star mask.</p>" + 
@@ -1470,7 +1470,7 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let joinMaskButton = new PushButton();
+    let joinMaskButton = new PushButton(this);
     joinMaskButton.text = "Join mask";
     joinMaskButton.toolTip =
             "<p>Creates a mask of the mosaic join. " +
@@ -1488,7 +1488,7 @@ function PhotometricMosaicDialog(data) {
     };
     
     let mosaicSection = new Control(this);
-    mosaicSection.sizer = new HorizontalSizer;
+    mosaicSection.sizer = new HorizontalSizer(this);
     mosaicSection.sizer.spacing = 10;
     mosaicSection.sizer.add(overlay_Label);
     mosaicSection.sizer.add(this.mosaicOverlayTgt_Control);
@@ -1524,7 +1524,7 @@ function PhotometricMosaicDialog(data) {
     //---------------------------------------------------------------
     // Vertically stack all the SectionBars and OK/Cancel button bar
     //---------------------------------------------------------------
-    this.sizer = new VerticalSizer;
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 6;
     this.sizer.spacing = 4;
     this.sizer.add(titleBar);

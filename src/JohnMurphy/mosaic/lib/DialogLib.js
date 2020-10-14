@@ -105,18 +105,18 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
         ok_Button.toolTip = okToolTip;
     }
 
-    let cancel_Button = new PushButton();
+    let cancel_Button = new PushButton(dialog);
     cancel_Button.text = "Cancel";
     cancel_Button.icon = dialog.scaledResource( ":/icons/cancel.png" );
     cancel_Button.onClick = function () {
         dialog.cancel();
     };
 
-    let buttons_Sizer = new HorizontalSizer;
+    let buttons_Sizer = new HorizontalSizer(dialog);
     buttons_Sizer.spacing = 6;
 
     // New Instance button
-    let newInstance_Button = new ToolButton();
+    let newInstance_Button = new ToolButton(dialog);
     newInstance_Button.icon = dialog.scaledResource(":/process-interface/new-instance.png");
     newInstance_Button.setScaledFixedSize(24, 24);
     newInstance_Button.toolTip = "Save as Process Icon";
@@ -127,7 +127,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
         dialog.newInstance();
     };
 
-    let browseDocumentationButton = new ToolButton();
+    let browseDocumentationButton = new ToolButton(dialog);
     browseDocumentationButton.icon = dialog.scaledResource(":/process-interface/browse-documentation.png");
     browseDocumentationButton.setScaledFixedSize(24, 24);
     browseDocumentationButton.toolTip =
@@ -148,7 +148,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     buttons_Sizer.add(newInstance_Button);
     buttons_Sizer.add(browseDocumentationButton);
 
-    let resetButton = new ToolButton();
+    let resetButton = new ToolButton(dialog);
     resetButton.icon = dialog.scaledResource(":/images/icons/reset.png");
     resetButton.setScaledFixedSize(24, 24);
     resetButton.toolTip = 
@@ -159,7 +159,7 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
         resetSettings();
     };
     
-    let saveSettingsButton = new ToolButton();
+    let saveSettingsButton = new ToolButton(dialog);
     saveSettingsButton.icon = dialog.scaledResource(":icons/save.png");
     saveSettingsButton.setScaledFixedSize(24, 24);
     saveSettingsButton.toolTip = 

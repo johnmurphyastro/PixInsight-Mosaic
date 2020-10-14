@@ -170,7 +170,10 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
             liveUpdate = checked;
             update_Button.enabled = !checked;
             if (checked){
+                self.enabled = false;
+                processEvents();
                 update();
+                self.enabled = true;
             }
         };
         liveUpdate_control.checked = liveUpdate;
@@ -179,7 +182,10 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         update_Button.text = "Update";
         update_Button.toolTip = "<p>Update display</p>";
         update_Button.onClick = function(){
+            self.enabled = false;
+            processEvents();
             update();
+            self.enabled = true;
         };
         update_Button.enabled = !liveUpdate_control.checked;
         
@@ -219,11 +225,14 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
             "target background and stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         starPairs = getStarPairs(selectedChannel);
         previewControl.updateBitmap(bitmap);
         update();
+        self.enabled = true;
     };
     
     let redRadioButton = new RadioButton(this);
@@ -231,9 +240,12 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     redRadioButton.toolTip = "Display the photometry stars detected within the red channel";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 0;
         starPairs = getStarPairs(selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let greenRadioButton = new RadioButton(this);
@@ -241,9 +253,12 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     greenRadioButton.toolTip = "Display the photometry stars detected within the green channel";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 1;
         starPairs = getStarPairs(selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let blueRadioButton = new RadioButton(this);
@@ -251,9 +266,12 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     blueRadioButton.toolTip = "Display the photometry stars detected within the blue channel";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 2;
         starPairs = getStarPairs(selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let allRadioButton = new RadioButton(this);
@@ -261,9 +279,12 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     allRadioButton.toolTip = "Display the photometry stars detected within all channels";
     allRadioButton.checked = true;
     allRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 3;
         starPairs = getStarPairs(selectedChannel);
         update();
+        self.enabled = true;
     };
     
     if (colorStarPairs.length === 1){
@@ -272,7 +293,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
         blueRadioButton.enabled = false;
     }
     
-    let optionsSizer = new HorizontalSizer();
+    let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.spacing = 10;
     optionsSizer.addSpacing(4);
@@ -327,7 +348,7 @@ function PhotometryStarsDialog(title, refBitmap, tgtBitmap, nChannels,
     }
 
     // Global sizer
-    this.sizer = new VerticalSizer;
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);

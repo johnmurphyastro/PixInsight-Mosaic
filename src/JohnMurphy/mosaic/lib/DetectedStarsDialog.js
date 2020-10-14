@@ -171,11 +171,14 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
             "target background and stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         stars = getStars(selectedBitmap, selectedChannel);
         previewControl.updateBitmap(bitmap);
         update();
+        self.enabled = true;
     };
     
     let redRadioButton = new RadioButton(this);
@@ -183,9 +186,12 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     redRadioButton.toolTip = "Display the stars detected within the red channel";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 0;
         stars = getStars(selectedBitmap, selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let greenRadioButton = new RadioButton(this);
@@ -193,9 +199,12 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     greenRadioButton.toolTip = "Display the stars detected within the green channel";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 1;
         stars = getStars(selectedBitmap, selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let blueRadioButton = new RadioButton(this);
@@ -203,9 +212,12 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     blueRadioButton.toolTip = "Display the stars detected within the blue channel";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 2;
         stars = getStars(selectedBitmap, selectedChannel);
         update();
+        self.enabled = true;
     };
     
     let allRadioButton = new RadioButton(this);
@@ -213,9 +225,12 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     allRadioButton.toolTip = "Display the stars detected within all channels";
     allRadioButton.checked = true;
     allRadioButton.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedChannel = 3;
         stars = getStars(selectedBitmap, selectedChannel);
         update();
+        self.enabled = true;
     };
     
     if (detectedStars.refColorStars.length === 1){
@@ -224,7 +239,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
         blueRadioButton.enabled = false;
     }
     
-    let optionsSizer = new HorizontalSizer();
+    let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.spacing = 10;
     optionsSizer.addSpacing(4);
@@ -244,7 +259,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     }
 
     // Global sizer
-    this.sizer = new VerticalSizer;
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);

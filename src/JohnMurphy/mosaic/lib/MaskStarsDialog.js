@@ -194,8 +194,10 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     previewControl.ok_Button.toolTip = "<p>Create new mask image</p>";
     previewControl.ok_Button.onClick = function(){
         console.writeln("\n<b><u>Creating mosaic mask</u></b>");
-        update();
+        self.enabled = false;
+        processEvents();
         createStarMask(tgtView, joinArea, detectedStars, data);    
+        self.enabled = true;
     };
     
     previewControl.cancel_Button.toolTip = "<p>Close dialog</p>";
@@ -211,33 +213,42 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     refCheckBox.toolTip = "Display reference or target image.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
+        self.enabled = false;
+        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         previewControl.updateBitmap(bitmap);
         update();
+        self.enabled = true;
     };
     
-    let liveUpdate_control = new CheckBox();
+    let liveUpdate_control = new CheckBox(this);
     liveUpdate_control.text = "Live update";
     liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
     liveUpdate_control.onCheck = function (checked){
         liveUpdate = checked;
         update_Button.enabled = !checked;
         if (checked){
+            self.enabled = false;
+            processEvents();
             update();
+            self.enabled = true;
         }
     };
     liveUpdate_control.checked = liveUpdate;
 
-    let update_Button = new PushButton();
+    let update_Button = new PushButton(this);
     update_Button.text = "Update";
     update_Button.toolTip = "<p>Update display</p>";
     update_Button.onClick = function(){
+        self.enabled = false;
+        processEvents();
         update();
+        self.enabled = true;
     };
     update_Button.enabled = !liveUpdate_control.checked;
     
-    let correctTarget_Button = new PushButton();
+    let correctTarget_Button = new PushButton(this);
     correctTarget_Button.text = "Correct target";
     correctTarget_Button.toolTip = "<p>Create a corrected target image.</p>" +
             "<p>The unedited reference image can be used to replace stars in a masked mosaic, " +
@@ -248,12 +259,14 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             "that can be used with the star mask.</p>";
     correctTarget_Button.onClick = function(){
         console.writeln("\n<b><u>Creating corrected target image</u></b>");
-        update();
+        self.enabled = false;
+        processEvents();
         createCorrectedTarget(data, joinArea, binnedColorSamplePairs,
             isHorizontal, isTargetAfterRef, scaleFactors);
+        self.enabled = true;
     };
     
-    let optionsSizer = new HorizontalSizer();
+    let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
@@ -335,7 +348,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     }
 
     // Global sizer
-    this.sizer = new VerticalSizer;
+    this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
