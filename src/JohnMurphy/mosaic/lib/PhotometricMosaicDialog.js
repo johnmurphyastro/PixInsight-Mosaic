@@ -1,4 +1,4 @@
-/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog, StdButton_Yes, StdIcon_Question, StdButton_No, StdButton_Cancel, Settings, DataType_Float, KEYPREFIX, DataType_Int32, DataType_Boolean */
+/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog, StdButton_Yes, StdIcon_Question, StdButton_No, StdButton_Cancel, Settings, DataType_Float, KEYPREFIX, DataType_Int32, DataType_Boolean, StdButton_Abort, StdIcon_Warning, StdButton_Ignore */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -1628,6 +1628,8 @@ function main() {
         restoreSettings(data);
     }
 
+    let checkedRefViewId = "";
+    let checkedTgtViewId = "";
     let photometricMosaicDialog = new PhotometricMosaicDialog(data);
     for (; ; ) {
         data.viewFlag = 0;
@@ -1675,6 +1677,40 @@ function main() {
             (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nOverlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
+        }
+
+        let getTrimMessageBox = function(imageView){
+            let imageName = imageView.fullId;
+            let msg = "<p>Warning: '<b>" + imageName + "</b>' has not been trimmed by the <b>" + TRIM_NAME() + "</b> script.</p>" +
+                    "<p><b>PhotometricMosaic</b> requires the images to have hard edges.<br>" +
+                    "Registration and Image integration or color combine can produce ragged edges. " +
+                    "Soft edges can also be introduced by the MosaicByCoordinates script.</p>" +
+                    "<p>A soft edge can produce fine lines at some places in the join.\n" +
+                    "Rough edges can cause a complete failure to match the two images, especially at the ends of the join.</p>" +
+                    "<p>Use <b>" + TRIM_NAME() + "</b> to errode pixels from the edges of the registered mosaic tiles.</p>";
+            return new MessageBox(msg, "Warning: Image may have soft or rough edges", 
+                StdIcon_Warning, StdButton_Ignore, StdButton_Abort);
+        };
+        
+        if (checkedTgtViewId !== data.targetView.fullId && 
+                !(searchFitsHistory(data.targetView, TRIM_NAME()) || searchFitsHistory(data.targetView, "TrimImage"))){
+            console.warningln("Warning: '" + data.targetView.fullId + "' has not been trimmed by the " + TRIM_NAME() + " script");
+            if (getTrimMessageBox(data.targetView).execute() === StdButton_Abort){
+                console.warningln("Aborted. Use " + TRIM_NAME() + " script to errode pixels from the registered image edges.");
+                return;
+            } else {
+                checkedTgtViewId = data.targetView.fullId;
+            }
+        }
+        if (checkedRefViewId !== data.referenceView.fullId && 
+                !(searchFitsHistory(data.referenceView, TRIM_NAME()) || searchFitsHistory(data.referenceView, "TrimImage"))){
+            console.warningln("Warning: '" + data.referenceView.fullId + "' has not been trimmed by the " + TRIM_NAME() + " script");
+            if (getTrimMessageBox(data.referenceView).execute() === StdButton_Abort){
+                console.warningln("Aborted. Use " + TRIM_NAME() + " script to errode pixels from the registered image edges.");
+                return;
+            } else {
+                checkedRefViewId = data.referenceView.fullId;
+            }
         }
 
         // Run the script

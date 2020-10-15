@@ -84,13 +84,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         let overlapTime = new Date().getTime();
         // Add trim warning check here so it is only displayed once
         console.writeln("Reference: <b>", referenceView.fullId, "</b>, Target: <b>", targetView.fullId, "</b>\n");
-        if (!searchFitsHistory(referenceView, TRIM_NAME())){
-            console.warningln("Warning: '" + referenceView.fullId +"' has not been trimmed by the " + TRIM_NAME() + " script");
-        }
-        if (!searchFitsHistory(targetView, TRIM_NAME())){
-            console.warningln("Warning: '" + targetView.fullId +"' has not been trimmed by the " + TRIM_NAME() + " script");
-        }
-        
         console.writeln("<b><u>Calculating overlap</u></b>");
         processEvents();
         overlap = new Overlap(referenceView.image, targetView.image);
