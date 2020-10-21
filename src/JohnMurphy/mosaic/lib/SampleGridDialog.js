@@ -47,8 +47,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     let selectedBitmap = REF;
     let bitmap = getBitmap(selectedBitmap);
     let bitmapOffset = getBitmapOffset(data);
-    let drawPathFlag = false;
-    let drawTargetSideFlag = false;
+    let drawPathFlag = true;
+    let drawTargetSideFlag = true;
     
     /**
      * Return bitmap of the reference or target image
@@ -257,8 +257,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     
     let targetSideCheckBox = new CheckBox(this);
-    targetSideCheckBox.text = "Target side";
-    targetSideCheckBox.toolTip = "<p>Displays the target side of the overlapping pixels.</p>" +
+    targetSideCheckBox.text = "Display target side";
+    targetSideCheckBox.toolTip = "<p>Indicates the target side of the overlapping pixels.</p>" +
             "<p>The overlap side of this boundary is fully corrected. " +
             "The Target side correction is extrapolated from the overlap data.</p>";
     targetSideCheckBox.checked = drawTargetSideFlag;

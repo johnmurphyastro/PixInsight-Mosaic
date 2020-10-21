@@ -441,9 +441,6 @@ function PreviewControl(parent, image, metadata, customControls, includeCancelBu
             else
                 graphics.fillRect(0, 0, self.scaledImage.width, self.scaledImage.height, new Brush(0xff000000));
 
-            graphics.pen = new Pen(0xffffffff, 0);
-            graphics.drawRect(-1, -1, self.scaledImage.width + 1, self.scaledImage.height + 1);
-
             if (self.onCustomPaint) {
                 // Draw on top of the bitmap if onCustomPaint(...) method has been set
                 self.onCustomPaint.call(self.onCustomPaintScope, 

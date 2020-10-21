@@ -1090,7 +1090,7 @@ function PhotometricMosaicDialog(data) {
     this.targetGradientSmoothness_Control.onValueUpdated = function (value) {
         data.targetGradientSmoothness = value;
     };
-    this.targetGradientSmoothness_Control.setRange(-1, 6);
+    this.targetGradientSmoothness_Control.setRange(-2, 5);
     this.targetGradientSmoothness_Control.slider.setRange(-100, 600);
     this.targetGradientSmoothness_Control.slider.minWidth = 140;
     this.targetGradientSmoothness_Control.setValue(data.targetGradientSmoothness);

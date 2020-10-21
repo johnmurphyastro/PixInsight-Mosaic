@@ -1,4 +1,4 @@
-/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter, Dialog, CoreApplication */
+/* global FrameStyle_Box, StdCursor_Checkmark, StdCursor_Crossmark, StdIcon_Information, StdButton_Ok, TextAlign_Right, TextAlign_VertCenter, Dialog, CoreApplication, StdIcon_Question, StdButton_Cancel */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -166,7 +166,12 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
             "<p>Saves settings between sessions.</p>" +
             "<p>Use 'Reset' to clear the saved settings.</p>";
     saveSettingsButton.onClick = function () {
-        saveSettings(data);
+        let msg = "<p>The current settings will be saved between sessions until 'Reset' is selected.</p>";
+        let reply = (new MessageBox(msg, "Save settings ?", 
+                StdIcon_Question, StdButton_Ok, StdButton_Cancel)).execute();
+        if (reply === StdButton_Ok){
+            saveSettings(data);
+        }
     };
 
     buttons_Sizer.add(resetButton);
