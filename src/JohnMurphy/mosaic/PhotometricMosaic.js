@@ -285,7 +285,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         console.writeln("\n<b><u>Displaying sample grid</u></b>");
         
         let joinPath = createMidJoinPathLimittedByOverlap(targetView.image,
-                data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+                data.cache.overlap, joinRect, isHorizontal, data);
         let targetSide = createOverlapOutlinePath(targetView.image, 
                 data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
         

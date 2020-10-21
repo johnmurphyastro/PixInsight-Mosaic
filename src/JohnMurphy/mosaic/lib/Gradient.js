@@ -166,11 +166,9 @@ function calcSurfaceSpline(samplePairs, logSmoothing){
  * @param {Rect} joinRect
  * @param {Boolean} isHorizontal
  * @param {PhotometricMosaicData} data
- * @param {Boolean} isTargetAfterRef
  * @returns {TargetRegions}
  */
-function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal, 
-        data, isTargetAfterRef){
+function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal, data){
             
     this.firstTaperStart = 0;
     this.overlapStart = 0;
@@ -198,29 +196,13 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
     }
     
     if (isHorizontal){
-        if (!data.taperFromJoin){
-            this.overlapStart = overlapBox.y0;
-            this.overlapEnd = overlapBox.y1;
-        } else if (isTargetAfterRef){
-            this.overlapStart = overlapBox.y0;
-            this.overlapEnd = this.joinEnd;
-        } else {
-            this.overlapStart = this.joinStart;
-            this.overlapEnd = overlapBox.y1;
-        }
+        this.overlapStart = overlapBox.y0;
+        this.overlapEnd = overlapBox.y1;
         this.firstTaperStart = Math.max(0, this.overlapStart - data.taperLength); // overlapStart - taperLength
         this.secondTaperEnd = Math.min(imageHeight, this.overlapEnd + data.taperLength); // overlapEnd + taperLength
     } else {
-        if (!data.taperFromJoin){
-            this.overlapStart = overlapBox.x0;
-            this.overlapEnd = overlapBox.x1;
-        } else if (isTargetAfterRef){
-            this.overlapStart = overlapBox.x0;
-            this.overlapEnd = this.joinEnd;
-        } else {
-            this.overlapStart = this.joinStart;
-            this.overlapEnd = overlapBox.x1;
-        }
+        this.overlapStart = overlapBox.x0;
+        this.overlapEnd = overlapBox.x1;
         this.firstTaperStart = Math.max(0, this.overlapStart - data.taperLength);
         this.secondTaperEnd = Math.min(imageWidth, this.overlapEnd + data.taperLength);
     }
@@ -251,7 +233,7 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     let taperLength_ = data.taperLength;
     
     let regions_ = new TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal, 
-        data, isTargetAfterRef);
+        data);
     
     let joinType_ = 0;
     

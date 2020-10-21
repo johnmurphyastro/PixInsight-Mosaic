@@ -101,7 +101,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         let title = "Gradient Graph";
         if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
             // This path is along the center of the joinRect, but constrained by the overlap area
-            graphLinePath_ = createMidJoinPathLimittedByOverlap(tgtImage, data.cache.overlap, joinRect, isHorizontal, isTargetAfterRef, data);
+            graphLinePath_ = createMidJoinPathLimittedByOverlap(tgtImage, data.cache.overlap, joinRect, isHorizontal, data);
             pointPath_ = graphLinePath_;
             title += " (Overlap region)";
         } else {
@@ -368,13 +368,12 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
  * @param {Overlap} overlap
  * @param {Rect} joinRect
  * @param {Boolean} isHorizontal
- * @param {Boolean} isTargetAfterRef
  * @param {PhotometricMosaicData} data
  * @returns {Point[]}
  */
-function createMidJoinPathLimittedByOverlap(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
+function createMidJoinPathLimittedByOverlap(tgtImage, overlap, joinRect, isHorizontal, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
-            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+            overlap, joinRect, isHorizontal, data);
     let joinMidPath;
     if (isHorizontal){
         joinMidPath = overlap.calcHorizOutlinePath(regions.joinMiddle);
@@ -397,7 +396,7 @@ function createMidJoinPathLimittedByOverlap(tgtImage, overlap, joinRect, isHoriz
  */
 function createOverlapOutlinePath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
-            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+            overlap, joinRect, isHorizontal, data);
     let path;
     // Target gradient region is target side of overlap
     if (isHorizontal){
@@ -422,7 +421,7 @@ function createOverlapOutlinePath(tgtImage, overlap, joinRect, isHorizontal, isT
  */
 function createOverlapBoundingBoxPath(tgtImage, overlap, joinRect, isHorizontal, isTargetAfterRef, data){
     let regions = new TargetRegions(tgtImage.width, tgtImage.height, 
-            overlap, joinRect, isHorizontal, data, isTargetAfterRef);
+            overlap, joinRect, isHorizontal, data);
     let overlapBox = overlap.overlapBox;
 
     let graphLinePath;

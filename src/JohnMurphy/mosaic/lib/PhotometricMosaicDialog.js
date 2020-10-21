@@ -112,7 +112,6 @@ function PhotometricMosaicData() {
         Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
         Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
         Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
-        Parameters.set("taperFromJoin", this.taperFromJoin);
         Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
         
         // Gradient Sample Generation
@@ -201,8 +200,6 @@ function PhotometricMosaicData() {
             }
             this.joinAreaPreviewRect = new Rect(x, y, x + w, y + h);
             
-            if (Parameters.has("taperFromJoin"))
-                this.taperFromJoin = Parameters.getBoolean("taperFromJoin");
             if (Parameters.has("cropTargetToJoinRegionFlag"))
                 this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
         }
@@ -272,7 +269,6 @@ function PhotometricMosaicData() {
         // Join Region (Advanced settings)
         this.hasJoinAreaPreview = false;
         this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
-        this.taperFromJoin = false;
         this.cropTargetToJoinRegionFlag = false;
         
         // Gradient Sample Generation
@@ -338,9 +334,6 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
         photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
         photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        if (EXTRA_CONTROLS()){
-            photometricMosaicDialog.taperFromJoin_Control.checked = this.taperFromJoin;
-        }
         photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
         
         // Gradient Sample Generation
@@ -1256,37 +1249,7 @@ function PhotometricMosaicDialog(data) {
             data.cropTargetToJoinRegionFlag = false;
             self.cropTarget_Control.checked = false; 
         }
-        if (EXTRA_CONTROLS()){
-            self.taperFromJoin_Control.enabled = checked;
-            if (!checked){
-                data.taperFromJoin = false;
-                self.taperFromJoin_Control.checked = false;
-            }
-        }
     };
-    
-    if (EXTRA_CONTROLS()){
-        this.taperFromJoin_Control = new CheckBox(this);
-        this.taperFromJoin_Control.text = "Taper from join";
-        this.taperFromJoin_Control.toolTip =
-                "<p>This is an advanced option and should usually be left unchecked.</p>" +
-                "<p>This option moves the taper from the target side of the " +
-                "Overlap bounding box to the target side of the Join Region.</p>" +
-                "<p>The target image's offset and gradient are fully corrected within the join region, " +
-                "but outside the Overlap bounding box the gradient can only be partially " +
-                "corrected. A taper is applied to blend these two regions together.</p>" +
-                "<p>This option is one of several strategies used to prevent a bright star " +
-                "near the start of the taper zone from causing a bright or dark shadow " +
-                "within the zone.</p>" +
-                "To learn more about the available strategies, read the Help sections:" +
-                "<ul><li>Join Region: Taking control of the join</li>" +
-                "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
-
-        this.taperFromJoin_Control.onCheck = function (checked){
-            data.taperFromJoin = checked;
-        };
-        this.taperFromJoin_Control.checked = data.taperFromJoin;
-    }
     
     this.cropTarget_Control = new CheckBox(this);
     this.cropTarget_Control.text = "Crop target";
@@ -1303,11 +1266,6 @@ function PhotometricMosaicDialog(data) {
     let joinAreaFlagsHorizSizer = new HorizontalSizer(this);
     joinAreaFlagsHorizSizer.addSpacing(GET_AREA_FROM_PREVIEW_STRLEN + 4);
     joinAreaFlagsHorizSizer.add(this.cropTarget_Control);
-    if (EXTRA_CONTROLS()){
-        joinAreaFlagsHorizSizer.addSpacing(20);
-        joinAreaFlagsHorizSizer.add(this.taperFromJoin_Control);
-    }
-    
     joinAreaFlagsHorizSizer.addStretch();
     
     let joinAreaSection = new Control(this);
