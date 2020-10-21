@@ -97,9 +97,9 @@
       {Select the 'Reset' icon to restore the default parameters.}
       {Select the reference and target views.}
       {In the \lref photometric_scale {Photometric Scale} section, use 'Edit and display graph' to display the \lref photometry_graph {Photometry graph}. Use \lref outlier_removal {Outlier removal} to remove any obvious outliers. See figure \figref photometry_graph_outlier}
-      {Ensure that the \lref join_region_from_size {Join Region} section bar check box is selected. This positions the join in the middle of the overlap area, avoiding low quality image corners (e.g. distored stars).}
+      {Ensure that the \lref join_region_from_size {Join Region} section bar checkbox is selected. This positions the join in the middle of the overlap area, avoiding low quality image corners (e.g. distorted stars).}
       {In the \lref overlap_area_gradient {Gradient Correction (Overlap region)} section, use 'Edit and display gradient' to display the \lref overlap_gradient_graph {Gradient graph}. Check that the curve is a good fit to the plotted points but doesn't follow the noise. Adjust \lref overlap_smoothness {Smoothness} if necessary. See figure \figref gradient_graph_overlap_region}
-      {In the \lref extrapolated_gradient {Gradient Correction (Target image)} section, use 'Edit and display gradient' to display the \lref extrapolated_gradient_graph {Gradient graph}. This gradient correction will be applied to the rest of the target image. It is based on the gradient detected on the target side of the overlap region. The aim is to specify a smoothness level that follows the gradient trend, but ignores the local peaks and troughs. For example, the diffuse light around a bright star may create a local peak in the gradient within the overlap region, but this local peak should not be allowed to propagate accross the rest of the target image. Adjust \lref extrapolated_smoothness {Smoothness} if necessary. See figure \figref gradient_graph_target_image}
+      {In the \lref extrapolated_gradient {Gradient Correction (Target image)} section, use 'Edit and display gradient' to display the \lref extrapolated_gradient_graph {Gradient graph}. This gradient correction will be applied to the rest of the target image. It is based on the gradient detected on the target side of the overlap region. The aim is to specify a smoothness level that follows the gradient trend, but ignores the local peaks and troughs. For example, the diffuse light around a bright star may create a local peak in the gradient within the overlap region, but this local peak should not be allowed to propagate across the rest of the target image. Adjust \lref extrapolated_smoothness {Smoothness} if necessary. See figure \figref gradient_graph_target_image}
       {In the \lref create_mosaic {Create Mosaic} section, choose a combination mode.}
       {After pressing 'OK', close the script dialog and inspect the new mosaic. Use the 'JoinRegion' preview to check the quality of the join.}
     }
@@ -130,7 +130,7 @@
       }
       Gradient graph showing the gradient that will be applied to the rest of the target image. The data points represent the difference between reference and target samples that are close to the target side boundary of the overlapping region.
 
-      If the graph had been created by joining two images, the first graph curve (1) would be a good choice. The peaks evident from the data points would most likely be from local gradients which should not be extrapolated accross the target image. The chosen curve is smooth enough to follow the gradient trend without including these local peaks and troughs. In most situations, this is the correct choice.
+      If the graph had been created by joining two images, the first graph curve (1) would be a good choice. The peaks evident from the data points would most likely be from local gradients which should not be extrapolated across the target image. The chosen curve is smooth enough to follow the gradient trend without including these local peaks and troughs. In most situations, this is the correct choice.
 
       However, the graph was actually created by joining two columns of images together. Each column had been built up by mosaicing five images together. In one column, the individual images contained vertical gradients. The peaks and troughs in the graph are not local gradients. They represent large scale gradients across the individual images. Hence in this case the closer fitting curve (2) is likely to produce better results.
 
@@ -154,7 +154,7 @@
 
       The second image shows the top left corner of the Overlap area for a mosaic created with the join at the top boundary of the overlap. These images were taken with a 50 mm camera lens, so the corners are heavily distorted. The distorted target image corner is not a good match for the reference image.
 
-      The third image was created using a Join Region running along the center of the overlap. This avoids including these corner areas. The Join region has had a similar effect as cropping the reference and target images. The reference image (Scutum) appears to finish at the bottom of the Join Region. The target image (Sagittarius) appears to start at the top of it. The distored corners have effectively been cropped out.
+      The third image was created using a Join Region running along the center of the overlap. This avoids including these corner areas. The Join region has had a similar effect as cropping the reference and target images. The reference image (Scutum) appears to finish at the bottom of the Join Region. The target image (Sagittarius) appears to start at the top of it. The distorted corners have effectively been cropped out.
 
       This example demonstrates that, when possible, the join between the target and reference images should be close to the center of the overlap and hence as far away from corners as possible.
     }
@@ -204,7 +204,7 @@
         images/BrightStarBestJoin.png { (5) User specified Join Region }
         images/BrightStarBest.png { (6) Mosaic (user specified Join Region) }
       }
-      Image (3) was created with the default central Join Region, and default parameters. The default parameters often work very well. In this case, the only significant problem is the horizontal line through through the top of the star's halo.
+      Image (3) was created with the default central Join Region, and default parameters. The default parameters often work very well. In this case, the only significant problem is the horizontal line through the top of the star's halo.
 
       Image (4) uses the same settings as (3) except for the target image gradient. In this case, the graph curve (Figure \figref invalid_gradient_correction) has been fitted to the local gradient (the star's halo, below the star). This has produced a vertical dark band below the star. This demonstrates that although the gradient applied to the overlap should follow the local gradients, the gradient applied to the rest of the target image must only follow the gradient's trend.
 
@@ -216,7 +216,7 @@
       \figtag \s {Default parameters for the mosaics in figure \figref join_region_mosaic}
         \image images/BrightStarDefaultSamples.png
         The join is indicated by the green line. The blue line indicates the target side of the overlap region.\n
-        The \lref multiply_star_radius {Multiply star radius} setting has increased the number of rejected samples around the saturated stars. If these samples were not rejected, the sample differences would have a big impact on the surface spline, and due to smoothing, this can adversely affect the surounding region.\n\n
+        The \lref multiply_star_radius {Multiply star radius} setting has increased the number of rejected samples around the saturated stars. If these samples were not rejected, the sample differences would have a big impact on the surface spline, and due to smoothing, this can adversely affect the surrounding region.\n\n
         \image images/BrightStarDefaultOverlapGradient.png
         This graph shows the relative gradient along the join (the green line).
         Although the Overlap region's gradient curve follows the local gradient reasonably well, the image brightness over the halo changes too rapidly for the correction to be perfect.\n
@@ -358,7 +358,7 @@ You can use the Detected Stars option to see which stars were detected.
     \image images/JoinRegion.png
     Creates a Join Region rectangle that is centered within the overlap area, running along the whole length of the overlap.
 
-    If \lref join_region_from_size {Join Region} and \lref join_region_from_preview {Join Region (Advanced settings)} are both are unselected, the Join Region defaults to the whole of the overlap area.
+    If \lref join_region_from_size {Join Region} and \lref join_region_from_preview {Join Region (Advanced settings)} are both unselected, the Join Region defaults to the whole of the overlap area.
 
     To learn how to use a Join Region, see:\n
     \lref join_region_taking_control {Join Region: Taking control of the join}\n
@@ -410,7 +410,7 @@ You can use the Detected Stars option to see which stars were detected.
     \figure [numbered:sample_generation]{
       \figtag \s {Sample Generation}
         \image images/Samples.png
-          Samples squares are drawn in red. Stars that caused a sample to be rejected are surounded by a red circle. The green line indicates the Join Path. The blue line indicates the target side envelope of the overlapping pixels.
+          Samples squares are drawn in red. Stars that caused a sample to be rejected are surrounded by a red circle. The green line indicates the Join Path. The blue line indicates the target side envelope of the overlapping pixels.
 
           Within the graph area, use the mouse wheel to zoom in or out, and the left mouse button to display the current (x,y) coordinate or to pan the image. The zoom level and (x,y) coordinate are displayed in the title bar.
     }
@@ -453,7 +453,7 @@ You can use the Detected Stars option to see which stars were detected.
     Although the \lref overlap_smoothness {Smoothness} parameter can be modified directly, it is usually better to use the 'Edit and display gradient' dialog instead so that the effects of the edit can be viewed. See Figure \fignum gradient_correction_overlap_region.
 
     \figure [numbered:gradient_correction_overlap_region]{
-      \figtag \s {Edit and display gradient dialog: relative gradient detected along the join path}
+      \figtag \s {Edit and display gradient dialog: relative gradient along the join path}
       \image images/GradientGraphOk1.png
       The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
 
@@ -468,7 +468,7 @@ You can use the Detected Stars option to see which stars were detected.
       {Smoothness \label overlap_smoothness}{
         Logarithm of the smoothness setting. This determines how closely the gradient correction follows the sample data points. Smaller values apply less smoothing. The aim is to correct both the gradient trends and the local variations, such as the scattered light around bright stars, but with enough smoothing to avoid following noise.
 
-        Use the \lref 'Edit and display gradient' dialog to determine the optimum smoothness. See Figure \figref gradient_correction_overlap_region.
+        Use the 'Edit and display gradient' dialog to determine the optimum smoothness. See Figure \figref gradient_correction_overlap_region.
       }
       {Taper length \label taper_length}{
         The length of the taper that's applied between the fully corrected overlap bounding box area and the rest of the partially corrected target image to provide a smooth transition. Ideally the taper length should be similar to the radius of the peaks and troughs of the local gradient.
@@ -481,24 +481,35 @@ You can use the Detected Stars option to see which stars were detected.
 
   \subsection { Gradient Correction (Target image) \label extrapolated_gradient} {
     \image images/PropagatedGradientCorrection.png
-    Applies an extrapolated gradient correction to the target image. The correction is based on the gradient detected on the target side edge of the overlap's bounding box. It is applied from this edge to the rest of the target image.
+    This section determines how the target pixels outside the overlap region (i.e. the rest of the target image) are corrected. The correction is based on the gradient detected on the target side edge of the overlap's bounding box. It is applied from this edge to the rest of the target image.
 
-    Consider using this option if the reference image has less gradient than the target. The reference image's gradient will be propagated across the mosaic, so consider using DBE as a final correction once the mosaic is complete.
-      \definition {
+    The best results are usually obtained with 'Gradient Correction (Target image)' selected. However, although it corrects relative gradients, it cannot correct the gradient due to the initial reference frame. Once the mosaic is completed, it will usually be necessary to apply a smooth gradient correction (e.g. using DynamicBackgroundExtraction).
+
+    Although the \lref overlap_smoothness {Smoothness} parameter can be modified directly, it is usually better to use the 'Edit and display gradient' dialog instead so that the effects of the edit can be viewed. See Figure \fignum gradient_correction_target_image.
+
+    \figure [numbered:gradient_correction_target_image]{
+      \figtag \s {Edit and display gradient dialog: relative gradient at the target side envelope of the overlap.}
+      \image images/BrightStarDefaultTargetGradient.png
+      The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
+
+      All the samples (see Figure \figref sample_generation) are used to create a surface spline that models the gradient for the whole of the overlap region. The graph line shows the modelled gradient along the overlapping pixel's target side envelope. The plotted dots represent the difference between each paired target and reference sample for the samples closest to this path.
+
+      The smoothness should be adjusted so that the line follows the gradients trend, but avoids following peaks or troughs that are due to local gradients (e.g. due to the diffuse light around bright stars). In this example, the peak visible in the graph should be ignored. A better result could be obtained if more samples around the bright star responsible had been rejected. See Figure \figref good_gradient_correction for more details.
+
+      The graph can be uncluttered to only display data from a single color. This is a display feature only. The \lref overlap_smoothness {Smoothness} will always be applied to all channels,  not just the channel being displayed.
+
+      Press 'Update' to update the graph to reflect the \lref overlap_smoothness {Smoothness} value.
+    }
+    \definition {
       {Smoothness \label extrapolated_smoothness}{
-        Logarithm of the smoothness setting. It determines how closely the gradient correction follows the sample pair data points. Smaller values apply less smoothing. The aim is to only correct the gradient trends and not the local variations, such as the scattered light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
+        Logarithm of the smoothness setting. It determines how closely the gradient correction follows the sample pair data points. Smaller values apply less smoothing.
 
-        Use the \lref extrapolated_gradient_graph {Gradient graph} to determine the optimum smoothness.
+        The aim is to correct the gradient trends but not the local variations, such as the scattered light around bright stars. These local gradients are unlikely to be valid at the other side of the target image.
+
+        Use the 'Edit and display gradient' to determine the optimum smoothness.  See Figure \figref gradient_correction_target_image.
       }
-      {Gradient graph \label extrapolated_gradient_graph}{
-        \image images/GradientPropagateGraphDialog.png
-        The vertical axis represents the difference between the two images, the horizontal axis the join's X-Coordinate (horizontal join) or Y-Coordinate (vertical join).
-
-            The plotted dots represent the difference between each paired target and reference samples within the whole of the overlap area. These points are typically scattered vertically. This is partly due to gradients perpendicular to the join, and partly due to noise.
-
-        The curve is the gradient correction along the path of the secondary join. This path is the target side of the overlap area's bounding box. This gradient will be applied to the rest of the target image.
-
-        The graphs produced for color images use red, green and blue dots and lines for each channel. The colors add together. For example: red, green and blue add up to white.
+      {Edit and display gradient \label extrapolated_gradient_graph}{
+         Displays the 'Edit and display gradient' dialog. See Figure \figref gradient_correction_target_image.
       }
     }
   }
@@ -542,19 +553,19 @@ You can use the Detected Stars option to see which stars were detected.
     }
 
     \definition {
-      {Limit stars \% \label mask_limit_stars}{
+      {Limit stars \%}{
         Specifies the percentage of the brightest detected stars that will be used to create the star mask. Small faint stars are usually free of artifacts, so normally only a small percentage of the detected stars need to be used.
 
         0\% will produce a solid mask with no stars.\n
         100\% will produce a mask that includes all detected stars.
       }
-      {Multiply star radius \label mask_mult_star_radius}{
+      {Multiply star radius}{
         \image images/MosaicMaskMultStarRadius.png
         Increases the mask star radius for saturated stars. In this example, it was set to 15. For stars that are saturated or close to saturation (peak value close to 1.0) the star radius is increased.
 
         The multiplication factor is (Multiply star radius) \sup {(peak value)}, where 'peak value' is the star's maximum pixel value. Hence in this example the multiplication factor is 15\sup{(peak value)}, which is approximately 15\sup{0.0} = 1.0 for faint stars and 15\sup{1.0} = 15.0 for saturated stars.
       }
-      {Add to star radius \label mask_add_star_radius}{
+      {Add to star radius}{
         Used to increase or decrease the radius of all mask stars. This is applied after the 'Multiply star radius'.
       }
       {Correct target \label correct_target}{
