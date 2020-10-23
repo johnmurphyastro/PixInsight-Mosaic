@@ -114,14 +114,7 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         // Display graph in script dialog
         let isColor = colorSamplePairs.length > 1;
         let graphDialog = new GradientGraphDialog(title, data, isColor, createZoomedGraph, photometricMosaicDialog);
-        if (graphDialog.execute() === StdButton_Yes){
-            // User requested graph saved to PixInsight View
-            let windowTitle = WINDOW_ID_PREFIX() + data.targetView.fullId + "__Gradient";
-            let zoomedGraph = graphDialog.getGraph();
-            let imageWindow = zoomedGraph.createWindow(windowTitle, true);
-            gradientGraphFitsHeader(imageWindow, data, isHorizontal, isTargetAfterRef);
-            imageWindow.show();
-        }
+        graphDialog.execute();
     }
     
     /**
@@ -259,28 +252,6 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         }
         
         return dataSamplePairs;
-    }
-    
-    /**
-     * 
-     * @param {ImageWindow} graphWindow Graph window
-     * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @param {Boolean} isHorizontal
-     * @param {Boolean} isTargetAfterRef
-     */
-    function gradientGraphFitsHeader(graphWindow, data, isHorizontal, isTargetAfterRef){
-        let view = graphWindow.mainView;
-        view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-        let keywords = graphWindow.keywords;
-        fitsHeaderImages(keywords, data);
-        fitsHeaderStarDetection(keywords, data);
-        fitsHeaderPhotometry(keywords, data);
-        let includeGradient = (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH());
-        let includePropagate = (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH());
-        fitsHeaderGradient(keywords, data, includeGradient, includePropagate);
-        fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
-        graphWindow.keywords = keywords;
-        view.endProcess();
     }
     
     /**

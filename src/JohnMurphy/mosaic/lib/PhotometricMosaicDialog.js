@@ -800,24 +800,6 @@ function PhotometricMosaicDialog(data) {
     photometrySection.sizer = new VerticalSizer;
     photometrySection.sizer.spacing = 4;
     photometrySection.sizer.add(photometricScaleHorizSizer1);
-    if (EXTRA_CONTROLS()){
-        let photometryStarsButton = new PushButton(this);
-        photometryStarsButton.text = "Photometry stars";
-        photometryStarsButton.toolTip =
-                "<p>Displays the stars that met the criteria for photometry, including: " +
-                "<ul><li>Found in both target and reference images.</li>" +
-                "<li>Amongst the brightest 'Limit stars %' stars.</li>" +
-                "<li>Within the specified 'Linear range'.</li>" +
-                "<li>Not rejected by 'Outlier removal'.</li></ul></p>";
-        photometryStarsButton.onClick = function () {
-            data.viewFlag = DISPLAY_PHOTOMETRY_STARS();
-            this.dialog.ok();
-        };
-        let photometricScaleHorizSizer2 = new HorizontalSizer;
-        photometricScaleHorizSizer2.addStretch();
-        photometricScaleHorizSizer2.add(photometryStarsButton);
-        photometrySection.sizer.add(photometricScaleHorizSizer2);
-    }
     let photometryBar = new SectionBar(this, "Photometric Scale");
     photometryBar.setSection(photometrySection);
     photometryBar.onToggleSection = this.onToggleSection;

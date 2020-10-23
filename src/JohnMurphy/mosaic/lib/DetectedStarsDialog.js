@@ -44,6 +44,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     let bitmapOffset = getBitmapOffset(data);
     let bitmap = getBitmap(selectedBitmap);
     let stars = getStars(selectedBitmap, selectedChannel);
+    let nChannels = detectedStars.refColorStars.length;
+    let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
+    let starPairs = getStarPairs(selectedChannel);
     
     /**
      * Return bitmap of the reference or target image
@@ -73,6 +76,24 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
             stars = colorStars[0];
         }
         return stars;
+    }
+    
+    /**
+     * @param {Number} channel
+     * @returns {StarPair[]}
+     */
+    function getStarPairs(channel){
+        starPairs = [];
+        if (channel < colorStarPairs.length){
+            // return stars from channel 0, 1 or 2
+            starPairs = colorStarPairs[channel];
+        } else if (colorStarPairs.length === 3){
+            // return stars in all channels
+            starPairs = colorStarPairs[0].concat(colorStarPairs[1], colorStarPairs[2]);
+        } else {
+            starPairs = colorStarPairs[0];
+        }
+        return starPairs;
     }
     
     /**
@@ -142,6 +163,55 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
         }
     }
     
+    /**
+     * Draw on top of the background bitmap, within the scrolled window
+     * @param {Control} viewport
+     * @param {Number} translateX
+     * @param {Number} translateY
+     * @param {Number} scale
+     * @param {Number} x0
+     * @param {Number} y0
+     * @param {Number} x1
+     * @param {Number} y1
+     */
+    function drawPhotometryStars(viewport, translateX, translateY, scale, x0, y0, x1, y1){
+        let graphics;
+        try {
+            graphics = new VectorGraphics(viewport);
+            graphics.clipRect = new Rect(x0, y0, x1, y1);
+            graphics.translateTransformation(translateX, translateY);
+            graphics.scaleTransformation(scale, scale);
+            graphics.pen = new Pen(0xffff0000);
+            // Draw inner star flux square and outer background sky flux square
+            for (let i = 0; i < starPairs.length; ++i){
+                let starPair = starPairs[i];
+                let tgtStar = starPair.tgtStar;
+                let refStar = starPair.refStar;
+                let x;
+                let y;
+                let s;
+                if (selectedBitmap === REF){
+                    x = refStar.pos.x - bitmapOffset.x;
+                    y = refStar.pos.y - bitmapOffset.y;
+                    s = Math.sqrt(refStar.size); // size is area of the square. s is length of side.
+                } else {
+                    x = tgtStar.pos.x - bitmapOffset.x;
+                    y = tgtStar.pos.y - bitmapOffset.y;
+                    s = Math.sqrt(tgtStar.size); // size is area of the square. s is length of side.
+                }
+                let rect = new Rect(s, s);
+                rect.center = new Point(x, y);
+                graphics.strokeRect(rect);
+                let bg = rect.inflatedBy( detectedStars.bkgDelta );
+                graphics.strokeRect(bg);
+            }
+        } catch(e) {
+            console.criticalln("drawPhotometryStars error: " + e);
+        } finally {
+            graphics.end();
+        }
+    }
+    
     // =================================
     // Sample Generation Preview frame
     // =================================
@@ -156,7 +226,11 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     };
     previewControl.onCustomPaintScope = this;
     previewControl.onCustomPaint = function (viewport, translateX, translateY, scale, x0, y0, x1, y1){
-        drawDetectedStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
+        if (photometricCheckBox.checked){
+            drawPhotometryStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
+        } else {
+            drawDetectedStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
+        }
     };
     previewControl.ok_Button.onClick = function(){
         self.ok();
@@ -171,14 +245,24 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
             "target background and stars.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         stars = getStars(selectedBitmap, selectedChannel);
+        starPairs = getStarPairs(selectedChannel);
         previewControl.updateBitmap(bitmap);
         update();
-        self.enabled = true;
+    };
+    
+    let photometricCheckBox = new CheckBox(this);
+    photometricCheckBox.text = "Photometry";
+    photometricCheckBox.toolTip = "<p>Indicates the stars that will be used for photometry.</p>" +
+            "<p>These stars were found in both the target and reference images, " +
+            "and were not rejected by the settings in the photometry section.</p>";
+    photometricCheckBox.checked = false;
+    photometricCheckBox.onClick = function (checked) {
+        starPairs = getStarPairs(selectedChannel);
+        previewControl.updateBitmap(bitmap);
+        update();
     };
     
     let redRadioButton = new RadioButton(this);
@@ -186,12 +270,10 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     redRadioButton.toolTip = "Display the stars detected within the red channel";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedChannel = 0;
         stars = getStars(selectedBitmap, selectedChannel);
+        starPairs = getStarPairs(selectedChannel);
         update();
-        self.enabled = true;
     };
     
     let greenRadioButton = new RadioButton(this);
@@ -199,12 +281,10 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     greenRadioButton.toolTip = "Display the stars detected within the green channel";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedChannel = 1;
         stars = getStars(selectedBitmap, selectedChannel);
+        starPairs = getStarPairs(selectedChannel);
         update();
-        self.enabled = true;
     };
     
     let blueRadioButton = new RadioButton(this);
@@ -212,12 +292,10 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     blueRadioButton.toolTip = "Display the stars detected within the blue channel";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedChannel = 2;
         stars = getStars(selectedBitmap, selectedChannel);
+        starPairs = getStarPairs(selectedChannel);
         update();
-        self.enabled = true;
     };
     
     let allRadioButton = new RadioButton(this);
@@ -225,12 +303,10 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     allRadioButton.toolTip = "Display the stars detected within all channels";
     allRadioButton.checked = true;
     allRadioButton.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedChannel = 3;
         stars = getStars(selectedBitmap, selectedChannel);
+        starPairs = getStarPairs(selectedChannel);
         update();
-        self.enabled = true;
     };
     
     if (detectedStars.refColorStars.length === 1){
@@ -244,7 +320,8 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     optionsSizer.spacing = 10;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
-    optionsSizer.addSpacing(20);
+    optionsSizer.add(photometricCheckBox);
+    optionsSizer.addSpacing(10);
     optionsSizer.add(redRadioButton);
     optionsSizer.add(greenRadioButton);
     optionsSizer.add(blueRadioButton);

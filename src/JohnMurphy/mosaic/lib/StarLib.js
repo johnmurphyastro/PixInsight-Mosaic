@@ -426,46 +426,6 @@ function StarMinMax() {
 }
 
 /**
- * 
- * @param {FITSKeyword} keywords
- * @param {StarPair[][]} colorStarPairs StarPair[] for L or R,G,B
- * @param {Number} nColors Number of channels
- * @param {LinearFitData[]} scaleFactors
- * @param {Rect} rect OverlapBox for photometricStar image, null for photometric graph
- */
-function addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, rect){
-    let maxErr = Number.NEGATIVE_INFINITY;
-    let errStar = null;
-    for (let c = 0; c < nColors; c++) {
-        let starPairs = colorStarPairs[c];
-        let linearFit = scaleFactors[c];
-        let comment = "scale[" + c + "]: " + linearFit.m.toPrecision(5) +
-                " (" + starPairs.length + " stars)";
-        keywords.push(new FITSKeyword("COMMENT", "", comment));
-
-        for (let starPair of starPairs) {
-            // y = ref; x = tgt
-            let y = eqnOfLineCalcY(starPair.tgtStar.flux, linearFit.m, linearFit.b);
-            let dif = Math.abs(y - starPair.refStar.flux);
-            if (dif > maxErr) {
-                maxErr = dif;
-                errStar = starPair.tgtStar;
-            }
-        }
-    }
-    if (maxErr > Number.NEGATIVE_INFINITY) {
-        let x = Math.round(errStar.pos.x);
-        let y = Math.round(errStar.pos.y);
-        if (rect){
-            x -= rect.x0;
-            y -= rect.y0;
-        }
-        let text = "Max error: " + maxErr.toPrecision(5) + " at (" + x + ", " + y + ")";
-        keywords.push(new FITSKeyword("COMMENT", "", text));
-    }
-}
-
-/**
  * Display photometry graph of reference flux against target flux
  * @param {String} refView
  * @param {String} tgtView
@@ -490,18 +450,7 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
         // Display graph in script dialog
         let graphDialog = new PhotometryGraphDialog("Photometry Graph", width, height, 
             data, photometricMosaicDialog, createZoomedGraph);
-        if (graphDialog.execute() === StdButton_Yes){
-            // User requested graph saved to PixInsight View
-            let isColor = refView.image.isColor;
-            let targetName = tgtView.fullId;
-            let windowTitle = WINDOW_ID_PREFIX() + targetName + "__Photometry";
-            let zoomedGraph = graphDialog.getGraph();
-            let imageWindow = zoomedGraph.createWindow(windowTitle, isColor);
-            let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
-            starGraphFitsHeader(imageWindow, colorStarPairs, data);
-            imageWindow.show();
-            imageWindow.zoomToFit();
-        }
+        graphDialog.execute();
     }
     
     /**
@@ -533,25 +482,6 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
         return scaleFactors;
     }
     
-    /**
-     * @param {ImageWindow} graphWindow Graph window
-     * @param {StarPair[][]} colorStarPairs StarPair[] for each color channel
-     * @param {PhotometricMosaicData} data User settings used to create FITS header
-     * @return {undefined}
-     */
-    function starGraphFitsHeader(graphWindow, colorStarPairs, data){
-        let view = graphWindow.mainView;
-        let nColors = colorStarPairs.length;
-        view.beginProcess(UndoFlag_NoSwapFile); // don't add to undo list
-        let keywords = graphWindow.keywords;
-        fitsHeaderImages(keywords, data);
-        fitsHeaderStarDetection(keywords, data);
-        fitsHeaderPhotometry(keywords, data);
-        let scaleFactors = getScaleFactors(colorStarPairs);
-        addScaleToFitsHeader(keywords, colorStarPairs, scaleFactors, nColors, null);
-        graphWindow.keywords = keywords;
-        view.endProcess();
-    };
     /**
      * Draw graph lines and points for a single color
      * @param {Graph} graph

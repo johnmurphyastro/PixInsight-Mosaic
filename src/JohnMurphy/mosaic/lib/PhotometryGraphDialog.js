@@ -45,15 +45,6 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let graph_ = createZoomedGraph_(zoom_, width, height);
     
     /**
-     * Provided to give access to the zoomed graph. This is used when saving
-     * the displayed graph to a PixInsight view.
-     * @returns {Graph}
-     */
-    this.getGraph = function(){
-        return graph_;
-    };
-    
-    /**
      * Converts bitmap (x,y) into graph coordinates.
      * @param {Number} x Bitmap x coordinate
      * @param {Number} y Bitmap y coordinate
@@ -80,21 +71,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     };
     
     bitmapControl.onMousePress = function ( x, y, button, buttonState, modifiers ){
-        if (button === 2){
-            // Right mouse button -> MessageBox -> Close dialog and save graph to PixInsight View
-            let messageBox = new MessageBox( "Save Graph (create Image Window)?\n",
-                    "Save and Close Graph", 
-                    StdIcon_Question, StdButton_Yes, StdButton_No, StdButton_Cancel);
-            let reply = messageBox.execute();
-            if (reply === StdButton_Yes){
-                self.done(StdButton_Yes);
-            } else if (reply === StdButton_No){
-                self.done(StdButton_No);
-            }
-        } else {
-            // Any other button. Display graph coordinates in title bar
-            displayXY(x, y);
-        }
+        // Display graph coordinates in title bar
+        displayXY(x, y);
     };
     
     bitmapControl.onMouseMove = function ( x, y, buttonState, modifiers ){
@@ -165,9 +143,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     }
     
     bitmapControl.toolTip = 
-            "<p>Mouse wheel: Zoom</p>" +
-            "<p>Left click: Display (x,y) in title bar</p>" +
-            "<p>Right click: Create a PixInsight image of the graph</p>";
+            "Mouse wheel: Zoom" +
+            "\nLeft click: Display (x,y) in title bar";
     
     // ===========================
     // Zoom controls and OK button

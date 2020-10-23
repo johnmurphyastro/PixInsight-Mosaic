@@ -36,11 +36,10 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "lib/Geometry.js"
 #include "lib/PreviewControl.js"
 #include "lib/SampleGridDialog.js"
-#include "lib/BinnedSampleGridDialog.js"
 #include "lib/DetectedStarsDialog.js"
-#include "lib/PhotometryStarsDialog.js"
 #include "lib/PhotometryGraphDialog.js"
 #include "lib/MaskStarsDialog.js"
+#include "extraControls/BinnedSampleGridDialog.js"
 
 // To stop my IDE from generating warnings...
 function VERSION(){return  "2.3";}
@@ -50,7 +49,6 @@ function TRIM_NAME(){return "TrimMosaicTile";}
 function MOSAIC_NAME(){return "Mosaic";}
 function WINDOW_ID_PREFIX(){return "PM__";}
 function DISPLAY_DETECTED_STARS(){return 1;}
-function DISPLAY_PHOTOMETRY_STARS(){return 2;}
 function DISPLAY_PHOTOMETRY_GRAPH(){return 4;}
 function DISPLAY_GRADIENT_SAMPLES(){return 8;}
 function DISPLAY_TARGET_GRADIENT_GRAPH(){return 16;}
@@ -157,18 +155,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let dialog = new DetectedStarsDialog("Detected Stars", refBitmap, tgtBitmap, detectedStars, data);
         dialog.execute();
-        return;
-    }
-    if (data.viewFlag === DISPLAY_PHOTOMETRY_STARS()) {
-        console.writeln("\n<b><u>Displaying photometry stars</u></b>");
-        let overlap = data.cache.overlap;
-        let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        detectedStars.showConsoleInfo = false;
-        let dialog = new PhotometryStarsDialog("Photometry Stars", refBitmap, tgtBitmap, nChannels, 
-                detectedStars, data, photometricMosaicDialog);
-        dialog.execute();
-        detectedStars.showConsoleInfo = true;
         return;
     }
     if (data.viewFlag === DISPLAY_PHOTOMETRY_GRAPH()){

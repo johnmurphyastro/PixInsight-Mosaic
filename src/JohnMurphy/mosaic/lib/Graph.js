@@ -273,28 +273,6 @@ function Graph(x0, y0, x1, y1) {
     };
     
     /**
-     * Create a PixInsight View window that contains the graph, but don't display it yet.
-     * @param {String} title
-     * @param {Boolean} isColor
-     * @returns {ImageWindow|Graph.createWindow.imageWindow}
-     */
-    this.createWindow = function (title, isColor) {
-        let bitsPerSample = 8;
-        let nChannels = isColor ? 3 : 1;
-        let imageWindow = new ImageWindow(bitmap_.width, bitmap_.height,
-                nChannels, bitsPerSample, false, isColor, title);
-
-        let view = imageWindow.mainView;
-        let image = view.image;
-
-        view.beginProcess(UndoFlag_NoSwapFile);
-        image.blend(bitmap_);
-        view.endProcess();
-
-        return imageWindow;
-    };
-    
-    /**
      * Calculate axis scale
      * @param {Number} axisLength
      * @param {Number} range
