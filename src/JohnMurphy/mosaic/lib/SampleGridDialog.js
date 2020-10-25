@@ -131,7 +131,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             graphics.pen = new Pen(0xffff0000, 1.5);
             for (let i = 0; i < firstNstars; ++i){
                 let star = stars[i];
-                let radius = Math.sqrt(star.size)/2;
+                let radius = Math.max(star.rect.width, star.rect.height)/2;
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
                 graphics.strokeCircle(x, y, radius);

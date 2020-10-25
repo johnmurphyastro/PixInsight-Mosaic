@@ -142,7 +142,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
             let star = stars[i];
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
-            let starDiameter = Math.sqrt(star.size);
+            let starDiameter = Math.max(star.rect.width, star.rect.height);
             // Increase protection for saturated or almost saturated stars
             let starRadius = starDiameter * Math.pow(sampleStarRadiusMult, star.peak) / 2;
             removeBinsInCircle(star.pos, starRadius);

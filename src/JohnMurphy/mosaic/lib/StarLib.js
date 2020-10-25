@@ -17,23 +17,192 @@
 // =================================================================================
 //"use strict";
 #define __PJSR_NO_STAR_DETECTOR_TEST_ROUTINES 1
+#define __PJSR_STAR_OBJECT_DEFINED  1
+function Star( pos, flux, size){
+   // Centroid position in pixels, image coordinates.
+   this.pos = new Point( pos.x, pos.y );
+   // Total flux, normalized intensity units.
+   this.flux = flux;
+   // Area of detected star structure in square pixels.
+   this.size = size;
+   // Local background estimate.
+   this.bkg = 0;
+   // Value at peak
+   this.peak = 0;
+   // Star bounding box
+   this.rect = null;
+   this.unmodifiedRect = null;
+   // true if no zero pixels
+   this.fluxOk = true;
+   this.bkgOk = true;
+   // Star flux (total flux - background flux)
+   let starFlux = -1;
+   
+   /** These should be on the constructor, but Star needs to be compatible with
+    * StarDetector.jsh
+    * @param {Number} bkg Local background estimate.
+    * @param {Number} peak Value at peak
+    * @param {Rect} rect Star bounding box
+    */
+   this.setBkgPeakRect = function(bkg, peak, rect){
+       this.bkg = bkg;
+       this.peak = peak;
+       this.rect = rect;
+       this.unmodifiedRect = rect;
+       starFlux = -1;
+   };
+   
+   /**
+    * @returns {Number} Star flux (total flux - bg flux)
+    */
+   this.getStarFlux = function(){
+       if (starFlux === -1){
+           starFlux = this.flux - this.bkg * this.size;
+       }
+       return starFlux;
+   };
+}
 #include "StarDetector.jsh"
 
 /**
+ * 
+ * @param {Image} refImage
+ * @param {Image} tgtImage
  * @param {Star} refStar
  * @param {Star} tgtStar
+ * @param {Number} bkgDelta Create sky background rect by inflating star rect by this
+ * @param {Number} channel
  * @returns {StarPair}
  */
-function StarPair(refStar, tgtStar){
-    this.tgtStar = tgtStar;
-    this.refStar = refStar;
+function StarPair(refImage, tgtImage, refStar, tgtStar, bkgDelta, channel){
+    
+    /**
+     * Used to increase the size of the star bounding box
+     * @param {Star} refStar
+     * @param {Star} tgtStar
+     * @returns {StarPair.Delta}
+     */
+    function Delta (refStar, tgtStar){
+        this.top = Math.max(refStar.pos.y - refStar.rect.y0, tgtStar.pos.y - tgtStar.rect.y0);
+        this.left = Math.max(refStar.pos.x - refStar.rect.x0, tgtStar.pos.x - tgtStar.rect.x0);
+        this.bottom = Math.max(refStar.rect.y1 - refStar.pos.y, tgtStar.rect.y1 - tgtStar.pos.y);
+        this.right = Math.max(refStar.rect.x1 - refStar.pos.x, tgtStar.rect.x1 - tgtStar.pos.x);
+        
+        let peak = Math.max(refStar.peak, tgtStar.peak);
+        let inflate = 1.0 + Math.min(5, Math.round(100 * peak));
+        this.top += inflate;
+        this.left += inflate;
+        this.bottom += inflate;
+        this.right += inflate;
+    }
+    
+    let delta = new Delta(refStar, tgtStar);
+    
+    this.refStar = createStar(refImage, refStar, delta, bkgDelta, channel);
+    this.tgtStar = createStar(tgtImage, tgtStar, delta, bkgDelta, channel);
+    
+    /**
+     * Create a star based on the supplied star, but with a larger star rectangle
+     * and a new background rectangle.
+     * The star's total flux and background level are calculated.
+     * @param {Image} image The image the star is from
+     * @param {Star} star Original star (not modified)
+     * @param {StarPair.Delta} delta Specifies how to inflate the star rectangle
+     * @param {Number} bkgDelta Distance between inner and outer rectangles
+     * @param {Number} channel Color channel
+     * @returns {Star}
+     */
+    function createStar(image, star, delta, bkgDelta, channel){
+        let x0 = Math.round(star.pos.x - delta.left);
+        let y0 = Math.round(star.pos.y - delta.top);
+        let x1 = Math.round(star.pos.x + delta.right);
+        let y1 = Math.round(star.pos.y + delta.bottom);
+        let rect = new Rect(x0, y0, x1, y1);
+        
+        // Calculate total star flux (i.e. star + star background)
+        let length = rect.area;
+        let samples = new Float64Array(length);
+        let size = 0;
+        let flux = 0;
+        let peak = 0;
+        image.getSamples(samples, rect, channel);
+        for (let i=0; i<length; i++){
+            if (samples[i] > 0){
+                let sample = samples[i];
+                flux += sample;
+                peak = Math.max(peak, sample);
+                size++;
+            }
+        }
+        
+        // TODO: A more accurate background would use data rejection, then
+        // bkg = (3 * median) - (2 * mean)
+        let bkgSamples = new BackgroundSamples(image, rect, bkgDelta, channel);
+        let bkg = Math.median( bkgSamples.allSamples );
+        
+        let s = new Star(star.pos, flux, size);
+        s.setBkgPeakRect(bkg, peak, rect);
+        s.unmodifiedRect = star.rect;           // The original rect from StarDetector
+        s.fluxOk = (size === length);           // false if star rect contained black samples
+        s.bkgOk = (bkgSamples.zeroCount === 0); // false if bg contained black samples
+        
+        return s;
+    }
+    
+    /**
+     * Create and store an array of all the image samples that are inbetween
+     * an inner and outer rectangle.
+     * @param {Image} image
+     * @param {Rect} innerRect
+     * @param {Number} bkgDelta
+     * @param {Number} channel
+     * @returns {StarPair.BackgroundSamples}
+     */
+    function BackgroundSamples(image, innerRect, bkgDelta, channel){
+        let outerRect = innerRect.inflatedBy( bkgDelta );
+        let top =    new Rect(outerRect.x0, outerRect.y0, outerRect.x1, innerRect.y0);
+        let bottom = new Rect(outerRect.x0, innerRect.y1, outerRect.x1, outerRect.y1);
+        let left =   new Rect(outerRect.x0, innerRect.y0, innerRect.x0, innerRect.y1);
+        let right =  new Rect(innerRect.x1, innerRect.y0, outerRect.x1, innerRect.y1);
+        
+        /**
+         * Read a rectangle of samples from the image,
+         * and append the values to the allSamples array.
+         * @param {Number[]} allSamples
+         * @param {Image} image
+         * @param {Rect} rect
+         * @param {Number} channel
+         */
+        function appendSamples(allSamples, image, rect, channel){
+            let samples = new Float64Array(rect.area);
+            image.getSamples(samples, rect, channel);
+            for (let i=0; i<samples.length; i++){
+                if (samples[i] > 0){ // don't include black pixels
+                    allSamples.push(samples[i]);
+                }
+            }
+        }
+        
+        /** All image samples inbetween the inner and outer rectangles  */
+        this.allSamples = [];
+        appendSamples(this.allSamples, image, top, channel);
+        appendSamples(this.allSamples, image, bottom, channel);
+        appendSamples(this.allSamples, image, left, channel);
+        appendSamples(this.allSamples, image, right, channel);
+        
+        /** The number of black pixels (excluded from the allSamples array) */
+        this.zeroCount = (top.area + bottom.area + left.area + right.area) - this.allSamples.length;
+    }
 }
 
 /**
- * 
+ * @param {View} refView
+ * @param {View} tgtView 
  * @returns {StarsDetected}
  */
-function StarsDetected(){
+function StarsDetected(refView, tgtView){
+    this.refView = refView;
+    this.tgtView = tgtView;
     /** {star[][]} color array of reference stars */
     this.refColorStars = null;
     /** {star[][]} color array of target stars */
@@ -44,16 +213,14 @@ function StarsDetected(){
     this.bkgDelta = 3;
     /** If true, write information to console */
     this.showConsoleInfo = true;
-    
+
     const self = this;
     
     /**
-     * @param {View} refView
-     * @param {View} tgtView
      * @param {Number} logSensitivity
      * @param {MosaicCache} cache
      */
-    this.detectStars = function (refView, tgtView, logSensitivity, cache) {
+    this.detectStars = function (logSensitivity, cache) {
         let nChannels = refView.image.isColor ? 3 : 1;
         const overlapBox = cache.overlap.overlapBox;
         // Reference and target image stars
@@ -66,12 +233,12 @@ function StarsDetected(){
             cache.tgtColorStars = [];
             let overlapMask = cache.overlap.getOverlapMask();
             for (let c = 0; c < nChannels; c++) {
-                let refStars = findStars(refView, overlapMask, overlapBox, logSensitivity, c);
+                let refStars = findStars(this.refView, overlapMask, overlapBox, logSensitivity, c);
                 cache.refColorStars.push(refStars);
                 writeln("Reference[" + c + "] detected " + refStars.length + " stars");
                 processEvents();
                 
-                let tgtStars = findStars(tgtView, overlapMask, overlapBox, logSensitivity, c);
+                let tgtStars = findStars(this.tgtView, overlapMask, overlapBox, logSensitivity, c);
                 cache.tgtColorStars.push(tgtStars);
                 writeln("Target   [" + c + "] detected " + tgtStars.length + " stars");
                 processEvents();
@@ -165,7 +332,7 @@ function StarsDetected(){
         starDetector.upperLimit = 1;
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
-        self.bkgDelta = starDetector.bkgDelta;
+        starDetector.bkgDelta = self.bkgDelta;
         
         const x0 = overlapBox.x0;
         const y0 = overlapBox.y0;
@@ -174,6 +341,8 @@ function StarsDetected(){
         for (let star of stars){
             star.pos.x += x0;
             star.pos.y += y0;
+            star.rect.moveBy(x0, y0);
+            star.unmodifiedRect = star.rect;
         }
         return stars;
     };
@@ -195,7 +364,7 @@ function StarsDetected(){
          * @returns {Number}
          */
         function sortOnFlux(a, b) {
-            return a.flux - b.flux;
+            return a.getStarFlux() - b.getStarFlux();
         };
 
         /**
@@ -235,9 +404,12 @@ function StarsDetected(){
          * @param {Boolean} useRange If true, reject pairs if the flux difference is too great
          * @param {Number} minGradient Minimum allowed (ref flux / target flux) 
          * @param {Number} maxGradient Maximum allowed (ref flux / target flux) 
+         * @param {Number} channel
          * @returns {StarPair[]} Array of matched stars
          */
-        function matchStars(tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient){
+        function matchStars(tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient, channel){
+            let refImage = self.refView.image;
+            let tgtImage = self.tgtView.image;
             let starPairArray = [];
             let r = refStars.length;
             while (r--) {
@@ -246,7 +418,7 @@ function StarsDetected(){
                 while (t--) {
                     let tStar = tgtStars[t];
                     if (useRange){
-                        let gradient = rStar.flux / tStar.flux;
+                        let gradient = rStar.getStarFlux() / tStar.getStarFlux();
                         if (gradient < minGradient || gradient > maxGradient){
                             continue;
                         }
@@ -255,7 +427,13 @@ function StarsDetected(){
                     if (deltaX < searchRadius){
                         let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
                         if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
-                            starPairArray.push(new StarPair(rStar, tStar));
+                            let starPair = new StarPair(refImage, tgtImage, rStar, tStar, 
+                                    self.bkgDelta, channel);
+                            if (starPair.refStar.fluxOk && starPair.tgtStar.fluxOk && 
+                                starPair.refStar.bkgOk && starPair.tgtStar.bkgOk)
+                            {
+                                starPairArray.push(starPair);
+                            }
                             // Remove star so it is not matched multiple times
                             // This should be efficient because the brightest stars are at the end of the array
                             tgtStars.splice(t, 1);
@@ -273,14 +451,14 @@ function StarsDetected(){
         // Use our first pass to calculate the approximate gradient. This pass might contain
         // stars that matched with noise or very faint stars
         let tgtStarsClone = tgtStars.slice();
-        let starPairArray = matchStars(tgtStarsClone, refStars, searchRadius, false, 0, 0);
+        let starPairArray = matchStars(tgtStarsClone, refStars, searchRadius, false, 0, 0, channel);
         if (starPairArray.length > 10) {
             // Second pass rejects stars if (refFlux / tgtFlux) is higher or lower than expected
             let linearFit = calculateScale(starPairArray);
             const gradient = linearFit.m;
             const tolerance = data.starFluxTolerance;
             let starPairArray2 = matchStars(tgtStars, refStars, searchRadius,
-                    true, gradient / tolerance, gradient * tolerance);
+                    true, gradient / tolerance, gradient * tolerance, channel);
             if (starPairArray2.length > 5){
                 let nRemoved = starPairArray.length - starPairArray2.length;
                 if (nRemoved){
@@ -325,7 +503,7 @@ function StarsDetected(){
                 // keep star with maximum flux
                 let key = starToKey(star);
                 let mapStar = starMap.get(key);
-                if (mapStar === undefined || mapStar.flux < star.flux){
+                if (mapStar === undefined || mapStar.getStarFlux() < star.getStarFlux()){
                     starMap.set(key, star);
                 }
             }
@@ -339,7 +517,7 @@ function StarsDetected(){
             for (let star of starMap.values()){
                 stars.push(star);
             }
-            return stars.sort((a, b) => b.flux - a.flux);
+            return stars.sort((a, b) => b.getStarFlux() - a.getStarFlux());
         };
 
         // Add all the stars to a map to reject duplicates at the same coordinates
@@ -368,7 +546,7 @@ function StarsDetected(){
 function calculateScale(starPairs) {
     let leastSquareFit = new LeastSquareFitAlgorithm();
     for (let starPair of starPairs) {
-        leastSquareFit.addValue(starPair.tgtStar.flux, starPair.refStar.flux);
+        leastSquareFit.addValue(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux());
     }
     return leastSquareFit.getOriginFit();
 }
@@ -385,8 +563,8 @@ function removeStarPairOutlier(starPairs, linearFit){
     for (let i=0; i<starPairs.length; i++){
         let starPair = starPairs[i];
         // Calculate the perpendicular distance of this point from the best fit line
-        let x = starPair.tgtStar.flux;
-        let y = starPair.refStar.flux;
+        let x = starPair.tgtStar.getStarFlux();
+        let y = starPair.refStar.getStarFlux();
         let perpDist = Math.abs(
                 (y - linearFit.m * x + linearFit.b) / Math.sqrt(linearFit.m * linearFit.m + 1));
         if (perpDist > maxErr){
@@ -417,10 +595,10 @@ function StarMinMax() {
      */
     this.calculateMinMax = function(starPairArray){
         for (let starPair of starPairArray) {
-            this.maxRefFlux = Math.max(this.maxRefFlux, starPair.refStar.flux);
-            this.maxTgtFlux = Math.max(this.maxTgtFlux, starPair.tgtStar.flux);
-            this.minRefFlux = Math.min(this.minRefFlux, starPair.refStar.flux);
-            this.minTgtFlux = Math.min(this.minTgtFlux, starPair.tgtStar.flux);
+            this.maxRefFlux = Math.max(this.maxRefFlux, starPair.refStar.getStarFlux());
+            this.maxTgtFlux = Math.max(this.maxTgtFlux, starPair.tgtStar.getStarFlux());
+            this.minRefFlux = Math.min(this.minRefFlux, starPair.refStar.getStarFlux());
+            this.minTgtFlux = Math.min(this.minTgtFlux, starPair.tgtStar.getStarFlux());
         }
     };
 }
@@ -494,7 +672,7 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
     function drawStarLineAndPoints(graph, lineColor, starPairs, linearFit, pointColor){
         graph.drawLine(linearFit.m, linearFit.b, lineColor);
         for (let starPair of starPairs){
-            graph.drawPoint(starPair.tgtStar.flux, starPair.refStar.flux, pointColor);
+            graph.drawPoint(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux(), pointColor);
         }
     };
     
@@ -628,7 +806,7 @@ function createStarMask(tgtView, joinArea, detectedStars, data){
             let star = detectedStars.allStars[i];
             // size is the area. sqrt gives box side length. Half gives circle radius
             // Double the star radius for bright stars
-            let starDiameter = Math.sqrt(star.size);
+            let starDiameter = Math.max(star.rect.width, star.rect.height);
             let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
             let radius = starRadius + data.maskStarRadiusAdd;
             graphics.fillCircle(star.pos, radius);

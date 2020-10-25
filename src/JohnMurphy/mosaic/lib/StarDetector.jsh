@@ -4,7 +4,7 @@
 //  / ____// /_/ / ___/ // _, _/   PixInsight JavaScript Runtime
 // /_/     \____/ /____//_/ |_|    PJSR Version 1.0
 // ----------------------------------------------------------------------------
-// pjsr/StarDetector.jsh - Released 2019-04-29T18:55:31Z
+// pjsr/StarDetector.jsh - Released 2020-08-19T07:28:16Z
 // John Murphy: Modified Star data structure to include background value.
 //      Modification follows suggestion by Juan Conejero, PixInsight forum:
 //      https://pixinsight.com/forum/index.php?topic=14574.0
@@ -13,7 +13,7 @@
 // PJSR is an ECMA-262-5 compliant framework for development of scripts on the
 // PixInsight platform.
 //
-// Copyright (c) 2003-2019 Pleiades Astrophoto S.L. All Rights Reserved.
+// Copyright (c) 2003-2020 Pleiades Astrophoto S.L. All Rights Reserved.
 //
 // Redistribution and use in both source and binary forms, with or without
 // modification, is permitted provided that the following conditions are met:
@@ -35,7 +35,7 @@
 //    and/or other materials provided with the product:
 //
 //    "This product is based on software from the PixInsight project, developed
-//    by Pleiades Astrophoto and its contributors (http://pixinsight.com/)."
+//    by Pleiades Astrophoto and its contributors (https://pixinsight.com/)."
 //
 //    Alternatively, if that is where third-party acknowledgments normally
 //    appear, this acknowledgment must be reproduced in the product itself.
@@ -104,7 +104,7 @@
  */
 #ifndef __PJSR_STAR_OBJECT_DEFINED
 #define __PJSR_STAR_OBJECT_DEFINED  1
-function Star( pos, flux, size, bkg, peak )
+function Star( pos, flux, size )
 {
    // Centroid position in pixels, image coordinates.
    this.pos = new Point( pos.x, pos.y );
@@ -112,10 +112,6 @@ function Star( pos, flux, size, bkg, peak )
    this.flux = flux;
    // Area of detected star structure in square pixels.
    this.size = size;
-   // Local background estimate.
-   this.bkg = bkg;
-   // Value at peak
-   this.peak = peak;
 }
 #endif
 
@@ -581,10 +577,14 @@ function StarDetector()
                               if ( wrk.sample( ix, iy ) > 0.85*p.peak )
                               {
                                  let m = Matrix.fromImage( wrk, r );
-                                 if ( m.median() < this.peakResponse*p.peak ){
-                                    // John Murphy: return star flux instead of total flux
-                                    let flux = p.flux - p.bkg * p.size;
-                                    S.push( new Star( p.pos, flux, p.size, p.bkg, p.peak) );
+                                 if ( m.median() < this.peakResponse*p.peak )
+                                 {
+                                    // John Murphy: add bkg, peak and star bounding box
+                                    let star = new Star( p.pos, p.flux, p.size );
+                                    if (star.hasOwnProperty('setBkgPeakRect')){
+                                        star.setBkgPeakRect(p.bkg, p.peak, r)
+                                    }
+                                    S.push( star );
                                  }
                               }
                      }
@@ -729,4 +729,4 @@ StarDetector.prototype = new Object;
 #endif   // __PJSR_StarDetector_jsh
 
 // ----------------------------------------------------------------------------
-// EOF pjsr/StarDetector.jsh - Released 2019-04-29T18:55:31Z
+// EOF pjsr/StarDetector.jsh - Released 2020-08-19T07:28:16Z

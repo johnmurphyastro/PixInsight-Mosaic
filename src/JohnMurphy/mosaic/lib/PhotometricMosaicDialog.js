@@ -19,7 +19,7 @@
 #include "DialogLib.js"
 #define KEYPREFIX "PhotometricMosaic"
 
-function EXTRA_CONTROLS(){return false;}
+function EXTRA_CONTROLS(){return true;}
 /**
  * Default the Reference view to a view that contains "Mosaic" in its name, but
  * doesn't start with "PM_" (e.g. graph windows).

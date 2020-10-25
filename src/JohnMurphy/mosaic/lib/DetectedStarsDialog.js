@@ -48,6 +48,8 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
     let starPairs = getStarPairs(selectedChannel);
     
+    let drawOrigPhotRects = false;
+    
     /**
      * Return bitmap of the reference or target image
      * @param {Number} refOrTgt Set to REF or TGT
@@ -151,7 +153,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
             graphics.antialiasing = true;
             for (let i = 0; i < stars.length; ++i){
                 let star = stars[i];
-                let radius = Math.sqrt(star.size)/2 + 4;
+                let radius = Math.max(star.rect.width, star.rect.height)/2 + 3;
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
                 graphics.strokeCircle(x, y, radius);
@@ -187,20 +189,21 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
                 let starPair = starPairs[i];
                 let tgtStar = starPair.tgtStar;
                 let refStar = starPair.refStar;
-                let x;
-                let y;
-                let s;
+                let rect;
                 if (selectedBitmap === REF){
-                    x = refStar.pos.x - bitmapOffset.x;
-                    y = refStar.pos.y - bitmapOffset.y;
-                    s = Math.sqrt(refStar.size); // size is area of the square. s is length of side.
+                    if (drawOrigPhotRects){
+                        rect = new Rect(refStar.unmodifiedRect);
+                    } else {
+                        rect = new Rect(refStar.rect);
+                    }
                 } else {
-                    x = tgtStar.pos.x - bitmapOffset.x;
-                    y = tgtStar.pos.y - bitmapOffset.y;
-                    s = Math.sqrt(tgtStar.size); // size is area of the square. s is length of side.
+                    if (drawOrigPhotRects){
+                        rect = new Rect(tgtStar.unmodifiedRect);
+                    } else {
+                        rect = new Rect(tgtStar.rect);
+                    }
                 }
-                let rect = new Rect(s, s);
-                rect.center = new Point(x, y);
+                rect.moveBy(-bitmapOffset.x, -bitmapOffset.y);
                 graphics.strokeRect(rect);
                 let bg = rect.inflatedBy( detectedStars.bkgDelta );
                 graphics.strokeRect(bg);
@@ -265,6 +268,20 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
         update();
     };
     
+    let oldPhotometricCheckBox;
+    if (EXTRA_CONTROLS()){
+        oldPhotometricCheckBox = new CheckBox(this);
+        oldPhotometricCheckBox.text = "Unmodified";
+        oldPhotometricCheckBox.toolTip = "<p>Use photometry rectangles from StarDetector.</p>";
+        oldPhotometricCheckBox.checked = drawOrigPhotRects;
+        oldPhotometricCheckBox.onClick = function (checked) {
+            drawOrigPhotRects = checked;
+            starPairs = getStarPairs(selectedChannel);
+            previewControl.updateBitmap(bitmap);
+            update();
+        };
+    }
+    
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
     redRadioButton.toolTip = "Display the stars detected within the red channel";
@@ -321,6 +338,8 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data)
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
     optionsSizer.add(photometricCheckBox);
+    if (EXTRA_CONTROLS())
+        optionsSizer.add(oldPhotometricCheckBox);
     optionsSizer.addSpacing(10);
     optionsSizer.add(redRadioButton);
     optionsSizer.add(greenRadioButton);

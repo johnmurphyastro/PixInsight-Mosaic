@@ -144,7 +144,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             for (let i = 0; i < firstNstars; ++i){
                 let star = allStars[i];
                 // size is the area. sqrt gives box side length. Half gives circle radius
-                let starDiameter = Math.sqrt(star.size);
+                let starDiameter = Math.max(star.rect.width, star.rect.height);
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
                 let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;

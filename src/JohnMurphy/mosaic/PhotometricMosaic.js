@@ -144,8 +144,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
 
-    let detectedStars = new StarsDetected();
-    detectedStars.detectStars(referenceView, targetView, data.logStarDetection, data.cache);
+    let detectedStars = new StarsDetected(referenceView, targetView);
+    detectedStars.detectStars(data.logStarDetection, data.cache);
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
