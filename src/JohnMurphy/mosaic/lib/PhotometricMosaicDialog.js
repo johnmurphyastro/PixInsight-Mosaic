@@ -19,7 +19,7 @@
 #include "DialogLib.js"
 #define KEYPREFIX "PhotometricMosaic"
 
-function EXTRA_CONTROLS(){return true;}
+function EXTRA_CONTROLS(){return false;}
 /**
  * Default the Reference view to a view that contains "Mosaic" in its name, but
  * doesn't start with "PM_" (e.g. graph windows).
@@ -98,6 +98,10 @@ function PhotometricMosaicData() {
         Parameters.set("starSearchRadius", this.starSearchRadius);
         
         // Photometric Scale
+        Parameters.set("apertureLogGrowth", this.apertureLogGrowth);
+        Parameters.set("apertureAdd", this.apertureAdd);
+        Parameters.set("apertureGrowthLimit", this.apertureGrowthLimit);
+        Parameters.set("apertureBgDelta", this.apertureBgDelta);
         Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
@@ -164,6 +168,14 @@ function PhotometricMosaicData() {
             this.starSearchRadius = Parameters.getReal("starSearchRadius");
         
         // Photometric Scale
+        if (Parameters.has("apertureLogGrowth"))
+            this.apertureLogGrowth = Parameters.getReal("apertureLogGrowth");
+        if (Parameters.has("apertureAdd"))
+            this.apertureAdd = Parameters.getInteger("apertureAdd");
+        if (Parameters.has("apertureGrowthLimit"))
+            this.apertureGrowthLimit = Parameters.getInteger("apertureGrowthLimit");
+        if (Parameters.has("apertureBgDelta"))
+            this.apertureBgDelta = Parameters.getInteger("apertureBgDelta");
         if (Parameters.has("limitPhotoStarsPercent"))
             this.limitPhotoStarsPercent = Parameters.getReal("limitPhotoStarsPercent");
         if (Parameters.has("linearRange"))
@@ -258,6 +270,10 @@ function PhotometricMosaicData() {
         this.starSearchRadius = 2.5;
         
         // Photometric Scale
+        this.apertureLogGrowth = 1.5;
+        this.apertureAdd = 1;
+        this.apertureGrowthLimit = 5;
+        this.apertureBgDelta = 3;
         this.limitPhotoStarsPercent = 100;
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
@@ -320,6 +336,10 @@ function PhotometricMosaicData() {
         }
         
         // Photometric Scale
+        photometricMosaicDialog.apertureLogGrowth_Control.setValue(this.apertureLogGrowth);
+        photometricMosaicDialog.apertureAdd_Control.setValue(this.apertureAdd);
+        photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
+        photometricMosaicDialog.apertureBkgDelta_Control.setValue(this.apertureBgDelta);
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
         photometricMosaicDialog.linearRange_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
@@ -379,6 +399,10 @@ function saveSettings(data){
     }
 
     // Photometric Scale
+    Settings.write( KEYPREFIX+"/apertureLogGrowth", DataType_Float, data.apertureLogGrowth );
+    Settings.write( KEYPREFIX+"/apertureAdd", DataType_Int32, data.apertureAdd );
+    Settings.write( KEYPREFIX+"/apertureGrowthLimit", DataType_Int32, data.apertureGrowthLimit );
+    Settings.write( KEYPREFIX+"/apertureBgDelta", DataType_Int32, data.apertureBgDelta );
     Settings.write( KEYPREFIX+"/limitPhotoStarsPercent", DataType_Float, data.limitPhotoStarsPercent );
     Settings.write( KEYPREFIX+"/linearRange", DataType_Float, data.linearRange );
     Settings.write( KEYPREFIX+"/outlierRemoval", DataType_Int32, data.outlierRemoval );
@@ -445,6 +469,18 @@ function restoreSettings(data){
     }
     
     // Photometric Scale
+    keyValue = Settings.read( KEYPREFIX+"/apertureLogGrowth", DataType_Float );
+    if ( Settings.lastReadOK )
+        data.apertureLogGrowth = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/apertureAdd", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.apertureAdd = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/apertureGrowthLimit", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.apertureGrowthLimit = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/apertureBgDelta", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.apertureBgDelta = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/limitPhotoStarsPercent", DataType_Float );
     if ( Settings.lastReadOK )
         data.limitPhotoStarsPercent = keyValue;
@@ -619,11 +655,10 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Star Detection"
     // =======================================
-    let STAR_DETECTION_STR_LEN = this.font.width("Star detection:");
     this.starDetection_Control = new NumericControl(this);
     this.starDetection_Control.real = true;
     this.starDetection_Control.label.text = "Star detection:";
-    this.starDetection_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.starDetection_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.starDetection_Control.toolTip = "<p>Logarithm of the star detection " +
             "sensitivity. Increase this value to detect less stars.</p>" +
             "<p>You usually don't need to modify this parameter.</p>";
@@ -636,22 +671,10 @@ function PhotometricMosaicDialog(data) {
     this.starDetection_Control.slider.minWidth = 50;
     this.starDetection_Control.setValue(data.logStarDetection);
     
-    let detectedStarsButton = new PushButton(this);
-    detectedStarsButton.text = "Detected stars";
-    detectedStarsButton.toolTip =
-            "<p>Displays all the stars detected in the reference and target images.</p>" +
-            "<p>These stars are cached until either the Photometric Mosaic dialog " +
-            "is closed or a modification invalidates the cache.</p>";
-    detectedStarsButton.onClick = function () {
-        data.viewFlag = DISPLAY_DETECTED_STARS();
-        this.dialog.ok();
-    };
-    
     let starDetectionSection = new Control(this);
     starDetectionSection.sizer = new HorizontalSizer;
     starDetectionSection.sizer.add(this.starDetection_Control);
     starDetectionSection.sizer.addStretch();
-    starDetectionSection.sizer.add(detectedStarsButton);
     let starDetectionBar = new SectionBar(this, "Star Detection");
     starDetectionBar.setSection(starDetectionSection);
     starDetectionBar.onToggleSection = this.onToggleSection;
@@ -724,12 +747,77 @@ function PhotometricMosaicDialog(data) {
     }
     
     // =======================================
-    // SectionBar: "Photometric Scale"
+    // SectionBar: "Photometry"
     // =======================================
+    this.apertureLogGrowth_Control = new NumericEdit(this);
+    this.apertureLogGrowth_Control.setReal(true);
+    this.apertureLogGrowth_Control.setPrecision(1);
+    this.apertureLogGrowth_Control.label.text = "Aperture growth:";
+    this.apertureLogGrowth_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
+    this.apertureLogGrowth_Control.toolTip =
+            "<p>Logarithm of aperture radius growth.</p>" +
+            "<p>The aperture radius increase depends on the star's peak value " +
+            "and this grow rate. Zero produces no growth.</p>";
+    this.apertureLogGrowth_Control.setRange(0, 4);
+    this.apertureLogGrowth_Control.setValue(data.apertureLogGrowth);
+    this.apertureLogGrowth_Control.onValueUpdated = function (value){
+        data.apertureLogGrowth = value;
+    };
+    this.apertureAdd_Control = new NumericEdit(this);
+    this.apertureAdd_Control.setReal(false);
+    this.apertureAdd_Control.label.text = "Aperture add:";
+    this.apertureAdd_Control.toolTip =
+            "<p>Minimum star aperture growth.</p>" +
+            "<p>This value gets added to the aperture radius for all stars.</p>";
+    this.apertureAdd_Control.setRange(0, 10);
+    this.apertureAdd_Control.setValue(data.apertureAdd);
+    this.apertureAdd_Control.onValueUpdated = function (value){
+        data.apertureAdd = value;
+    };
+    this.apertureGrowthLimit_Control = new NumericEdit(this);
+    this.apertureGrowthLimit_Control.setReal(false);
+    this.apertureGrowthLimit_Control.label.text = "Aperture limit:";
+    this.apertureGrowthLimit_Control.toolTip =
+            "<p>Maximum star aperture growth.</p>" +
+            "<p>Limits the aperture radius growth to this number of pixels.</p>";
+    this.apertureGrowthLimit_Control.setRange(3, 25);
+    this.apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
+    this.apertureGrowthLimit_Control.onValueUpdated = function (value){
+        data.apertureGrowthLimit = value;
+    };
+    this.apertureBkgDelta_Control = new NumericEdit(this);
+    this.apertureBkgDelta_Control.setReal(false);
+    this.apertureBkgDelta_Control.label.text = "Background delta:";
+    this.apertureBkgDelta_Control.toolTip = "<p>Background annulus thickness.</p>";
+    this.apertureBkgDelta_Control.setRange(1, 10);
+    this.apertureBkgDelta_Control.setValue(data.apertureBgDelta);
+    this.apertureBkgDelta_Control.onValueUpdated = function (value){
+        data.apertureBgDelta = value;
+    };
+    let detectedStarsButton = new PushButton(this);
+    detectedStarsButton.text = "Edit Aperture";
+    detectedStarsButton.toolTip =
+            "<p>Displays all the stars detected in the reference and target images.</p>" +
+            "<p>These stars are cached until either the Photometric Mosaic dialog " +
+            "is closed or a modification invalidates the cache.</p>";
+    detectedStarsButton.onClick = function () {
+        data.viewFlag = DISPLAY_DETECTED_STARS();
+        this.dialog.ok();
+    };
+    let photometricScaleHorizSizer = new HorizontalSizer(this);
+    photometricScaleHorizSizer.spacing = 10;
+    photometricScaleHorizSizer.add(this.apertureLogGrowth_Control);
+    photometricScaleHorizSizer.add(this.apertureAdd_Control);
+    photometricScaleHorizSizer.add(this.apertureGrowthLimit_Control);
+    photometricScaleHorizSizer.addSpacing(1);
+    photometricScaleHorizSizer.add(this.apertureBkgDelta_Control);
+    photometricScaleHorizSizer.addStretch();
+    photometricScaleHorizSizer.add(detectedStarsButton);
+    
     this.limitPhotoStarsPercent_Control = new NumericEdit(this);
     this.limitPhotoStarsPercent_Control.setReal(true);
     this.limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitPhotoStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.limitPhotoStarsPercent_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.limitPhotoStarsPercent_Control.toolTip =
             "<p>Specifies the percentage of detected stars used for photometry. " +
             "The faintest stars are rejected.</p>" +
@@ -799,8 +887,9 @@ function PhotometricMosaicDialog(data) {
     let photometrySection = new Control(this);
     photometrySection.sizer = new VerticalSizer;
     photometrySection.sizer.spacing = 4;
+    photometrySection.sizer.add(photometricScaleHorizSizer);
     photometrySection.sizer.add(photometricScaleHorizSizer1);
-    let photometryBar = new SectionBar(this, "Photometric Scale");
+    let photometryBar = new SectionBar(this, "Photometry");
     photometryBar.setSection(photometrySection);
     photometryBar.onToggleSection = this.onToggleSection;
     photometryBar.toolTip = "<p>Determines the photometry stars used " +
@@ -817,7 +906,7 @@ function PhotometricMosaicDialog(data) {
     this.limitSampleStarsPercent_Control = new NumericEdit(this);
     this.limitSampleStarsPercent_Control.real = true;
     this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitSampleStarsPercent_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.limitSampleStarsPercent_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.limitSampleStarsPercent_Control.toolTip =
             "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
             "<p>0% implies that no samples are rejected due to stars. This is " +
@@ -896,7 +985,7 @@ function PhotometricMosaicDialog(data) {
         this.maxSamples_Control = new NumericEdit(this);
         this.maxSamples_Control.real = false;
         this.maxSamples_Control.label.text = "Max samples:";
-        this.maxSamples_Control.label.minWidth = this.font.width("Limit stars %:");
+        this.maxSamples_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
         this.maxSamples_Control.toolTip =
             "<p>Limits the number of samples used to create the surface spline. " +
             "If the number of samples exceed this limit, they are combined " +
@@ -967,7 +1056,7 @@ function PhotometricMosaicDialog(data) {
     this.overlapGradientSmoothness_Control.real = true;
     this.overlapGradientSmoothness_Control.setPrecision(1);
     this.overlapGradientSmoothness_Control.label.text = "Smoothness:";
-    this.overlapGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.overlapGradientSmoothness_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.overlapGradientSmoothness_Control.toolTip =
         "<p>A surface spline is created to model the relative " +
         "gradient over the whole of the overlap region.</p>" +
@@ -1013,7 +1102,7 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control = new NumericControl(this);
     this.taperLength_Control.real = false;
     this.taperLength_Control.label.text = "Taper length:";
-    this.taperLength_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.taperLength_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.taperLength_Control.toolTip = taperTooltip;
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
@@ -1050,7 +1139,7 @@ function PhotometricMosaicDialog(data) {
     this.targetGradientSmoothness_Control.real = true;
     this.targetGradientSmoothness_Control.setPrecision(1);
     this.targetGradientSmoothness_Control.label.text = "Smoothness:";
-    this.targetGradientSmoothness_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.targetGradientSmoothness_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.targetGradientSmoothness_Control.toolTip =
         "<p>The target image gradient correction is determined from the gradient " +
         "along the target side edge of the Overlap's bounding box.</p>" +
@@ -1277,7 +1366,7 @@ function PhotometricMosaicDialog(data) {
     this.joinSize_Control = new NumericControl(this);
     this.joinSize_Control.real = false;
     this.joinSize_Control.label.text = "Join size:";
-    this.joinSize_Control.label.minWidth = STAR_DETECTION_STR_LEN;
+    this.joinSize_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.joinSize_Control.toolTip = "<p>Specifies the thickness of the Join Region. " +
             "For a horizontal join, this is the height. For a vertical join, the width. " +
             "The ideal Join size depends on the Mosaic Combination mode:" +
@@ -1538,6 +1627,64 @@ function createOutlierRemovalControl(dialog, data, strLength){
     outlierRemoval_Control.slider.minWidth = 221;
     outlierRemoval_Control.setValue(data.outlierRemoval);
     return outlierRemoval_Control;
+}
+
+function createApertureLogGrowthControl(dialog, data, strLen){
+    let apertureLogGrowth_Control = new NumericControl(dialog);
+    apertureLogGrowth_Control.real = true;
+    apertureLogGrowth_Control.setPrecision(1);
+    apertureLogGrowth_Control.label.text = "Aperture growth:";
+    apertureLogGrowth_Control.label.minWidth = strLen;
+    apertureLogGrowth_Control.toolTip =
+            "<p>Logarithm of aperture radius growth.</p>" +
+            "<p>The aperture radius increase depends on the star's peak value " +
+            "and this grow rate. Zero produces no growth.</p>";
+    apertureLogGrowth_Control.setRange(0, 4);
+    apertureLogGrowth_Control.slider.setRange(0, 40);
+    apertureLogGrowth_Control.slider.minWidth = 200;
+    apertureLogGrowth_Control.slider.maxWidth = 200;
+    apertureLogGrowth_Control.setValue(data.apertureLogGrowth);
+    return apertureLogGrowth_Control;
+}
+function createApertureAddControl(dialog, data, strLen){
+    let apertureAdd_Control = new NumericControl(dialog);
+    apertureAdd_Control.real = false;
+    apertureAdd_Control.label.text = "Aperture add:";
+    apertureAdd_Control.label.minWidth = strLen;
+    apertureAdd_Control.toolTip =
+            "<p>Minimum star aperture growth.</p>" +
+            "<p>This value gets added to the aperture radius for all stars.</p>";
+    apertureAdd_Control.setRange(0, 10);
+    apertureAdd_Control.slider.setRange(0, 10);
+    apertureAdd_Control.slider.minWidth = 25;
+    apertureAdd_Control.setValue(data.apertureAdd);
+    return apertureAdd_Control;
+}
+function createApertureGrowthLimitControl(dialog, data, strLen){
+    let apertureGrowthLimit_Control = new NumericControl(dialog);
+    apertureGrowthLimit_Control.real = false;
+    apertureGrowthLimit_Control.label.text = "Aperture Limit:";
+    apertureGrowthLimit_Control.label.minWidth = strLen;
+    apertureGrowthLimit_Control.toolTip =
+            "<p>Maximum star aperture growth.</p>" +
+            "<p>Limits the aperture radius growth to this number of pixels.</p>";
+    apertureGrowthLimit_Control.setRange(3, 25);
+    apertureGrowthLimit_Control.slider.setRange(3, 25);
+    apertureGrowthLimit_Control.slider.minWidth = 25;
+    apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
+    return apertureGrowthLimit_Control;
+}
+function createApertureBkgDeltaControl(dialog, data, strLen){
+    let apertureBkgDelta_Control = new NumericControl(dialog);
+    apertureBkgDelta_Control.real = false;
+    apertureBkgDelta_Control.label.text = "Background delta:";
+    apertureBkgDelta_Control.label.minWidth = strLen;
+    apertureBkgDelta_Control.toolTip = "<p>Background annulus thickness.</p>";
+    apertureBkgDelta_Control.setRange(1, 10);
+    apertureBkgDelta_Control.slider.setRange(1, 10);
+    apertureBkgDelta_Control.slider.minWidth = 25;
+    apertureBkgDelta_Control.setValue(data.apertureBgDelta);
+    return apertureBkgDelta_Control;
 }
 
 // Our dialog inherits all properties and methods from the core Dialog object.

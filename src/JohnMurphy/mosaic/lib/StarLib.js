@@ -65,16 +65,15 @@ function Star( pos, flux, size){
 #include "StarDetector.jsh"
 
 /**
- * 
+ * @param {PhotometricMosaicData} data Values from user interface
  * @param {Image} refImage
  * @param {Image} tgtImage
  * @param {Star} refStar
  * @param {Star} tgtStar
- * @param {Number} bkgDelta Create sky background rect by inflating star rect by this
  * @param {Number} channel
  * @returns {StarPair}
  */
-function StarPair(refImage, tgtImage, refStar, tgtStar, bkgDelta, channel){
+function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
     
     /**
      * Used to increase the size of the star bounding box
@@ -89,7 +88,8 @@ function StarPair(refImage, tgtImage, refStar, tgtStar, bkgDelta, channel){
         this.right = Math.max(refStar.rect.x1 - refStar.pos.x, tgtStar.rect.x1 - tgtStar.pos.x);
         
         let peak = Math.max(refStar.peak, tgtStar.peak);
-        let inflate = 1.0 + Math.min(5, Math.round(100 * peak));
+        let growthRate = Math.pow(10, data.apertureLogGrowth);
+        let inflate = Math.round(Math.min(data.apertureGrowthLimit, growthRate * peak + data.apertureAdd));
         this.top += inflate;
         this.left += inflate;
         this.bottom += inflate;
@@ -98,8 +98,8 @@ function StarPair(refImage, tgtImage, refStar, tgtStar, bkgDelta, channel){
     
     let delta = new Delta(refStar, tgtStar);
     
-    this.refStar = createStar(refImage, refStar, delta, bkgDelta, channel);
-    this.tgtStar = createStar(tgtImage, tgtStar, delta, bkgDelta, channel);
+    this.refStar = createStar(refImage, refStar, delta, data.apertureBgDelta, channel);
+    this.tgtStar = createStar(tgtImage, tgtStar, delta, data.apertureBgDelta, channel);
     
     /**
      * Create a star based on the supplied star, but with a larger star rectangle
@@ -209,8 +209,6 @@ function StarsDetected(refView, tgtView){
     this.tgtColorStars = null;
     /** {Star[]} refColorStars and tgtColorStars, sorted by star flux */
     this.allStars = null;
-    /** Gets set to background rectangle inflation around star */
-    this.bkgDelta = 3;
     /** If true, write information to console */
     this.showConsoleInfo = true;
 
@@ -218,9 +216,10 @@ function StarsDetected(refView, tgtView){
     
     /**
      * @param {Number} logSensitivity
+     * @param {Number} apertureBgDelta 
      * @param {MosaicCache} cache
      */
-    this.detectStars = function (logSensitivity, cache) {
+    this.detectStars = function (logSensitivity, apertureBgDelta, cache) {
         let nChannels = refView.image.isColor ? 3 : 1;
         const overlapBox = cache.overlap.overlapBox;
         // Reference and target image stars
@@ -233,12 +232,14 @@ function StarsDetected(refView, tgtView){
             cache.tgtColorStars = [];
             let overlapMask = cache.overlap.getOverlapMask();
             for (let c = 0; c < nChannels; c++) {
-                let refStars = findStars(this.refView, overlapMask, overlapBox, logSensitivity, c);
+                let refStars = findStars(this.refView, overlapMask, overlapBox, 
+                        logSensitivity, apertureBgDelta, c);
                 cache.refColorStars.push(refStars);
                 writeln("Reference[" + c + "] detected " + refStars.length + " stars");
                 processEvents();
                 
-                let tgtStars = findStars(this.tgtView, overlapMask, overlapBox, logSensitivity, c);
+                let tgtStars = findStars(this.tgtView, overlapMask, overlapBox, 
+                        logSensitivity, apertureBgDelta, c);
                 cache.tgtColorStars.push(tgtStars);
                 writeln("Target   [" + c + "] detected " + tgtStars.length + " stars");
                 processEvents();
@@ -288,10 +289,11 @@ function StarsDetected(refView, tgtView){
      * @param {Image} mask Bitmap represents overlapping region
      * @param {Rect} overlapBox Bounding box of the overlap area
      * @param {Number} logSensitivity
+     * @param {Number} apertureBgDelta
      * @param {Number} channel
      * @returns {Star[]}
      */
-    function findStars(view, mask, overlapBox, logSensitivity, channel){
+    function findStars(view, mask, overlapBox, logSensitivity, apertureBgDelta, channel){
         let lastProgressPc = 0;
         function progressCallback(count, total){
             if (count === 0){
@@ -332,7 +334,7 @@ function StarsDetected(refView, tgtView){
         starDetector.upperLimit = 1;
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
-        starDetector.bkgDelta = self.bkgDelta;
+        starDetector.bkgDelta = apertureBgDelta;
         
         const x0 = overlapBox.x0;
         const y0 = overlapBox.y0;
@@ -398,18 +400,19 @@ function StarsDetected(refView, tgtView){
          * Use flux and search radius to match stars.
          * Start with the brightest ref star and look for the brightest tgt star
          * within the searchRadius. If a tgt star is found it is removed from tgtStar array.
+         * @param {PhotometricMosaicData} data Values from user interface
          * @param {Star[]} tgtStars Modified (entries are removed)
          * @param {Star[]} refStars
-         * @param {Number} searchRadius
          * @param {Boolean} useRange If true, reject pairs if the flux difference is too great
          * @param {Number} minGradient Minimum allowed (ref flux / target flux) 
          * @param {Number} maxGradient Maximum allowed (ref flux / target flux) 
          * @param {Number} channel
          * @returns {StarPair[]} Array of matched stars
          */
-        function matchStars(tgtStars, refStars, searchRadius, useRange, minGradient, maxGradient, channel){
+        function matchStars(data, tgtStars, refStars, useRange, minGradient, maxGradient, channel){
             let refImage = self.refView.image;
             let tgtImage = self.tgtView.image;
+            let searchRadius = data.starSearchRadius;
             let starPairArray = [];
             let r = refStars.length;
             while (r--) {
@@ -427,8 +430,7 @@ function StarsDetected(refView, tgtView){
                     if (deltaX < searchRadius){
                         let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
                         if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
-                            let starPair = new StarPair(refImage, tgtImage, rStar, tStar, 
-                                    self.bkgDelta, channel);
+                            let starPair = new StarPair(data, refImage, tgtImage, rStar, tStar, channel);
                             if (starPair.refStar.fluxOk && starPair.tgtStar.fluxOk && 
                                 starPair.refStar.bkgOk && starPair.tgtStar.bkgOk)
                             {
@@ -451,13 +453,13 @@ function StarsDetected(refView, tgtView){
         // Use our first pass to calculate the approximate gradient. This pass might contain
         // stars that matched with noise or very faint stars
         let tgtStarsClone = tgtStars.slice();
-        let starPairArray = matchStars(tgtStarsClone, refStars, searchRadius, false, 0, 0, channel);
+        let starPairArray = matchStars(data, tgtStarsClone, refStars, false, 0, 0, channel);
         if (starPairArray.length > 10) {
             // Second pass rejects stars if (refFlux / tgtFlux) is higher or lower than expected
             let linearFit = calculateScale(starPairArray);
             const gradient = linearFit.m;
             const tolerance = data.starFluxTolerance;
-            let starPairArray2 = matchStars(tgtStars, refStars, searchRadius,
+            let starPairArray2 = matchStars(data, tgtStars, refStars,
                     true, gradient / tolerance, gradient * tolerance, channel);
             if (starPairArray2.length > 5){
                 let nRemoved = starPairArray.length - starPairArray2.length;
@@ -637,13 +639,14 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
      * @param {Number} factor
      * @param {Number} width
      * @param {Number} height
+     * @param {Number} selectedChannel R=0, G=1, B=2, All=3
      * @returns {Graph}
      */
-    function createZoomedGraph(factor, width, height){
+    function createZoomedGraph(factor, width, height, selectedChannel){
         let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
         let scaleFactors = getScaleFactors(colorStarPairs);
         let graph = createGraph(refView.fullId, tgtView.fullId, width, height, 
-            colorStarPairs, scaleFactors, factor, preserveAspectRatio);
+            colorStarPairs, scaleFactors, factor, preserveAspectRatio, selectedChannel);
         return graph;
     }
     
@@ -686,10 +689,11 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
      * @param {LinearFitData[]} scaleFactors Lines are drawn through origin with these gradients
      * @param {Number} zoomFactor
      * @param {Boolean} preserveAspectRatio 
+     * @param {Number} selectedChannel R=0, G=1, B=2, All=3
      * @returns {Graph}
      */
     function createGraph(referenceName, targetName, width, height, colorStarPairs, 
-            scaleFactors, zoomFactor, preserveAspectRatio){
+            scaleFactors, zoomFactor, preserveAspectRatio, selectedChannel){
         let targetLabel = "Target (" + targetName + ")";
         let referenceLabel = "Reference (" + referenceName + ")";
 
@@ -731,9 +735,11 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
             let lineColors = [0xFF770000, 0xFF007700, 0xFF000077]; // r, g, b
             let pointColors = [0xFFFF0000, 0xFF00FF00, 0xFF0000FF]; // r, g, b
             for (let c = 0; c < colorStarPairs.length; c++){
-                let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
-                drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], scaleFactors[c], pointColors[c]);
-                graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+                if (selectedChannel === 3 || selectedChannel === c){
+                    let graphAreaOnly = graphWithAxis.createGraphAreaOnly();
+                    drawStarLineAndPoints(graphAreaOnly, lineColors[c], colorStarPairs[c], scaleFactors[c], pointColors[c]);
+                    graphWithAxis.mergeWithGraphAreaOnly(graphAreaOnly);
+                }
             }
         }
         

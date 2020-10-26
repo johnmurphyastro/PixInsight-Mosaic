@@ -145,7 +145,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
 
     let detectedStars = new StarsDetected(referenceView, targetView);
-    detectedStars.detectStars(data.logStarDetection, data.cache);
+    detectedStars.detectStars(data.logStarDetection, data.apertureBgDelta, data.cache);
     processEvents();
     
     if (data.viewFlag === DISPLAY_DETECTED_STARS()){
@@ -153,7 +153,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new DetectedStarsDialog("Detected Stars", refBitmap, tgtBitmap, detectedStars, data);
+        let dialog = new DetectedStarsDialog("Detected Stars", refBitmap, tgtBitmap, 
+                detectedStars, data, photometricMosaicDialog);
         dialog.execute();
         return;
     }

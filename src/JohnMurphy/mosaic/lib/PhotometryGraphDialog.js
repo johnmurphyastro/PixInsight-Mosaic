@@ -41,8 +41,9 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.__base__();
     let self = this;
     let zoom_ = 1;
+    let selectedChannel_ = 3;
     let createZoomedGraph_ = createZoomedGraph;
-    let graph_ = createZoomedGraph_(zoom_, width, height);
+    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel_);
     
     /**
      * Converts bitmap (x,y) into graph coordinates.
@@ -110,7 +111,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
      */
     function update(width, height){
         try {
-            graph_ = createZoomedGraph_(getZoomFactor(), width, height);
+            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel_);
             bitmapControl.repaint();    // display the zoomed graph bitmap
         } catch (e) {
             console.criticalln("Graph update error: " + e);
@@ -220,12 +221,85 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);
     
+    // ===========================
+    // Color toggles
+    // ===========================
+    let redRadioButton = new RadioButton(this);
+    redRadioButton.text = "Red";
+    redRadioButton.toolTip = "<p>Display the red channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
+    redRadioButton.checked = false;
+    redRadioButton.onClick = function (checked) {
+        selectedChannel_ = 0;
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let greenRadioButton = new RadioButton(this);
+    greenRadioButton.text = "Green";
+    greenRadioButton.toolTip = "<p>Display the green channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
+    greenRadioButton.checked = false;
+    greenRadioButton.onClick = function (checked) {
+        selectedChannel_ = 1;
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let blueRadioButton = new RadioButton(this);
+    blueRadioButton.text = "Blue";
+    blueRadioButton.toolTip = "<p>Display the blue channel gradient</p>" + 
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
+    blueRadioButton.checked = false;
+    blueRadioButton.onClick = function (checked) {
+        selectedChannel_ = 2;
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    let allRadioButton = new RadioButton(this);
+    allRadioButton.text = "All";
+    allRadioButton.toolTip = "Display all channels";
+    allRadioButton.checked = true;
+    allRadioButton.onClick = function (checked) {
+        selectedChannel_ = 3;
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    };
+    
+    if (!data.targetView.image.isColor){
+        redRadioButton.enabled = false;
+        greenRadioButton.enabled = false;
+        blueRadioButton.enabled = false;
+    }
+    
+    let color_Sizer = new HorizontalSizer(this);
+    color_Sizer.margin = 0;
+    color_Sizer.spacing = 10;
+    color_Sizer.addSpacing(4);
+    color_Sizer.add(redRadioButton);
+    color_Sizer.add(greenRadioButton);
+    color_Sizer.add(blueRadioButton);
+    color_Sizer.add(allRadioButton);
+    color_Sizer.addStretch();
+    
     // ============================
     // Photometry controls
     // ============================
-    const OUTLIER_REMOVAL_STRLEN = this.font.width("Outlier Removal:");
+    const BACKGROUND_DELTA_STRLEN = this.font.width("Background delta:");
     let limitPhotoStarsPercent_Control = 
-            createLimitPhotoStarsPercentControl(this, data, OUTLIER_REMOVAL_STRLEN);
+            createLimitPhotoStarsPercentControl(this, data, BACKGROUND_DELTA_STRLEN);
     limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
         data.limitPhotoStarsPercent = value;
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(value);
@@ -234,7 +308,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
     
-    let linearRange_Control = createLinearRangeControl(this, data, OUTLIER_REMOVAL_STRLEN);
+    let linearRange_Control = createLinearRangeControl(this, data, BACKGROUND_DELTA_STRLEN);
     linearRange_Control.onValueUpdated = function (value) {
         data.linearRange = value;
         photometricMosaicDialog.linearRange_Control.setValue(value);
@@ -243,7 +317,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
 
-    let outlierRemoval_Control = createOutlierRemovalControl(this, data, OUTLIER_REMOVAL_STRLEN);
+    let outlierRemoval_Control = createOutlierRemovalControl(this, data, BACKGROUND_DELTA_STRLEN);
     outlierRemoval_Control.onValueUpdated = function (value) {
         data.outlierRemoval = value;
         photometricMosaicDialog.outlierRemoval_Control.setValue(value);
@@ -252,6 +326,40 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
     
+    let apertureLogGrowth_Control = createApertureLogGrowthControl(this, data, BACKGROUND_DELTA_STRLEN);
+    apertureLogGrowth_Control.onValueUpdated = function (value) {
+        data.apertureLogGrowth = value;
+        photometricMosaicDialog.apertureLogGrowth_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
+    };
+    let apertureAdd_Control = createApertureAddControl(this, data, BACKGROUND_DELTA_STRLEN);
+    apertureAdd_Control.onValueUpdated = function (value) {
+        data.apertureAdd = value;
+        photometricMosaicDialog.apertureAdd_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
+    };
+    let apertureBkgDelta_Control = createApertureBkgDeltaControl(this, data, BACKGROUND_DELTA_STRLEN);
+    apertureBkgDelta_Control.onValueUpdated = function (value) {
+        data.apertureBgDelta = value;
+        photometricMosaicDialog.apertureBkgDelta_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
+    };
+    let aperture_Sizer1 = new HorizontalSizer(this);
+    aperture_Sizer1.add(apertureLogGrowth_Control);
+    aperture_Sizer1.addStretch();
+    let aperture_Sizer2 = new HorizontalSizer(this);
+    aperture_Sizer2.add(apertureAdd_Control);
+    aperture_Sizer2.addStretch();
+    let aperture_Sizer4 = new HorizontalSizer(this);
+    aperture_Sizer4.add(apertureBkgDelta_Control);
+    aperture_Sizer4.addStretch();
+    
     //-------------
     // Global sizer
     //-------------
@@ -259,15 +367,20 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
+    this.sizer.add(color_Sizer);
     this.sizer.add(limitPhotoStarsPercent_Control);
     this.sizer.add(linearRange_Control);
     this.sizer.add(outlierRemoval_Control);
+    this.sizer.addSpacing(4);
+    this.sizer.add(aperture_Sizer1);
+    this.sizer.add(aperture_Sizer2);
+    this.sizer.add(aperture_Sizer4);
     this.sizer.add(zoomButton_Sizer);
     
     this.userResizable = true;
     let preferredWidth = width + this.sizer.margin * 2;
-    let preferredHeight = height + this.sizer.spacing * 4 + this.sizer.margin * 2 +
-           linearRange_Control.height * 4 + 4;
+    let preferredHeight = height + this.sizer.spacing * 8 + this.sizer.margin * 2 +
+           linearRange_Control.height * 7 + redRadioButton.height + 4;
     this.resize(preferredWidth, preferredHeight);
     
     this.setScaledMinSize(300, 300);
