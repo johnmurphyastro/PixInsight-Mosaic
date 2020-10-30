@@ -325,11 +325,27 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    let filterGroupBox = new GroupBox(this);
+    filterGroupBox.title = "Filter stars";
+    filterGroupBox.sizer = new VerticalSizer();
+    filterGroupBox.sizer.margin = 2;
+    filterGroupBox.sizer.spacing = 2;
+    filterGroupBox.sizer.add(limitPhotoStarsPercent_Control);
+    filterGroupBox.sizer.add(linearRange_Control);
+    filterGroupBox.sizer.add(outlierRemoval_Control);
     
-    let apertureLogGrowth_Control = createApertureLogGrowthControl(this, data, BACKGROUND_DELTA_STRLEN);
-    apertureLogGrowth_Control.onValueUpdated = function (value) {
-        data.apertureLogGrowth = value;
-        photometricMosaicDialog.apertureLogGrowth_Control.setValue(value);
+    let apertureGrowthRate_Control = createApertureGrowthRateControl(this, data, BACKGROUND_DELTA_STRLEN);
+    apertureGrowthRate_Control.onValueUpdated = function (value) {
+        data.apertureGrowthRate = value;
+        photometricMosaicDialog.apertureGrowthRate_Control.setValue(value);
+        if (liveUpdate_control.checked){
+            update(bitmapControl.width, bitmapControl.height);
+        }
+    };
+    let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, BACKGROUND_DELTA_STRLEN);
+    apertureGrowthLimit_Control.onValueUpdated = function (value) {
+        data.apertureGrowthLimit = value;
+        photometricMosaicDialog.apertureGrowthLimit_Control.setValue(value);
         if (liveUpdate_control.checked){
             update(bitmapControl.width, bitmapControl.height);
         }
@@ -351,15 +367,37 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
     let aperture_Sizer1 = new HorizontalSizer(this);
-    aperture_Sizer1.add(apertureLogGrowth_Control);
+    aperture_Sizer1.add(apertureGrowthRate_Control);
     aperture_Sizer1.addStretch();
     let aperture_Sizer2 = new HorizontalSizer(this);
-    aperture_Sizer2.add(apertureAdd_Control);
+    aperture_Sizer2.add(apertureGrowthLimit_Control);
     aperture_Sizer2.addStretch();
+    let aperture_Sizer3 = new HorizontalSizer(this);
+    aperture_Sizer3.add(apertureAdd_Control);
+    aperture_Sizer3.addStretch();
     let aperture_Sizer4 = new HorizontalSizer(this);
     aperture_Sizer4.add(apertureBkgDelta_Control);
     aperture_Sizer4.addStretch();
+    let apertureGroupBox = new GroupBox(this);
+    apertureGroupBox.title = "Aperture size";
+    apertureGroupBox.sizer = new VerticalSizer();
+    apertureGroupBox.sizer.margin = 2;
+    apertureGroupBox.sizer.spacing = 2;
+    apertureGroupBox.sizer.add(aperture_Sizer1);
+    apertureGroupBox.sizer.add(aperture_Sizer2);
+    apertureGroupBox.sizer.add(aperture_Sizer3);
+    apertureGroupBox.sizer.add(aperture_Sizer4);
+    let groupBoxSizer = new HorizontalSizer(this);
+    groupBoxSizer.margin = 0;
+    groupBoxSizer.addSpacing(4);
+    groupBoxSizer.add(apertureGroupBox);
+    groupBoxSizer.addSpacing(4);
     
+    let groupBoxSizer2 = new HorizontalSizer(this);
+    groupBoxSizer2.margin = 0;
+    groupBoxSizer2.addSpacing(4);
+    groupBoxSizer2.add(filterGroupBox);
+    groupBoxSizer2.addSpacing(4);
     //-------------
     // Global sizer
     //-------------
@@ -368,13 +406,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
     this.sizer.add(color_Sizer);
-    this.sizer.add(limitPhotoStarsPercent_Control);
-    this.sizer.add(linearRange_Control);
-    this.sizer.add(outlierRemoval_Control);
-    this.sizer.addSpacing(4);
-    this.sizer.add(aperture_Sizer1);
-    this.sizer.add(aperture_Sizer2);
-    this.sizer.add(aperture_Sizer4);
+    this.sizer.add(groupBoxSizer);
+    this.sizer.add(groupBoxSizer2);
     this.sizer.add(zoomButton_Sizer);
     
     this.userResizable = true;

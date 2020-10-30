@@ -154,7 +154,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             graphics.antialiasing = true;
             for (let i = 0; i < stars.length; ++i){
                 let star = stars[i];
-                let radius = Math.max(star.rect.width, star.rect.height)/2 + 3;
+                let radius = star.getStarRadius();
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
                 graphics.strokeCircle(x, y, radius);
@@ -194,15 +194,15 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
                 let rect;
                 if (selectedBitmap === REF){
                     if (drawOrigPhotRects){
-                        rect = new Rect(refStar.unmodifiedRect);
+                        rect = new Rect(refStar.getBoundingBox());
                     } else {
-                        rect = new Rect(refStar.rect);
+                        rect = new Rect(refStar.getStarAperture());
                     }
                 } else {
                     if (drawOrigPhotRects){
-                        rect = new Rect(tgtStar.unmodifiedRect);
+                        rect = new Rect(tgtStar.getBoundingBox());
                     } else {
-                        rect = new Rect(tgtStar.rect);
+                        rect = new Rect(tgtStar.getStarAperture());
                     }
                 }
                 rect.moveBy(-bitmapOffset.x, -bitmapOffset.y);
@@ -389,9 +389,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         optionsSizer.add(oldPhotometricCheckBox);
     
     let strLen = this.font.width("Background delta:");
-    let apertureLogGrowth_Control = createApertureLogGrowthControl(this, data, strLen);
+    let apertureLogGrowth_Control = createApertureGrowthRateControl(this, data, strLen);
     apertureLogGrowth_Control.onValueUpdated = function (value) {
-        data.apertureLogGrowth = value;
+        data.apertureGrowthRate = value;
         photometricMosaicDialog.apertureLogGrowth_Control.setValue(value);
         if (liveUpdate){
             updatePhotometry();
@@ -423,16 +423,30 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     };
     let aperture_Sizer1 = new HorizontalSizer(this);
     aperture_Sizer1.add(apertureLogGrowth_Control);
-    aperture_Sizer1.addStretch();
     let aperture_Sizer2 = new HorizontalSizer(this);
-    aperture_Sizer2.add(apertureAdd_Control);
+    aperture_Sizer2.add(apertureGrowthLimit_Control);
     aperture_Sizer2.addStretch();
     let aperture_Sizer3 = new HorizontalSizer(this);
-    aperture_Sizer3.add(apertureGrowthLimit_Control);
+    aperture_Sizer3.add(apertureAdd_Control);
     aperture_Sizer3.addStretch();
     let aperture_Sizer4 = new HorizontalSizer(this);
     aperture_Sizer4.add(apertureBkgDelta_Control);
     aperture_Sizer4.addStretch();
+    let apertureGroupBox = new GroupBox(this);
+    apertureGroupBox.title = "Aperture size";
+    apertureGroupBox.sizer = new VerticalSizer();
+    apertureGroupBox.sizer.margin = 2;
+    apertureGroupBox.sizer.spacing = 2;
+    apertureGroupBox.sizer.add(aperture_Sizer1);
+    apertureGroupBox.sizer.add(aperture_Sizer2);
+    apertureGroupBox.sizer.add(aperture_Sizer3);
+    apertureGroupBox.sizer.add(aperture_Sizer4);
+    let groupBoxSizer = new HorizontalSizer(this);
+    groupBoxSizer.margin = 0;
+    groupBoxSizer.addSpacing(4);
+    groupBoxSizer.add(apertureGroupBox);
+    groupBoxSizer.addStretch();
+    groupBoxSizer.addSpacing(2);
 
     /**
      * Draw the stars on top of the background bitmap within the scrolled window.
@@ -455,10 +469,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
-    this.sizer.add(aperture_Sizer1);
-    this.sizer.add(aperture_Sizer2);
-    this.sizer.add(aperture_Sizer3);
-    this.sizer.add(aperture_Sizer4);
+    this.sizer.add(groupBoxSizer);
     this.sizer.add(previewControl.getButtonSizer());
 
     // The PreviewControl size is determined by the size of the bitmap

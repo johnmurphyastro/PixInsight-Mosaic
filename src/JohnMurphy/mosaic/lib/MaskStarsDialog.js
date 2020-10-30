@@ -144,11 +144,10 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             for (let i = 0; i < firstNstars; ++i){
                 let star = allStars[i];
                 // size is the area. sqrt gives box side length. Half gives circle radius
-                let starDiameter = Math.max(star.rect.width, star.rect.height);
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
-                let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
-                graphics.strokeCircle(x, y, starRadius + data.maskStarRadiusAdd);
+                let starRadius = calcStarMaskRadius(star, data);
+                graphics.strokeCircle(x, y, starRadius);
             }
         } catch (e) {
             console.criticalln("drawMaskStars error: " + e);
@@ -279,7 +278,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     optionsSizer.add(correctTarget_Button);
     optionsSizer.addSpacing(10);
 
-    let starMaskLabelSize = this.font.width("Multiply star radius:");
+    let starMaskLabelSize = this.font.width("Limit stars %:");
     let limitMaskStars_Control = new NumericControl(this);
     limitMaskStars_Control.real = false;
     limitMaskStars_Control.label.text = "Limit stars %:";
@@ -293,7 +292,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     limitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
     limitMaskStars_Control.setRange(0, 100);
     limitMaskStars_Control.slider.setRange(0, 100);
-    limitMaskStars_Control.slider.minWidth = 200;
+    limitMaskStars_Control.slider.minWidth = 300;
     limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
     limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
@@ -302,20 +301,38 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         }
     };
     
-    let maskStarRadiusMult_Control = new NumericControl(this);
-    maskStarRadiusMult_Control.real = true;
-    maskStarRadiusMult_Control.label.text = "Multiply star radius:";
-    maskStarRadiusMult_Control.toolTip =
+    let maskStarGrowthRate_Control = new NumericControl(this);
+    maskStarGrowthRate_Control.real = true;
+    maskStarGrowthRate_Control.label.text = "Growth rate:";
+    maskStarGrowthRate_Control.toolTip =
             "<p>Increases the size of the brightest stars.</p>" +
             "<p>It mainly affects stars that are saturated or close to saturation.</p>";
-    maskStarRadiusMult_Control.label.setFixedWidth(starMaskLabelSize);
-    maskStarRadiusMult_Control.setRange(1, 25);
-    maskStarRadiusMult_Control.slider.setRange(1, 250);
-    maskStarRadiusMult_Control.setPrecision(1);
-    maskStarRadiusMult_Control.slider.minWidth = 250;
-    maskStarRadiusMult_Control.setValue(data.maskStarRadiusMult);
-    maskStarRadiusMult_Control.onValueUpdated = function (value) {
-        data.maskStarRadiusMult = value;
+    maskStarGrowthRate_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarGrowthRate_Control.setRange(0, 30);
+    maskStarGrowthRate_Control.slider.setRange(0, 300);
+    maskStarGrowthRate_Control.setPrecision(2);
+    maskStarGrowthRate_Control.slider.minWidth = 300;
+    maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
+    maskStarGrowthRate_Control.onValueUpdated = function (value) {
+        data.maskStarGrowthRate = value;
+        if (liveUpdate) {
+            update();
+        }
+    };
+    
+    let maskStarGrowthLimit_Control = new NumericControl(this);
+    maskStarGrowthLimit_Control.real = false;
+    maskStarGrowthLimit_Control.label.text = "Growth Limit:";
+    maskStarGrowthLimit_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarGrowthLimit_Control.toolTip =
+            "<p>Maximum star growth.</p>" +
+            "<p>Limits the radius growth to this number of pixels.</p>";
+    maskStarGrowthLimit_Control.setRange(3, 300);
+    maskStarGrowthLimit_Control.slider.setRange(3, 300);
+    maskStarGrowthLimit_Control.slider.minWidth = 300;
+    maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
+    maskStarGrowthLimit_Control.onValueUpdated = function (value) {
+        data.maskStarGrowthLimit = value;
         if (liveUpdate) {
             update();
         }
@@ -323,15 +340,15 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     
     let maskStarRadiusAdd_Control = new NumericControl(this);
     maskStarRadiusAdd_Control.real = true;
-    maskStarRadiusAdd_Control.label.text = "Add to star radius:";
+    maskStarRadiusAdd_Control.label.text = "Radius add:";
     maskStarRadiusAdd_Control.toolTip =
             "<p>Used to increases or decreases the radius of all mask stars.</p>" +
             "<p>This is applied after the 'Multiply star radius'.</p>";
     maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
-    maskStarRadiusAdd_Control.setRange(0, 10);
-    maskStarRadiusAdd_Control.slider.setRange(0, 100);
+    maskStarRadiusAdd_Control.setRange(0, 30);
+    maskStarRadiusAdd_Control.slider.setRange(0, 300);
     maskStarRadiusAdd_Control.setPrecision(1);
-    maskStarRadiusAdd_Control.slider.minWidth = 100;
+    maskStarRadiusAdd_Control.slider.minWidth = 300;
     maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
@@ -340,6 +357,45 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         }
     };
 
+    let filter_Sizer = new HorizontalSizer(this);
+    filter_Sizer.add(limitMaskStars_Control);
+    filter_Sizer.addStretch();
+    let filterGroupBox = new GroupBox(this);
+    filterGroupBox.title = "Filter stars";
+    filterGroupBox.sizer = new VerticalSizer();
+    filterGroupBox.sizer.margin = 2;
+    filterGroupBox.sizer.spacing = 2;
+    filterGroupBox.sizer.add(filter_Sizer);
+
+    let aperture_Sizer1 = new HorizontalSizer(this);
+    aperture_Sizer1.add(maskStarGrowthRate_Control);
+    aperture_Sizer1.addStretch();
+    let aperture_Sizer2 = new HorizontalSizer(this);
+    aperture_Sizer2.add(maskStarGrowthLimit_Control);
+    aperture_Sizer2.addStretch();
+    let aperture_Sizer3 = new HorizontalSizer(this);
+    aperture_Sizer3.add(maskStarRadiusAdd_Control);
+    aperture_Sizer3.addStretch();
+    let apertureGroupBox = new GroupBox(this);
+    apertureGroupBox.title = "Star size";
+    apertureGroupBox.sizer = new VerticalSizer();
+    apertureGroupBox.sizer.margin = 2;
+    apertureGroupBox.sizer.spacing = 2;
+    apertureGroupBox.sizer.add(aperture_Sizer1);
+    apertureGroupBox.sizer.add(aperture_Sizer2);
+    apertureGroupBox.sizer.add(aperture_Sizer3);
+    let groupBoxSizer = new HorizontalSizer(this);
+    groupBoxSizer.margin = 0;
+    groupBoxSizer.addSpacing(4);
+    groupBoxSizer.add(apertureGroupBox);
+    groupBoxSizer.addSpacing(4);
+
+    let groupBoxSizer2 = new HorizontalSizer(this);
+    groupBoxSizer2.margin = 0;
+    groupBoxSizer2.addSpacing(4);
+    groupBoxSizer2.add(filterGroupBox);
+    groupBoxSizer2.addSpacing(4);
+    
     /**
      * Draw the stars on top of the background bitmap within the scrolled window.
      */
@@ -349,12 +405,11 @@ function MaskStarsDialog(joinArea, detectedStars, data,
 
     // Global sizer
     this.sizer = new VerticalSizer(this);
-    this.sizer.margin = 2;
+    this.sizer.margin = 4;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(limitMaskStars_Control);
-    this.sizer.add(maskStarRadiusMult_Control);
-    this.sizer.add(maskStarRadiusAdd_Control);
+    this.sizer.add(groupBoxSizer);
+    this.sizer.add(groupBoxSizer2);
     this.sizer.add(optionsSizer);
     this.sizer.add(previewControl.getButtonSizer());
 

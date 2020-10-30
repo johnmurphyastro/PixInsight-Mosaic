@@ -233,7 +233,9 @@ function fitsHeaderMask(keywords, data){
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitMaskStarsPercent: " + data.limitMaskStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
-        SCRIPT_NAME() + ".maskStarRadiusMult: " + data.maskStarRadiusMult));
+        SCRIPT_NAME() + ".maskStarGrowthRate: " + data.maskStarGrowthRate));
+        keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".maskStarGrowthLimit: " + data.maskStarGrowthLimit));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".maskStarRadiusAdd: " + data.maskStarRadiusAdd));
 }

@@ -89,12 +89,18 @@ function MosaicCache() {
                 data.starFluxTolerance + "_" +
                 data.starSearchRadius + "_" +
                 
+                data.apertureGrowthRate + "_" +
+                data.apertureGrowthLimit + "_" +
+                data.apertureAdd + "_" +
+                data.apertureBgDelta + "_" +
                 data.limitPhotoStarsPercent + "_" +
                 data.linearRange + "_" +
                 data.outlierRemoval + "_" +
                 
-                data.limitSampleStarsPercent + "_" + 
-                data.sampleStarRadiusMult + "_" + 
+                data.sampleStarGrowthRate + "_" +
+                data.sampleStarGrowthLimit + "_" +
+                data.sampleStarRadiusAdd + "_" +
+                data.limitSampleStarsPercent + "_" +
                 data.sampleSize + "_";
         
         let value = this.sampleGridMapMap.get(key);
@@ -120,12 +126,18 @@ function MosaicCache() {
                 data.starFluxTolerance + "_" +
                 data.starSearchRadius + "_" +
                 
+                data.apertureGrowthRate + "_" +
+                data.apertureGrowthLimit + "_" +
+                data.apertureAdd + "_" +
+                data.apertureBgDelta + "_" +
                 data.limitPhotoStarsPercent + "_" +
                 data.linearRange + "_" +
                 data.outlierRemoval + "_" +
                 
-                data.limitSampleStarsPercent + "_" + 
-                data.sampleStarRadiusMult + "_" + 
+                data.sampleStarGrowthRate + "_" +
+                data.sampleStarGrowthLimit + "_" +
+                data.sampleStarRadiusAdd + "_" +
+                data.limitSampleStarsPercent + "_" +
                 data.sampleSize + "_";
         
         let value = this.samplePairsMap.get(key);
@@ -150,13 +162,19 @@ function MosaicCache() {
                 data.starFluxTolerance + "_" +
                 data.starSearchRadius + "_" +
                 
+                data.apertureGrowthRate + "_" +
+                data.apertureGrowthLimit + "_" +
+                data.apertureAdd + "_" +
+                data.apertureBgDelta + "_" +
                 data.limitPhotoStarsPercent + "_" +
                 data.linearRange + "_" +
                 data.outlierRemoval + "_" +
                 
-                data.limitSampleStarsPercent + "_" + 
-                data.sampleStarRadiusMult + "_" + 
-                data.sampleSize + "_" + 
+                data.sampleStarGrowthRate + "_" +
+                data.sampleStarGrowthLimit + "_" +
+                data.sampleStarRadiusAdd + "_" +
+                data.limitSampleStarsPercent + "_" +
+                data.sampleSize + "_" +
                 data.maxSamples + "_" +
                 
                 logSmoothing + "_";

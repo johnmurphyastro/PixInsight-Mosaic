@@ -1,4 +1,4 @@
-/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes, GraphDialog */
+/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes, GraphDialog, APERTURE_GROWTH, APERTURE_ADD, APERTURE_GROWTH_LIMIT, APERTURE_BKG_DELTA */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -18,136 +18,65 @@
 //"use strict";
 #define __PJSR_NO_STAR_DETECTOR_TEST_ROUTINES 1
 #define __PJSR_STAR_OBJECT_DEFINED  1
-function Star( pos, flux, size){
-   // Centroid position in pixels, image coordinates.
-   this.pos = new Point( pos.x, pos.y );
-   // Total flux, normalized intensity units.
-   this.flux = flux;
-   // Area of detected star structure in square pixels.
-   this.size = size;
-   // Local background estimate.
-   this.bkg = 0;
-   // Value at peak
-   this.peak = 0;
-   // Star bounding box
-   this.rect = null;
-   this.unmodifiedRect = null;
-   // true if no zero pixels
-   this.fluxOk = true;
-   this.bkgOk = true;
-   // Star flux (total flux - background flux)
-   let starFlux = -1;
-   
-   /** These should be on the constructor, but Star needs to be compatible with
-    * StarDetector.jsh
-    * @param {Number} bkg Local background estimate.
-    * @param {Number} peak Value at peak
-    * @param {Rect} rect Star bounding box
-    */
-   this.setBkgPeakRect = function(bkg, peak, rect){
-       this.bkg = bkg;
-       this.peak = peak;
-       this.rect = rect;
-       this.unmodifiedRect = rect;
-       starFlux = -1;
-   };
-   
-   /**
-    * @returns {Number} Star flux (total flux - bg flux)
-    */
-   this.getStarFlux = function(){
-       if (starFlux === -1){
-           starFlux = this.flux - this.bkg * this.size;
-       }
-       return starFlux;
-   };
-}
+
+#define APERTURE_ADD 1
+#define APERTURE_GROWTH 1.0
+#define APERTURE_GROWTH_LIMIT 10
+#define APERTURE_BKG_DELTA = 10
 #include "StarDetector.jsh"
 
-/**
- * @param {PhotometricMosaicData} data Values from user interface
- * @param {Image} refImage
- * @param {Image} tgtImage
- * @param {Star} refStar
- * @param {Star} tgtStar
- * @param {Number} channel
- * @returns {StarPair}
- */
-function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
+function Star(pos, flux, size) {
+    // Centroid position in pixels, image coordinates (from StarDetector).
+    this.pos = new Point(pos.x, pos.y);
+    // Total flux, normalized intensity units (from StarDetector).
+    this.flux = flux;
+    // Area of detected star structure in square pixels (from StarDetector).
+    this.size = size;
+
+    // Value at peak (from StarDetector)
+    let _peakValue;
+    // Star bounding box (from StarDetector)
+    let _boundingBox;
+    
+    // Calculated aperture rectangle
+    let _starAperture;
+    // Calculated radius
+    let _starRadius;
+    // Calculated star only flux (total flux - background flux)
+    let _starFlux;
+    // true if no zero pixels
+    this.fluxOk = true;
+    this.bkgOk = true;
+
+    /** This method should be called only once, after the constructor but before calcStarFlux().
+     * @param {Number} bkg Local background estimate.
+     * @param {Number} peak Value at peak
+     * @param {Rect} rect Star bounding box
+     */
+    this.setBkgPeakRect = function (bkg, peak, rect) {
+        this.setBoundingBox(rect);
+        _peakValue = peak;
+        _starFlux = this.flux - bkg * this.size;
+    };
+    
+    this.setBoundingBox = function (rect){
+        _boundingBox = new Rect(rect);
+    };
+    
+    this.setPeakValue = function (peakValue){
+        _peakValue = peakValue;
+    };
     
     /**
-     * Used to increase the size of the star bounding box
-     * @param {Star} refStar
-     * @param {Star} tgtStar
-     * @returns {StarPair.Delta}
+     * Star was detected within a cropped image. Move it to the full image coordinate.
+     * @param {Number} x0
+     * @param {Number} y0
      */
-    function Delta (refStar, tgtStar){
-        this.top = Math.max(refStar.pos.y - refStar.rect.y0, tgtStar.pos.y - tgtStar.rect.y0);
-        this.left = Math.max(refStar.pos.x - refStar.rect.x0, tgtStar.pos.x - tgtStar.rect.x0);
-        this.bottom = Math.max(refStar.rect.y1 - refStar.pos.y, tgtStar.rect.y1 - tgtStar.pos.y);
-        this.right = Math.max(refStar.rect.x1 - refStar.pos.x, tgtStar.rect.x1 - tgtStar.pos.x);
-        
-        let peak = Math.max(refStar.peak, tgtStar.peak);
-        let growthRate = Math.pow(10, data.apertureLogGrowth);
-        let inflate = Math.round(Math.min(data.apertureGrowthLimit, growthRate * peak + data.apertureAdd));
-        this.top += inflate;
-        this.left += inflate;
-        this.bottom += inflate;
-        this.right += inflate;
-    }
-    
-    let delta = new Delta(refStar, tgtStar);
-    
-    this.refStar = createStar(refImage, refStar, delta, data.apertureBgDelta, channel);
-    this.tgtStar = createStar(tgtImage, tgtStar, delta, data.apertureBgDelta, channel);
-    
-    /**
-     * Create a star based on the supplied star, but with a larger star rectangle
-     * and a new background rectangle.
-     * The star's total flux and background level are calculated.
-     * @param {Image} image The image the star is from
-     * @param {Star} star Original star (not modified)
-     * @param {StarPair.Delta} delta Specifies how to inflate the star rectangle
-     * @param {Number} bkgDelta Distance between inner and outer rectangles
-     * @param {Number} channel Color channel
-     * @returns {Star}
-     */
-    function createStar(image, star, delta, bkgDelta, channel){
-        let x0 = Math.round(star.pos.x - delta.left);
-        let y0 = Math.round(star.pos.y - delta.top);
-        let x1 = Math.round(star.pos.x + delta.right);
-        let y1 = Math.round(star.pos.y + delta.bottom);
-        let rect = new Rect(x0, y0, x1, y1);
-        
-        // Calculate total star flux (i.e. star + star background)
-        let length = rect.area;
-        let samples = new Float64Array(length);
-        let size = 0;
-        let flux = 0;
-        let peak = 0;
-        image.getSamples(samples, rect, channel);
-        for (let i=0; i<length; i++){
-            if (samples[i] > 0){
-                let sample = samples[i];
-                flux += sample;
-                peak = Math.max(peak, sample);
-                size++;
-            }
-        }
-        
-        // TODO: A more accurate background would use data rejection, then
-        // bkg = (3 * median) - (2 * mean)
-        let bkgSamples = new BackgroundSamples(image, rect, bkgDelta, channel);
-        let bkg = Math.median( bkgSamples.allSamples );
-        
-        let s = new Star(star.pos, flux, size);
-        s.setBkgPeakRect(bkg, peak, rect);
-        s.unmodifiedRect = star.rect;           // The original rect from StarDetector
-        s.fluxOk = (size === length);           // false if star rect contained black samples
-        s.bkgOk = (bkgSamples.zeroCount === 0); // false if bg contained black samples
-        
-        return s;
-    }
+    this.moveBy = function(x0, y0){
+        this.pos.x += x0;
+        this.pos.y += y0;
+        _boundingBox.moveBy(x0, y0);
+    };
     
     /**
      * Create and store an array of all the image samples that are inbetween
@@ -193,6 +122,174 @@ function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
         /** The number of black pixels (excluded from the allSamples array) */
         this.zeroCount = (top.area + bottom.area + left.area + right.area) - this.allSamples.length;
     }
+
+    /** Private method
+     * Sets the star aperture and then calculates th star's flux and radius.
+     * @param {Image} image 
+     * @param {Number} channel Color channel
+     * @param {Rect} aperture The star aperture
+     * @param {Number} bgDelta Thickness of background annulus
+     */
+    this.calcStarFlux = function (image, channel, aperture, bgDelta) {
+        // Calculate total star flux (i.e. star + star background)
+        let length = aperture.area;
+        let samples = new Float64Array(length);
+        let nSamples = 0;
+        let flux = 0;
+        image.getSamples(samples, aperture, channel);
+        for (let i = 0; i < length; i++) {
+            if (samples[i] > 0) {
+                flux += samples[i];
+                nSamples++;
+            }
+        }
+        let bgSamples = new BackgroundSamples(image, aperture, bgDelta, channel);
+        let bg = Math.median(bgSamples.allSamples);
+        this.fluxOk = (nSamples === length);      // false if star rect contained black samples
+        this.bkgOk = (bgSamples.zeroCount === 0); // false if bg contained black samples
+        _starFlux = flux - bg * nSamples;
+        _starAperture = aperture;
+        _starRadius = Math.max(aperture.width, aperture.height) / 2;
+    };
+    
+    /**
+     * This method is used straight after StarDetection to improve the star flux accuracy
+     * @param {Image} image 
+     * @param {Number} channel Color channel
+     * @param {Number} apertureAdd Add this number of pixels to the bounding box
+     * @param {Number} apertureGrowthRate Aperture increase depends on star flux
+     * @param {Number} apertureGrowthLimit Aperture growth is limited to this number of pixels
+     * @param {Number} apertureBgDelta Thickness of background annulus
+     */
+    this.recalcStarFlux = function(image, channel, apertureAdd, apertureGrowthRate, apertureGrowthLimit, apertureBgDelta){
+        let inflate = calcApertureCorrection(
+                apertureAdd, apertureGrowthRate, apertureGrowthLimit, _starFlux);
+        let aperture = _boundingBox.inflatedBy(Math.round(inflate));
+        this.calcStarFlux(image, channel, aperture, apertureBgDelta);
+    };
+    
+    /**
+     * Creates a new star with the same position, peak value and bounding box.
+     * The star's flux is calculated from the supplied image and aperture.
+     * @param {Image} image 
+     * @param {Number} channel Color channel
+     * @param {Rect} aperture The star aperture
+     * @param {Number} bgDelta Thickness of background annulus
+     */
+    this.factory = function(image, channel, aperture, bgDelta){
+        let s = new Star(this.pos, this.flux, this.size);
+        s.setPeakValue(_peakValue);
+        s.setBoundingBox(_boundingBox);
+        s.calcStarFlux(image, channel, aperture, bgDelta);
+        return s;
+    };
+
+    /**
+     * @returns {rect} star bounding box (from StarDetector)
+     */
+    this.getBoundingBox = function () {
+        return _boundingBox;
+    };
+    
+    /**
+     * @returns {Number} star peak value (from StarDetector)
+     */
+    this.getPeakValue = function () {
+        return _peakValue;
+    };
+    
+    /**
+     * @returns {Number} Calculated star flux
+     */
+    this.getStarFlux = function (){
+        return _starFlux;
+    };
+    
+    /**
+     * @returns {Number} Photometry star aperture
+     */
+    this.getStarAperture = function (){
+        return _starAperture;
+    };
+    
+    /**
+     * @returns {Number} Star radius
+     */
+    this.getStarRadius = function (){
+        return _starRadius;
+    };
+}
+
+/**
+ * @param {Number} apertureAdd
+ * @param {Number} growthRate
+ * @param {Number} growthLimit
+ * @param {Number} starFlux
+ * @returns {Number} Inflate the star's bounding box by this to create aperture.
+ * Does not round the result.
+ */
+function calcApertureCorrection(apertureAdd, growthRate, growthLimit, starFlux){
+    return apertureAdd + Math.min(growthRate * starFlux, growthLimit);
+}
+
+/**
+ * @param {PhotometricMosaicData} data Values from user interface
+ * @param {Image} refImage
+ * @param {Image} tgtImage
+ * @param {Star} refStar
+ * @param {Star} tgtStar
+ * @param {Number} channel
+ * @returns {StarPair}
+ */
+function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
+    
+    /**
+     * Used to increase the size of the star bounding box
+     * @param {Star} refStar
+     * @param {Star} tgtStar
+     * @returns {StarPair.Delta}
+     */
+    function Delta (refStar, tgtStar){
+        let refRect = refStar.getBoundingBox();
+        let tgtRect = tgtStar.getBoundingBox();
+        this.top = Math.max(refStar.pos.y - refRect.y0, tgtStar.pos.y - tgtRect.y0);
+        this.left = Math.max(refStar.pos.x - refRect.x0, tgtStar.pos.x - tgtRect.x0);
+        this.bottom = Math.max(refRect.y1 - refStar.pos.y, tgtRect.y1 - tgtStar.pos.y);
+        this.right = Math.max(refRect.x1 - refStar.pos.x, tgtRect.x1 - tgtStar.pos.x);
+        
+        let maxFlux = Math.max(refStar.getStarFlux(), tgtStar.getStarFlux());
+        let inflate = Math.round(calcApertureCorrection(
+                data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit, maxFlux));
+        this.top += inflate;
+        this.left += inflate;
+        this.bottom += inflate;
+        this.right += inflate;
+    }
+    
+    let delta = new Delta(refStar, tgtStar);
+    
+    this.refStar = createStar(refImage, refStar, delta, data.apertureBgDelta, channel);
+    this.tgtStar = createStar(tgtImage, tgtStar, delta, data.apertureBgDelta, channel);
+    
+    /**
+     * Create a star based on the supplied star, but with a larger star rectangle
+     * and a new background rectangle.
+     * The star's total flux and background level are calculated.
+     * @param {Image} image The image the star is from
+     * @param {Star} star Original star (not modified)
+     * @param {StarPair.Delta} delta Specifies how to inflate the star rectangle
+     * @param {Number} bkgDelta Distance between inner and outer rectangles
+     * @param {Number} channel Color channel
+     * @returns {Star}
+     */
+    function createStar(image, star, delta, bkgDelta, channel){
+        let x0 = Math.round(star.pos.x - delta.left);
+        let y0 = Math.round(star.pos.y - delta.top);
+        let x1 = Math.round(star.pos.x + delta.right);
+        let y1 = Math.round(star.pos.y + delta.bottom);
+        let aperture = new Rect(x0, y0, x1, y1);
+        return star.factory(image, channel, aperture, bkgDelta);
+    }
 }
 
 /**
@@ -216,10 +313,9 @@ function StarsDetected(refView, tgtView){
     
     /**
      * @param {Number} logSensitivity
-     * @param {Number} apertureBgDelta 
      * @param {MosaicCache} cache
      */
-    this.detectStars = function (logSensitivity, apertureBgDelta, cache) {
+    this.detectStars = function (logSensitivity, cache) {
         let nChannels = refView.image.isColor ? 3 : 1;
         const overlapBox = cache.overlap.overlapBox;
         // Reference and target image stars
@@ -233,13 +329,13 @@ function StarsDetected(refView, tgtView){
             let overlapMask = cache.overlap.getOverlapMask();
             for (let c = 0; c < nChannels; c++) {
                 let refStars = findStars(this.refView, overlapMask, overlapBox, 
-                        logSensitivity, apertureBgDelta, c);
+                        logSensitivity, c);
                 cache.refColorStars.push(refStars);
                 writeln("Reference[" + c + "] detected " + refStars.length + " stars");
                 processEvents();
                 
                 let tgtStars = findStars(this.tgtView, overlapMask, overlapBox, 
-                        logSensitivity, apertureBgDelta, c);
+                        logSensitivity, c);
                 cache.tgtColorStars.push(tgtStars);
                 writeln("Target   [" + c + "] detected " + tgtStars.length + " stars");
                 processEvents();
@@ -289,11 +385,10 @@ function StarsDetected(refView, tgtView){
      * @param {Image} mask Bitmap represents overlapping region
      * @param {Rect} overlapBox Bounding box of the overlap area
      * @param {Number} logSensitivity
-     * @param {Number} apertureBgDelta
      * @param {Number} channel
      * @returns {Star[]}
      */
-    function findStars(view, mask, overlapBox, logSensitivity, apertureBgDelta, channel){
+    function findStars(view, mask, overlapBox, logSensitivity, channel){
         let lastProgressPc = 0;
         function progressCallback(count, total){
             if (count === 0){
@@ -334,20 +429,20 @@ function StarsDetected(refView, tgtView){
         starDetector.upperLimit = 1;
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
-        starDetector.bkgDelta = apertureBgDelta;
+        starDetector.bkgDelta = APERTURE_BKG_DELTA;
         
         const x0 = overlapBox.x0;
         const y0 = overlapBox.y0;
         let stars = starDetector.stars(starImage);
         starImage.free();
         for (let star of stars){
-            star.pos.x += x0;
-            star.pos.y += y0;
-            star.rect.moveBy(x0, y0);
-            star.unmodifiedRect = star.rect;
+            star.moveBy(x0, y0);
+            // Calculate the flux, this time using an inflated star aperture
+            star.recalcStarFlux(view.image, channel, 
+                    APERTURE_ADD, APERTURE_GROWTH, APERTURE_GROWTH_LIMIT, APERTURE_BKG_DELTA);
         }
         return stars;
-    };
+    }
     
     /**
      * Finds the stars that exist in both images that have no pixel above upperLimit.
@@ -384,7 +479,7 @@ function StarsDetected(refView, tgtView){
             let limitStarsPercent = data.limitPhotoStarsPercent;
             let filteredStars = [];
             for (let star of stars) {
-                if (star.peak < peakUpperLimit) {
+                if (star.getPeakValue() < peakUpperLimit) {
                     filteredStars.push(star);
                 }
             }
@@ -417,9 +512,15 @@ function StarsDetected(refView, tgtView){
             let r = refStars.length;
             while (r--) {
                 let rStar = refStars[r];
+                if (!rStar.fluxOk )
+                    continue;
+                
                 let t = tgtStars.length;
                 while (t--) {
                     let tStar = tgtStars[t];
+                    if (!tStar.fluxOk )
+                        continue;
+                
                     if (useRange){
                         let gradient = rStar.getStarFlux() / tStar.getStarFlux();
                         if (gradient < minGradient || gradient > maxGradient){
@@ -431,8 +532,8 @@ function StarsDetected(refView, tgtView){
                         let deltaY = Math.abs(tStar.pos.y - rStar.pos.y);
                         if (deltaY < searchRadius && rSqr > deltaX * deltaX + deltaY * deltaY) {
                             let starPair = new StarPair(data, refImage, tgtImage, rStar, tStar, channel);
-                            if (starPair.refStar.fluxOk && starPair.tgtStar.fluxOk && 
-                                starPair.refStar.bkgOk && starPair.tgtStar.bkgOk)
+                            if (starPair.refStar.fluxOk && starPair.tgtStar.fluxOk /* && 
+                                starPair.refStar.bkgOk && starPair.tgtStar.bkgOk */)
                             {
                                 starPairArray.push(starPair);
                             }
@@ -471,7 +572,7 @@ function StarsDetected(refView, tgtView){
             }
         }
         return starPairArray;
-    };
+    }
 
     /**
      * Combien star arrays removing duplicate stars (keep star with maximum flux)
@@ -532,7 +633,7 @@ function StarsDetected(refView, tgtView){
             addStars(starMap, tgtColorStars[c]);
         }
         return getSortedStars(starMap);
-    };
+    }
     
     function writeln(consoleMsg){
         if (self.showConsoleInfo){
@@ -779,6 +880,32 @@ function createJoinMask(tgtView, overlap, joinRect){
 }
 
 /**
+ * @param {Star} star
+ * @param {PhotometricMosaicData} data
+ * @returns {Number} Star radius
+ */
+function calcStarMaskRadius(star, data){
+    let starBox = star.getBoundingBox();
+    let r = Math.max(starBox.width, starBox.height) / 2;
+    let delta = calcApertureCorrection(data.maskStarRadiusAdd, 
+            data.maskStarGrowthRate, data.maskStarGrowthLimit, star.getStarFlux());
+    return r + delta;
+}
+
+/**
+ * @param {Star} star
+ * @param {PhotometricMosaicData} data
+ * @returns {Number} Star radius
+ */
+function calcSampleStarRejectionRadius(star, data){
+    let starBox = star.getBoundingBox();
+    let r = Math.max(starBox.width, starBox.height) / 2;
+    let delta = calcApertureCorrection(data.sampleStarRadiusAdd, 
+            data.sampleStarGrowthRate, data.sampleStarGrowthLimit, star.getStarFlux());
+    return r + delta;
+}
+
+/**
  * @param {View} tgtView
  * @param {Rect} joinArea 
  * @param {StarsDetected} detectedStars
@@ -810,11 +937,7 @@ function createStarMask(tgtView, joinArea, detectedStars, data){
 
         for (let i = 0; i < firstNstars; ++i){
             let star = detectedStars.allStars[i];
-            // size is the area. sqrt gives box side length. Half gives circle radius
-            // Double the star radius for bright stars
-            let starDiameter = Math.max(star.rect.width, star.rect.height);
-            let starRadius = starDiameter * Math.pow(data.maskStarRadiusMult, star.peak) / 2;
-            let radius = starRadius + data.maskStarRadiusAdd;
+            let radius = calcStarMaskRadius(star, data);
             graphics.fillCircle(star.pos, radius);
         }
     } catch (e) {
