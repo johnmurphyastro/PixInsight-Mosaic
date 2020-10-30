@@ -22,7 +22,7 @@
 #define APERTURE_ADD 1
 #define APERTURE_GROWTH 1.0
 #define APERTURE_GROWTH_LIMIT 10
-#define APERTURE_BKG_DELTA = 10
+#define APERTURE_BKG_DELTA 10
 #include "StarDetector.jsh"
 
 function Star(pos, flux, size) {
