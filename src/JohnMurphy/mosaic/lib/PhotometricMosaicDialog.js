@@ -348,7 +348,7 @@ function PhotometricMosaicData() {
         }
         
         // Photometric Scale
-        photometricMosaicDialog.apertureLogGrowth_Control.setValue(this.apertureGrowthRate);
+        photometricMosaicDialog.apertureGrowthRate_Control.setValue(this.apertureGrowthRate);
         photometricMosaicDialog.apertureAdd_Control.setValue(this.apertureAdd);
         photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
         photometricMosaicDialog.apertureBkgDelta_Control.setValue(this.apertureBgDelta);
@@ -604,17 +604,19 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Quick Start Guide"
     // =======================================
     // Create the Program Description at the top
-    let titleLabel = createTitleLabel("<b>" + TITLE() + " v" + VERSION() +
-            " &mdash; Corrects the scale and gradient between two registered images.</b><br />" +
-            "(1) Each join should be approximately vertical or horizontal.<br />" +
-            "(2) Join frames into either rows or columns.<br />" +
-            "(3) Join these strips to create the final mosaic.<br />" +
+    let titleLabel = createTitleLabel(
+            "<b>Combines registered linear images. " +
+            "Gradient and scale corrections are applied.</b><br />" +
+            "(1) Read help sections: <i>Prerequisites</i> and <i>Quick Start Guide</i>.<br />" +
+            "(2) Each join should be approximately vertical or horizontal.<br />" +
+            "(3) Join frames into either rows or columns.<br />" +
+            "(4) Join these strips to create the final mosaic.<br />" +
             "Copyright &copy; 2019-2020 John Murphy");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
     titleSection.setMinSize(650, 60);
-    let titleBar = new SectionBar(this, "Quick Start Guide");
+    let titleBar = new SectionBar(this, "Photometric Mosaic V" + VERSION());
     titleBar.setSection(titleSection);
     titleBar.onToggleSection = this.onToggleSection;
     // SectionBar "Quick Start Guide" End
@@ -774,17 +776,17 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Photometry"
     // =======================================
-    this.apertureLogGrowth_Control = new NumericEdit(this);
-    this.apertureLogGrowth_Control.setReal(true);
-    this.apertureLogGrowth_Control.setPrecision(2);
-    this.apertureLogGrowth_Control.label.text = "Growth rate:";
-    this.apertureLogGrowth_Control.toolTip =
+    this.apertureGrowthRate_Control = new NumericEdit(this);
+    this.apertureGrowthRate_Control.setReal(true);
+    this.apertureGrowthRate_Control.setPrecision(2);
+    this.apertureGrowthRate_Control.label.text = "Growth rate:";
+    this.apertureGrowthRate_Control.toolTip =
             "<p>Logarithm of aperture radius growth.</p>" +
             "<p>The aperture radius increase depends on the star's peak value " +
             "and this grow rate. Zero produces no growth.</p>";
-    this.apertureLogGrowth_Control.setRange(0, 30);
-    this.apertureLogGrowth_Control.setValue(data.apertureGrowthRate);
-    this.apertureLogGrowth_Control.onValueUpdated = function (value){
+    this.apertureGrowthRate_Control.setRange(0, 30);
+    this.apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+    this.apertureGrowthRate_Control.onValueUpdated = function (value){
         data.apertureGrowthRate = value;
     };
     this.apertureAdd_Control = new NumericEdit(this);
@@ -831,9 +833,9 @@ function PhotometricMosaicDialog(data) {
     let apertureGroupBox = new GroupBox(this);
     apertureGroupBox.title = "Aperture size";
     apertureGroupBox.sizer = new HorizontalSizer();
-    apertureGroupBox.sizer.margin = 4;
+    apertureGroupBox.sizer.margin = 2;
     apertureGroupBox.sizer.spacing = 10;
-    apertureGroupBox.sizer.add(this.apertureLogGrowth_Control);
+    apertureGroupBox.sizer.add(this.apertureGrowthRate_Control);
     apertureGroupBox.sizer.add(this.apertureGrowthLimit_Control);
     apertureGroupBox.sizer.add(this.apertureAdd_Control);
     apertureGroupBox.sizer.add(this.apertureBkgDelta_Control);
@@ -901,7 +903,7 @@ function PhotometricMosaicDialog(data) {
     let filterGroupBox = new GroupBox(this);
     filterGroupBox.title = "Filter stars";
     filterGroupBox.sizer = new HorizontalSizer(filterGroupBox);
-    filterGroupBox.sizer.margin = 4;
+    filterGroupBox.sizer.margin = 2;
     filterGroupBox.sizer.spacing = 10;
     filterGroupBox.sizer.add(this.limitPhotoStarsPercent_Control);
     filterGroupBox.sizer.add(this.linearRange_Control);
@@ -961,7 +963,7 @@ function PhotometricMosaicDialog(data) {
     let filterSampleStarsGroupBox = new GroupBox(this);
     filterSampleStarsGroupBox.title = "Filter stars";
     filterSampleStarsGroupBox.sizer = new HorizontalSizer();
-    filterSampleStarsGroupBox.sizer.margin = 4;
+    filterSampleStarsGroupBox.sizer.margin = 2;
     filterSampleStarsGroupBox.sizer.spacing = 10;
     filterSampleStarsGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
     
@@ -1006,7 +1008,7 @@ function PhotometricMosaicDialog(data) {
     let sampleRejectStarGroupBox = new GroupBox(this);
     sampleRejectStarGroupBox.title = "Star rejection radius";
     sampleRejectStarGroupBox.sizer = new HorizontalSizer();
-    sampleRejectStarGroupBox.sizer.margin = 4;
+    sampleRejectStarGroupBox.sizer.margin = 2;
     sampleRejectStarGroupBox.sizer.spacing = 10;
     sampleRejectStarGroupBox.sizer.add(this.sampleStarGrowthRate_Control);
     sampleRejectStarGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
@@ -1028,7 +1030,7 @@ function PhotometricMosaicDialog(data) {
     let sampleSizeGroupBox = new GroupBox(this);
     sampleSizeGroupBox.title = "Samples";
     sampleSizeGroupBox.sizer = new HorizontalSizer();
-    sampleSizeGroupBox.sizer.margin = 4;
+    sampleSizeGroupBox.sizer.margin = 2;
     sampleSizeGroupBox.sizer.spacing = 10;
     sampleSizeGroupBox.sizer.add(this.sampleSize_Control);
     sampleSizeGroupBox.sizer.addStretch();
@@ -1278,8 +1280,9 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Propagated Gradient Correction" End
 
     // ===========================================
-    // SectionBar: Join Region (Advanced settings)
-    // ============================================
+    // SectionBar: Join Region
+    // GroupBox Join Region (User defined)
+    // ===========================================
     const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
     const JoinRegionTooltip =
@@ -1338,7 +1341,7 @@ function PhotometricMosaicDialog(data) {
     function previewUpdateActions(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
-            dialog.joinAreaBar.checkBox.checked = data.hasJoinAreaPreview;
+            dialog.joinAreaGroupBox.checked = data.hasJoinAreaPreview;
             data.joinAreaPreviewRect = view.window.previewRect(view);
             dialog.rectangleX0_Control.setValue(data.joinAreaPreviewRect.x0);
             dialog.rectangleY0_Control.setValue(data.joinAreaPreviewRect.y0);
@@ -1384,7 +1387,7 @@ function PhotometricMosaicDialog(data) {
     
     this.setHasJoinAreaPreview = function(checked){
         data.hasJoinAreaPreview = checked;
-        self.joinAreaBar.checkBox.checked = checked;
+        self.joinAreaGroupBox.checked = checked;
         self.rectangleX0_Control.enabled = checked;
         self.rectangleWidth_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
@@ -1415,22 +1418,21 @@ function PhotometricMosaicDialog(data) {
     joinAreaFlagsHorizSizer.add(this.cropTarget_Control);
     joinAreaFlagsHorizSizer.addStretch();
     
-    let joinAreaSection = new Control(this);
-    joinAreaSection.sizer = new VerticalSizer(this);
-    joinAreaSection.sizer.spacing = 4;
-    joinAreaSection.sizer.add(joinAreaHorizSizer1);
-    joinAreaSection.sizer.add(joinAreaHorizSizer2);
-    joinAreaSection.sizer.add(joinAreaFlagsHorizSizer);
-    this.joinAreaBar = new SectionBar(this, "Join Region (Advanced settings)");
-    this.joinAreaBar.setSection(joinAreaSection);
-    this.joinAreaBar.enableCheckBox();
-    this.joinAreaBar.toolTip = JoinRegionTooltip;
-    this.joinAreaBar.checkBox.onClick = this.setHasJoinAreaPreview;
-    this.joinAreaBar.onToggleSection = this.onToggleSection;
-    // SectionBar "Join Region" End
+    this.joinAreaGroupBox = new GroupBox(this);
+    this.joinAreaGroupBox.title = "Join Region (User defined)";
+    this.joinAreaGroupBox.titleCheckBox = true;
+    this.joinAreaGroupBox.onCheck = this.setHasJoinAreaPreview;
+    this.joinAreaGroupBox.toolTip = JoinRegionTooltip;
+    this.joinAreaGroupBox.sizer = new VerticalSizer(this);
+    this.joinAreaGroupBox.sizer.margin = 2;
+    this.joinAreaGroupBox.sizer.spacing = 4;
+    this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer1);
+    this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer2);
+    this.joinAreaGroupBox.sizer.add(joinAreaFlagsHorizSizer);
+    // GroupBox "Join Region (User defined)" End
 
     // =======================================
-    // SectionBar: "Join Region"
+    // GroupBox: "Join Region (Centered)"
     // =======================================
     let joinSizeTooltip = 
         "<p>Limits the Join Region to a long thin rectangle that is centered within the overlap region.</p>" +
@@ -1466,22 +1468,33 @@ function PhotometricMosaicDialog(data) {
             self.setHasJoinAreaPreview(false);
         }
         data.hasJoinSize = checked;
-        self.joinSizeBar.checkBox.checked = checked;
+        self.joinSizeGroupBox.checked = checked;
         self.joinSize_Control.enabled = checked;
     };
     
-    let joinSizeSection = new Control(this);
-    joinSizeSection.sizer = new VerticalSizer;
-    joinSizeSection.sizer.spacing = 4;
-    joinSizeSection.sizer.add(this.joinSize_Control);
-    this.joinSizeBar = new SectionBar(this, "Join Region");
-    this.joinSizeBar.setSection(joinSizeSection);
-    this.joinSizeBar.enableCheckBox();
-    this.joinSizeBar.toolTip = joinSizeTooltip;
-    this.joinSizeBar.checkBox.onClick = this.setHasJoinSize;
-    this.joinSizeBar.onToggleSection = this.onToggleSection;
+    this.joinSizeGroupBox = new GroupBox(this);
+    this.joinSizeGroupBox.title = "Join Region (Centered)";
+    this.joinSizeGroupBox.toolTip = joinSizeTooltip;
+    this.joinSizeGroupBox.titleCheckBox = true;
+    this.joinSizeGroupBox.onCheck = this.setHasJoinSize;
+    this.joinSizeGroupBox.sizer = new VerticalSizer;
+    this.joinSizeGroupBox.sizer.margin = 2;
+    this.joinSizeGroupBox.sizer.spacing = 4;
+    this.joinSizeGroupBox.sizer.add(this.joinSize_Control);
+    
     this.setHasJoinSize(data.hasJoinSize);
     this.setHasJoinAreaPreview(data.hasJoinAreaPreview); 
+    
+    let joinRegionSection = new Control(this);
+    joinRegionSection.sizer = new VerticalSizer;
+    joinRegionSection.sizer.spacing = 2;
+    joinRegionSection.sizer.add(this.joinSizeGroupBox);
+    joinRegionSection.sizer.add(this.joinAreaGroupBox);
+    let joinRegionBar = new SectionBar(this, "Join Region");
+    joinRegionBar.setSection(joinRegionSection);
+    joinRegionBar.onToggleSection = this.onToggleSection;
+    joinRegionBar.toolTip = 
+            "The Join Region determines were the reference - target image join occures";
     // SectionBar "Join Region" End
 
 
@@ -1623,10 +1636,8 @@ function PhotometricMosaicDialog(data) {
     }
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
-    this.sizer.add(this.joinSizeBar);
-    this.sizer.add(joinSizeSection);
-    this.sizer.add(this.joinAreaBar);
-    this.sizer.add(joinAreaSection);
+    this.sizer.add(joinRegionBar);
+    this.sizer.add(joinRegionSection);
     this.sizer.add(sampleGenerationBar);
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
@@ -1639,8 +1650,7 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(buttons_Sizer);
     
     starDetectionSection.hide();
-    joinSizeSection.hide();
-    joinAreaSection.hide();
+    joinRegionSection.hide();
 
     //-------------------------------------------------------
     // Set all the window data
@@ -1667,7 +1677,7 @@ function createLimitPhotoStarsPercentControl(dialog, data, strLength){
     limitPhotoStarsPercent_Control.setRange(0, 100);
     limitPhotoStarsPercent_Control.slider.setRange(0, 200);
     limitPhotoStarsPercent_Control.setPrecision(2);
-    limitPhotoStarsPercent_Control.slider.minWidth = 200;
+    limitPhotoStarsPercent_Control.maxWidth = 500;
     limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
     return limitPhotoStarsPercent_Control;
 }
@@ -1683,9 +1693,9 @@ function createLinearRangeControl(dialog, data, strLength){
             "<p>Use this to reject stars that are outside the " +
             "camera's linear response range.</p>";
     linearRange_Control.setRange(0.001, 1.0);
-    linearRange_Control.slider.setRange(0, 500);
+    linearRange_Control.slider.setRange(0, 1000);
     linearRange_Control.setPrecision(3);
-    linearRange_Control.slider.minWidth = 200;
+    linearRange_Control.maxWidth = 1000;
     linearRange_Control.setValue(data.linearRange);
     return linearRange_Control;
 }
@@ -1701,27 +1711,26 @@ function createOutlierRemovalControl(dialog, data, strLength){
             "<p>Removing a few outliers can improve accuracy, but don't over do it.</p>";
     outlierRemoval_Control.setRange(0, 50);
     outlierRemoval_Control.slider.setRange(0, 50);
-    outlierRemoval_Control.slider.minWidth = 221;
+    outlierRemoval_Control.maxWidth = 400;
     outlierRemoval_Control.setValue(data.outlierRemoval);
     return outlierRemoval_Control;
 }
 
 function createApertureGrowthRateControl(dialog, data, strLen){
-    let apertureLogGrowth_Control = new NumericControl(dialog);
-    apertureLogGrowth_Control.real = true;
-    apertureLogGrowth_Control.setPrecision(2);
-    apertureLogGrowth_Control.label.text = "Growth rate:";
-    apertureLogGrowth_Control.label.minWidth = strLen;
-    apertureLogGrowth_Control.toolTip =
+    let apertureGrowthRate_Control = new NumericControl(dialog);
+    apertureGrowthRate_Control.real = true;
+    apertureGrowthRate_Control.setPrecision(2);
+    apertureGrowthRate_Control.label.text = "Growth rate:";
+    apertureGrowthRate_Control.label.minWidth = strLen;
+    apertureGrowthRate_Control.toolTip =
             "<p>Logarithm of aperture radius growth.</p>" +
             "<p>The aperture radius increase depends on the star's peak value " +
             "and this grow rate. Zero produces no growth.</p>";
-    apertureLogGrowth_Control.setRange(0, 30);
-    apertureLogGrowth_Control.slider.setRange(0, 300);
-    apertureLogGrowth_Control.slider.minWidth = 301;
-    apertureLogGrowth_Control.slider.maxWidth = 301;
-    apertureLogGrowth_Control.setValue(data.apertureGrowthRate);
-    return apertureLogGrowth_Control;
+    apertureGrowthRate_Control.setRange(0, 30);
+    apertureGrowthRate_Control.slider.setRange(0, 300);
+    apertureGrowthRate_Control.maxWidth = 800;
+    apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+    return apertureGrowthRate_Control;
 }
 function createApertureAddControl(dialog, data, strLen){
     let apertureAdd_Control = new NumericControl(dialog);
@@ -1733,7 +1742,8 @@ function createApertureAddControl(dialog, data, strLen){
             "<p>This value gets added to the aperture radius for all stars.</p>";
     apertureAdd_Control.setRange(0, 10);
     apertureAdd_Control.slider.setRange(0, 10);
-    apertureAdd_Control.slider.minWidth = 25;
+//    apertureAdd_Control.slider.minWidth = 25;
+    apertureAdd_Control.maxWidth = 250;
     apertureAdd_Control.setValue(data.apertureAdd);
     return apertureAdd_Control;
 }
@@ -1747,7 +1757,7 @@ function createApertureGrowthLimitControl(dialog, data, strLen){
             "<p>Limits the aperture radius growth to this number of pixels.</p>";
     apertureGrowthLimit_Control.setRange(3, 25);
     apertureGrowthLimit_Control.slider.setRange(3, 25);
-    apertureGrowthLimit_Control.slider.minWidth = 25;
+    apertureGrowthLimit_Control.maxWidth = 800;
     apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
     return apertureGrowthLimit_Control;
 }
@@ -1759,7 +1769,7 @@ function createApertureBkgDeltaControl(dialog, data, strLen){
     apertureBkgDelta_Control.toolTip = "<p>Background annulus thickness.</p>";
     apertureBkgDelta_Control.setRange(1, 25);
     apertureBkgDelta_Control.slider.setRange(1, 25);
-    apertureBkgDelta_Control.slider.minWidth = 25;
+    apertureBkgDelta_Control.maxWidth = 250;
     apertureBkgDelta_Control.setValue(data.apertureBgDelta);
     return apertureBkgDelta_Control;
 }

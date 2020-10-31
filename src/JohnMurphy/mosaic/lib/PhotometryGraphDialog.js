@@ -147,6 +147,27 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             "Mouse wheel: Zoom" +
             "\nLeft click: Display (x,y) in title bar";
     
+    bitmapControl.setMinHeight(142);
+    
+    // ========================================
+    // User controls
+    // ========================================
+    let controlsHeight = 0;
+    let minHeight = bitmapControl.minHeight;
+    
+    this.onToggleSection = function(bar, beginToggle){
+        if (beginToggle){
+            if (bar.isExpanded()){
+                bitmapControl.setMinHeight(bitmapControl.height + bar.section.height + 2);
+            } else {
+                bitmapControl.setMinHeight(bitmapControl.height - bar.section.height - 2);
+            }
+            this.adjustToContents();
+        }  else {
+            bitmapControl.setMinHeight(minHeight);
+        }
+    };
+    
     // ===========================
     // Zoom controls and OK button
     // ===========================
@@ -220,6 +241,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);
+    controlsHeight += update_Button.height;
     
     // ===========================
     // Color toggles
@@ -294,9 +316,11 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     color_Sizer.add(allRadioButton);
     color_Sizer.addStretch();
     
-    // ============================
-    // Photometry controls
-    // ============================
+    controlsHeight += redRadioButton.height;
+    
+    // ===================================================
+    // SectionBar: Star filters
+    // ===================================================
     const BACKGROUND_DELTA_STRLEN = this.font.width("Background delta:");
     let limitPhotoStarsPercent_Control = 
             createLimitPhotoStarsPercentControl(this, data, BACKGROUND_DELTA_STRLEN);
@@ -307,6 +331,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    controlsHeight += limitPhotoStarsPercent_Control.height;
     
     let linearRange_Control = createLinearRangeControl(this, data, BACKGROUND_DELTA_STRLEN);
     linearRange_Control.onValueUpdated = function (value) {
@@ -316,7 +341,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
-
+    controlsHeight += linearRange_Control.height;
+    
     let outlierRemoval_Control = createOutlierRemovalControl(this, data, BACKGROUND_DELTA_STRLEN);
     outlierRemoval_Control.onValueUpdated = function (value) {
         data.outlierRemoval = value;
@@ -325,15 +351,24 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
-    let filterGroupBox = new GroupBox(this);
-    filterGroupBox.title = "Filter stars";
-    filterGroupBox.sizer = new VerticalSizer();
-    filterGroupBox.sizer.margin = 2;
-    filterGroupBox.sizer.spacing = 2;
-    filterGroupBox.sizer.add(limitPhotoStarsPercent_Control);
-    filterGroupBox.sizer.add(linearRange_Control);
-    filterGroupBox.sizer.add(outlierRemoval_Control);
+    controlsHeight += outlierRemoval_Control.height;
     
+    let filterSection = new Control(this);
+    filterSection.sizer = new VerticalSizer;
+    filterSection.sizer.spacing = 2;
+    filterSection.sizer.add(limitPhotoStarsPercent_Control);
+    filterSection.sizer.add(linearRange_Control);
+    filterSection.sizer.add(outlierRemoval_Control);
+    filterSection.sizer.addSpacing(5);
+    let filterBar = new SectionBar(this, "Filter Photometry Stars");
+    filterBar.setSection(filterSection);
+    filterBar.onToggleSection = this.onToggleSection;
+    filterBar.toolTip = "Specifies which stars are used for photometry";
+    controlsHeight += filterBar.height + filterSection.sizer.spacing * 2 + 5;
+    
+    // ===================================================
+    // SectionBar: Star aperture size
+    // ===================================================
     let apertureGrowthRate_Control = createApertureGrowthRateControl(this, data, BACKGROUND_DELTA_STRLEN);
     apertureGrowthRate_Control.onValueUpdated = function (value) {
         data.apertureGrowthRate = value;
@@ -342,6 +377,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+//    controlsHeight += apertureGrowthRate_Control.height;
     let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, BACKGROUND_DELTA_STRLEN);
     apertureGrowthLimit_Control.onValueUpdated = function (value) {
         data.apertureGrowthLimit = value;
@@ -350,6 +386,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+//    controlsHeight += apertureGrowthLimit_Control.height;
     let apertureAdd_Control = createApertureAddControl(this, data, BACKGROUND_DELTA_STRLEN);
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
@@ -358,6 +395,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+//    controlsHeight += apertureAdd_Control.height;
     let apertureBkgDelta_Control = createApertureBkgDeltaControl(this, data, BACKGROUND_DELTA_STRLEN);
     apertureBkgDelta_Control.onValueUpdated = function (value) {
         data.apertureBgDelta = value;
@@ -366,38 +404,22 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
-    let aperture_Sizer1 = new HorizontalSizer(this);
-    aperture_Sizer1.add(apertureGrowthRate_Control);
-    aperture_Sizer1.addStretch();
-    let aperture_Sizer2 = new HorizontalSizer(this);
-    aperture_Sizer2.add(apertureGrowthLimit_Control);
-    aperture_Sizer2.addStretch();
-    let aperture_Sizer3 = new HorizontalSizer(this);
-    aperture_Sizer3.add(apertureAdd_Control);
-    aperture_Sizer3.addStretch();
-    let aperture_Sizer4 = new HorizontalSizer(this);
-    aperture_Sizer4.add(apertureBkgDelta_Control);
-    aperture_Sizer4.addStretch();
-    let apertureGroupBox = new GroupBox(this);
-    apertureGroupBox.title = "Aperture size";
-    apertureGroupBox.sizer = new VerticalSizer();
-    apertureGroupBox.sizer.margin = 2;
-    apertureGroupBox.sizer.spacing = 2;
-    apertureGroupBox.sizer.add(aperture_Sizer1);
-    apertureGroupBox.sizer.add(aperture_Sizer2);
-    apertureGroupBox.sizer.add(aperture_Sizer3);
-    apertureGroupBox.sizer.add(aperture_Sizer4);
-    let groupBoxSizer = new HorizontalSizer(this);
-    groupBoxSizer.margin = 0;
-    groupBoxSizer.addSpacing(4);
-    groupBoxSizer.add(apertureGroupBox);
-    groupBoxSizer.addSpacing(4);
+//    controlsHeight += apertureBkgDelta_Control.height;
     
-    let groupBoxSizer2 = new HorizontalSizer(this);
-    groupBoxSizer2.margin = 0;
-    groupBoxSizer2.addSpacing(4);
-    groupBoxSizer2.add(filterGroupBox);
-    groupBoxSizer2.addSpacing(4);
+    let apertureSection = new Control(this);
+    apertureSection.sizer = new VerticalSizer;
+    apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(apertureGrowthRate_Control);
+    apertureSection.sizer.add(apertureGrowthLimit_Control);
+    apertureSection.sizer.add(apertureAdd_Control);
+    apertureSection.sizer.add(apertureBkgDelta_Control);
+    let apertureBar = new SectionBar(this, "Star Aperture Size");
+    apertureBar.setSection(apertureSection);
+    apertureBar.onToggleSection = this.onToggleSection;
+    apertureBar.toolTip = "Specifies photometry star aperture settings";
+    controlsHeight += apertureBar.height;
+    //controlsHeight += apertureBar.height + apertureSection.sizer.spacing * 3;
+    
     //-------------
     // Global sizer
     //-------------
@@ -406,15 +428,20 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.sizer.spacing = 2;
     this.sizer.add(bitmapControl, 100);
     this.sizer.add(color_Sizer);
-    this.sizer.add(groupBoxSizer);
-    this.sizer.add(groupBoxSizer2);
+    this.sizer.add(apertureBar);
+    this.sizer.add(apertureSection);
+    this.sizer.add(filterBar);
+    this.sizer.add(filterSection);
     this.sizer.add(zoomButton_Sizer);
+    
+    controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 5;
+    //controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 6;
     
     this.userResizable = true;
     let preferredWidth = width + this.sizer.margin * 2;
-    let preferredHeight = height + this.sizer.spacing * 8 + this.sizer.margin * 2 +
-           linearRange_Control.height * 7 + redRadioButton.height + 4;
+    let preferredHeight = height + controlsHeight;
     this.resize(preferredWidth, preferredHeight);
+    apertureSection.hide();
     
     this.setScaledMinSize(300, 300);
     this.windowTitle = title + " 1:1";

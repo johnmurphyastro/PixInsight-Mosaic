@@ -224,9 +224,25 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         self.ok();
     };
     
+    previewControl.setMinHeight(200);
+    
     // ========================================
     // User controls
     // ========================================
+    let controlsHeight = 0;
+    let minHeight = previewControl.minHeight;
+    this.onToggleSection = function(bar, beginToggle){
+        if (beginToggle){
+            if (bar.isExpanded()){
+                previewControl.setMinHeight(previewControl.height + bar.section.height + 2);
+            } else {
+                previewControl.setMinHeight(previewControl.height - bar.section.height - 2);
+            }
+        } else {
+            previewControl.setMinHeight(minHeight);
+        }
+    };
+    
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
     refCheckBox.toolTip = "Display either the reference or target background.";
@@ -280,25 +296,35 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     optionsSizer.add(targetSideCheckBox);
     optionsSizer.addStretch();
     
+    controlsHeight += refCheckBox.height;
+    
+    // ===================================================
+    // SectionBar: Sample rejection
+    // ===================================================
     const labelLength = this.font.width("Growth Limit:");
     let limitSampleStarsPercent_Control = 
                 createLimitSampleStarsPercentControl(this, data, labelLength);
-        limitSampleStarsPercent_Control.onValueUpdated = function (value) {
-            data.limitSampleStarsPercent = value;
-            photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
-            if (liveUpdate){
-                updateSampleGrid();
-            }
-        };
+    limitSampleStarsPercent_Control.maxWidth = 500;
+    limitSampleStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitSampleStarsPercent = value;
+        photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
+        if (liveUpdate){
+            updateSampleGrid();
+        }
+    };
     let filterGroupBox = new GroupBox(this);
     filterGroupBox.title = "Filter stars";
     filterGroupBox.sizer = new VerticalSizer();
     filterGroupBox.sizer.margin = 2;
     filterGroupBox.sizer.spacing = 2;
     filterGroupBox.sizer.add(limitSampleStarsPercent_Control);
+    
+    controlsHeight += limitSampleStarsPercent_Control.height;
+    controlsHeight += filterGroupBox.height + filterGroupBox.sizer.margin * 2;
         
     let sampleStarGrowthRate_Control =
                 createSampleStarGrowthRateControl(this, data, labelLength);
+    sampleStarGrowthRate_Control.maxWidth = 800;
     sampleStarGrowthRate_Control.onValueUpdated = function (value){
         data.sampleStarGrowthRate = value;
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(value);
@@ -307,6 +333,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     };
     let sampleStarGrowthLimit_Control = createSampleStarGrowthLimitControl(this, data, labelLength);
+    sampleStarGrowthLimit_Control.maxWidth = 800;
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.sampleStarGrowthLimit = value;
         photometricMosaicDialog.sampleStarGrowthLimit_Control.setValue(value);
@@ -315,6 +342,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     };
     let sampleStarAdd_Control = createSampleStarAddControl(this, data, labelLength);
+    sampleStarAdd_Control.maxWidth = 300;
     sampleStarAdd_Control.onValueUpdated = function (value) {
         data.sampleStarRadiusAdd = value;
         photometricMosaicDialog.sampleStarAdd_Control.setValue(value);
@@ -330,8 +358,31 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthRate_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimit_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarAdd_Control);
+    
+    controlsHeight += sampleStarGrowthRate_Control.height + 
+            sampleStarGrowthLimit_Control.height + 
+            sampleStarAdd_Control.height + 
+            rejectRadiusGroupBox.height + 
+            rejectRadiusGroupBox.sizer.margin * 2 +
+            rejectRadiusGroupBox.sizer.spacing * 2;
+    
+    let rejectSamplesSection = new Control(this);
+    rejectSamplesSection.sizer = new VerticalSizer;
+    rejectSamplesSection.sizer.spacing = 2;
+    rejectSamplesSection.sizer.add(rejectRadiusGroupBox);
+    rejectSamplesSection.sizer.add(filterGroupBox);
+    let rejectSamplesBar = new SectionBar(this, "Sample Rejection");
+    rejectSamplesBar.setSection(rejectSamplesSection);
+    rejectSamplesBar.onToggleSection = this.onToggleSection;
+    rejectSamplesBar.toolTip = "Reject samples that are too close to bright stars";
+    controlsHeight += rejectSamplesBar.height + 2;
+    // SectionBar "Sample Rejection" End
 
+    // ===================================================
+    // SectionBar: Sample Generation
+    // ===================================================
     let sampleSize_Control = createSampleSizeControl(this, data, maxSampleSize, labelLength);
+    sampleSize_Control.maxWidth = 500;
     sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
         photometricMosaicDialog.sampleSize_Control.setValue(value);
@@ -339,12 +390,18 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
-    let sampleSizeGroupBox = new GroupBox(this);
-    sampleSizeGroupBox.title = "Samples";
-    sampleSizeGroupBox.sizer = new VerticalSizer();
-    sampleSizeGroupBox.sizer.margin = 2;
-    sampleSizeGroupBox.sizer.spacing = 2;
-    sampleSizeGroupBox.sizer.add(sampleSize_Control);
+    controlsHeight += sampleSize_Control.height;
+    let sampleGenerationSection = new Control(this);
+    sampleGenerationSection.sizer = new VerticalSizer;
+    sampleGenerationSection.sizer.spacing = 2;
+    sampleGenerationSection.sizer.add(sampleSize_Control);
+    sampleGenerationSection.sizer.addSpacing(5);
+    let sampleGenerationBar = new SectionBar(this, "Sample Generation");
+    sampleGenerationBar.setSection(sampleGenerationSection);
+    sampleGenerationBar.onToggleSection = this.onToggleSection;
+    sampleGenerationBar.toolTip = "Specifies generate samples settings";
+    controlsHeight += sampleGenerationBar.height + 5;
+    // SectionBar "Sample Rejection" End
     
     /**
      * Create a new SampleGridMap from the updated parameters, and draw it 
@@ -361,22 +418,22 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     this.sizer.margin = 2;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(rejectRadiusGroupBox);
-    this.sizer.add(filterGroupBox);
-    this.sizer.add(sampleSizeGroupBox);
-    
     this.sizer.add(optionsSizer);
+    this.sizer.add(rejectSamplesBar);
+    this.sizer.add(rejectSamplesSection);
+    this.sizer.add(sampleGenerationBar);
+    this.sizer.add(sampleGenerationSection);
     this.sizer.add(previewControl.getButtonSizer());
+
+    controlsHeight += this.sizer.spacing * 6 + this.sizer.margin * 2;
 
     // The PreviewControl size is determined by the size of the bitmap
     // The dialog must also leave enough room for the extra controls we are adding
     this.userResizable = true;
     let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
-            this.sizer.spacing * 5 + this.sizer.margin * 2 +
-            refCheckBox.height + limitSampleStarsPercent_Control.height * 3 + this.logicalPixelsToPhysical(20);
+            controlsHeight + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
-    
     setTitle();
 }
 

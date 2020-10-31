@@ -280,9 +280,25 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         self.ok();
     };
 
+    previewControl.setMinHeight(200);
     // ========================================
     // User controls
     // ========================================
+    let controlsHeight = 0;
+    let minHeight = previewControl.minHeight;
+    
+    this.onToggleSection = function(bar, beginToggle){
+        if (beginToggle){
+            if (bar.isExpanded()){
+                previewControl.setMinHeight(previewControl.height + bar.section.height + 2);
+            } else {
+                previewControl.setMinHeight(previewControl.height - bar.section.height - 2);
+            }
+        } else {
+            previewControl.setMinHeight(minHeight);
+        }
+    };
+    
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
     refCheckBox.toolTip = "Display either reference background and stars, or " +
@@ -388,15 +404,21 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     if (EXTRA_CONTROLS())
         optionsSizer.add(oldPhotometricCheckBox);
     
+    controlsHeight += refCheckBox.height;
+    
+    // ===================================================
+    // SectionBar: Star aperture size
+    // ===================================================
     let strLen = this.font.width("Background delta:");
-    let apertureLogGrowth_Control = createApertureGrowthRateControl(this, data, strLen);
-    apertureLogGrowth_Control.onValueUpdated = function (value) {
+    let apertureGrowthRate_Control = createApertureGrowthRateControl(this, data, strLen);
+    apertureGrowthRate_Control.onValueUpdated = function (value) {
         data.apertureGrowthRate = value;
-        photometricMosaicDialog.apertureLogGrowth_Control.setValue(value);
+        photometricMosaicDialog.apertureGrowthRate_Control.setValue(value);
         if (liveUpdate){
             updatePhotometry();
         }
     };
+    controlsHeight += apertureGrowthRate_Control.height;
     let apertureAdd_Control = createApertureAddControl(this, data, strLen);
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
@@ -405,6 +427,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             updatePhotometry();
         }
     };
+    controlsHeight += apertureAdd_Control.height;
     let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, strLen);
     apertureGrowthLimit_Control.onValueUpdated = function (value) {
         data.apertureGrowthLimit = value;
@@ -413,6 +436,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             updatePhotometry();
         }
     };
+    controlsHeight += apertureGrowthLimit_Control.height;
     let apertureBkgDelta_Control = createApertureBkgDeltaControl(this, data, strLen);
     apertureBkgDelta_Control.onValueUpdated = function (value) {
         data.apertureBgDelta = value;
@@ -421,32 +445,68 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             updatePhotometry();
         }
     };
-    let aperture_Sizer1 = new HorizontalSizer(this);
-    aperture_Sizer1.add(apertureLogGrowth_Control);
-    let aperture_Sizer2 = new HorizontalSizer(this);
-    aperture_Sizer2.add(apertureGrowthLimit_Control);
-    aperture_Sizer2.addStretch();
-    let aperture_Sizer3 = new HorizontalSizer(this);
-    aperture_Sizer3.add(apertureAdd_Control);
-    aperture_Sizer3.addStretch();
-    let aperture_Sizer4 = new HorizontalSizer(this);
-    aperture_Sizer4.add(apertureBkgDelta_Control);
-    aperture_Sizer4.addStretch();
-    let apertureGroupBox = new GroupBox(this);
-    apertureGroupBox.title = "Aperture size";
-    apertureGroupBox.sizer = new VerticalSizer();
-    apertureGroupBox.sizer.margin = 2;
-    apertureGroupBox.sizer.spacing = 2;
-    apertureGroupBox.sizer.add(aperture_Sizer1);
-    apertureGroupBox.sizer.add(aperture_Sizer2);
-    apertureGroupBox.sizer.add(aperture_Sizer3);
-    apertureGroupBox.sizer.add(aperture_Sizer4);
-    let groupBoxSizer = new HorizontalSizer(this);
-    groupBoxSizer.margin = 0;
-    groupBoxSizer.addSpacing(4);
-    groupBoxSizer.add(apertureGroupBox);
-    groupBoxSizer.addStretch();
-    groupBoxSizer.addSpacing(2);
+    controlsHeight += apertureBkgDelta_Control.height;
+    
+    let apertureSection = new Control(this);
+    apertureSection.sizer = new VerticalSizer;
+    apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(apertureGrowthRate_Control);
+    apertureSection.sizer.add(apertureGrowthLimit_Control);
+    apertureSection.sizer.add(apertureAdd_Control);
+    apertureSection.sizer.add(apertureBkgDelta_Control);
+    let apertureBar = new SectionBar(this, "Star Aperture Size");
+    apertureBar.setSection(apertureSection);
+    apertureBar.onToggleSection = this.onToggleSection;
+    apertureBar.toolTip = "Specifies the photometry star aperture";
+    controlsHeight += apertureBar.height + apertureSection.sizer.spacing * 3;
+    
+    // ===================================================
+    // SectionBar: Star filters
+    // ===================================================
+    const BACKGROUND_DELTA_STRLEN = this.font.width("Background delta:");
+    let limitPhotoStarsPercent_Control = 
+            createLimitPhotoStarsPercentControl(this, data, BACKGROUND_DELTA_STRLEN);
+    limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
+        data.limitPhotoStarsPercent = value;
+        photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(value);
+        if (liveUpdate){
+            updatePhotometry();
+        }
+    };
+//    controlsHeight += limitPhotoStarsPercent_Control.height;
+    
+    let linearRange_Control = createLinearRangeControl(this, data, BACKGROUND_DELTA_STRLEN);
+    linearRange_Control.onValueUpdated = function (value) {
+        data.linearRange = value;
+        photometricMosaicDialog.linearRange_Control.setValue(value);
+        if (liveUpdate){
+            updatePhotometry();
+        }
+    };
+//    controlsHeight += linearRange_Control.height;
+    
+    let outlierRemoval_Control = createOutlierRemovalControl(this, data, BACKGROUND_DELTA_STRLEN);
+    outlierRemoval_Control.onValueUpdated = function (value) {
+        data.outlierRemoval = value;
+        photometricMosaicDialog.outlierRemoval_Control.setValue(value);
+        if (liveUpdate){
+            updatePhotometry();
+        }
+    };
+//    controlsHeight += outlierRemoval_Control.height;
+    
+    let filterSection = new Control(this);
+    filterSection.sizer = new VerticalSizer;
+    filterSection.sizer.spacing = 2;
+    filterSection.sizer.add(limitPhotoStarsPercent_Control);
+    filterSection.sizer.add(linearRange_Control);
+    filterSection.sizer.add(outlierRemoval_Control);
+    filterSection.sizer.addSpacing(5);
+    let filterBar = new SectionBar(this, "Filter Photometry Stars");
+    filterBar.setSection(filterSection);
+    filterBar.onToggleSection = this.onToggleSection;
+    filterBar.toolTip = "Specifies which stars are used for photometry";
+    controlsHeight += filterBar.height + filterSection.sizer.spacing * 2 + 5;
 
     /**
      * Draw the stars on top of the background bitmap within the scrolled window.
@@ -469,17 +529,21 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
-    this.sizer.add(groupBoxSizer);
+    this.sizer.add(apertureBar);
+    this.sizer.add(apertureSection);
+    this.sizer.add(filterBar);
+    this.sizer.add(filterSection);
     this.sizer.add(previewControl.getButtonSizer());
+    
+    controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 4;
+    filterSection.hide();
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
     let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
-            apertureAdd_Control.height * 4 + this.sizer.spacing * 6 + this.sizer.margin * 2 +
-            refCheckBox.height + this.logicalPixelsToPhysical(20);
+            controlsHeight + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
-    
     setTitle();
 }
 

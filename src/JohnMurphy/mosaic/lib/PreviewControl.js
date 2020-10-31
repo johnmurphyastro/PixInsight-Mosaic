@@ -492,7 +492,7 @@ function PreviewControl(parent, image, metadata, customControls, includeCancelBu
     this.setImage(image, metadata);
     
     this.width = Math.min(this.logicalPixelsToPhysical(1800), image.width);
-    this.height = Math.min(this.logicalPixelsToPhysical(900), image.height);
+    this.height = Math.min(this.logicalPixelsToPhysical(800), image.height);
 }
 
 PreviewControl.prototype = new Frame;

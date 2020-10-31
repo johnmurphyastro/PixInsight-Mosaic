@@ -173,10 +173,68 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     
     let liveUpdate = false;
     
+    /**
+     * @param {HorizontalSizer} horizontalSizer
+     */
+    function customControls (horizontalSizer){
+        let liveUpdate_control = new CheckBox(self);
+        liveUpdate_control.text = "Live update";
+        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+        liveUpdate_control.onCheck = function (checked){
+            liveUpdate = checked;
+            update_Button.enabled = !checked;
+            if (checked){
+                self.enabled = false;
+                processEvents();
+                update();
+                self.enabled = true;
+            }
+        };
+        liveUpdate_control.checked = liveUpdate;
+
+        let update_Button = new PushButton(self);
+        update_Button.text = "Update";
+        update_Button.toolTip = "<p>Update display</p>";
+        update_Button.onClick = function(){
+            self.enabled = false;
+            processEvents();
+            update();
+            self.enabled = true;
+        };
+        update_Button.enabled = !liveUpdate_control.checked;
+        
+        let correctTarget_Button = new PushButton(self);
+        correctTarget_Button.text = "Correct target";
+        correctTarget_Button.setFixedWidth();
+        correctTarget_Button.toolTip = "<p>Create a corrected target image.</p>" +
+                "<p>The unedited reference image can be used to replace stars in a masked mosaic, " +
+                "but if you wish to use the target image instead, " +
+                "it must first be corrected (scale and gradient) before it " +
+                "can be used.</p>" +
+                "<p>This option creates a corrected target image " +
+                "that can be used with the star mask.</p>";
+        correctTarget_Button.onClick = function () {
+            console.writeln("\n<b><u>Creating corrected target image</u></b>");
+            self.enabled = false;
+            processEvents();
+            createCorrectedTarget(data, joinArea, binnedColorSamplePairs,
+                    isHorizontal, isTargetAfterRef, scaleFactors);
+            self.enabled = true;
+        };
+        
+        horizontalSizer.addSpacing(20);
+        horizontalSizer.add(liveUpdate_control);
+        horizontalSizer.addSpacing(6);
+        horizontalSizer.add(update_Button);
+        horizontalSizer.addSpacing(20);
+        horizontalSizer.add(correctTarget_Button);
+        horizontalSizer.addSpacing(10);
+    }
+    
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, null, true);
+    let previewControl = new PreviewControl(this, bitmap, null, customControls, true);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -204,9 +262,25 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         self.ok();
     };
 
+    previewControl.setMinHeight(200);
     // ========================================
     // User controls
     // ========================================
+    let controlsHeight = 0;
+    let minHeight = previewControl.minHeight;
+    
+    this.onToggleSection = function(bar, beginToggle){
+        if (beginToggle){
+            if (bar.isExpanded()){
+                previewControl.setMinHeight(previewControl.height + bar.section.height + 2);
+            } else {
+                previewControl.setMinHeight(previewControl.height - bar.section.height - 2);
+            }
+        } else {
+            previewControl.setMinHeight(minHeight);
+        }
+    };
+    
     let refCheckBox = new CheckBox(this);
     refCheckBox.text = "Reference";
     refCheckBox.toolTip = "Display reference or target image.";
@@ -221,64 +295,90 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         self.enabled = true;
     };
     
-    let liveUpdate_control = new CheckBox(this);
-    liveUpdate_control.text = "Live update";
-    liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
-    liveUpdate_control.onCheck = function (checked){
-        liveUpdate = checked;
-        update_Button.enabled = !checked;
-        if (checked){
-            self.enabled = false;
-            processEvents();
-            update();
-            self.enabled = true;
-        }
-    };
-    liveUpdate_control.checked = liveUpdate;
-
-    let update_Button = new PushButton(this);
-    update_Button.text = "Update";
-    update_Button.toolTip = "<p>Update display</p>";
-    update_Button.onClick = function(){
-        self.enabled = false;
-        processEvents();
-        update();
-        self.enabled = true;
-    };
-    update_Button.enabled = !liveUpdate_control.checked;
-    
-    let correctTarget_Button = new PushButton(this);
-    correctTarget_Button.text = "Correct target";
-    correctTarget_Button.toolTip = "<p>Create a corrected target image.</p>" +
-            "<p>The unedited reference image can be used to replace stars in a masked mosaic, " +
-            "but if you wish to use the target image instead, " +
-            "it must first be corrected (scale and gradient) before it " +
-            "can be used.</p>" +
-            "<p>This option creates a corrected target image " +
-            "that can be used with the star mask.</p>";
-    correctTarget_Button.onClick = function(){
-        console.writeln("\n<b><u>Creating corrected target image</u></b>");
-        self.enabled = false;
-        processEvents();
-        createCorrectedTarget(data, joinArea, binnedColorSamplePairs,
-            isHorizontal, isTargetAfterRef, scaleFactors);
-        self.enabled = true;
-    };
-    
     let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(refCheckBox);
-    optionsSizer.addSpacing(20);
-    optionsSizer.add(liveUpdate_control);
-    optionsSizer.addSpacing(6);
-    optionsSizer.add(update_Button);
-    optionsSizer.addSpacing(10);
     optionsSizer.addStretch();
-    optionsSizer.add(correctTarget_Button);
-    optionsSizer.addSpacing(10);
+    
+    controlsHeight += refCheckBox.height;
 
+    // ===================================================
+    // SectionBar: Star size
+    // ===================================================
     let starMaskLabelSize = this.font.width("Limit stars %:");
+    let maskStarGrowthRate_Control = new NumericControl(this);
+    maskStarGrowthRate_Control.real = true;
+    maskStarGrowthRate_Control.label.text = "Growth rate:";
+    maskStarGrowthRate_Control.toolTip =
+            "<p>Increases the size of the brightest stars.</p>" +
+            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
+    maskStarGrowthRate_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarGrowthRate_Control.setRange(0, 30);
+    maskStarGrowthRate_Control.slider.setRange(0, 300);
+    maskStarGrowthRate_Control.setPrecision(2);
+    maskStarGrowthRate_Control.maxWidth = 800;
+    maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
+    maskStarGrowthRate_Control.onValueUpdated = function (value) {
+        data.maskStarGrowthRate = value;
+        if (liveUpdate) {
+            update();
+        }
+    };
+    controlsHeight += maskStarGrowthRate_Control.height;
+    let maskStarGrowthLimit_Control = new NumericControl(this);
+    maskStarGrowthLimit_Control.real = false;
+    maskStarGrowthLimit_Control.label.text = "Growth Limit:";
+    maskStarGrowthLimit_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarGrowthLimit_Control.toolTip =
+            "<p>Maximum star growth.</p>" +
+            "<p>Limits the radius growth to this number of pixels.</p>";
+    maskStarGrowthLimit_Control.setRange(3, 300);
+    maskStarGrowthLimit_Control.slider.setRange(3, 300);
+    maskStarGrowthLimit_Control.maxWidth = 800;
+    maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
+    maskStarGrowthLimit_Control.onValueUpdated = function (value) {
+        data.maskStarGrowthLimit = value;
+        if (liveUpdate) {
+            update();
+        }
+    };
+    controlsHeight += maskStarGrowthLimit_Control.height;
+    let maskStarRadiusAdd_Control = new NumericControl(this);
+    maskStarRadiusAdd_Control.real = true;
+    maskStarRadiusAdd_Control.label.text = "Radius add:";
+    maskStarRadiusAdd_Control.toolTip =
+            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
+            "<p>This is applied after the 'Multiply star radius'.</p>";
+    maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
+    maskStarRadiusAdd_Control.setRange(0, 30);
+    maskStarRadiusAdd_Control.slider.setRange(0, 300);
+    maskStarRadiusAdd_Control.setPrecision(1);
+    maskStarRadiusAdd_Control.maxWidth = 800;
+    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
+    maskStarRadiusAdd_Control.onValueUpdated = function (value) {
+        data.maskStarRadiusAdd = value;
+        if (liveUpdate) {
+            update();
+        }
+    };
+    controlsHeight += maskStarRadiusAdd_Control.height;
+    
+    let apertureSection = new Control(this);
+    apertureSection.sizer = new VerticalSizer;
+    apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(maskStarGrowthRate_Control);
+    apertureSection.sizer.add(maskStarGrowthLimit_Control);
+    apertureSection.sizer.add(maskStarRadiusAdd_Control);
+    let apertureBar = new SectionBar(this, "Star Size");
+    apertureBar.setSection(apertureSection);
+    apertureBar.onToggleSection = this.onToggleSection;
+    apertureBar.toolTip = "Specifies star size";
+    controlsHeight += apertureBar.height + apertureSection.sizer.spacing * 2;
+    
+    // ===================================================
+    // SectionBar: Star filters
+    // ===================================================
     let limitMaskStars_Control = new NumericControl(this);
     limitMaskStars_Control.real = false;
     limitMaskStars_Control.label.text = "Limit stars %:";
@@ -292,7 +392,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     limitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
     limitMaskStars_Control.setRange(0, 100);
     limitMaskStars_Control.slider.setRange(0, 100);
-    limitMaskStars_Control.slider.minWidth = 300;
+    limitMaskStars_Control.maxWidth = 300;
     limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
     limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
@@ -300,101 +400,18 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             update();
         }
     };
+    controlsHeight += limitMaskStars_Control.height;
     
-    let maskStarGrowthRate_Control = new NumericControl(this);
-    maskStarGrowthRate_Control.real = true;
-    maskStarGrowthRate_Control.label.text = "Growth rate:";
-    maskStarGrowthRate_Control.toolTip =
-            "<p>Increases the size of the brightest stars.</p>" +
-            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
-    maskStarGrowthRate_Control.label.setFixedWidth(starMaskLabelSize);
-    maskStarGrowthRate_Control.setRange(0, 30);
-    maskStarGrowthRate_Control.slider.setRange(0, 300);
-    maskStarGrowthRate_Control.setPrecision(2);
-    maskStarGrowthRate_Control.slider.minWidth = 300;
-    maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
-    maskStarGrowthRate_Control.onValueUpdated = function (value) {
-        data.maskStarGrowthRate = value;
-        if (liveUpdate) {
-            update();
-        }
-    };
-    
-    let maskStarGrowthLimit_Control = new NumericControl(this);
-    maskStarGrowthLimit_Control.real = false;
-    maskStarGrowthLimit_Control.label.text = "Growth Limit:";
-    maskStarGrowthLimit_Control.label.setFixedWidth(starMaskLabelSize);
-    maskStarGrowthLimit_Control.toolTip =
-            "<p>Maximum star growth.</p>" +
-            "<p>Limits the radius growth to this number of pixels.</p>";
-    maskStarGrowthLimit_Control.setRange(3, 300);
-    maskStarGrowthLimit_Control.slider.setRange(3, 300);
-    maskStarGrowthLimit_Control.slider.minWidth = 300;
-    maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
-    maskStarGrowthLimit_Control.onValueUpdated = function (value) {
-        data.maskStarGrowthLimit = value;
-        if (liveUpdate) {
-            update();
-        }
-    };
-    
-    let maskStarRadiusAdd_Control = new NumericControl(this);
-    maskStarRadiusAdd_Control.real = true;
-    maskStarRadiusAdd_Control.label.text = "Radius add:";
-    maskStarRadiusAdd_Control.toolTip =
-            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply star radius'.</p>";
-    maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
-    maskStarRadiusAdd_Control.setRange(0, 30);
-    maskStarRadiusAdd_Control.slider.setRange(0, 300);
-    maskStarRadiusAdd_Control.setPrecision(1);
-    maskStarRadiusAdd_Control.slider.minWidth = 300;
-    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
-    maskStarRadiusAdd_Control.onValueUpdated = function (value) {
-        data.maskStarRadiusAdd = value;
-        if (liveUpdate) {
-            update();
-        }
-    };
-
-    let filter_Sizer = new HorizontalSizer(this);
-    filter_Sizer.add(limitMaskStars_Control);
-    filter_Sizer.addStretch();
-    let filterGroupBox = new GroupBox(this);
-    filterGroupBox.title = "Filter stars";
-    filterGroupBox.sizer = new VerticalSizer();
-    filterGroupBox.sizer.margin = 2;
-    filterGroupBox.sizer.spacing = 2;
-    filterGroupBox.sizer.add(filter_Sizer);
-
-    let aperture_Sizer1 = new HorizontalSizer(this);
-    aperture_Sizer1.add(maskStarGrowthRate_Control);
-    aperture_Sizer1.addStretch();
-    let aperture_Sizer2 = new HorizontalSizer(this);
-    aperture_Sizer2.add(maskStarGrowthLimit_Control);
-    aperture_Sizer2.addStretch();
-    let aperture_Sizer3 = new HorizontalSizer(this);
-    aperture_Sizer3.add(maskStarRadiusAdd_Control);
-    aperture_Sizer3.addStretch();
-    let apertureGroupBox = new GroupBox(this);
-    apertureGroupBox.title = "Star size";
-    apertureGroupBox.sizer = new VerticalSizer();
-    apertureGroupBox.sizer.margin = 2;
-    apertureGroupBox.sizer.spacing = 2;
-    apertureGroupBox.sizer.add(aperture_Sizer1);
-    apertureGroupBox.sizer.add(aperture_Sizer2);
-    apertureGroupBox.sizer.add(aperture_Sizer3);
-    let groupBoxSizer = new HorizontalSizer(this);
-    groupBoxSizer.margin = 0;
-    groupBoxSizer.addSpacing(4);
-    groupBoxSizer.add(apertureGroupBox);
-    groupBoxSizer.addSpacing(4);
-
-    let groupBoxSizer2 = new HorizontalSizer(this);
-    groupBoxSizer2.margin = 0;
-    groupBoxSizer2.addSpacing(4);
-    groupBoxSizer2.add(filterGroupBox);
-    groupBoxSizer2.addSpacing(4);
+    let filterSection = new Control(this);
+    filterSection.sizer = new VerticalSizer;
+    filterSection.sizer.spacing = 2;
+    filterSection.sizer.add(limitMaskStars_Control);
+    filterSection.sizer.addSpacing(5);
+    let filterBar = new SectionBar(this, "Filter Stars");
+    filterBar.setSection(filterSection);
+    filterBar.onToggleSection = this.onToggleSection;
+    filterBar.toolTip = "Specifies which stars to unmask";
+    controlsHeight += filterBar.height + 5;
     
     /**
      * Draw the stars on top of the background bitmap within the scrolled window.
@@ -408,17 +425,20 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     this.sizer.margin = 4;
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
-    this.sizer.add(groupBoxSizer);
-    this.sizer.add(groupBoxSizer2);
     this.sizer.add(optionsSizer);
+    this.sizer.add(apertureBar);
+    this.sizer.add(apertureSection);
+    this.sizer.add(filterBar);
+    this.sizer.add(filterSection);
     this.sizer.add(previewControl.getButtonSizer());
+
+    controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 6;
 
     // The PreviewControl size is determined by the size of the bitmap
     this.userResizable = true;
     let preferredWidth = previewControl.width + this.sizer.margin * 2 + this.logicalPixelsToPhysical(20);
     let preferredHeight = previewControl.height + previewControl.getButtonSizerHeight() +
-            this.sizer.spacing * 5 + this.sizer.margin * 2 +
-            refCheckBox.height + limitMaskStars_Control.height * 3 + this.logicalPixelsToPhysical(20);
+            controlsHeight + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     
     {
