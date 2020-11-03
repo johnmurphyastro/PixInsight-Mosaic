@@ -294,14 +294,6 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         update();
         self.enabled = true;
     };
-    
-    let optionsSizer = new HorizontalSizer(this);
-    optionsSizer.margin = 0;
-    optionsSizer.addSpacing(4);
-    optionsSizer.add(refCheckBox);
-    optionsSizer.addStretch();
-    
-    controlsHeight += refCheckBox.height;
 
     // ===================================================
     // SectionBar: Star size
@@ -336,7 +328,6 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthLimit_Control.setRange(3, 300);
     maskStarGrowthLimit_Control.slider.setRange(3, 300);
     maskStarGrowthLimit_Control.maxWidth = 800;
-    maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
     maskStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.maskStarGrowthLimit = value;
         if (liveUpdate) {
@@ -355,7 +346,6 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarRadiusAdd_Control.slider.setRange(0, 300);
     maskStarRadiusAdd_Control.setPrecision(1);
     maskStarRadiusAdd_Control.maxWidth = 800;
-    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
         if (liveUpdate) {
@@ -419,6 +409,36 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     function update(){
         previewControl.forceRedraw();
     }
+    
+    function setAutoValues(){
+        if (data.isAutoMaskStar){
+            data.maskStarGrowthRate = data.apertureGrowthRate;
+            data.maskStarRadiusAdd = data.apertureAdd + 3;
+        }
+        maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
+        maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
+        maskStarGrowthRate_Control.enabled = !data.isAutoMaskStar;
+        maskStarRadiusAdd_Control.enabled = !data.isAutoMaskStar;
+    }
+    let autoCheckBox = new CheckBox(this);
+    autoCheckBox.text = "Auto";
+    autoCheckBox.toolTip = "Use calculated values for some fields";
+    autoCheckBox.onClick = function (checked) {
+        data.isAutoMaskStar = checked;
+        setAutoValues();
+        update();
+    };
+    autoCheckBox.checked = data.isAutoMaskStar;
+    setAutoValues();
+    let optionsSizer = new HorizontalSizer(this);
+    optionsSizer.margin = 0;
+    optionsSizer.addSpacing(4);
+    optionsSizer.add(autoCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(refCheckBox);
+    optionsSizer.addStretch();
+    
+    controlsHeight += refCheckBox.height;
 
     // Global sizer
     this.sizer = new VerticalSizer(this);

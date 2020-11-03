@@ -373,24 +373,17 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     apertureGrowthRate_Control.onValueUpdated = function (value) {
         data.apertureGrowthRate = value;
         photometricMosaicDialog.apertureGrowthRate_Control.setValue(value);
+        photometricMosaicDialog.updateSampleStarGrowthRate();
         if (liveUpdate_control.checked){
             update(bitmapControl.width, bitmapControl.height);
         }
     };
 //    controlsHeight += apertureGrowthRate_Control.height;
-    let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, BACKGROUND_DELTA_STRLEN);
-    apertureGrowthLimit_Control.onValueUpdated = function (value) {
-        data.apertureGrowthLimit = value;
-        photometricMosaicDialog.apertureGrowthLimit_Control.setValue(value);
-        if (liveUpdate_control.checked){
-            update(bitmapControl.width, bitmapControl.height);
-        }
-    };
-//    controlsHeight += apertureGrowthLimit_Control.height;
     let apertureAdd_Control = createApertureAddControl(this, data, BACKGROUND_DELTA_STRLEN);
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
         photometricMosaicDialog.apertureAdd_Control.setValue(value);
+        photometricMosaicDialog.updateSampleStarRadiusAdd();
         if (liveUpdate_control.checked){
             update(bitmapControl.width, bitmapControl.height);
         }
@@ -410,7 +403,18 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     apertureSection.sizer = new VerticalSizer;
     apertureSection.sizer.spacing = 2;
     apertureSection.sizer.add(apertureGrowthRate_Control);
-    apertureSection.sizer.add(apertureGrowthLimit_Control);
+    if (EXTRA_CONTROLS()){
+        let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, BACKGROUND_DELTA_STRLEN);
+        apertureGrowthLimit_Control.onValueUpdated = function (value) {
+            data.apertureGrowthLimit = value;
+            photometricMosaicDialog.apertureGrowthLimit_Control.setValue(value);
+            if (liveUpdate_control.checked){
+                update(bitmapControl.width, bitmapControl.height);
+            }
+        };
+//      controlsHeight += apertureGrowthLimit_Control.height;
+        apertureSection.sizer.add(apertureGrowthLimit_Control);
+    }
     apertureSection.sizer.add(apertureAdd_Control);
     apertureSection.sizer.add(apertureBkgDelta_Control);
     let apertureBar = new SectionBar(this, "Star Aperture Size");

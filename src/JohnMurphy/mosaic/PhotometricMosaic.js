@@ -112,7 +112,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         }
         let intersectRect = joinAreaPreview.intersection(overlapBox);
         isHorizontal = isJoinHorizontal(data, intersectRect, showJoinDirection);
-        if (data.cropTargetToJoinRegionFlag){
+        if (data.isCroppingTargetToJoinRegion){
             joinRect = intersectRect;
         } else {
             joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
@@ -221,7 +221,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     let isTargetAfterRef;
     let isAmbiguousFlag = false;
-    if (data.cropTargetToJoinRegionFlag){
+    if (data.isCroppingTargetToJoinRegion){
         isTargetAfterRef = null;
     } else if (isHorizontal){
         isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);
@@ -327,7 +327,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     let propagateSurfaceSplines;
-    if (data.targetGradientFlag && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
+    if (data.isTargetGradientCorrection && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
         propagateSurfaceSplines = [];
         try {
             let smoothness = data.targetGradientSmoothness;
@@ -468,7 +468,7 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
     for (let channel = 0; channel < nChannels; channel++) {
         let scale = scaleFactors[channel].m;
         let propagateSurfaceSpline = null;
-        if (data.targetGradientFlag){
+        if (data.isTargetGradientCorrection){
             propagateSurfaceSpline = propagateSurfaceSplines[channel];
         }
         let surfaceSpline = surfaceSplines[channel];
@@ -535,7 +535,7 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
 function isJoinHorizontal(data, joinRect, showConsoleInfo){
     let isHorizontal = joinRect.width > joinRect.height;
     if (showConsoleInfo){
-        if (data.cropTargetToJoinRegionFlag){
+        if (data.isCroppingTargetToJoinRegion){
             console.writeln("<b>Mode: Crop target image to Join Region</b>");
         } else if (isHorizontal) {
             console.writeln("<b>Horizontal join</b>");

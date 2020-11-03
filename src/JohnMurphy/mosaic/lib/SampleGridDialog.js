@@ -286,18 +286,6 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         self.enabled = true;
     };
     
-    let optionsSizer = new HorizontalSizer(this);
-    optionsSizer.margin = 0;
-    optionsSizer.addSpacing(4);
-    optionsSizer.add(refCheckBox);
-    optionsSizer.addSpacing(23);
-    optionsSizer.add(pathCheckBox);
-    optionsSizer.addSpacing(23);
-    optionsSizer.add(targetSideCheckBox);
-    optionsSizer.addStretch();
-    
-    controlsHeight += refCheckBox.height;
-    
     // ===================================================
     // SectionBar: Sample rejection
     // ===================================================
@@ -332,6 +320,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
+    sampleStarGrowthRate_Control.enabled = !data.isAutoSampleGeneration;
     let sampleStarGrowthLimit_Control = createSampleStarGrowthLimitControl(this, data, labelLength);
     sampleStarGrowthLimit_Control.maxWidth = 800;
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
@@ -350,6 +339,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
+    sampleStarAdd_Control.enabled = !data.isAutoSampleGeneration;
     let rejectRadiusGroupBox = new GroupBox(this);
     rejectRadiusGroupBox.title = "Star rejection radius";
     rejectRadiusGroupBox.sizer = new VerticalSizer();
@@ -390,6 +380,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
+    sampleSize_Control.enabled = !data.isAutoSampleGeneration;
     controlsHeight += sampleSize_Control.height;
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
@@ -412,6 +403,36 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             detectedStars.allStars, data.cache.overlap.overlapBox, data);
         previewControl.forceRedraw();
     }
+    
+    let autoCheckBox = new CheckBox(this);
+    autoCheckBox.text = "Auto";
+    autoCheckBox.toolTip = "Use calculated values for some fields";
+    autoCheckBox.onClick = function (checked) {
+        photometricMosaicDialog.setAutoSampleGeneration(checked);
+        if (checked){
+            sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
+            sampleStarAdd_Control.setValue(data.sampleStarRadiusAdd);
+            sampleSize_Control.setValue(data.sampleSize);
+            updateSampleGrid();
+        }
+        sampleStarGrowthRate_Control.enabled = !checked;
+        sampleStarAdd_Control.enabled = !checked;
+        sampleSize_Control.enabled = !checked;
+    };
+    autoCheckBox.checked = data.isAutoSampleGeneration;
+    let optionsSizer = new HorizontalSizer(this);
+    optionsSizer.margin = 0;
+    optionsSizer.addSpacing(4);
+    optionsSizer.add(autoCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(pathCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(targetSideCheckBox);
+    optionsSizer.addStretch();
+    
+    controlsHeight += refCheckBox.height;
 
     // Global sizer
     this.sizer = new VerticalSizer(this);
@@ -522,9 +543,9 @@ function createSampleSizeControl(dialog, data, maxSampleSize, labelLength){
             "<p>Specifies the size of the sample squares.</p>" +
             "<p>The sample size should be greater than 2x the size of the largest " +
             "star that's not rejected by 'Limit stars %'.</p>";
-    sampleSize_Control.setRange(2, Math.min(maxSampleSize, 50));
-    sampleSize_Control.slider.setRange(2, 50);
-    sampleSize_Control.slider.minWidth = 50;
+    sampleSize_Control.setRange(2, Math.min(maxSampleSize, 150));
+    sampleSize_Control.slider.setRange(2, 150);
+    sampleSize_Control.slider.minWidth = 150;
     sampleSize_Control.setValue(data.sampleSize);
     return sampleSize_Control;
 }

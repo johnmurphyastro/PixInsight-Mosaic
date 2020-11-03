@@ -189,7 +189,7 @@ function TargetRegions(imageWidth, imageHeight, overlap, joinRect, isHorizontal,
     
     this.joinMiddle = Math.floor((this.joinStart + this.joinEnd) / 2);
     
-    if (data.mosaicOverlayTgtFlag){
+    if (data.isMosaicOverlay){
         // In overlay mode, the join has zero thickness and is runs along middle of join region
         this.joinStart = this.joinMiddle;
         this.joinEnd = this.joinMiddle;
@@ -237,11 +237,11 @@ function ScaleAndGradientApplier(imageWidth, imageHeight, overlap, joinRect, isH
     
     let joinType_ = 0;
     
-    if (data.mosaicOverlayTgtFlag){
+    if (data.isMosaicOverlay){
         joinType_ = OVERLAY_TGT;
-    } else if (data.mosaicRandomFlag){
+    } else if (data.isMosaicRandom){
         joinType_ = OVERLAY_RND;
-    } else if (data.mosaicAverageFlag){
+    } else if (data.isMosaicAverage){
         joinType_ = OVERLAY_AVG;
     }
     

@@ -116,7 +116,7 @@ function PhotometricMosaicData() {
         Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
         Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
         Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
-        Parameters.set("cropTargetToJoinRegionFlag", this.cropTargetToJoinRegionFlag);
+        Parameters.set("isCroppingTargetToJoinRegion", this.isCroppingTargetToJoinRegion);
         
         // Gradient Sample Generation
         Parameters.set("sampleStarGrowthRate", this.sampleStarGrowthRate);
@@ -125,13 +125,15 @@ function PhotometricMosaicData() {
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("maxSamples", this.maxSamples);
+        Parameters.set("isAutoSampleGeneration", this.isAutoSampleGeneration);
         
         // Gradient Correction (Overlap region)
         Parameters.set("overlapGradientSmoothness", this.overlapGradientSmoothness);
         Parameters.set("taperLength", this.taperLength);
+        Parameters.set("isAutoTaperLength", this.isAutoTaperLength);
         
         // Gradient Correction (Target image)
-        Parameters.set("targetGradientFlag", this.targetGradientFlag);
+        Parameters.set("isTargetGradientCorrection", this.isTargetGradientCorrection);
         Parameters.set("targetGradientSmoothness", this.targetGradientSmoothness);
         
         // Mosaic Star Mask
@@ -139,11 +141,12 @@ function PhotometricMosaicData() {
         Parameters.set("maskStarGrowthRate", this.maskStarGrowthRate);
         Parameters.set("maskStarGrowthLimit", this.maskStarGrowthLimit);
         Parameters.set("maskStarRadiusAdd", this.maskStarRadiusAdd);
+        Parameters.set("isAutoMaskStar", this.isAutoMaskStar);
         
         // Create Mosaic
-        Parameters.set("mosaicOverlayTgtFlag", this.mosaicOverlayTgtFlag);
-        Parameters.set("mosaicRandomFlag", this.mosaicRandomFlag);
-        Parameters.set("mosaicAverageFlag", this.mosaicAverageFlag); 
+        Parameters.set("isMosaicOverlay", this.isMosaicOverlay);
+        Parameters.set("isMosaicRandom", this.isMosaicRandom);
+        Parameters.set("isMosaicAverage", this.isMosaicAverage); 
         
         Parameters.set("graphWidth", this.graphWidth);
         Parameters.set("graphHeight", this.graphHeight);
@@ -215,8 +218,8 @@ function PhotometricMosaicData() {
             }
             this.joinAreaPreviewRect = new Rect(x, y, x + w, y + h);
             
-            if (Parameters.has("cropTargetToJoinRegionFlag"))
-                this.cropTargetToJoinRegionFlag = Parameters.getBoolean("cropTargetToJoinRegionFlag");
+            if (Parameters.has("isCroppingTargetToJoinRegion"))
+                this.isCroppingTargetToJoinRegion = Parameters.getBoolean("isCroppingTargetToJoinRegion");
         }
         
         // Gradient Sample Generation
@@ -232,16 +235,20 @@ function PhotometricMosaicData() {
             this.sampleSize = Parameters.getInteger("sampleSize");
         if (Parameters.has("maxSamples"))
             this.maxSamples = Parameters.getInteger("maxSamples");
+        if (Parameters.has("isAutoSampleGeneration"))
+            this.isAutoSampleGeneration = Parameters.getBoolean("isAutoSampleGeneration");
         
         // Gradient Correction (Overlap region)
         if (Parameters.has("overlapGradientSmoothness"))
             this.overlapGradientSmoothness = Parameters.getReal("overlapGradientSmoothness");
         if (Parameters.has("taperLength"))
             this.taperLength = Parameters.getInteger("taperLength");
+        if (Parameters.has("isAutoTaperLength"))
+            this.isAutoTaperLength = Parameters.getBoolean("isAutoTaperLength");
         
         // Gradient Correction (Target image)
-        if (Parameters.has("targetGradientFlag"))
-            this.targetGradientFlag = Parameters.getBoolean("targetGradientFlag");
+        if (Parameters.has("isTargetGradientCorrection"))
+            this.isTargetGradientCorrection = Parameters.getBoolean("isTargetGradientCorrection");
         if (Parameters.has("targetGradientSmoothness"))
             this.targetGradientSmoothness = Parameters.getReal("targetGradientSmoothness");
         
@@ -254,15 +261,17 @@ function PhotometricMosaicData() {
             this.maskStarGrowthLimit = Parameters.getInteger("maskStarGrowthLimit");
         if (Parameters.has("maskStarRadiusAdd"))
             this.maskStarRadiusAdd = Parameters.getReal("maskStarRadiusAdd");
+        if (Parameters.has("isAutoMaskStar"))
+            this.isAutoMaskStar = Parameters.getBoolean("isAutoMaskStar");
         
         // Create Mosaic
-        if (Parameters.has("mosaicOverlayTgtFlag"))
-            this.mosaicOverlayTgtFlag = Parameters.getBoolean("mosaicOverlayTgtFlag");
-        if (Parameters.has("mosaicRandomFlag"))
-            this.mosaicRandomFlag = Parameters.getBoolean("mosaicRandomFlag");
-        if (Parameters.has("mosaicAverageFlag"))
-            this.mosaicAverageFlag = Parameters.getBoolean("mosaicAverageFlag");
-        
+        if (Parameters.has("isMosaicOverlay"))
+            this.isMosaicOverlay = Parameters.getBoolean("isMosaicOverlay");
+        if (Parameters.has("isMosaicRandom"))
+            this.isMosaicRandom = Parameters.getBoolean("isMosaicRandom");
+        if (Parameters.has("isMosaicAverage"))
+            this.isMosaicAverage = Parameters.getBoolean("isMosaicAverage");
+
         if (Parameters.has("graphWidth"))
             this.graphWidth = Parameters.getInteger("graphWidth");
         if (Parameters.has("graphHeight"))
@@ -280,7 +289,7 @@ function PhotometricMosaicData() {
         
         // Photometric Scale
         this.apertureGrowthRate = 1.0;
-        this.apertureGrowthLimit = 10;
+        this.apertureGrowthLimit = 300;
         this.apertureAdd = 1;
         this.apertureBgDelta = 10;
         this.limitPhotoStarsPercent = 100;
@@ -294,22 +303,24 @@ function PhotometricMosaicData() {
         // Join Region (Advanced settings)
         this.hasJoinAreaPreview = false;
         this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
-        this.cropTargetToJoinRegionFlag = false;
+        this.isCroppingTargetToJoinRegion = false;
         
         // Gradient Sample Generation
         this.sampleStarGrowthRate = 1.0;
-        this.sampleStarGrowthLimit = 150;
+        this.sampleStarGrowthLimit = 300;
         this.sampleStarRadiusAdd = 1;
         this.limitSampleStarsPercent = 25;
-        this.sampleSize = 15;
+        this.sampleSize = 20;
         this.maxSamples = 3000;
+        this.isAutoSampleGeneration = true;
         
         // Gradient Correction (Overlap region)
-        this.overlapGradientSmoothness = -1;
-        this.taperLength = 100;
+        this.overlapGradientSmoothness = 0;
+        this.taperLength = 200;
+        this.isAutoTaperLength = true;
         
         // Gradient Correction (Target image)
-        this.targetGradientFlag = true;
+        this.isTargetGradientCorrection = true;
         this.targetGradientSmoothness = 2;
         
         // Mosaic Star Mask
@@ -317,17 +328,15 @@ function PhotometricMosaicData() {
         this.maskStarGrowthRate = 1.0;
         this.maskStarGrowthLimit = 150;
         this.maskStarRadiusAdd = 5;
+        this.isAutoMaskStar = true;
         
         // Create Mosaic
-        this.mosaicOverlayTgtFlag = true;
-        this.mosaicRandomFlag = false;
-        this.mosaicAverageFlag = false;
+        this.isMosaicOverlay = true;
+        this.isMosaicRandom = false;
+        this.isMosaicAverage = false;
         
         this.graphWidth = 1200; // gradient and photometry graph width
         this.graphHeight = 800; // gradient and photometry graph height
-        
-        // Set by '... Graph', 'Sample Grid', 'Create Mask' buttons
-        this.testFlag = 0;
         
         this.cache = new MosaicCache();
         
@@ -350,11 +359,12 @@ function PhotometricMosaicData() {
         // Photometric Scale
         photometricMosaicDialog.apertureGrowthRate_Control.setValue(this.apertureGrowthRate);
         photometricMosaicDialog.apertureAdd_Control.setValue(this.apertureAdd);
-        photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
         photometricMosaicDialog.apertureBkgDelta_Control.setValue(this.apertureBgDelta);
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
         photometricMosaicDialog.linearRange_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
+        if (EXTRA_CONTROLS())
+            photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
         
         // Join Region
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
@@ -366,7 +376,7 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
         photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
         photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        photometricMosaicDialog.cropTarget_Control.checked = this.cropTargetToJoinRegionFlag;
+        photometricMosaicDialog.cropTarget_Control.checked = this.isCroppingTargetToJoinRegion;
         
         // Gradient Sample Generation
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(this.sampleStarGrowthRate);
@@ -377,19 +387,22 @@ function PhotometricMosaicData() {
         if (EXTRA_CONTROLS()){
             photometricMosaicDialog.maxSamples_Control.setValue(this.maxSamples);
         }
+        photometricMosaicDialog.setAutoSampleGeneration(this.isAutoSampleGeneration);
         
         // Gradient Correction (Overlap region)
         photometricMosaicDialog.overlapGradientSmoothness_Control.setValue(this.overlapGradientSmoothness);
         photometricMosaicDialog.taperLength_Control.setValue(this.taperLength);
+        photometricMosaicDialog.autoTaperLengthCheckBox.checked = this.isAutoTaperLength;
+        photometricMosaicDialog.setAutoTaperLengthFlag(this.isAutoTaperLength);
         
         // Gradient Correction (Target image)
         photometricMosaicDialog.targetGradientSmoothness_Control.setValue(this.targetGradientSmoothness);
-        photometricMosaicDialog.setTargetGradientFlag(this.targetGradientFlag);
+        photometricMosaicDialog.setTargetGradientFlag(this.isTargetGradientCorrection);
         
         // Create Mosaic
-        photometricMosaicDialog.mosaicOverlayTgt_Control.checked = this.mosaicOverlayTgtFlag;
-        photometricMosaicDialog.mosaicRandom_Control.checked = this.mosaicRandomFlag;
-        photometricMosaicDialog.mosaicAverage_Control.checked = this.mosaicAverageFlag;
+        photometricMosaicDialog.mosaicOverlayTgt_Control.checked = this.isMosaicOverlay;
+        photometricMosaicDialog.mosaicRandom_Control.checked = this.isMosaicRandom;
+        photometricMosaicDialog.mosaicAverage_Control.checked = this.isMosaicAverage;
     };
     
     // Initialise the script's data
@@ -433,13 +446,15 @@ function saveSettings(data){
     if (EXTRA_CONTROLS()){
         Settings.write( KEYPREFIX+"/maxSamples", DataType_Int32, data.maxSamples );
     }
-   
+    Settings.write( KEYPREFIX+"/isAutoSampleGeneration", DataType_Boolean, data.isAutoSampleGeneration );
+    
     // Gradient Correction (Overlap region)
     Settings.write( KEYPREFIX+"/overlapGradientSmoothness", DataType_Float, data.overlapGradientSmoothness );
     Settings.write( KEYPREFIX+"/taperLength", DataType_Int32, data.taperLength );
+    Settings.write( KEYPREFIX+"/isAutoTaperLength", DataType_Boolean, data.isAutoTaperLength );
     
     // Gradient Correction (Target image)
-    Settings.write( KEYPREFIX+"/targetGradientFlag", DataType_Boolean, data.targetGradientFlag );
+    Settings.write( KEYPREFIX+"/isTargetGradientCorrection", DataType_Boolean, data.isTargetGradientCorrection );
     Settings.write( KEYPREFIX+"/targetGradientSmoothness", DataType_Float, data.targetGradientSmoothness );
     
     // Mosaic Star Mask
@@ -447,11 +462,12 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/maskStarGrowthRate", DataType_Float, data.maskStarGrowthRate );
     Settings.write( KEYPREFIX+"/maskStarGrowthLimit", DataType_Int32, data.maskStarGrowthLimit );
     Settings.write( KEYPREFIX+"/maskStarRadiusAdd", DataType_Float, data.maskStarRadiusAdd );
+    Settings.write( KEYPREFIX+"/isAutoMaskStar", DataType_Boolean, data.isAutoMaskStar );
     
     // Create Mosaic
-    Settings.write( KEYPREFIX+"/mosaicOverlayTgtFlag", DataType_Boolean, data.mosaicOverlayTgtFlag );
-    Settings.write( KEYPREFIX+"/mosaicRandomFlag", DataType_Boolean, data.mosaicRandomFlag );
-    Settings.write( KEYPREFIX+"/mosaicAverageFlag", DataType_Boolean, data.mosaicAverageFlag );
+    Settings.write( KEYPREFIX+"/isMosaicOverlay", DataType_Boolean, data.isMosaicOverlay );
+    Settings.write( KEYPREFIX+"/isMosaicRandom", DataType_Boolean, data.isMosaicRandom );
+    Settings.write( KEYPREFIX+"/isMosaicAverage", DataType_Boolean, data.isMosaicAverage );
     
     Settings.write( KEYPREFIX+"/graphWidth", DataType_Int32, data.graphWidth );
     Settings.write( KEYPREFIX+"/graphHeight", DataType_Int32, data.graphHeight );
@@ -534,6 +550,9 @@ function restoreSettings(data){
         if ( Settings.lastReadOK )
             data.maxSamples = keyValue;
     }
+    keyValue = Settings.read( KEYPREFIX+"/isAutoSampleGeneration", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.isAutoSampleGeneration = keyValue;
     
     // Gradient Correction (Overlap region)
     keyValue = Settings.read( KEYPREFIX+"/overlapGradientSmoothness", DataType_Float );
@@ -542,11 +561,14 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/taperLength", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.taperLength = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/isAutoTaperLength", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.isAutoTaperLength = keyValue;
     
     // Gradient Correction (Target image)
-    keyValue = Settings.read( KEYPREFIX+"/targetGradientFlag", DataType_Boolean );
+    keyValue = Settings.read( KEYPREFIX+"/isTargetGradientCorrection", DataType_Boolean );
     if ( Settings.lastReadOK )
-        data.targetGradientFlag = keyValue;
+        data.isTargetGradientCorrection = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/targetGradientSmoothness", DataType_Float );
     if ( Settings.lastReadOK )
         data.targetGradientSmoothness = keyValue;
@@ -564,17 +586,20 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/maskStarRadiusAdd", DataType_Float );
     if ( Settings.lastReadOK )
         data.maskStarRadiusAdd = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/isAutoMaskStar", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.isAutoMaskStar = keyValue;
     
     // Create Mosaic
-    keyValue = Settings.read( KEYPREFIX+"/mosaicOverlayTgtFlag", DataType_Boolean );
+    keyValue = Settings.read( KEYPREFIX+"/isMosaicOverlay", DataType_Boolean );
     if ( Settings.lastReadOK )
-        data.mosaicOverlayTgtFlag = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/mosaicRandomFlag", DataType_Boolean );
+        data.isMosaicOverlay = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/isMosaicRandom", DataType_Boolean );
     if ( Settings.lastReadOK )
-        data.mosaicRandomFlag = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/mosaicAverageFlag", DataType_Boolean );
+        data.isMosaicRandom = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/isMosaicAverage", DataType_Boolean );
     if ( Settings.lastReadOK )
-        data.mosaicAverageFlag = keyValue;
+        data.isMosaicAverage = keyValue;
     
     keyValue = Settings.read( KEYPREFIX+"/graphWidth", DataType_Int32 );
     if ( Settings.lastReadOK )
@@ -605,13 +630,15 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // Create the Program Description at the top
     let titleLabel = createTitleLabel(
-            "<b>Combines registered linear images. " +
-            "Gradient and scale corrections are applied.</b><br />" +
-            "(1) Read help sections: <i>Prerequisites</i> and <i>Quick Start Guide</i>.<br />" +
-            "(2) Each join should be approximately vertical or horizontal.<br />" +
-            "(3) Join frames into either rows or columns.<br />" +
-            "(4) Join these strips to create the final mosaic.<br />" +
-            "Copyright &copy; 2019-2020 John Murphy");
+        "<b>Combines registered linear images. " +
+        "Gradient and scale corrections are applied. " +
+        "Designed to work with planned mosaics where the tiles form a regular grid.</b><br />" +
+        "(1) Read help sections: <i>Prerequisites</i> and <i>Quick Start Guide</i>.<br />" +
+        "(2) Ensure the black areas surrounding each image really are black (Readout Data = 0.0).<br />" +
+        "(3) Use the helper script <i>TrimMosaicTile</i> to errode away soft or ragged image edges.<br />" +
+        "(4) Join frames into either rows or columns, " +
+        "and then join these strips to create the final mosaic.<br />" +
+        "Copyright &copy; 2019-2020 John Murphy");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
     titleSection.sizer.add(titleLabel);
@@ -662,6 +689,7 @@ function PhotometricMosaicDialog(data) {
     }
     targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
+        self.updateSampleSize();
     };
 
     let targetImage_Sizer = new HorizontalSizer(this);
@@ -788,6 +816,7 @@ function PhotometricMosaicDialog(data) {
     this.apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
     this.apertureGrowthRate_Control.onValueUpdated = function (value){
         data.apertureGrowthRate = value;
+        self.updateSampleStarGrowthRate();
     };
     this.apertureAdd_Control = new NumericEdit(this);
     this.apertureAdd_Control.setReal(false);
@@ -799,18 +828,21 @@ function PhotometricMosaicDialog(data) {
     this.apertureAdd_Control.setValue(data.apertureAdd);
     this.apertureAdd_Control.onValueUpdated = function (value){
         data.apertureAdd = value;
+        self.updateSampleStarRadiusAdd();
     };
-    this.apertureGrowthLimit_Control = new NumericEdit(this);
-    this.apertureGrowthLimit_Control.setReal(false);
-    this.apertureGrowthLimit_Control.label.text = "Growth limit:";
-    this.apertureGrowthLimit_Control.toolTip =
-            "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>";
-    this.apertureGrowthLimit_Control.setRange(3, 25);
-    this.apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
-    this.apertureGrowthLimit_Control.onValueUpdated = function (value){
-        data.apertureGrowthLimit = value;
-    };
+    if (EXTRA_CONTROLS()){
+        this.apertureGrowthLimit_Control = new NumericEdit(this);
+        this.apertureGrowthLimit_Control.setReal(false);
+        this.apertureGrowthLimit_Control.label.text = "Growth limit:";
+        this.apertureGrowthLimit_Control.toolTip =
+                "<p>Maximum star aperture growth.</p>" +
+                "<p>Limits the aperture radius growth to this number of pixels.</p>";
+        this.apertureGrowthLimit_Control.setRange(3, 300);
+        this.apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
+        this.apertureGrowthLimit_Control.onValueUpdated = function (value){
+            data.apertureGrowthLimit = value;
+        };
+    }
     this.apertureBkgDelta_Control = new NumericEdit(this);
     this.apertureBkgDelta_Control.setReal(false);
     this.apertureBkgDelta_Control.label.text = "Background delta:";
@@ -836,7 +868,9 @@ function PhotometricMosaicDialog(data) {
     apertureGroupBox.sizer.margin = 2;
     apertureGroupBox.sizer.spacing = 10;
     apertureGroupBox.sizer.add(this.apertureGrowthRate_Control);
-    apertureGroupBox.sizer.add(this.apertureGrowthLimit_Control);
+    if (EXTRA_CONTROLS()){
+        apertureGroupBox.sizer.add(this.apertureGrowthLimit_Control);
+    }
     apertureGroupBox.sizer.add(this.apertureAdd_Control);
     apertureGroupBox.sizer.add(this.apertureBkgDelta_Control);
     apertureGroupBox.sizer.addStretch();
@@ -932,7 +966,7 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Photometric Scale" End
 
     // =======================================
-    // SectionBar: "Gradient Sample Generation"
+    // SectionBar: "Sample Generation"
     // =======================================
     const sampleGenerationStrLen = this.font.width("Multiply star radius:");
  
@@ -1021,10 +1055,11 @@ function PhotometricMosaicDialog(data) {
             "<p>Specifies the size of the sample squares.</p>" +
             "<p>The sample size should be greater than 2x the size of the largest " +
             "star that's not rejected by 'Limit stars %'.</p>";
-    this.sampleSize_Control.setRange(2, 50);
+    this.sampleSize_Control.setRange(2, 150);
     this.sampleSize_Control.setValue(data.sampleSize);
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
+        self.setAutoTaperLengthFlag(data.isAutoTaperLength);
     };
     
     let sampleSizeGroupBox = new GroupBox(this);
@@ -1057,7 +1092,20 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
+    this.autoSampleGenerationCheckBox = new CheckBox(this);
+    this.autoSampleGenerationCheckBox.text = "Auto";
+    this.autoSampleGenerationCheckBox.toolTip = 
+            "<p>Automatically determine most settings.</p>" +
+            "<p>In the 'Star rejection radius' section, the 'Growth rate' and " +
+            "'Radius add' use settings from the Photometry section.</p>" +
+            "<p>'Sample size' can be calculated provided the images have been " +
+            "plate solved. Otherwise it is set to its default.</p>";
+    this.autoSampleGenerationCheckBox.onCheck = function (checked){
+        self.setAutoSampleGeneration(checked);
+    };
+    
     let sampleGridSizer = new HorizontalSizer(this);
+    sampleGridSizer.add(this.autoSampleGenerationCheckBox);
     sampleGridSizer.addStretch();
     sampleGridSizer.add(displaySamplesButton);
     
@@ -1114,7 +1162,7 @@ function PhotometricMosaicDialog(data) {
     if (EXTRA_CONTROLS()){
         sampleGenerationSection.sizer.add(maxSamplesSizer);
     }
-    let sampleGenerationBar = new SectionBar(this, "Gradient Sample Generation");
+    let sampleGenerationBar = new SectionBar(this, "Sample Generation");
     sampleGenerationBar.setSection(sampleGenerationSection);
     sampleGenerationBar.onToggleSection = this.onToggleSection;
     sampleGenerationBar.toolTip = 
@@ -1127,6 +1175,39 @@ function PhotometricMosaicDialog(data) {
             "either image or if they are too close to a bright star.</p>" +
             "<p>The surface spline resolution will depend on the sample size, " +
             "how noisy each sample is, and how much smoothing is applied.</p>";
+    
+    this.setAutoSampleGeneration = function (checked){
+        data.isAutoSampleGeneration = checked;
+        self.autoSampleGenerationCheckBox.checked = data.isAutoSampleGeneration;
+        self.sampleStarGrowthRate_Control.enabled = !checked;
+        self.sampleStarAdd_Control.enabled = !checked;
+        self.sampleSize_Control.enabled = !checked;
+        if (checked){
+            self.updateSampleSize();
+            self.updateSampleStarGrowthRate();
+            self.updateSampleStarRadiusAdd();
+        }
+    };
+    this.updateSampleSize = function(){
+        if (data.isAutoSampleGeneration && data.targetView !== null){
+            let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
+            data.sampleSize = Math.max(13, Math.round(0.005 / pixelAngle));
+            self.sampleSize_Control.setValue(data.sampleSize);
+        } 
+    };
+    this.updateSampleStarGrowthRate = function(){
+        if (data.isAutoSampleGeneration){
+            data.sampleStarGrowthRate = data.apertureGrowthRate;
+            self.sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
+        }
+    };
+    this.updateSampleStarRadiusAdd = function(){
+        if (data.isAutoSampleGeneration){
+            data.sampleStarRadiusAdd = data.apertureAdd;
+            self.sampleStarAdd_Control.setValue(data.sampleStarRadiusAdd);
+        }
+    };
+    
     // SectionBar: "Gradient Sample Generation" End
 
     // ==================================================
@@ -1186,10 +1267,43 @@ function PhotometricMosaicDialog(data) {
     this.taperLength_Control.onValueUpdated = function (value) {
         data.taperLength = value;
     };
-    this.taperLength_Control.setRange(0, 500);
-    this.taperLength_Control.slider.setRange(0, 500);
+    this.taperLength_Control.setRange(0, 2000);
+    this.taperLength_Control.slider.setRange(0, 200);
     this.taperLength_Control.slider.minWidth = 500;
     this.taperLength_Control.setValue(data.taperLength);
+    
+    this.autoTaperLengthCheckBox = new CheckBox(this);
+    this.autoTaperLengthCheckBox.text = "Auto";
+    this.autoTaperLengthCheckBox.toolTip = "<p>Automatically determine taper length.</p>";
+    this.autoTaperLengthCheckBox.onCheck = function (checked){
+        self.taperLength_Control.enabled = !checked;
+        data.isAutoTaperLength = checked;
+        self.setAutoTaperLengthFlag(data.isAutoTaperLength);
+    };
+    this.autoTaperLengthCheckBox.checked = data.isAutoTaperLength;
+    
+    this.setAutoTaperLengthFlag = function(isAutoTaperLength){
+        data.isAutoTaperLength = isAutoTaperLength;
+        if (data.isAutoTaperLength){
+            let taperLength;
+            if (data.isTargetGradientCorrection){
+                let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
+                taperLength = Math.max(100, Math.round(0.075 / pixelAngle));
+            } else {
+                // No target image gradient correction. This requires a longer tager
+                taperLength = 1000;
+            }
+            data.taperLength = taperLength;
+            self.taperLength_Control.setValue(data.taperLength);
+        }
+        self.taperLength_Control.enabled = !data.isAutoTaperLength;
+    };
+    
+    let taperLengthSizer = new HorizontalSizer(this);
+    taperLengthSizer.spacing = 4;
+    taperLengthSizer.add(this.taperLength_Control);
+    taperLengthSizer.addSpacing(20);
+    taperLengthSizer.add(this.autoTaperLengthCheckBox);
     
     let overlapGradientSizer = new HorizontalSizer(this);
     overlapGradientSizer.spacing = 4;
@@ -1201,7 +1315,7 @@ function PhotometricMosaicDialog(data) {
     overlapGradientSection.sizer = new VerticalSizer(this);
     overlapGradientSection.sizer.spacing = 4;
     overlapGradientSection.sizer.add(overlapGradientSizer);
-    overlapGradientSection.sizer.add(this.taperLength_Control);
+    overlapGradientSection.sizer.add(taperLengthSizer);
     let gradientBar = new SectionBar(this, "Gradient Correction (Overlap region)");
     gradientBar.setSection(overlapGradientSection);
     gradientBar.onToggleSection = this.onToggleSection;
@@ -1254,10 +1368,11 @@ function PhotometricMosaicDialog(data) {
     };
     
     this.setTargetGradientFlag = function (checked){
-        data.targetGradientFlag = checked;
+        data.isTargetGradientCorrection = checked;
         self.targetGradientBar.checkBox.checked = checked;
         self.targetGradientSmoothness_Control.enabled = checked;
         targetGradientGraphButton.enabled = checked;
+        self.setAutoTaperLengthFlag(data.isAutoTaperLength);
     };
     
     let targetGradientSection = new Control(this);
@@ -1276,7 +1391,7 @@ function PhotometricMosaicDialog(data) {
             "<p>In most situations, this option should be selected.</p>";
     this.targetGradientBar.checkBox.onClick = this.setTargetGradientFlag;
     this.targetGradientBar.onToggleSection = this.onToggleSection;
-    this.setTargetGradientFlag(data.targetGradientFlag);
+    this.setTargetGradientFlag(data.isTargetGradientCorrection);
     // SectionBar: "Propagated Gradient Correction" End
 
     // ===========================================
@@ -1396,7 +1511,7 @@ function PhotometricMosaicDialog(data) {
         if (checked){
             self.setHasJoinSize(false);
         } else {
-            data.cropTargetToJoinRegionFlag = false;
+            data.isCroppingTargetToJoinRegion = false;
             self.cropTarget_Control.checked = false; 
         }
     };
@@ -1409,9 +1524,9 @@ function PhotometricMosaicDialog(data) {
         "<p>This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic.</p>" +
         "<p>This option only supports the mosaic combination modes 'Overlay' and 'Average'.</p>";
     this.cropTarget_Control.onCheck = function (checked){
-        data.cropTargetToJoinRegionFlag = checked;
+        data.isCroppingTargetToJoinRegion = checked;
     };
-    this.cropTarget_Control.checked = data.cropTargetToJoinRegionFlag;
+    this.cropTarget_Control.checked = data.isCroppingTargetToJoinRegion;
     
     let joinAreaFlagsHorizSizer = new HorizontalSizer(this);
     joinAreaFlagsHorizSizer.addSpacing(GET_AREA_FROM_PREVIEW_STRLEN + 4);
@@ -1515,11 +1630,11 @@ function PhotometricMosaicDialog(data) {
             "are drawn on top.</li></ul>" +
             "<p>For a pure 'target overlay' or 'reference overlay', create " +
             "a Join Region at one side of the overlap region.</p>";
-    this.mosaicOverlayTgt_Control.checked = data.mosaicOverlayTgtFlag;
+    this.mosaicOverlayTgt_Control.checked = data.isMosaicOverlay;
     this.mosaicOverlayTgt_Control.onClick = function (checked) {
-        data.mosaicOverlayTgtFlag = checked;
-        data.mosaicRandomFlag = !checked;
-        data.mosaicAverageFlag = !checked;
+        data.isMosaicOverlay = checked;
+        data.isMosaicRandom = !checked;
+        data.isMosaicAverage = !checked;
     };
 
     this.mosaicRandom_Control = new RadioButton(this);
@@ -1533,11 +1648,11 @@ function PhotometricMosaicDialog(data) {
             "to apply either the reference or target image to the mosaic through " +
             "a mask that only reveals the bright stars. The 'Mosaic Star Mask' " +
             "section has been provided for this purpose.</p>";
-    this.mosaicRandom_Control.checked = data.mosaicRandomFlag;
+    this.mosaicRandom_Control.checked = data.isMosaicRandom;
     this.mosaicRandom_Control.onClick = function (checked) {
-        data.mosaicRandomFlag = checked;
-        data.mosaicOverlayTgtFlag = !checked;
-        data.mosaicAverageFlag = !checked;
+        data.isMosaicRandom = checked;
+        data.isMosaicOverlay = !checked;
+        data.isMosaicAverage = !checked;
     };
     this.mosaicAverage_Control = new RadioButton(this);
     this.mosaicAverage_Control.text = "Average";
@@ -1545,11 +1660,11 @@ function PhotometricMosaicDialog(data) {
             "pixels are set to the average of the reference and target pixels.</p>" +
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
             "over the join, but this can also make the join more visible.</p>";
-    this.mosaicAverage_Control.checked = data.mosaicAverageFlag;
+    this.mosaicAverage_Control.checked = data.isMosaicAverage;
     this.mosaicAverage_Control.onClick = function (checked) {
-        data.mosaicAverageFlag = checked;
-        data.mosaicRandomFlag = !checked;
-        data.mosaicOverlayTgtFlag = !checked;
+        data.isMosaicAverage = checked;
+        data.isMosaicRandom = !checked;
+        data.isMosaicOverlay = !checked;
     };
     
     
@@ -1617,6 +1732,7 @@ function PhotometricMosaicDialog(data) {
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, 
             helpWindowTitle, HELP_MSG, "PhotometricMosaic", okTooltip);
 
+    this.setAutoSampleGeneration(data.isAutoSampleGeneration);
     //---------------------------------------------------------------
     // Vertically stack all the SectionBars and OK/Cancel button bar
     //---------------------------------------------------------------
@@ -1755,8 +1871,8 @@ function createApertureGrowthLimitControl(dialog, data, strLen){
     apertureGrowthLimit_Control.toolTip =
             "<p>Maximum star aperture growth.</p>" +
             "<p>Limits the aperture radius growth to this number of pixels.</p>";
-    apertureGrowthLimit_Control.setRange(3, 25);
-    apertureGrowthLimit_Control.slider.setRange(3, 25);
+    apertureGrowthLimit_Control.setRange(3, 300);
+    apertureGrowthLimit_Control.slider.setRange(3, 300);
     apertureGrowthLimit_Control.maxWidth = 800;
     apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
     return apertureGrowthLimit_Control;
@@ -1842,12 +1958,12 @@ function main() {
             (new MessageBox("ERROR: Target and Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.targetGradientFlag && data.targetGradientSmoothness < data.overlapGradientSmoothness){
+        if (data.isTargetGradientCorrection && data.targetGradientSmoothness < data.overlapGradientSmoothness){
             (new MessageBox("'Gradient Correction (Target image)' Smoothness must be less than or equal to 'Gradient Correction (Overlap Region)' Smoothness", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.cropTargetToJoinRegionFlag && data.mosaicRandomFlag){
+        if (data.isCroppingTargetToJoinRegion && data.isMosaicRandom){
             (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nOverlay and Average", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;

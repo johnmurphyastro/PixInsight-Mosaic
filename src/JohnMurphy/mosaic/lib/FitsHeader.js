@@ -118,6 +118,21 @@ function searchFitsHistory(view, word){
 }
 
 /**
+ * If the FITS header contains the CDELT1 keyword, its value is returned.
+ * Otherwise, the supplied default is returned.
+ * @param {View} view
+ * @param {Number} defaultValue default pixel angular size in degrees
+ * @returns {Number} pixel angular size in degrees
+ */
+function getPixelAngularSize(view, defaultValue){
+    for (let fitsKeyword of view.window.keywords) {
+        if (fitsKeyword.name === "CDELT1")
+            return Math.abs(fitsKeyword.numericValue);
+    }
+    return defaultValue;
+}
+
+/**
  * @param {FITSKeyword} keywords
  * @param {PhotometricMosaicData} data
  */
@@ -166,7 +181,7 @@ function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     if (includePropagate){
-        if (data.targetGradientFlag){
+        if (data.isTargetGradientCorrection){
             keywords.push(new FITSKeyword("HISTORY", "", 
                 SCRIPT_NAME() + ".targetGradientSmoothness: " + data.targetGradientSmoothness));
         }
@@ -203,11 +218,11 @@ function fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef){
  */
 function fitsHeaderMosaic(keywords, data){
     let mode = "unknown";
-    if (data.mosaicAverageFlag){
+    if (data.isMosaicAverage){
         mode = "Average";
-    } else if (data.mosaicOverlayTgtFlag){
+    } else if (data.isMosaicOverlay){
         mode = "Overlay";
-    } else if (data.mosaicRandomFlag){
+    } else if (data.isMosaicRandom){
         mode = "Random";
     }
     keywords.push(new FITSKeyword("HISTORY", "", 
