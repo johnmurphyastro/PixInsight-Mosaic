@@ -320,7 +320,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
-    sampleStarGrowthRate_Control.enabled = !data.isAutoSampleGeneration;
+    sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration;
     let sampleStarGrowthLimit_Control = createSampleStarGrowthLimitControl(this, data, labelLength);
     sampleStarGrowthLimit_Control.maxWidth = 800;
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
@@ -330,16 +330,16 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
-    let sampleStarAdd_Control = createSampleStarAddControl(this, data, labelLength);
-    sampleStarAdd_Control.maxWidth = 300;
-    sampleStarAdd_Control.onValueUpdated = function (value) {
+    let sampleStarRadiusAdd_Control = createSampleStarAddControl(this, data, labelLength);
+    sampleStarRadiusAdd_Control.maxWidth = 300;
+    sampleStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.sampleStarRadiusAdd = value;
-        photometricMosaicDialog.sampleStarAdd_Control.setValue(value);
+        photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(value);
         if (liveUpdate){
             updateSampleGrid();
         }
     };
-    sampleStarAdd_Control.enabled = !data.isAutoSampleGeneration;
+    sampleStarRadiusAdd_Control.enabled = !data.useAutoSampleGeneration;
     let rejectRadiusGroupBox = new GroupBox(this);
     rejectRadiusGroupBox.title = "Star rejection radius";
     rejectRadiusGroupBox.sizer = new VerticalSizer();
@@ -347,11 +347,11 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     rejectRadiusGroupBox.sizer.spacing = 2;
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthRate_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimit_Control);
-    rejectRadiusGroupBox.sizer.add(sampleStarAdd_Control);
+    rejectRadiusGroupBox.sizer.add(sampleStarRadiusAdd_Control);
     
     controlsHeight += sampleStarGrowthRate_Control.height + 
             sampleStarGrowthLimit_Control.height + 
-            sampleStarAdd_Control.height + 
+            sampleStarRadiusAdd_Control.height + 
             rejectRadiusGroupBox.height + 
             rejectRadiusGroupBox.sizer.margin * 2 +
             rejectRadiusGroupBox.sizer.spacing * 2;
@@ -380,7 +380,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
-    sampleSize_Control.enabled = !data.isAutoSampleGeneration;
+    sampleSize_Control.enabled = !data.useAutoSampleGeneration;
     controlsHeight += sampleSize_Control.height;
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
@@ -408,18 +408,18 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     autoCheckBox.text = "Auto";
     autoCheckBox.toolTip = "Use calculated values for some fields";
     autoCheckBox.onClick = function (checked) {
-        photometricMosaicDialog.setAutoSampleGeneration(checked);
+        photometricMosaicDialog.setSampleGenerationAutoValues(checked);
         if (checked){
             sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
-            sampleStarAdd_Control.setValue(data.sampleStarRadiusAdd);
+            sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
             sampleSize_Control.setValue(data.sampleSize);
             updateSampleGrid();
         }
         sampleStarGrowthRate_Control.enabled = !checked;
-        sampleStarAdd_Control.enabled = !checked;
+        sampleStarRadiusAdd_Control.enabled = !checked;
         sampleSize_Control.enabled = !checked;
     };
-    autoCheckBox.checked = data.isAutoSampleGeneration;
+    autoCheckBox.checked = data.useAutoSampleGeneration;
     let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
@@ -520,18 +520,18 @@ function createSampleStarGrowthLimitControl(dialog, data, strLen){
 }
 
 function createSampleStarAddControl(dialog, data, strLen){
-    let sampleStarAdd_Control = new NumericControl(dialog);
-    sampleStarAdd_Control.real = false;
-    sampleStarAdd_Control.label.text = "Radius add:";
-    sampleStarAdd_Control.label.minWidth = strLen;
-    sampleStarAdd_Control.toolTip =
+    let sampleStarRadiusAdd_Control = new NumericControl(dialog);
+    sampleStarRadiusAdd_Control.real = false;
+    sampleStarRadiusAdd_Control.label.text = "Radius add:";
+    sampleStarRadiusAdd_Control.label.minWidth = strLen;
+    sampleStarRadiusAdd_Control.toolTip =
             "<p>Minimum star aperture growth.</p>" +
             "<p>This value gets added to the aperture radius for all stars.</p>";
-    sampleStarAdd_Control.setRange(0, 10);
-    sampleStarAdd_Control.slider.setRange(0, 10);
-    sampleStarAdd_Control.slider.minWidth = 50;
-    sampleStarAdd_Control.setValue(data.sampleStarRadiusAdd);
-    return sampleStarAdd_Control;
+    sampleStarRadiusAdd_Control.setRange(0, 10);
+    sampleStarRadiusAdd_Control.slider.setRange(0, 10);
+    sampleStarRadiusAdd_Control.slider.minWidth = 50;
+    sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
+    return sampleStarRadiusAdd_Control;
 }
  
 function createSampleSizeControl(dialog, data, maxSampleSize, labelLength){

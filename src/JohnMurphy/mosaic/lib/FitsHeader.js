@@ -181,7 +181,7 @@ function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
     if (includePropagate){
-        if (data.isTargetGradientCorrection){
+        if (data.useTargetGradientCorrection){
             keywords.push(new FITSKeyword("HISTORY", "", 
                 SCRIPT_NAME() + ".targetGradientSmoothness: " + data.targetGradientSmoothness));
         }
@@ -218,11 +218,11 @@ function fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef){
  */
 function fitsHeaderMosaic(keywords, data){
     let mode = "unknown";
-    if (data.isMosaicAverage){
+    if (data.useMosaicAverage){
         mode = "Average";
-    } else if (data.isMosaicOverlay){
+    } else if (data.useMosaicOverlay){
         mode = "Overlay";
-    } else if (data.isMosaicRandom){
+    } else if (data.useMosaicRandom){
         mode = "Random";
     }
     keywords.push(new FITSKeyword("HISTORY", "", 

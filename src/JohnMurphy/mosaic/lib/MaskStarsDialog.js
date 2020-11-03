@@ -328,6 +328,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthLimit_Control.setRange(3, 300);
     maskStarGrowthLimit_Control.slider.setRange(3, 300);
     maskStarGrowthLimit_Control.maxWidth = 800;
+    maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
     maskStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.maskStarGrowthLimit = value;
         if (liveUpdate) {
@@ -346,6 +347,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarRadiusAdd_Control.slider.setRange(0, 300);
     maskStarRadiusAdd_Control.setPrecision(1);
     maskStarRadiusAdd_Control.maxWidth = 800;
+    maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
         if (liveUpdate) {
@@ -411,24 +413,24 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     }
     
     function setAutoValues(){
-        if (data.isAutoMaskStar){
+        if (data.useAutoMaskStarSize){
             data.maskStarGrowthRate = data.apertureGrowthRate;
             data.maskStarRadiusAdd = data.apertureAdd + 3;
         }
         maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
         maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
-        maskStarGrowthRate_Control.enabled = !data.isAutoMaskStar;
-        maskStarRadiusAdd_Control.enabled = !data.isAutoMaskStar;
+        maskStarGrowthRate_Control.enabled = !data.useAutoMaskStarSize;
+        maskStarRadiusAdd_Control.enabled = !data.useAutoMaskStarSize;
     }
     let autoCheckBox = new CheckBox(this);
     autoCheckBox.text = "Auto";
     autoCheckBox.toolTip = "Use calculated values for some fields";
     autoCheckBox.onClick = function (checked) {
-        data.isAutoMaskStar = checked;
+        data.useAutoMaskStarSize = checked;
         setAutoValues();
         update();
     };
-    autoCheckBox.checked = data.isAutoMaskStar;
+    autoCheckBox.checked = data.useAutoMaskStarSize;
     setAutoValues();
     let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
