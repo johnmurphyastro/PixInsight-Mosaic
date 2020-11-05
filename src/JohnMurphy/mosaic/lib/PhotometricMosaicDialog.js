@@ -805,51 +805,25 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     // SectionBar: "Photometry"
     // =======================================
-    this.apertureGrowthRate_Control = new NumericEdit(this);
-    this.apertureGrowthRate_Control.setReal(true);
-    this.apertureGrowthRate_Control.setPrecision(2);
-    this.apertureGrowthRate_Control.label.text = "Growth rate:";
-    this.apertureGrowthRate_Control.toolTip =
-            "<p>Logarithm of aperture radius growth.</p>" +
-            "<p>The aperture radius increase depends on the star's peak value " +
-            "and this grow rate. Zero produces no growth.</p>";
-    this.apertureGrowthRate_Control.setRange(0, 30);
-    this.apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+    let photometryControls = new PhotometryControls();
+    
+    this.apertureGrowthRate_Control = photometryControls.createApertureGrowthRateEdit(this, data);
     this.apertureGrowthRate_Control.onValueUpdated = function (value){
         data.apertureGrowthRate = value;
         self.setSampleStarGrowthRateAutoValue();
     };
-    this.apertureAdd_Control = new NumericEdit(this);
-    this.apertureAdd_Control.setReal(false);
-    this.apertureAdd_Control.label.text = "Radius add:";
-    this.apertureAdd_Control.toolTip =
-            "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>";
-    this.apertureAdd_Control.setRange(0, 10);
-    this.apertureAdd_Control.setValue(data.apertureAdd);
+    this.apertureAdd_Control = photometryControls.createApertureAddEdit(this, data);
     this.apertureAdd_Control.onValueUpdated = function (value){
         data.apertureAdd = value;
         self.setSampleStarRadiusAddAutoValue();
     };
     if (EXTRA_CONTROLS()){
-        this.apertureGrowthLimit_Control = new NumericEdit(this);
-        this.apertureGrowthLimit_Control.setReal(false);
-        this.apertureGrowthLimit_Control.label.text = "Growth limit:";
-        this.apertureGrowthLimit_Control.toolTip =
-                "<p>Maximum star aperture growth.</p>" +
-                "<p>Limits the aperture radius growth to this number of pixels.</p>";
-        this.apertureGrowthLimit_Control.setRange(3, 300);
-        this.apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
+        this.apertureGrowthLimit_Control = photometryControls.createApertureGrowthLimitEdit(this, data);
         this.apertureGrowthLimit_Control.onValueUpdated = function (value){
             data.apertureGrowthLimit = value;
         };
     }
-    this.apertureBgDelta_Control = new NumericEdit(this);
-    this.apertureBgDelta_Control.setReal(false);
-    this.apertureBgDelta_Control.label.text = "Background delta:";
-    this.apertureBgDelta_Control.toolTip = "<p>Background annulus thickness.</p>";
-    this.apertureBgDelta_Control.setRange(1, 25);
-    this.apertureBgDelta_Control.setValue(data.apertureBgDelta);
+    this.apertureBgDelta_Control = photometryControls.createApertureBgDeltaEdit(this, data);
     this.apertureBgDelta_Control.onValueUpdated = function (value){
         data.apertureBgDelta = value;
     };
@@ -876,46 +850,19 @@ function PhotometricMosaicDialog(data) {
     apertureGroupBox.sizer.add(this.apertureBgDelta_Control);
     apertureGroupBox.sizer.addStretch();
     
-    this.limitPhotoStarsPercent_Control = new NumericEdit(this);
-    this.limitPhotoStarsPercent_Control.setReal(true);
-    this.limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitPhotoStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of detected stars used for photometry. " +
-            "The faintest stars are rejected.</p>" +
-            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
-            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
-            "<p>0% implies no stars will be used. The scale will default to one.</p>";
-    this.limitPhotoStarsPercent_Control.setPrecision(2);
-    this.limitPhotoStarsPercent_Control.setRange(0, 100);
-    this.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+    this.limitPhotoStarsPercent_Control = 
+            photometryControls.createLimitPhotoStarsPercentEdit(this, data);
     this.limitPhotoStarsPercent_Control.onValueUpdated = function (value){
         data.limitPhotoStarsPercent = value;
     };
     
-    this.linearRange_Control = new NumericEdit(this);
-    this.linearRange_Control.setReal(true);
-    this.linearRange_Control.label.text = "Linear range:";
-    this.linearRange_Control.toolTip =
-            "<p>Restricts the stars used for photometry to those " +
-            "that have a peak pixel value less than the specified value.</p>" +
-            "<p>Use this to reject stars that are outside the " +
-            "camera's linear response range.</p>";
-    this.linearRange_Control.setPrecision(3);
-    this.linearRange_Control.setRange(0.001, 1.0);
-    this.linearRange_Control.setValue(data.linearRange);
+    this.linearRange_Control = photometryControls.createLinearRangeEdit(this, data);
     this.linearRange_Control.onValueUpdated = function (value){
         data.linearRange = value;
     };
     
-    this.outlierRemoval_Control = new NumericEdit(this);
-    this.outlierRemoval_Control.setReal(false);
-    this.outlierRemoval_Control.label.text = "Outlier removal:";
-    this.outlierRemoval_Control.toolTip =
-            "<p>Number of outlier stars to remove.</p>" +
-            "<p>Outliers can be due to variable stars, or measurement issues.</p>" +
-            "<p>Removing a few outliers can improve accuracy, but don't over do it.</p>";
-    this.outlierRemoval_Control.setRange(0, 50);
-    this.outlierRemoval_Control.setValue(data.outlierRemoval);
+    this.outlierRemoval_Control = 
+            photometryControls.createOutlierRemovalEdit(this, data);
     this.outlierRemoval_Control.onValueUpdated = function (value){
         data.outlierRemoval = value;
     };
@@ -970,27 +917,9 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Sample Generation"
     // =======================================
     const sampleGenerationStrLen = this.font.width("Multiply star radius:");
- 
-    this.limitSampleStarsPercent_Control = new NumericEdit(this);
-    this.limitSampleStarsPercent_Control.real = false;
-    this.limitSampleStarsPercent_Control.label.text = "Limit stars %:";
-    this.limitSampleStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
-            "<p>100% implies that all detected stars are used to reject samples.</p>" +
-            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
-            "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can affect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is only necessary to reject bright stars. This script uses the " +
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. It is more important to " +
-            "include most of the samples than to reject faint stars.</p>";
-    this.limitSampleStarsPercent_Control.setPrecision(2);
-    this.limitSampleStarsPercent_Control.setRange(0, 100);
-    this.limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);        
+    let sampleControls = new SampleControls;
+    
+    this.limitSampleStarsPercent_Control = sampleControls.createLimitSampleStarsPercentEdit(this, data);       
     this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
     };
@@ -1002,40 +931,17 @@ function PhotometricMosaicDialog(data) {
     filterSampleStarsGroupBox.sizer.spacing = 10;
     filterSampleStarsGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
     
-    this.sampleStarGrowthRate_Control = new NumericEdit(this);
-    this.sampleStarGrowthRate_Control.real = true;
-    this.sampleStarGrowthRate_Control.label.text = "Growth rate:";
-    this.sampleStarGrowthRate_Control.toolTip =
-            "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Read the Help sections on 'Join Region' to learn when these " +
-            "samples should be rejected.</p>";
-    this.sampleStarGrowthRate_Control.setPrecision(2);
-    this.sampleStarGrowthRate_Control.setRange(0, 30);
-    this.sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);     
+    this.sampleStarGrowthRate_Control = sampleControls.createSampleStarGrowthRateEdit(this, data);    
     this.sampleStarGrowthRate_Control.onValueUpdated = function (value){
         data.sampleStarGrowthRate = value;
     };
     
-    this.sampleStarGrowthLimit_Control = new NumericEdit(this);
-    this.sampleStarGrowthLimit_Control.setReal(false);
-    this.sampleStarGrowthLimit_Control.label.text = "Growth limit:";
-    this.sampleStarGrowthLimit_Control.toolTip =
-            "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>";
-    this.sampleStarGrowthLimit_Control.setRange(3, 300);
-    this.sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
+    this.sampleStarGrowthLimit_Control = sampleControls.createSampleStarGrowthLimitEdit(this, data);
     this.sampleStarGrowthLimit_Control.onValueUpdated = function (value){
         data.sampleStarGrowthLimit = value;
     };
     
-    this.sampleStarRadiusAdd_Control = new NumericEdit(this);
-    this.sampleStarRadiusAdd_Control.setReal(false);
-    this.sampleStarRadiusAdd_Control.label.text = "Radius add:";
-    this.sampleStarRadiusAdd_Control.toolTip =
-            "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>";
-    this.sampleStarRadiusAdd_Control.setRange(0, 10);
-    this.sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
+    this.sampleStarRadiusAdd_Control = sampleControls.createSampleStarAddEdit(this, data);
     this.sampleStarRadiusAdd_Control.onValueUpdated = function (value){
         data.sampleStarRadiusAdd = value;
     };
@@ -1049,15 +955,8 @@ function PhotometricMosaicDialog(data) {
     sampleRejectStarGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
     sampleRejectStarGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
     
-    this.sampleSize_Control = new NumericEdit(this);
-    this.sampleSize_Control.real = false;
-    this.sampleSize_Control.label.text = "Sample size:";
-    this.sampleSize_Control.toolTip =
-            "<p>Specifies the size of the sample squares.</p>" +
-            "<p>The sample size should be greater than 2x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>";
-    this.sampleSize_Control.setRange(2, 150);
-    this.sampleSize_Control.setValue(data.sampleSize);
+    this.sampleSize_Control = sampleControls.createSampleSizeEdit(
+            this, data, sampleControls.sampleSize.range.max);
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
     };
@@ -1410,9 +1309,29 @@ function PhotometricMosaicDialog(data) {
             "For more information on how to use a Join Region, read the Help sections:" +
             "<ul><li>Join Region: Taking control of the join</li>" +
             "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
-            
+    
+    /**
+     * 
+     * @param {String} label
+     * @param {String} tooltip
+     * @param {Number} initialValue
+     * @param {Number} editWidth
+     * @returns {NumericEdit}
+     */
+    function createPreviewNumericEdit(label, tooltip, initialValue, editWidth) {
+        let control = new NumericEdit();
+        control.setReal(false);
+        control.setRange(0, 100000);
+        control.setValue(initialValue);
+        control.label.text = label;
+        control.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+        control.edit.setFixedWidth(editWidth);
+        control.toolTip = tooltip;
+        return control;
+    }
+    
     let x0ToolTip = "X-coordinate of Join Region's top left corner";
-    this.rectangleX0_Control = createNumericEdit("Left:", x0ToolTip,
+    this.rectangleX0_Control = createPreviewNumericEdit("Left:", x0ToolTip,
             data.joinAreaPreviewRect.x0, 50);
     this.rectangleX0_Control.label.setFixedWidth(
             this.font.width("Left:") + GET_AREA_FROM_PREVIEW_STRLEN + 4);
@@ -1420,17 +1339,17 @@ function PhotometricMosaicDialog(data) {
         data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
     let y0ToolTip = "Y-coordinate of Join Region's top left corner";
-    this.rectangleY0_Control = createNumericEdit("Top:", y0ToolTip,
+    this.rectangleY0_Control = createPreviewNumericEdit("Top:", y0ToolTip,
             data.joinAreaPreviewRect.y0, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
         data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
-    this.rectangleWidth_Control = createNumericEdit("Width:", "Join Region width",
+    this.rectangleWidth_Control = createPreviewNumericEdit("Width:", "Join Region width",
             data.joinAreaPreviewRect.width, 50);
     this.rectangleWidth_Control.onValueUpdated = function (value){
         data.joinAreaPreviewRect = getJoinAreaPreviewRect();
     };
-    this.rectangleHeight_Control = createNumericEdit("Height:", "Join Region height",
+    this.rectangleHeight_Control = createPreviewNumericEdit("Height:", "Join Region height",
             data.joinAreaPreviewRect.height, 50);
     this.rectangleHeight_Control.onValueUpdated = function (value){
         data.joinAreaPreviewRect = getJoinAreaPreviewRect();
@@ -1772,120 +1691,6 @@ function PhotometricMosaicDialog(data) {
     this.windowTitle = TITLE();
     this.adjustToContents();
     this.setFixedSize();
-}
-
-//-------------------------------------------------------
-// Photometry Stars Controls
-//-------------------------------------------------------
-function createLimitPhotoStarsPercentControl(dialog, data, strLength){
-    let limitPhotoStarsPercent_Control = new NumericControl(dialog);
-    limitPhotoStarsPercent_Control.real = true;
-    limitPhotoStarsPercent_Control.label.text = "Limit stars %:";
-    limitPhotoStarsPercent_Control.label.minWidth = strLength;
-    limitPhotoStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of detected stars used for photometry. " +
-            "The faintest stars are rejected.</p>" +
-            "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
-            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
-            "<p>0% implies no stars will be used. The scale will default to one.</p>";
-    limitPhotoStarsPercent_Control.setRange(0, 100);
-    limitPhotoStarsPercent_Control.slider.setRange(0, 200);
-    limitPhotoStarsPercent_Control.setPrecision(2);
-    limitPhotoStarsPercent_Control.maxWidth = 500;
-    limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
-    return limitPhotoStarsPercent_Control;
-}
-
-function createLinearRangeControl(dialog, data, strLength){
-    let linearRange_Control = new NumericControl(dialog);
-    linearRange_Control.real = true;
-    linearRange_Control.label.text = "Linear range:";
-    linearRange_Control.label.minWidth = strLength;
-    linearRange_Control.toolTip =
-            "<p>Restricts the stars used for photometry to those " +
-            "that have a peak pixel value less than the specified value.</p>" +
-            "<p>Use this to reject stars that are outside the " +
-            "camera's linear response range.</p>";
-    linearRange_Control.setRange(0.001, 1.0);
-    linearRange_Control.slider.setRange(0, 1000);
-    linearRange_Control.setPrecision(3);
-    linearRange_Control.maxWidth = 1000;
-    linearRange_Control.setValue(data.linearRange);
-    return linearRange_Control;
-}
-
-function createOutlierRemovalControl(dialog, data, strLength){
-    let outlierRemoval_Control = new NumericControl(dialog);
-    outlierRemoval_Control.real = false;
-    outlierRemoval_Control.label.text = "Outlier removal:";
-    outlierRemoval_Control.label.minWidth = strLength;
-    outlierRemoval_Control.toolTip =
-            "<p>Number of outlier stars to remove.</p>" +
-            "<p>Outliers can be due to variable stars, or measurement issues.</p>" +
-            "<p>Removing a few outliers can improve accuracy, but don't over do it.</p>";
-    outlierRemoval_Control.setRange(0, 50);
-    outlierRemoval_Control.slider.setRange(0, 50);
-    outlierRemoval_Control.maxWidth = 400;
-    outlierRemoval_Control.setValue(data.outlierRemoval);
-    return outlierRemoval_Control;
-}
-
-function createApertureGrowthRateControl(dialog, data, strLen){
-    let apertureGrowthRate_Control = new NumericControl(dialog);
-    apertureGrowthRate_Control.real = true;
-    apertureGrowthRate_Control.setPrecision(2);
-    apertureGrowthRate_Control.label.text = "Growth rate:";
-    apertureGrowthRate_Control.label.minWidth = strLen;
-    apertureGrowthRate_Control.toolTip =
-            "<p>Logarithm of aperture radius growth.</p>" +
-            "<p>The aperture radius increase depends on the star's peak value " +
-            "and this grow rate. Zero produces no growth.</p>";
-    apertureGrowthRate_Control.setRange(0, 30);
-    apertureGrowthRate_Control.slider.setRange(0, 300);
-    apertureGrowthRate_Control.maxWidth = 800;
-    apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
-    return apertureGrowthRate_Control;
-}
-function createApertureAddControl(dialog, data, strLen){
-    let apertureAdd_Control = new NumericControl(dialog);
-    apertureAdd_Control.real = false;
-    apertureAdd_Control.label.text = "Radius add:";
-    apertureAdd_Control.label.minWidth = strLen;
-    apertureAdd_Control.toolTip =
-            "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>";
-    apertureAdd_Control.setRange(0, 10);
-    apertureAdd_Control.slider.setRange(0, 10);
-//    apertureAdd_Control.slider.minWidth = 25;
-    apertureAdd_Control.maxWidth = 250;
-    apertureAdd_Control.setValue(data.apertureAdd);
-    return apertureAdd_Control;
-}
-function createApertureGrowthLimitControl(dialog, data, strLen){
-    let apertureGrowthLimit_Control = new NumericControl(dialog);
-    apertureGrowthLimit_Control.real = false;
-    apertureGrowthLimit_Control.label.text = "Growth Limit:";
-    apertureGrowthLimit_Control.label.minWidth = strLen;
-    apertureGrowthLimit_Control.toolTip =
-            "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>";
-    apertureGrowthLimit_Control.setRange(3, 300);
-    apertureGrowthLimit_Control.slider.setRange(3, 300);
-    apertureGrowthLimit_Control.maxWidth = 800;
-    apertureGrowthLimit_Control.setValue(data.apertureGrowthLimit);
-    return apertureGrowthLimit_Control;
-}
-function createApertureBgDeltaControl(dialog, data, strLen){
-    let apertureBgDelta_Control = new NumericControl(dialog);
-    apertureBgDelta_Control.real = false;
-    apertureBgDelta_Control.label.text = "Background delta:";
-    apertureBgDelta_Control.label.minWidth = strLen;
-    apertureBgDelta_Control.toolTip = "<p>Background annulus thickness.</p>";
-    apertureBgDelta_Control.setRange(1, 25);
-    apertureBgDelta_Control.slider.setRange(1, 25);
-    apertureBgDelta_Control.maxWidth = 250;
-    apertureBgDelta_Control.setValue(data.apertureBgDelta);
-    return apertureBgDelta_Control;
 }
 
 // Our dialog inherits all properties and methods from the core Dialog object.

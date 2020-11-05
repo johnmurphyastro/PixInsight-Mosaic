@@ -1,4 +1,4 @@
-/* global UndoFlag_NoSwapFile, Dialog, StdButton_No, StdIcon_Question, StdButton_Cancel, StdButton_Yes */
+/* global UndoFlag_NoSwapFile, Dialog, StdButton_No, StdIcon_Question, StdButton_Cancel, StdButton_Yes, PhotometryControls */
 
 // Version 1.0 (c) John Murphy 12th-Aug-2020
 //
@@ -322,8 +322,10 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     // SectionBar: Star filters
     // ===================================================
     const BACKGROUND_DELTA_STRLEN = this.font.width("Background delta:");
-    let limitPhotoStarsPercent_Control = 
-            createLimitPhotoStarsPercentControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let photometryControls = new PhotometryControls();
+    
+    let limitPhotoStarsPercent_Control = photometryControls.createLimitPhotoStarsPercentControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     limitPhotoStarsPercent_Control.onValueUpdated = function (value) {
         data.limitPhotoStarsPercent = value;
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(value);
@@ -333,7 +335,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     };
     controlsHeight += limitPhotoStarsPercent_Control.height;
     
-    let linearRange_Control = createLinearRangeControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let linearRange_Control = photometryControls.createLinearRangeControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     linearRange_Control.onValueUpdated = function (value) {
         data.linearRange = value;
         photometricMosaicDialog.linearRange_Control.setValue(value);
@@ -343,7 +346,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     };
     controlsHeight += linearRange_Control.height;
     
-    let outlierRemoval_Control = createOutlierRemovalControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let outlierRemoval_Control = photometryControls.createOutlierRemovalControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     outlierRemoval_Control.onValueUpdated = function (value) {
         data.outlierRemoval = value;
         photometricMosaicDialog.outlierRemoval_Control.setValue(value);
@@ -369,7 +373,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     // ===================================================
     // SectionBar: Star aperture size
     // ===================================================
-    let apertureGrowthRate_Control = createApertureGrowthRateControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let apertureGrowthRate_Control = photometryControls.createApertureGrowthRateControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     apertureGrowthRate_Control.onValueUpdated = function (value) {
         data.apertureGrowthRate = value;
         photometricMosaicDialog.apertureGrowthRate_Control.setValue(value);
@@ -379,7 +384,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
 //    controlsHeight += apertureGrowthRate_Control.height;
-    let apertureAdd_Control = createApertureAddControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let apertureAdd_Control = photometryControls.createApertureAddControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
         photometricMosaicDialog.apertureAdd_Control.setValue(value);
@@ -389,7 +395,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         }
     };
 //    controlsHeight += apertureAdd_Control.height;
-    let apertureBgDelta_Control = createApertureBgDeltaControl(this, data, BACKGROUND_DELTA_STRLEN);
+    let apertureBgDelta_Control = photometryControls.createApertureBgDeltaControl(
+            this, data, BACKGROUND_DELTA_STRLEN);
     apertureBgDelta_Control.onValueUpdated = function (value) {
         data.apertureBgDelta = value;
         photometricMosaicDialog.apertureBgDelta_Control.setValue(value);
@@ -404,7 +411,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     apertureSection.sizer.spacing = 2;
     apertureSection.sizer.add(apertureGrowthRate_Control);
     if (EXTRA_CONTROLS()){
-        let apertureGrowthLimit_Control = createApertureGrowthLimitControl(this, data, BACKGROUND_DELTA_STRLEN);
+        let apertureGrowthLimit_Control = photometryControls.createApertureGrowthLimitControl(
+                this, data, BACKGROUND_DELTA_STRLEN);
         apertureGrowthLimit_Control.onValueUpdated = function (value) {
             data.apertureGrowthLimit = value;
             photometricMosaicDialog.apertureGrowthLimit_Control.setValue(value);

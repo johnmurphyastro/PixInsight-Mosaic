@@ -290,9 +290,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     // SectionBar: Sample rejection
     // ===================================================
     const labelLength = this.font.width("Growth Limit:");
+    let sampleControls = new SampleControls;
+    
     let limitSampleStarsPercent_Control = 
-                createLimitSampleStarsPercentControl(this, data, labelLength);
-    limitSampleStarsPercent_Control.maxWidth = 500;
+                sampleControls.createLimitSampleStarsPercentControl(this, data, labelLength);
     limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
@@ -311,8 +312,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     controlsHeight += filterGroupBox.height + filterGroupBox.sizer.margin * 2;
         
     let sampleStarGrowthRate_Control =
-                createSampleStarGrowthRateControl(this, data, labelLength);
-    sampleStarGrowthRate_Control.maxWidth = 800;
+                sampleControls.createSampleStarGrowthRateControl(this, data, labelLength);
     sampleStarGrowthRate_Control.onValueUpdated = function (value){
         data.sampleStarGrowthRate = value;
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(value);
@@ -321,8 +321,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     };
     sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration;
-    let sampleStarGrowthLimit_Control = createSampleStarGrowthLimitControl(this, data, labelLength);
-    sampleStarGrowthLimit_Control.maxWidth = 800;
+    let sampleStarGrowthLimit_Control = 
+            sampleControls.createSampleStarGrowthLimitControl(this, data, labelLength);
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.sampleStarGrowthLimit = value;
         photometricMosaicDialog.sampleStarGrowthLimit_Control.setValue(value);
@@ -330,8 +330,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
         }
     };
-    let sampleStarRadiusAdd_Control = createSampleStarAddControl(this, data, labelLength);
-    sampleStarRadiusAdd_Control.maxWidth = 300;
+    let sampleStarRadiusAdd_Control = 
+            sampleControls.createSampleStarAddControl(this, data, labelLength);
     sampleStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.sampleStarRadiusAdd = value;
         photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(value);
@@ -371,8 +371,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     // ===================================================
     // SectionBar: Sample Generation
     // ===================================================
-    let sampleSize_Control = createSampleSizeControl(this, data, maxSampleSize, labelLength);
-    sampleSize_Control.maxWidth = 500;
+    let sampleSize_Control = sampleControls.createSampleSizeControl(
+            this, data, maxSampleSize, labelLength);
     sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
         photometricMosaicDialog.sampleSize_Control.setValue(value);
@@ -456,98 +456,6 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             controlsHeight + this.logicalPixelsToPhysical(20);
     this.resize(preferredWidth, preferredHeight);
     setTitle();
-}
-
-//-------------------------------------------------------
-// Sample Grid Controls
-//-------------------------------------------------------
-function createLimitSampleStarsPercentControl(dialog, data, sampleGenerationStrLen){
-    let limitSampleStarsPercent_Control = new NumericControl(dialog);
-    limitSampleStarsPercent_Control.real = false;
-    limitSampleStarsPercent_Control.label.text = "Limit stars %:";
-    limitSampleStarsPercent_Control.label.minWidth = sampleGenerationStrLen;
-    limitSampleStarsPercent_Control.toolTip =
-            "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
-            "<p>100% implies that all detected stars are used to reject samples.</p>" +
-            "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
-            "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
-            "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can affect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is only necessary to reject bright stars. This script uses the " +
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. It is more important to " +
-            "include most of the samples than to reject faint stars.</p>";
-    limitSampleStarsPercent_Control.setRange(0, 100);
-    limitSampleStarsPercent_Control.slider.setRange(0, 100);
-    limitSampleStarsPercent_Control.slider.minWidth = 101;
-    limitSampleStarsPercent_Control.setValue(data.limitSampleStarsPercent);
-    return limitSampleStarsPercent_Control;
-}
- 
-function createSampleStarGrowthRateControl(dialog, data, labelLength){
-    let sampleStarGrowthRate_Control = new NumericControl(dialog);
-    sampleStarGrowthRate_Control.real = true;
-    sampleStarGrowthRate_Control.label.text = "Growth rate:";
-    sampleStarGrowthRate_Control.label.minWidth = labelLength;
-    sampleStarGrowthRate_Control.toolTip =
-            "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Read the Help sections on 'Join Region' to learn when these " +
-            "samples should be rejected.</p>";
-    sampleStarGrowthRate_Control.setPrecision(2);
-    sampleStarGrowthRate_Control.setRange(0, 30);
-    sampleStarGrowthRate_Control.slider.setRange(0, 300);
-    sampleStarGrowthRate_Control.slider.minWidth = 301;
-    sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
-    return sampleStarGrowthRate_Control;
-}
-
-function createSampleStarGrowthLimitControl(dialog, data, strLen){
-    let sampleStarGrowthLimit_Control = new NumericControl(dialog);
-    sampleStarGrowthLimit_Control.real = false;
-    sampleStarGrowthLimit_Control.label.text = "Growth Limit:";
-    sampleStarGrowthLimit_Control.label.minWidth = strLen;
-    sampleStarGrowthLimit_Control.toolTip =
-            "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>";
-    sampleStarGrowthLimit_Control.setRange(3, 300);
-    sampleStarGrowthLimit_Control.slider.setRange(3, 300);
-    sampleStarGrowthLimit_Control.slider.minWidth = 300;
-    sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
-    return sampleStarGrowthLimit_Control;
-}
-
-function createSampleStarAddControl(dialog, data, strLen){
-    let sampleStarRadiusAdd_Control = new NumericControl(dialog);
-    sampleStarRadiusAdd_Control.real = false;
-    sampleStarRadiusAdd_Control.label.text = "Radius add:";
-    sampleStarRadiusAdd_Control.label.minWidth = strLen;
-    sampleStarRadiusAdd_Control.toolTip =
-            "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>";
-    sampleStarRadiusAdd_Control.setRange(0, 10);
-    sampleStarRadiusAdd_Control.slider.setRange(0, 10);
-    sampleStarRadiusAdd_Control.slider.minWidth = 50;
-    sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
-    return sampleStarRadiusAdd_Control;
-}
- 
-function createSampleSizeControl(dialog, data, maxSampleSize, labelLength){
-    let sampleSize_Control = new NumericControl(dialog);
-    sampleSize_Control.real = false;
-    sampleSize_Control.label.text = "Sample size:";
-    sampleSize_Control.label.minWidth = labelLength;
-    sampleSize_Control.toolTip =
-            "<p>Specifies the size of the sample squares.</p>" +
-            "<p>The sample size should be greater than 2x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>";
-    sampleSize_Control.setRange(2, Math.min(maxSampleSize, 150));
-    sampleSize_Control.slider.setRange(2, 150);
-    sampleSize_Control.slider.minWidth = 150;
-    sampleSize_Control.setValue(data.sampleSize);
-    return sampleSize_Control;
 }
 
 SampleGridDialog.prototype = new Dialog;

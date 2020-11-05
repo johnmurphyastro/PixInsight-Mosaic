@@ -182,26 +182,6 @@ function createWindowControlButtons(dialog, data, helpMsgTitle, helpMsg, scriptN
     return buttons_Sizer;
 }
 
-/**
- * 
- * @param {String} label
- * @param {String} tooltip
- * @param {Number} initialValue
- * @param {Number} editWidth
- * @returns {NumericEdit}
- */
-function createNumericEdit(label, tooltip, initialValue, editWidth){
-    let numericEditControl = new NumericEdit();
-    numericEditControl.setReal(false);
-    numericEditControl.setRange(0, 100000);
-    numericEditControl.setValue(initialValue);
-    numericEditControl.label.text = label;
-    numericEditControl.label.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-    numericEditControl.edit.setFixedWidth(editWidth);
-    numericEditControl.toolTip = tooltip;
-    return numericEditControl;
-}
-
 function createGroupBox(dialog, title){
     let groupBox = new GroupBox(dialog);
     groupBox.title = title;
