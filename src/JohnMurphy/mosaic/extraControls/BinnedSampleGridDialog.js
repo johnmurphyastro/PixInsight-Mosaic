@@ -116,7 +116,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
                 graphics.antialiasing = true;
                 for (let i = 0; i < firstNstars; ++i){
                     let star = stars[i];
-                    let radius = Math.max(star.rect.width, star.rect.height)/2;
+                    let radius = star.getStarRadius();
                     let x = star.pos.x - bitmapOffset.x;
                     let y = star.pos.y - bitmapOffset.y;
                     graphics.strokeCircle(x, y, radius);

@@ -76,16 +76,12 @@ function MosaicCache() {
     };
     
     /**
-     * Create SampleGridMap and cache it in a map
-     * @param {Image} tgtImage
-     * @param {Image} refImage
-     * @param {Star[]} allStars
-     * @param {Rect} overlapBox
      * @param {PhotometricMosaicData} data
-     * @returns {SampleGridMap} Map of sample squares (all color channels)
+     * @param {Number} growthLimit
+     * @returns {String}
      */
-    this.getSampleGridMap = function (tgtImage, refImage, allStars, overlapBox, data){
-        let key = "_" +
+    function getSampleKey(data, growthLimit){
+        return "_" +
                 data.starFluxTolerance + "_" +
                 data.starSearchRadius + "_" +
                 
@@ -98,14 +94,26 @@ function MosaicCache() {
                 data.outlierRemoval + "_" +
                 
                 data.sampleStarGrowthRate + "_" +
-                data.sampleStarGrowthLimit + "_" +
+                growthLimit + "_" +
                 data.sampleStarRadiusAdd + "_" +
                 data.limitSampleStarsPercent + "_" +
                 data.sampleSize + "_";
+    }
+    
+    /**
+     * Create SampleGridMap and cache it in a map
+     * @param {Star[]} allStars
+     * @param {PhotometricMosaicData} data
+     * @param {Boolean} isOverlapSampleGrid
+     * @returns {SampleGridMap} Map of sample squares (all color channels)
+     */
+    this.getSampleGridMap = function (allStars, data, isOverlapSampleGrid){
+        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
+        let key = getSampleKey(data, growthLimit);
         
         let value = this.sampleGridMapMap.get(key);
         if (value === undefined){
-            value = createSampleGridMap(tgtImage, refImage, allStars, overlapBox, data);
+            value = createSampleGridMap(allStars, data, growthLimit);
             this.sampleGridMapMap.set(key, value);
         }
         return value;
@@ -114,34 +122,20 @@ function MosaicCache() {
     /**
      * Create SampleGridMap and cache it in a map
      * @param {SampleGridMap} sampleGridMap Map of sample squares (all color channels)
-     * @param {Image} tgtImage
-     * @param {Image} refImage
      * @param {type} scaleFactors
      * @param {type} isHorizontal Determines sort order for SamplePair
      * @param {PhotometricMosaicData} data
+     * @param {Boolean} isOverlapSampleGrid
      * @returns {SamplePair[][]} Returns SamplePair[] for each color
      */
-    this.getSamplePairs = function (sampleGridMap, tgtImage, refImage, scaleFactors, isHorizontal, data){
-        let key = "_" +
-                data.starFluxTolerance + "_" +
-                data.starSearchRadius + "_" +
-                
-                data.apertureGrowthRate + "_" +
-                data.apertureGrowthLimit + "_" +
-                data.apertureAdd + "_" +
-                data.apertureBgDelta + "_" +
-                data.limitPhotoStarsPercent + "_" +
-                data.linearRange + "_" +
-                data.outlierRemoval + "_" +
-                
-                data.sampleStarGrowthRate + "_" +
-                data.sampleStarGrowthLimit + "_" +
-                data.sampleStarRadiusAdd + "_" +
-                data.limitSampleStarsPercent + "_" +
-                data.sampleSize + "_";
+    this.getSamplePairs = function (sampleGridMap, scaleFactors, isHorizontal, data, isOverlapSampleGrid){
+        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
+        let key = getSampleKey(data, growthLimit);
         
         let value = this.samplePairsMap.get(key);
         if (value === undefined){
+            let tgtImage = data.targetView.image;
+            let refImage = data.referenceView.image;
             value = createSamplePairs(sampleGridMap, tgtImage, refImage, scaleFactors, isHorizontal);
             this.samplePairsMap.set(key, value);
         }
@@ -155,29 +149,13 @@ function MosaicCache() {
      * @param {SamplePair[]} samplePairs median values from ref and tgt samples
      * @param {Number} logSmoothing Logarithmic value; larger values smooth more
      * @param {Number} channel Color channel (0, 1 or 2)
+     * @param {Boolean} isOverlapSampleGrid
      * @returns {SurfaceSpline}
      */
-    this.getSurfaceSpline = function (data, samplePairs, logSmoothing, channel){ 
-        let key = "_" + channel + "_" + 
-                data.starFluxTolerance + "_" +
-                data.starSearchRadius + "_" +
-                
-                data.apertureGrowthRate + "_" +
-                data.apertureGrowthLimit + "_" +
-                data.apertureAdd + "_" +
-                data.apertureBgDelta + "_" +
-                data.limitPhotoStarsPercent + "_" +
-                data.linearRange + "_" +
-                data.outlierRemoval + "_" +
-                
-                data.sampleStarGrowthRate + "_" +
-                data.sampleStarGrowthLimit + "_" +
-                data.sampleStarRadiusAdd + "_" +
-                data.limitSampleStarsPercent + "_" +
-                data.sampleSize + "_" +
-                data.maxSamples + "_" +
-                
-                logSmoothing + "_";
+    this.getSurfaceSpline = function (data, samplePairs, logSmoothing, channel, isOverlapSampleGrid){
+        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
+        let key = getSampleKey(data, growthLimit);
+        key += data.maxSamples + "_" + logSmoothing + "_";
         
         let value = this.surfaceSplineMap.get(key);
         if (value === undefined){

@@ -121,6 +121,7 @@ function PhotometricMosaicData() {
         // Gradient Sample Generation
         Parameters.set("sampleStarGrowthRate", this.sampleStarGrowthRate);
         Parameters.set("sampleStarGrowthLimit", this.sampleStarGrowthLimit);
+        Parameters.set("sampleStarGrowthLimitTarget", this.sampleStarGrowthLimitTarget);
         Parameters.set("sampleStarRadiusAdd", this.sampleStarRadiusAdd);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
@@ -227,6 +228,8 @@ function PhotometricMosaicData() {
             this.sampleStarGrowthRate = Parameters.getReal("sampleStarGrowthRate");
         if (Parameters.has("sampleStarGrowthLimit"))
             this.sampleStarGrowthLimit = Parameters.getInteger("sampleStarGrowthLimit");
+        if (Parameters.has("sampleStarGrowthLimitTarget"))
+            this.sampleStarGrowthLimitTarget = Parameters.getInteger("sampleStarGrowthLimitTarget");
         if (Parameters.has("sampleStarRadiusAdd"))
             this.sampleStarRadiusAdd = Parameters.getInteger("sampleStarRadiusAdd");
         if (Parameters.has("limitSampleStarsPercent"))
@@ -307,7 +310,8 @@ function PhotometricMosaicData() {
         
         // Gradient Sample Generation
         this.sampleStarGrowthRate = 1.0;
-        this.sampleStarGrowthLimit = 300;
+        this.sampleStarGrowthLimit = 50;
+        this.sampleStarGrowthLimitTarget = 300;
         this.sampleStarRadiusAdd = 1;
         this.limitSampleStarsPercent = 25;
         this.sampleSize = 20;
@@ -315,7 +319,7 @@ function PhotometricMosaicData() {
         this.useAutoSampleGeneration = true;
         
         // Gradient Correction (Overlap region)
-        this.overlapGradientSmoothness = 0;
+        this.overlapGradientSmoothness = -1;
         this.taperLength = 200;
         this.useAutoTaperLength = true;
         
@@ -381,6 +385,7 @@ function PhotometricMosaicData() {
         // Gradient Sample Generation
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(this.sampleStarGrowthRate);
         photometricMosaicDialog.sampleStarGrowthLimit_Control.setValue(this.sampleStarGrowthLimit);
+        photometricMosaicDialog.sampleStarGrowthLimitTarget_Control.setValue(this.sampleStarGrowthLimitTarget);
         photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(this.sampleStarRadiusAdd);
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
@@ -440,6 +445,7 @@ function saveSettings(data){
     // Gradient Sample Generation
     Settings.write( KEYPREFIX+"/sampleStarGrowthRate", DataType_Float, data.sampleStarGrowthRate );
     Settings.write( KEYPREFIX+"/sampleStarGrowthLimit", DataType_Int32, data.sampleStarGrowthLimit );
+    Settings.write( KEYPREFIX+"/sampleStarGrowthLimitTarget", DataType_Int32, data.sampleStarGrowthLimitTarget );
     Settings.write( KEYPREFIX+"/sampleStarRadiusAdd", DataType_Int32, data.sampleStarRadiusAdd );
     Settings.write( KEYPREFIX+"/limitSampleStarsPercent", DataType_Int32, data.limitSampleStarsPercent );
     Settings.write( KEYPREFIX+"/sampleSize", DataType_Int32, data.sampleSize );
@@ -536,6 +542,9 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthLimit", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.sampleStarGrowthLimit = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthLimitTarget", DataType_Int32 );
+    if ( Settings.lastReadOK )
+        data.sampleStarGrowthLimitTarget = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/sampleStarRadiusAdd", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.sampleStarRadiusAdd = keyValue;
@@ -828,7 +837,7 @@ function PhotometricMosaicDialog(data) {
         data.apertureBgDelta = value;
     };
     let detectedStarsButton = new PushButton(this);
-    detectedStarsButton.text = "Photometry stars";
+    detectedStarsButton.text = "Photometry stars ";
     detectedStarsButton.toolTip =
             "<p>Displays all the stars detected in the reference and target images.</p>" +
             "<p>These stars are cached until either the Photometric Mosaic dialog " +
@@ -892,18 +901,35 @@ function PhotometricMosaicDialog(data) {
     filterGroupBox.sizer.add(this.outlierRemoval_Control);
     filterGroupBox.sizer.addStretch();
     
-    let photometryButtons = new HorizontalSizer();
-    photometryButtons.spacing = 6;
-    photometryButtons.addStretch();
-    photometryButtons.add(detectedStarsButton);
-    photometryButtons.add(photometryGraphButton);
+    let starButtonGroupBox = new GroupBox(this);
+    starButtonGroupBox.title = "Edit / Display";
+    starButtonGroupBox.sizer = new HorizontalSizer(starButtonGroupBox);
+    starButtonGroupBox.sizer.margin = 2;
+    starButtonGroupBox.sizer.addSpacing(20);
+    starButtonGroupBox.sizer.add(detectedStarsButton);
+    
+    let graphButtonGroupBox = new GroupBox(this);
+    graphButtonGroupBox.title = "Edit / Display";
+    graphButtonGroupBox.sizer = new HorizontalSizer(starButtonGroupBox);
+    graphButtonGroupBox.sizer.margin = 2;
+    graphButtonGroupBox.sizer.addSpacing(20);
+    graphButtonGroupBox.sizer.add(photometryGraphButton);
+    
+    let apertureHorizSizer = new HorizontalSizer();
+    apertureHorizSizer.spacing = 10;
+    apertureHorizSizer.add(apertureGroupBox, 100);
+    apertureHorizSizer.add(starButtonGroupBox);
+    
+    let filterHorizSizer = new HorizontalSizer();
+    filterHorizSizer.spacing = 10;
+    filterHorizSizer.add(filterGroupBox, 100);
+    filterHorizSizer.add(graphButtonGroupBox);
 
     let photometrySection = new Control(this);
     photometrySection.sizer = new VerticalSizer();
-    photometrySection.sizer.add(apertureGroupBox);
-    photometrySection.sizer.add(filterGroupBox);
-    photometrySection.sizer.addSpacing(4);
-    photometrySection.sizer.add(photometryButtons);
+    photometrySection.sizer.spacing = 4;
+    photometrySection.sizer.add(apertureHorizSizer);
+    photometrySection.sizer.add(filterHorizSizer);
     let photometryBar = new SectionBar(this, "Photometry");
     photometryBar.setSection(photometrySection);
     photometryBar.onToggleSection = this.onToggleSection;
@@ -941,19 +967,26 @@ function PhotometricMosaicDialog(data) {
         data.sampleStarGrowthLimit = value;
     };
     
+    this.sampleStarGrowthLimitTarget_Control = sampleControls.createSampleStarGrowthLimitTargetEdit(this, data);
+    this.sampleStarGrowthLimitTarget_Control.onValueUpdated = function (value){
+        data.sampleStarGrowthLimitTarget = value;
+    };
+    
     this.sampleStarRadiusAdd_Control = sampleControls.createSampleStarAddEdit(this, data);
     this.sampleStarRadiusAdd_Control.onValueUpdated = function (value){
         data.sampleStarRadiusAdd = value;
     };
     
-    let sampleRejectStarGroupBox = new GroupBox(this);
-    sampleRejectStarGroupBox.title = "Star rejection radius";
-    sampleRejectStarGroupBox.sizer = new HorizontalSizer();
-    sampleRejectStarGroupBox.sizer.margin = 2;
-    sampleRejectStarGroupBox.sizer.spacing = 10;
-    sampleRejectStarGroupBox.sizer.add(this.sampleStarGrowthRate_Control);
-    sampleRejectStarGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
-    sampleRejectStarGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
+    let sampleStarRejectRadiusGroupBox = new GroupBox(this);
+    sampleStarRejectRadiusGroupBox.title = "Star rejection radius";
+    sampleStarRejectRadiusGroupBox.sizer = new HorizontalSizer();
+    sampleStarRejectRadiusGroupBox.sizer.margin = 2;
+    sampleStarRejectRadiusGroupBox.sizer.spacing = 10;
+    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthRate_Control);
+    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
+    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimitTarget_Control);
+    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
+    sampleStarRejectRadiusGroupBox.sizer.addStretch();
     
     this.sampleSize_Control = sampleControls.createSampleSizeEdit(
             this, data, sampleControls.sampleSize.range.max);
@@ -965,15 +998,8 @@ function PhotometricMosaicDialog(data) {
     sampleSizeGroupBox.title = "Samples";
     sampleSizeGroupBox.sizer = new HorizontalSizer();
     sampleSizeGroupBox.sizer.margin = 2;
-    sampleSizeGroupBox.sizer.spacing = 10;
     sampleSizeGroupBox.sizer.add(this.sampleSize_Control);
     sampleSizeGroupBox.sizer.addStretch();
-    
-    let sampleRejectStarHorizontalSizer = new HorizontalSizer();
-    sampleRejectStarHorizontalSizer.spacing = 10;
-    sampleRejectStarHorizontalSizer.add(sampleRejectStarGroupBox, 0);
-    sampleRejectStarHorizontalSizer.add(filterSampleStarsGroupBox, 0);
-    sampleRejectStarHorizontalSizer.add(sampleSizeGroupBox, 100);
     
     let displaySamplesButton = new PushButton(this);
     displaySamplesButton.text = "Display samples";
@@ -1003,10 +1029,20 @@ function PhotometricMosaicDialog(data) {
         self.setSampleGenerationAutoValues(checked);
     };
     
-    let sampleGridSizer = new HorizontalSizer(this);
-    sampleGridSizer.add(this.autoSampleGenerationCheckBox);
-    sampleGridSizer.addStretch();
-    sampleGridSizer.add(displaySamplesButton);
+    let editDisplayGroupBox = new GroupBox(this);
+    editDisplayGroupBox.title = "Edit / Display";
+    editDisplayGroupBox.sizer = new HorizontalSizer();
+    editDisplayGroupBox.sizer.margin = 2;
+    editDisplayGroupBox.sizer.spacing = 10;
+    editDisplayGroupBox.sizer.addSpacing(20);
+    editDisplayGroupBox.sizer.add(this.autoSampleGenerationCheckBox);
+    editDisplayGroupBox.sizer.add(displaySamplesButton);
+    
+    let generateSamplesHorizSizer = new HorizontalSizer();
+    generateSamplesHorizSizer.spacing = 10;
+    generateSamplesHorizSizer.add(filterSampleStarsGroupBox);
+    generateSamplesHorizSizer.add(sampleSizeGroupBox, 100);
+    generateSamplesHorizSizer.add(editDisplayGroupBox);
     
     let maxSamplesSizer;
     if (EXTRA_CONTROLS()){
@@ -1056,8 +1092,8 @@ function PhotometricMosaicDialog(data) {
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
     sampleGenerationSection.sizer.spacing = 4;
-    sampleGenerationSection.sizer.add(sampleRejectStarHorizontalSizer);
-    sampleGenerationSection.sizer.add(sampleGridSizer);
+    sampleGenerationSection.sizer.add(sampleStarRejectRadiusGroupBox);
+    sampleGenerationSection.sizer.add(generateSamplesHorizSizer);
     if (EXTRA_CONTROLS()){
         sampleGenerationSection.sizer.add(maxSamplesSizer);
     }
@@ -1079,11 +1115,15 @@ function PhotometricMosaicDialog(data) {
         data.useAutoSampleGeneration = checked;
         self.autoSampleGenerationCheckBox.checked = data.useAutoSampleGeneration;
         self.sampleStarGrowthRate_Control.enabled = !checked;
+        self.sampleStarGrowthLimit_Control.enabled = !checked;
+        self.sampleStarGrowthLimitTarget_Control.enabled = !checked;
         self.sampleStarRadiusAdd_Control.enabled = !checked;
         self.sampleSize_Control.enabled = !checked;
         if (checked){
             self.setSampleSizeAutoValue();
             self.setSampleStarGrowthRateAutoValue();
+            self.setSampleStarGrowthLimitAutoValue();
+            self.setSampleStarGrowthLimitTargetAutoValue();
             self.setSampleStarRadiusAddAutoValue();
         }
     };
@@ -1093,6 +1133,20 @@ function PhotometricMosaicDialog(data) {
             data.sampleSize = Math.max(13, Math.round(0.005 / pixelAngle));
             self.sampleSize_Control.setValue(data.sampleSize);
         } 
+    };
+    this.setSampleStarGrowthLimitAutoValue = function(){
+        if (data.useAutoSampleGeneration && data.targetView !== null){
+            let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
+            data.sampleStarGrowthLimit = Math.max(10, Math.round(0.015 / pixelAngle));
+            self.sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
+        }
+    };
+    this.setSampleStarGrowthLimitTargetAutoValue = function(){
+        if (data.useAutoSampleGeneration && data.targetView !== null){
+            let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
+            data.sampleStarGrowthLimitTarget = Math.max(10, Math.round(0.05 / pixelAngle));
+            self.sampleStarGrowthLimitTarget_Control.setValue(data.sampleStarGrowthLimitTarget);
+        }
     };
     this.setSampleStarGrowthRateAutoValue = function(){
         if (data.useAutoSampleGeneration){
@@ -1110,9 +1164,9 @@ function PhotometricMosaicDialog(data) {
     
     // SectionBar: "Gradient Sample Generation" End
 
-    // ==================================================
-    // SectionBar: "Gradient Correction (Overlap region)"
-    // ==================================================
+    // ===============================================================
+    // SectionBar: "Gradient Correction" : Group box "Overlap region"
+    // ===============================================================
     // Gradient controls
     this.overlapGradientSmoothness_Control = new NumericControl(this);
     this.overlapGradientSmoothness_Control.real = true;
@@ -1209,23 +1263,21 @@ function PhotometricMosaicDialog(data) {
     overlapGradientSizer.addSpacing(20);
     overlapGradientSizer.add(overlapGradientGraphButton);
     
-    let overlapGradientSection = new Control(this);
-    overlapGradientSection.sizer = new VerticalSizer(this);
-    overlapGradientSection.sizer.spacing = 4;
-    overlapGradientSection.sizer.add(overlapGradientSizer);
-    overlapGradientSection.sizer.add(taperLengthSizer);
-    let gradientBar = new SectionBar(this, "Gradient Correction (Overlap region)");
-    gradientBar.setSection(overlapGradientSection);
-    gradientBar.onToggleSection = this.onToggleSection;
-    gradientBar.toolTip = "<p>A surface spline is created to model the relative " +
+    let gradientOverlapGroupBox = new GroupBox(this);
+    gradientOverlapGroupBox.title = "Overlap region";
+    gradientOverlapGroupBox.sizer = new VerticalSizer();
+    gradientOverlapGroupBox.sizer.margin = 2;
+    gradientOverlapGroupBox.sizer.spacing = 4;
+    gradientOverlapGroupBox.sizer.add(overlapGradientSizer);
+    gradientOverlapGroupBox.sizer.add(taperLengthSizer);
+    gradientOverlapGroupBox.toolTip = "<p>A surface spline is created to model the relative " +
             "gradient over the whole of the overlap region.</p>" +
             "<p>Smoothing is applied to this surface spline to ensure it follows " +
             "the gradient but not the noise.</p>";
-    //SectionBar: "Gradient Correction" End
     
-    // ===============================================
-    // SectionBar: "Gradient Correction (Target image)"
-    // ===============================================
+    // =============================================================
+    // SectionBar: "Gradient Correction" : Group box "Target Image"
+    // =============================================================
     this.targetGradientSmoothness_Control = new NumericControl(this);
     this.targetGradientSmoothness_Control.real = true;
     this.targetGradientSmoothness_Control.setPrecision(1);
@@ -1267,30 +1319,43 @@ function PhotometricMosaicDialog(data) {
     
     this.setTargetGradientFlag = function (checked){
         data.useTargetGradientCorrection = checked;
-        self.targetGradientBar.checkBox.checked = checked;
+        self.gradientTargetImageGroupBox.checked = checked;
         self.targetGradientSmoothness_Control.enabled = checked;
         targetGradientGraphButton.enabled = checked;
         self.setTaperLengthAutoValue(data);
     };
     
-    let targetGradientSection = new Control(this);
-    targetGradientSection.sizer = new HorizontalSizer;
-    targetGradientSection.sizer.spacing = 10;
-    targetGradientSection.sizer.add(this.targetGradientSmoothness_Control);
-    targetGradientSection.sizer.addSpacing(20);
-    targetGradientSection.sizer.add(targetGradientGraphButton);
-    this.targetGradientBar = new SectionBar(this, "Gradient Correction (Target image)");
-    this.targetGradientBar.setSection(targetGradientSection);
-    this.targetGradientBar.enableCheckBox();
-    this.targetGradientBar.toolTip = 
+    this.gradientTargetImageGroupBox = new GroupBox(this);
+    this.gradientTargetImageGroupBox.title = "Target image";
+    this.gradientTargetImageGroupBox.titleCheckBox = true;
+    this.gradientTargetImageGroupBox.onCheck = this.setTargetGradientFlag;
+    this.gradientTargetImageGroupBox.sizer = new HorizontalSizer();
+    this.gradientTargetImageGroupBox.sizer.margin = 2;
+    this.gradientTargetImageGroupBox.sizer.spacing = 10;
+    this.gradientTargetImageGroupBox.sizer.add(this.targetGradientSmoothness_Control);
+    this.gradientTargetImageGroupBox.sizer.addSpacing(20);
+    this.gradientTargetImageGroupBox.sizer.add(targetGradientGraphButton);
+    this.gradientTargetImageGroupBox.toolTip = 
             "<p>If selected, a gradient correction is applied " +
             "to the rest of the target image (i.e. outside the overlap region).</p>" +
             "<p>If not selected, only the average background offset is applied.</p>" +
             "<p>In most situations, this option should be selected.</p>";
-    this.targetGradientBar.checkBox.onClick = this.setTargetGradientFlag;
-    this.targetGradientBar.onToggleSection = this.onToggleSection;
+    
+    let gradientSection = new Control(this);
+    gradientSection.sizer = new VerticalSizer(this);
+    gradientSection.sizer.spacing = 4;
+    gradientSection.sizer.add(gradientOverlapGroupBox);
+    gradientSection.sizer.add(this.gradientTargetImageGroupBox);
+    let gradientBar = new SectionBar(this, "Gradient Correction");
+    gradientBar.setSection(gradientSection);
+    gradientBar.onToggleSection = this.onToggleSection;
+    gradientBar.toolTip = "<p>A surface spline is created to model the relative " +
+            "gradient over the whole of the overlap region.</p>" +
+            "<p>Smoothing is applied to this surface spline to ensure it follows " +
+            "the gradient but not the noise.</p>";
+
     this.setTargetGradientFlag(data.useTargetGradientCorrection);
-    // SectionBar: "Propagated Gradient Correction" End
+    // SectionBar: "Gradient Correction" End
 
     // ===========================================
     // SectionBar: Join Region
@@ -1674,9 +1739,7 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(sampleGenerationBar);
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
-    this.sizer.add(overlapGradientSection);
-    this.sizer.add(this.targetGradientBar);
-    this.sizer.add(targetGradientSection);
+    this.sizer.add(gradientSection);
     this.sizer.add(this.mosaicBar);
     this.sizer.add(mosaicSection);
     this.sizer.addSpacing(5);

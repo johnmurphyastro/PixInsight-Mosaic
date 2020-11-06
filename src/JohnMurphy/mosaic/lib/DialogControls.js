@@ -25,7 +25,9 @@ function createNumericControl(dialog, values, strLength){
     let control = new NumericControl(dialog);
     control.real = values.real;
     control.label.text = values.text;
-    control.label.minWidth = strLength;
+    if (strLength > 0){
+        control.label.minWidth = strLength;
+    }
     control.toolTip = values.toolTip;
     control.setRange(values.range.min, values.range.max);
     control.slider.setRange(values.slider.range.min, values.slider.range.max);
@@ -368,7 +370,7 @@ function SampleControls(){
     
     this.growthLimit = {
         real: false,
-        text: "Growth Limit:",
+        text: "Growth Limit (Overlap):",
         slider: {range: {min:3, max:300}},
         range: {min:3, max:300},
         precision: 0,
@@ -395,6 +397,38 @@ function SampleControls(){
     this.createSampleStarGrowthLimitEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthLimit);
         control.setValue(data.sampleStarGrowthLimit);
+        return control;
+    };
+    
+    this.growthLimitTarget = {
+        real: false,
+        text: "Growth Limit (Target):",
+        slider: {range: {min:3, max:300}},
+        range: {min:3, max:300},
+        precision: 0,
+        maxWidth: 800,
+        toolTip: "<p>Maximum star aperture growth.</p>" +
+            "<p>Limits the aperture radius growth to this number of pixels.</p>"
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @param {Number} strLength
+     * @returns {NumericControl}
+     */
+    this.createSampleStarGrowthLimitTargetControl = function(dialog, data, strLength){
+        let control = createNumericControl(dialog, self.growthLimitTarget, strLength);
+        control.setValue(data.sampleStarGrowthLimitTarget);
+        return control;
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @returns {NumericEdit}
+     */
+    this.createSampleStarGrowthLimitTargetEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.growthLimitTarget);
+        control.setValue(data.sampleStarGrowthLimitTarget);
         return control;
     };
     

@@ -266,8 +266,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     //targetImage, referenceImage, stars, sampleRect, data
-    let sampleGridMap = data.cache.getSampleGridMap(targetView.image, referenceView.image,
-            detectedStars.allStars, overlapBox, data);
+    let sampleGridMap = data.cache.getSampleGridMap(detectedStars.allStars, data, true);
             
     if (data.viewFlag === DISPLAY_GRADIENT_SAMPLES()){
         console.writeln("\n<b><u>Displaying sample grid</u></b>");
@@ -287,7 +286,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     }
     
     let colorSamplePairs = data.cache.getSamplePairs(
-            sampleGridMap, targetView.image, referenceView.image, scaleFactors, isHorizontal, data);
+            sampleGridMap, scaleFactors, isHorizontal, data, true);
     for (let samplePairs of colorSamplePairs){
         if (samplePairs.length < 3) {
             new MessageBox("Error: Too few samples to create a Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
@@ -329,11 +328,26 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     let propagateSurfaceSplines;
     if (data.useTargetGradientCorrection && data.viewFlag !== DISPLAY_OVERLAP_GRADIENT_GRAPH()) {
+        let sampleGridMapTarget = data.cache.getSampleGridMap(detectedStars.allStars, data, false);
+        let colorSamplePairsTarget = data.cache.getSamplePairs(
+            sampleGridMapTarget, scaleFactors, isHorizontal, data, false);
+        for (let samplePairs of colorSamplePairsTarget){
+            if (samplePairs.length < 3) {
+                new MessageBox("Error: Too few samples to create a target Surface Spline.", TITLE(), StdIcon_Error, StdButton_Ok).execute();
+                return;
+            }
+        }
+        let binnedColorSamplePairsTarget = [];
+        for (let c=0; c<nChannels; c++){
+            binnedColorSamplePairsTarget[c] = createBinnedSampleGrid(overlapBox, colorSamplePairsTarget[c], 
+                    isHorizontal, data.maxSamples);
+        }
+        
         propagateSurfaceSplines = [];
         try {
             let smoothness = data.targetGradientSmoothness;
-            let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, 3);
-            propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3);
+            let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairsTarget, smoothness, 3);
+            propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairsTarget, smoothness, 3);
             consoleInfo.end();
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
@@ -344,8 +358,8 @@ function photometricMosaic(data, photometricMosaicDialog)
         if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()) {
             // This gradient is important after the edge of the overlap box
             GradientGraph(targetView.image, isHorizontal, isTargetAfterRef,
-                    joinRect, colorSamplePairs, photometricMosaicDialog,
-                    data, binnedColorSamplePairs);
+                    joinRect, colorSamplePairsTarget, photometricMosaicDialog,
+                    data, binnedColorSamplePairsTarget);
             return;
         }
     } else {

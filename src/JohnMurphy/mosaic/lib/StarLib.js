@@ -895,13 +895,14 @@ function calcStarMaskRadius(star, data){
 /**
  * @param {Star} star
  * @param {PhotometricMosaicData} data
+ * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
  * @returns {Number} Star radius
  */
-function calcSampleStarRejectionRadius(star, data){
+function calcSampleStarRejectionRadius(star, data, growthLimit){
     let starBox = star.getBoundingBox();
     let r = Math.max(starBox.width, starBox.height) / 2;
     let delta = calcApertureCorrection(data.sampleStarRadiusAdd, 
-            data.sampleStarGrowthRate, data.sampleStarGrowthLimit, star.getStarFlux());
+            data.sampleStarGrowthRate, growthLimit, star.getStarFlux());
     return r + delta;
 }
 

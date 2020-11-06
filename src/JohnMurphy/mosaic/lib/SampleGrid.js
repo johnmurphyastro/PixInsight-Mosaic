@@ -40,15 +40,16 @@ function SamplePair(targetMedian, referenceMedian, rect) {
 // ============ Algorithms ============
 /**
  * Create SamplePair[] for each color channel
- * @param {Image} targetImage
- * @param {Image} referenceImage
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
- * @param {Rect} sampleRect Reject samples outside this area (overlap bounding box)
  * @param {PhotometricMosaicData} data User settings
+ * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
  * @returns {SampleGridMap} Map of sample squares (all color channels)
  */
-function createSampleGridMap(targetImage, referenceImage, stars, sampleRect, data) {
-
+function createSampleGridMap(stars, data, growthLimit) {
+    // data.targetView.image, data.referenceView.image, data.cache.overlap.overlapBox
+    let targetImage = data.targetView.image;
+    let referenceImage = data.referenceView.image;
+    let sampleRect = data.cache.overlap.overlapBox;
     let firstNstars;
     if (data.limitSampleStarsPercent < 100){
         firstNstars = Math.floor(stars.length * data.limitSampleStarsPercent / 100);
@@ -59,8 +60,8 @@ function createSampleGridMap(targetImage, referenceImage, stars, sampleRect, dat
     // Create colorSamplePairs with empty SamplePairsArrays
     let nChannels = referenceImage.isColor ? 3 : 1;
     let sampleGridMap = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
-    sampleGridMap.addSampleBins(targetImage, referenceImage, data.linearRange);
-    sampleGridMap.removeBinRectWithStars(stars, data, firstNstars);
+    sampleGridMap.addSampleBins(targetImage, referenceImage);
+    sampleGridMap.removeBinRectWithStars(stars, data, firstNstars, growthLimit);
     
     return sampleGridMap;
 }
@@ -118,15 +119,14 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * Reject bins with one or more zero pixels.
      * @param {Image} targetImage
      * @param {Image} referenceImage
-     * @param {Number} rejectHigh TODO Not currently used
      * @returns {undefined}
      */
-    this.addSampleBins = function(targetImage, referenceImage, rejectHigh){
+    this.addSampleBins = function(targetImage, referenceImage){
         let xMax = getNumberOfColumns();
         let yMax = getNumberOfRows();
         for (let xKey = 0; xKey < xMax; xKey++){
             for (let yKey = 0; yKey < yMax; yKey++){
-                addBinRect(targetImage, referenceImage, xKey, yKey, rejectHigh);
+                addBinRect(targetImage, referenceImage, xKey, yKey);
             }
         }
     };
@@ -136,14 +136,15 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @param {Star[]} stars Must be sorted by flux before calling this function
      * @param {PhotometricMosaicData} data 
      * @param {Number} firstNstars Only use this number of the brightest stars
+     * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
      */
-    this.removeBinRectWithStars = function(stars, data, firstNstars){
+    this.removeBinRectWithStars = function(stars, data, firstNstars, growthLimit){
         for (let i=0; i<firstNstars; i++){
             let star = stars[i];
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
             // Increase protection for saturated or almost saturated stars
-            let starRadius = calcSampleStarRejectionRadius(star, data);
+            let starRadius = calcSampleStarRejectionRadius(star, data, growthLimit);
             removeBinsInCircle(star.pos, starRadius);
         }
     };
@@ -243,7 +244,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
         return "" + xKey + "," + yKey;
     }
     
-    /** TODO rejectHigh not currently used
+    /**
      * If the specified bin does not contain pixels that are zero or > rejectHigh
      * add an entry to our binRect map. If the sample contains a 
      * pixel > rejectHigh save it to a 'too bright' map, with the coordinate of 
@@ -253,9 +254,8 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @param {Image} refImage
      * @param {Number} xKey Nth sample in x direction (starting at zero)
      * @param {Number} yKey Nth sample in y direction (starting at zero)
-     * @param {Number} rejectHigh Reject samples with pixels greater than this TODO
      */
-    function addBinRect(tgtImage, refImage, xKey, yKey, rejectHigh){
+    function addBinRect(tgtImage, refImage, xKey, yKey){
         let nChannels = binRectMapArray_.length;
         let binRect = new Rect(binSize_, binSize_);
         binRect.moveTo(getX(xKey), getY(yKey));
