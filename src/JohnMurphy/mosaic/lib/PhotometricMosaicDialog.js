@@ -313,7 +313,7 @@ function PhotometricMosaicData() {
         this.sampleStarGrowthLimit = 50;
         this.sampleStarGrowthLimitTarget = 300;
         this.sampleStarRadiusAdd = 1;
-        this.limitSampleStarsPercent = 25;
+        this.limitSampleStarsPercent = 35;
         this.sampleSize = 20;
         this.maxSamples = 3000;
         this.useAutoSampleGeneration = true;
@@ -354,11 +354,9 @@ function PhotometricMosaicData() {
         // Star Detection
         photometricMosaicDialog.logStarDetection_Control.setValue(this.logStarDetection);
         
-        if (EXTRA_CONTROLS()){
-            // Photometric Star Search
-            photometricMosaicDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
-            photometricMosaicDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
-        }
+        // Photometric Star Search
+        photometricMosaicDialog.starFluxTolerance_Control.setValue(this.starFluxTolerance);
+        photometricMosaicDialog.starSearchRadius_Control.setValue(this.starSearchRadius);
         
         // Photometric Scale
         photometricMosaicDialog.apertureGrowthRate_Control.setValue(this.apertureGrowthRate);
@@ -424,11 +422,9 @@ function saveSettings(data){
     // Star Detection
     Settings.write( KEYPREFIX+"/starDetection", DataType_Float, data.logStarDetection );
     
-    if (EXTRA_CONTROLS()){
         // Photometric Star Search
-        Settings.write( KEYPREFIX+"/starFluxTolerance", DataType_Float, data.starFluxTolerance );
-        Settings.write( KEYPREFIX+"/starSearchRadius", DataType_Float, data.starSearchRadius );
-    }
+    Settings.write( KEYPREFIX+"/starFluxTolerance", DataType_Float, data.starFluxTolerance );
+    Settings.write( KEYPREFIX+"/starSearchRadius", DataType_Float, data.starSearchRadius );
 
     // Photometric Scale
     Settings.write( KEYPREFIX+"/apertureGrowthRate", DataType_Float, data.apertureGrowthRate );
@@ -497,15 +493,13 @@ function restoreSettings(data){
     if ( Settings.lastReadOK )
         data.logStarDetection = keyValue;
     
-    if (EXTRA_CONTROLS()){
-        // Photometric Star Search
-        keyValue = Settings.read( KEYPREFIX+"/starFluxTolerance", DataType_Float );
-        if ( Settings.lastReadOK )
-            data.starFluxTolerance = keyValue;
-        keyValue = Settings.read( KEYPREFIX+"/starSearchRadius", DataType_Float );
-        if ( Settings.lastReadOK )
-            data.starSearchRadius;
-    }
+    // Photometric Star Search
+    keyValue = Settings.read( KEYPREFIX+"/starFluxTolerance", DataType_Float );
+    if ( Settings.lastReadOK )
+        data.starFluxTolerance = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/starSearchRadius", DataType_Float );
+    if ( Settings.lastReadOK )
+        data.starSearchRadius;
     
     // Photometric Scale
     keyValue = Settings.read( KEYPREFIX+"/apertureGrowthRate", DataType_Float );
@@ -700,6 +694,8 @@ function PhotometricMosaicDialog(data) {
         data.targetView = view;
         self.setSampleSizeAutoValue();
         self.setTaperLengthAutoValue(data);
+        self.setSampleStarGrowthLimitAutoValue();
+        self.setSampleStarGrowthLimitTargetAutoValue();
     };
 
     let targetImage_Sizer = new HorizontalSizer(this);
@@ -749,67 +745,66 @@ function PhotometricMosaicDialog(data) {
     
     let photometrySearchSection;
     let photometrySearchBar;
-    if (EXTRA_CONTROLS()){
-        // =======================================
-        // SectionBar: "Photometric Star Search"
-        // =======================================
-        const labelWidth = Math.max(
-                this.font.width("Star flux tolerance:"), 
-                this.font.width("Star search radius:"));
-        this.starFluxTolerance_Control = new NumericControl(this);
-        this.starFluxTolerance_Control.real = true;
-        this.starFluxTolerance_Control.label.text = "Star flux tolerance:";
-        this.starFluxTolerance_Control.toolTip =
-                "<p>Star flux tolerance is used to prevent invalid target to reference " +
-                "star matches. Smaller values reject more matches.</p>" +
-                "<p>Star matches are rejected if the difference in star flux " +
-                "is larger than expected. The algorithm first calculates the average scale difference, " +
-                "and then rejects matches if their brightness ratio is greater than " +
-                "(expected ratio * tolerance) or smaller than (expected ratio / tolerance)</p>" +
-                "<p>1.0 implies the star flux ratio must exactly match the expected ratio.</p>" +
-                "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>" +
-                "<p>You usually don't need to modify this parameter.</p>";
-        this.starFluxTolerance_Control.label.minWidth = labelWidth;
-        this.starFluxTolerance_Control.setRange(1.01, 2);
-        this.starFluxTolerance_Control.slider.setRange(100, 200);
-        this.starFluxTolerance_Control.setPrecision(2);
-        this.starFluxTolerance_Control.slider.minWidth = 100;
-        this.starFluxTolerance_Control.setValue(data.starFluxTolerance);
-        this.starFluxTolerance_Control.onValueUpdated = function (value) {
-            data.starFluxTolerance = value;
-        };
 
-        this.starSearchRadius_Control = new NumericControl(this);
-        this.starSearchRadius_Control.real = true;
-        this.starSearchRadius_Control.label.text = "Star search radius:";
-        this.starSearchRadius_Control.toolTip =
-                "<p>Search radius used to match the reference and target stars. " +
-                "Larger values find more photometric stars but at the risk of matching " +
-                "the wrong star or even matching noise.</p>" +
-                "<p>You usually don't need to modify this parameter.</p>";
+    // =======================================
+    // SectionBar: "Photometric Star Search"
+    // =======================================
+    const labelWidth = Math.max(
+            this.font.width("Star flux tolerance:"), 
+            this.font.width("Star search radius:"));
+    this.starFluxTolerance_Control = new NumericControl(this);
+    this.starFluxTolerance_Control.real = true;
+    this.starFluxTolerance_Control.label.text = "Star flux tolerance:";
+    this.starFluxTolerance_Control.toolTip =
+            "<p>Star flux tolerance is used to prevent invalid target to reference " +
+            "star matches. Smaller values reject more matches.</p>" +
+            "<p>Star matches are rejected if the difference in star flux " +
+            "is larger than expected. The algorithm first calculates the average scale difference, " +
+            "and then rejects matches if their brightness ratio is greater than " +
+            "(expected ratio * tolerance) or smaller than (expected ratio / tolerance)</p>" +
+            "<p>1.0 implies the star flux ratio must exactly match the expected ratio.</p>" +
+            "<p>2.0 implies that the ratio can be double or half the expected ratio.</p>" +
+            "<p>You usually don't need to modify this parameter.</p>";
+    this.starFluxTolerance_Control.label.minWidth = labelWidth;
+    this.starFluxTolerance_Control.setRange(1.01, 2);
+    this.starFluxTolerance_Control.slider.setRange(100, 200);
+    this.starFluxTolerance_Control.setPrecision(2);
+    this.starFluxTolerance_Control.slider.minWidth = 100;
+    this.starFluxTolerance_Control.setValue(data.starFluxTolerance);
+    this.starFluxTolerance_Control.onValueUpdated = function (value) {
+        data.starFluxTolerance = value;
+    };
 
-        this.starSearchRadius_Control.label.minWidth = labelWidth;
-        this.starSearchRadius_Control.setRange(1, 10);
-        this.starSearchRadius_Control.slider.setRange(1, 100);
-        this.starSearchRadius_Control.setPrecision(1);
-        this.starSearchRadius_Control.slider.minWidth = 100;
-        this.starSearchRadius_Control.setValue(data.starSearchRadius);
-        this.starSearchRadius_Control.onValueUpdated = function (value) {
-            data.starSearchRadius = value;
-        };
+    this.starSearchRadius_Control = new NumericControl(this);
+    this.starSearchRadius_Control.real = true;
+    this.starSearchRadius_Control.label.text = "Star search radius:";
+    this.starSearchRadius_Control.toolTip =
+            "<p>Search radius used to match the reference and target stars. " +
+            "Larger values find more photometric stars but at the risk of matching " +
+            "the wrong star or even matching noise.</p>" +
+            "<p>You usually don't need to modify this parameter.</p>";
 
-        photometrySearchSection = new Control(this);
-        photometrySearchSection.sizer = new VerticalSizer;
-        photometrySearchSection.sizer.spacing = 4;
-        photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
-        photometrySearchSection.sizer.add(this.starSearchRadius_Control);
-        photometrySearchBar = new SectionBar(this, "Photometric Star Search");
-        photometrySearchBar.setSection(photometrySearchSection);
-        photometrySearchBar.onToggleSection = this.onToggleSection;
-        photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
-                "<p>The default settings usually work well.</p>";
-        // SectionBar: "Photometric Star Search" End
-    }
+    this.starSearchRadius_Control.label.minWidth = labelWidth;
+    this.starSearchRadius_Control.setRange(1, 10);
+    this.starSearchRadius_Control.slider.setRange(1, 100);
+    this.starSearchRadius_Control.setPrecision(1);
+    this.starSearchRadius_Control.slider.minWidth = 100;
+    this.starSearchRadius_Control.setValue(data.starSearchRadius);
+    this.starSearchRadius_Control.onValueUpdated = function (value) {
+        data.starSearchRadius = value;
+    };
+
+    photometrySearchSection = new Control(this);
+    photometrySearchSection.sizer = new VerticalSizer;
+    photometrySearchSection.sizer.spacing = 4;
+    photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
+    photometrySearchSection.sizer.add(this.starSearchRadius_Control);
+    photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+    photometrySearchBar.setSection(photometrySearchSection);
+    photometrySearchBar.onToggleSection = this.onToggleSection;
+    photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
+            "<p>The default settings usually work well.</p>";
+    // SectionBar: "Photometric Star Search" End
     
     // =======================================
     // SectionBar: "Photometry"
@@ -1002,7 +997,7 @@ function PhotometricMosaicDialog(data) {
     sampleSizeGroupBox.sizer.addStretch();
     
     let displaySamplesButton = new PushButton(this);
-    displaySamplesButton.text = "Display samples";
+    displaySamplesButton.text = "Sample generation";
     displaySamplesButton.toolTip =
             "<p>Edit parameters and view the grid of samples in real time.</p>" +
             "<p>A surface spline is constructed from these samples to " +
@@ -1130,22 +1125,36 @@ function PhotometricMosaicDialog(data) {
     this.setSampleSizeAutoValue = function(){
         if (data.useAutoSampleGeneration && data.targetView !== null){
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            data.sampleSize = Math.max(13, Math.round(0.005 / pixelAngle));
+            // Make sure we sample at least 70 x 70 microns on the sensor
+            let minSampleSize = Math.round(70 / getPixelSize(data.targetView, 5));
+            minSampleSize = Math.max(minSampleSize, self.sampleSize_Control.lowerBound);
+            // 0.005 deg = 18 arcsec (18 >> than than 4 arcsecond seeing)
+            let size = Math.max(minSampleSize, Math.round(0.005 / pixelAngle));
+            size = Math.min(size, self.sampleSize_Control.upperBound);
+            data.sampleSize = size;
             self.sampleSize_Control.setValue(data.sampleSize);
         } 
     };
     this.setSampleStarGrowthLimitAutoValue = function(){
         if (data.useAutoSampleGeneration && data.targetView !== null){
+            // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            data.sampleStarGrowthLimit = Math.max(10, Math.round(0.015 / pixelAngle));
+            // 0.015 deg = 54 arcsec
+            let limit = Math.max(3, Math.round(0.015 / pixelAngle));
+            limit = Math.min(limit, self.sampleStarGrowthLimit_Control.upperBound);
+            data.sampleStarGrowthLimit = limit;
             self.sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
         }
     };
     this.setSampleStarGrowthLimitTargetAutoValue = function(){
         if (data.useAutoSampleGeneration && data.targetView !== null){
+            // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            data.sampleStarGrowthLimitTarget = Math.max(10, Math.round(0.05 / pixelAngle));
-            self.sampleStarGrowthLimitTarget_Control.setValue(data.sampleStarGrowthLimitTarget);
+            // 0.05 = 180 arcsec
+            let limit = Math.max(3, Math.round(0.05 / pixelAngle));
+            limit = Math.min(limit, self.sampleStarGrowthLimitTarget_Control.upperBound);
+            data.sampleStarGrowthLimitTarget = limit;
+            self.sampleStarGrowthLimitTarget_Control.setValue(limit);
         }
     };
     this.setSampleStarGrowthRateAutoValue = function(){
@@ -1239,12 +1248,15 @@ function PhotometricMosaicDialog(data) {
         if (data.useAutoTaperLength){
             let taperLength;
             if (data.useTargetGradientCorrection){
+                // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
+                // 0.075 deg = 270 arcsec
                 let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-                taperLength = Math.max(100, Math.round(0.075 / pixelAngle));
+                taperLength = Math.max(10, Math.round(0.075 / pixelAngle));
             } else {
                 // No target image gradient correction. This requires a longer tager
                 taperLength = 1000;
             }
+            taperLength = Math.min(taperLength, self.taperLength_Control.upperBound);
             data.taperLength = taperLength;
             self.taperLength_Control.setValue(data.taperLength);
         }
@@ -1727,11 +1739,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(selectViewSection);
     this.sizer.add(starDetectionBar);
     this.sizer.add(starDetectionSection);
-    if (EXTRA_CONTROLS()){
-        this.sizer.add(photometrySearchBar);
-        this.sizer.add(photometrySearchSection);
-        photometrySearchSection.hide();
-    }
+    this.sizer.add(photometrySearchBar);
+    this.sizer.add(photometrySearchSection);
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
     this.sizer.add(joinRegionBar);
@@ -1746,6 +1755,7 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(buttons_Sizer);
     
     starDetectionSection.hide();
+    photometrySearchSection.hide();
     joinRegionSection.hide();
 
     //-------------------------------------------------------

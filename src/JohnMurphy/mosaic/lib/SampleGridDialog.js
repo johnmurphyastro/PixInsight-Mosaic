@@ -128,9 +128,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             }
             graphics.antialiasing = true;
             if (drawOverlapRejectionFlag){
-                graphics.pen = new Pen(0xffff0000, 1.5);
+                graphics.pen = new Pen(0xffff0000, 1.0);
             } else  {
-                graphics.pen = new Pen(0xff0000ff, 1.5);
+                graphics.pen = new Pen(0xff0000ff, 1.0);
             }
             let growthLimit = drawOverlapRejectionFlag ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
             for (let i = 0; i < firstNstars; ++i){
@@ -261,7 +261,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     
     let displayOverlapRejectionCheckBox = new CheckBox(this);
-    displayOverlapRejectionCheckBox.text = "Display overlap rejection";
+    displayOverlapRejectionCheckBox.text = "Overlap rejection";
     displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for either overlap correction " +
             "or the target image correction.</p>" +
             "<p>Overlap correction: Aim to reject samples that contain bright stars or filter halos. " +
@@ -441,7 +441,6 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     optionsSizer.add(autoCheckBox);
     optionsSizer.addSpacing(20);
     optionsSizer.add(refCheckBox);
-    optionsSizer.addSpacing(20);
     optionsSizer.addSpacing(20);
     optionsSizer.add(displayOverlapRejectionCheckBox);
     optionsSizer.addStretch();

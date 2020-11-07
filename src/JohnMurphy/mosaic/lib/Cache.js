@@ -155,7 +155,7 @@ function MosaicCache() {
     this.getSurfaceSpline = function (data, samplePairs, logSmoothing, channel, isOverlapSampleGrid){
         let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
         let key = getSampleKey(data, growthLimit);
-        key += data.maxSamples + "_" + logSmoothing + "_";
+        key += data.maxSamples + "_" + logSmoothing + "_" + channel + "_";
         
         let value = this.surfaceSplineMap.get(key);
         if (value === undefined){

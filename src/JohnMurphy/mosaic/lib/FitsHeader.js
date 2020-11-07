@@ -118,6 +118,19 @@ function searchFitsHistory(view, word){
 }
 
 /**
+ * @param {View} view
+ * @param {Number} defaultValue This value will be returned if XPIXSZ header entry is not found.
+ * @returns {Number} Pixel size in microns
+ */
+function getPixelSize(view, defaultValue){
+    for (let fitsKeyword of view.window.keywords) {
+        if (fitsKeyword.name === "XPIXSZ")
+            return fitsKeyword.numericValue;
+    }
+    return defaultValue;
+}
+
+/**
  * If the FITS header contains the CDELT1 keyword, its value is returned.
  * Otherwise, the supplied default is returned.
  * @param {View} view

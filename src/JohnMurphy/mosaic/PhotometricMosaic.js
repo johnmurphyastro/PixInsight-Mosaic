@@ -279,7 +279,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         let overlap = data.cache.overlap;
         let refBitmap = extractOverlapImage(referenceView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
-        let dialog = new SampleGridDialog("SampleGrid", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
+        let dialog = new SampleGridDialog("Sample Generation", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
                 data, maxSampleSize, joinPath, targetSide, photometricMosaicDialog);
         dialog.execute();
         return;

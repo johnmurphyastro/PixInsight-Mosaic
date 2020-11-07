@@ -160,7 +160,7 @@ function PhotometryControls(){
         real: true,
         text: "Growth rate:",
         slider: {range: {min:0, max:300}},
-        range: {min:0, max:30},
+        range: {min:0, max:3},
         precision: 2,
         maxWidth: 800,
         toolTip: "<p>Aperture radius growth rate.</p>" +
@@ -339,7 +339,7 @@ function SampleControls(){
         real: true,
         text: "Growth rate:",
         slider: {range: {min:0, max:300}},
-        range: {min:0, max:30},
+        range: {min:0, max:3},
         precision: 2,
         maxWidth: 800,
         toolTip: "<p>Increase to reject more samples around saturated stars.</p>" +
