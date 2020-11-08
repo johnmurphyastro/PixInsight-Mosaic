@@ -651,7 +651,10 @@ function calculateScale(starPairs) {
     for (let starPair of starPairs) {
         leastSquareFit.addValue(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux());
     }
-    return leastSquareFit.getOriginFit();
+    if (starPairs.length < 9){
+        return leastSquareFit.getOriginFit();
+    }
+    return leastSquareFit.getLinearFit();
 }
 
 /**
@@ -669,7 +672,7 @@ function removeStarPairOutlier(starPairs, linearFit){
         let x = starPair.tgtStar.getStarFlux();
         let y = starPair.refStar.getStarFlux();
         let perpDist = Math.abs(
-                (y - linearFit.m * x + linearFit.b) / Math.sqrt(linearFit.m * linearFit.m + 1));
+                (linearFit.m * x - y + linearFit.b) / Math.sqrt(linearFit.m * linearFit.m + 1));
         if (perpDist > maxErr){
             maxErr = perpDist;
             removeStarPairIdx = i;
