@@ -44,7 +44,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let selectedChannel_ = 3;
     let useSmallPoints = false;
     let createZoomedGraph_ = createZoomedGraph;
-    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel, useSmallPoints);
+    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel_, useSmallPoints);
     
     /**
      * Converts bitmap (x,y) into graph coordinates.
@@ -112,7 +112,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
      */
     function update(width, height){
         try {
-            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel, useSmallPoints);
+            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel_, useSmallPoints);
             bitmapControl.repaint();    // display the zoomed graph bitmap
         } catch (e) {
             console.criticalln("Graph update error: " + e);
