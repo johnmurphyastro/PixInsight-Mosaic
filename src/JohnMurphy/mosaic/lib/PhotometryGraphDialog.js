@@ -42,8 +42,9 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let self = this;
     let zoom_ = 1;
     let selectedChannel_ = 3;
+    let useSmallPoints = false;
     let createZoomedGraph_ = createZoomedGraph;
-    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel_);
+    let graph_ = createZoomedGraph_(zoom_, width, height, selectedChannel, useSmallPoints);
     
     /**
      * Converts bitmap (x,y) into graph coordinates.
@@ -111,7 +112,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
      */
     function update(width, height){
         try {
-            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel_);
+            graph_ = createZoomedGraph_(getZoomFactor(), width, height, selectedChannel, useSmallPoints);
             bitmapControl.repaint();    // display the zoomed graph bitmap
         } catch (e) {
             console.criticalln("Graph update error: " + e);
@@ -165,6 +166,9 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             this.adjustToContents();
         }  else {
             bitmapControl.setMinHeight(minHeight);
+            let maxDialogHeight = self.logicalPixelsToPhysical(1150);
+            if (self.height > maxDialogHeight)
+                self.resize(self.width, maxDialogHeight);
         }
     };
     
@@ -256,7 +260,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         selectedChannel_ = 0;
         self.enabled = false;
         processEvents();
-        update(bitmapControl.width, bitmapControl.height, true);
+        update(bitmapControl.width, bitmapControl.height);
         self.enabled = true;
     };
     
@@ -270,7 +274,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         selectedChannel_ = 1;
         self.enabled = false;
         processEvents();
-        update(bitmapControl.width, bitmapControl.height, true);
+        update(bitmapControl.width, bitmapControl.height);
         self.enabled = true;
     };
     
@@ -284,7 +288,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         selectedChannel_ = 2;
         self.enabled = false;
         processEvents();
-        update(bitmapControl.width, bitmapControl.height, true);
+        update(bitmapControl.width, bitmapControl.height);
         self.enabled = true;
     };
     
@@ -296,7 +300,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         selectedChannel_ = 3;
         self.enabled = false;
         processEvents();
-        update(bitmapControl.width, bitmapControl.height, true);
+        update(bitmapControl.width, bitmapControl.height);
         self.enabled = true;
     };
     
@@ -306,6 +310,18 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         blueRadioButton.enabled = false;
     }
     
+    let smallPoints = new CheckBox(this);
+    smallPoints.text = "Small points";
+    smallPoints.toolTip = "Use a dot instead of '+' to represent data points.";
+    smallPoints.checked = useSmallPoints;
+    smallPoints.onClick = function (checked) {
+        useSmallPoints = checked;
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height);
+        self.enabled = true;
+    };
+    
     let color_Sizer = new HorizontalSizer(this);
     color_Sizer.margin = 0;
     color_Sizer.spacing = 10;
@@ -314,6 +330,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     color_Sizer.add(greenRadioButton);
     color_Sizer.add(blueRadioButton);
     color_Sizer.add(allRadioButton);
+    color_Sizer.addSpacing(10);
+    color_Sizer.add(smallPoints);
     color_Sizer.addStretch();
     
     controlsHeight += redRadioButton.height;
@@ -445,6 +463,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     this.sizer.add(filterBar);
     this.sizer.add(filterSection);
     this.sizer.add(zoomButton_Sizer);
+    apertureSection.hide();
     
     controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 5;
     //controlsHeight += this.sizer.margin * 2 + this.sizer.spacing * 6;
@@ -453,8 +472,6 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let preferredWidth = width + this.sizer.margin * 2;
     let preferredHeight = height + controlsHeight;
     this.resize(preferredWidth, preferredHeight);
-    apertureSection.hide();
-    
     this.setScaledMinSize(300, 300);
     this.windowTitle = title + " 1:1";
 }

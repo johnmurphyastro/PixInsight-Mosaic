@@ -1858,16 +1858,6 @@ function main() {
                 StdIcon_Warning, StdButton_Ignore, StdButton_Abort);
         };
         
-        if (checkedTgtViewId !== data.targetView.fullId && 
-                !(searchFitsHistory(data.targetView, TRIM_NAME()) || searchFitsHistory(data.targetView, "TrimImage"))){
-            console.warningln("Warning: '" + data.targetView.fullId + "' has not been trimmed by the " + TRIM_NAME() + " script");
-            if (getTrimMessageBox(data.targetView).execute() === StdButton_Abort){
-                console.warningln("Aborted. Use " + TRIM_NAME() + " script to errode pixels from the registered image edges.");
-                return;
-            } else {
-                checkedTgtViewId = data.targetView.fullId;
-            }
-        }
         if (checkedRefViewId !== data.referenceView.fullId && 
                 !(searchFitsHistory(data.referenceView, TRIM_NAME()) || searchFitsHistory(data.referenceView, "TrimImage"))){
             console.warningln("Warning: '" + data.referenceView.fullId + "' has not been trimmed by the " + TRIM_NAME() + " script");
@@ -1877,6 +1867,30 @@ function main() {
             } else {
                 checkedRefViewId = data.referenceView.fullId;
             }
+        }
+        
+        if (checkedTgtViewId !== data.targetView.fullId){
+            if (!(searchFitsHistory(data.targetView, TRIM_NAME()) || searchFitsHistory(data.targetView, "TrimImage"))){
+                console.warningln("Warning: '" + data.targetView.fullId + "' has not been trimmed by the " + TRIM_NAME() + " script");
+                if (getTrimMessageBox(data.targetView).execute() === StdButton_Abort){
+                    console.warningln("Aborted. Use " + TRIM_NAME() + " script to errode pixels from the registered image edges.");
+                    return;
+                }
+            }
+            if (!searchFits(data.targetView, "CDELT1") || !searchFits(data.targetView, "XPIXSZ")){
+                let msg = "<p>Unable to find an ImageSolver header entry ('CDELT1' or 'XPIXSZ').</p>" +
+                        "<p>The 'auto' default settings should not be relied upon.</p>";
+                let response = (new MessageBox(msg, "Missing header entry 'CDELT1' or 'XPIXSZ'",
+                    StdIcon_Warning, StdButton_Ignore, StdButton_Abort)).execute();
+                let consoleMsg = "Failed to find an ImageSolver header entry ('CDELT1' or 'XPIXSZ')";
+                if (response === StdButton_Abort){
+                    console.warningln("Aborted. " + consoleMsg);
+                    return;
+                } else {
+                    console.warningln(consoleMsg);
+                }
+            }
+            checkedTgtViewId = data.targetView.fullId;
         }
 
         // Run the script

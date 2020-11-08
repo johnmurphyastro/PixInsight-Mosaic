@@ -719,6 +719,7 @@ function StarMinMax() {
  */
 function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosaicDialog){
     let nChannels = refView.image.isColor ? 3 : 1;
+    let useCrosses = true;
     let preserveAspectRatio = true;
     {   // Constructor
         // The ideal width and height ratio depends on the graph line's gradient
@@ -744,9 +745,11 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
      * @param {Number} width
      * @param {Number} height
      * @param {Number} selectedChannel R=0, G=1, B=2, All=3
+     * @param {Boolean} smallPoints If true, draw points instead of crosses
      * @returns {Graph}
      */
-    function createZoomedGraph(factor, width, height, selectedChannel){
+    function createZoomedGraph(factor, width, height, selectedChannel, smallPoints){
+        useCrosses = !smallPoints;
         let colorStarPairs = detectedStars.getColorStarPairs(nChannels, data);
         let scaleFactors = getScaleFactors(colorStarPairs);
         let graph = createGraph(refView.fullId, tgtView.fullId, width, height, 
@@ -779,7 +782,11 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
     function drawStarLineAndPoints(graph, lineColor, starPairs, linearFit, pointColor){
         graph.drawLine(linearFit.m, linearFit.b, lineColor);
         for (let starPair of starPairs){
-            graph.drawPoint(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux(), pointColor);
+            if (useCrosses){
+                graph.drawCross(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux(), pointColor);
+            } else {
+                graph.drawPoint(starPair.tgtStar.getStarFlux(), starPair.refStar.getStarFlux(), pointColor);
+            }
         }
     };
     

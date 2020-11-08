@@ -119,6 +119,19 @@ function searchFitsHistory(view, word){
 
 /**
  * @param {View} view
+ * @param {String} name Header name
+ * @returns {Boolean} True if the header exists
+ */
+function searchFits(view, name){
+    for (let fitsKeyword of view.window.keywords) {
+        if (fitsKeyword.name === name)
+            return true;
+    }
+    return false;
+}
+
+/**
+ * @param {View} view
  * @param {Number} defaultValue This value will be returned if XPIXSZ header entry is not found.
  * @returns {Number} Pixel size in microns
  */

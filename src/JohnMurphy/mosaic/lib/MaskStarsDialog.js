@@ -257,6 +257,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         self.enabled = true;
     };
     
+    previewControl.cancel_Button.text = "Close";
     previewControl.cancel_Button.toolTip = "<p>Close dialog</p>";
     previewControl.cancel_Button.onClick = function(){
         self.ok();
