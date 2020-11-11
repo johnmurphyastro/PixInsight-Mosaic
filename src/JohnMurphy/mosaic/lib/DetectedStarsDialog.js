@@ -315,9 +315,8 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     
     let photometricCheckBox = new CheckBox(this);
     photometricCheckBox.text = "Photometry";
-    photometricCheckBox.toolTip = "<p>Indicates the stars that will be used for photometry.</p>" +
-            "<p>These stars were found in both the target and reference images, " +
-            "and were not rejected by the settings in the photometry section.</p>";
+    photometricCheckBox.toolTip = "<p>Display either the detected stars (circles) " +
+            "or the stars used for photometry (square aperture rings).</p>";
     photometricCheckBox.checked = true;
     photometricCheckBox.onClick = function (checked) {
         starPairs = getStarPairs(selectedChannel);
@@ -341,7 +340,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
-    redRadioButton.toolTip = "Display the stars detected within the red channel";
+    redRadioButton.toolTip = "<p>Display the stars detected within the red channel</p>" +
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
         selectedChannel = 0;
@@ -352,7 +353,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
-    greenRadioButton.toolTip = "Display the stars detected within the green channel";
+    greenRadioButton.toolTip = "<p>Display the stars detected within the green channel</p>" +
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
         selectedChannel = 1;
@@ -363,7 +366,9 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
-    blueRadioButton.toolTip = "Display the stars detected within the blue channel";
+    blueRadioButton.toolTip = "<p>Display the stars detected within the blue channel</p>" +
+            "<p>This is only used to unclutter the display. " +
+            "The settings will be applied to all color channels.</p>";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {
         selectedChannel = 2;
@@ -447,6 +452,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     let apertureSection = new Control(this);
     apertureSection.sizer = new VerticalSizer;
     apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(apertureAdd_Control);
     apertureSection.sizer.add(apertureGrowthRate_Control);
     if (EXTRA_CONTROLS()){
         let apertureGrowthLimit_Control = photometryControls.createApertureGrowthLimitControl(
@@ -461,7 +467,6 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         controlsHeight += apertureGrowthLimit_Control.height;
         apertureSection.sizer.add(apertureGrowthLimit_Control);
     }
-    apertureSection.sizer.add(apertureAdd_Control);
     apertureSection.sizer.add(apertureBgDelta_Control);
     let apertureBar = new SectionBar(this, "Star Aperture Size");
     apertureBar.setSection(apertureSection);

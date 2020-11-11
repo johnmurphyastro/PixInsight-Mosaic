@@ -1,3 +1,5 @@
+/* global StdIcon_Error, StdButton_Ok */
+
 // Version 1.0 (c) John Murphy 22nd-April-2020
 //
 // ======== #license ===============================================================
@@ -472,4 +474,60 @@ function Overlap(refImage, tgtImage){
     }
     
     construct(this.refBox, this.tgtBox);
+}
+
+/**
+ * Creates a JoinRegion
+ * @param {PhotometricMosaicData} data
+ */
+function JoinRegion(data){
+    let overlapBox = data.cache.overlap.overlapBox;
+    this.joinRect = new Rect(overlapBox);
+    
+    /**
+     * @returns {Boolean}
+     */
+    this.isJoinHorizontal = function(){
+        return this.joinRect.width > this.joinRect.height;
+    };
+    
+    /**
+     * If the Join mode is hasJoinSize or hasJoinAreaPreview, create the preview of the join.
+     * @param {View} view
+     */
+    this.createPreview = function(view){
+        if (data.hasJoinSize || data.hasJoinAreaPreview){
+            createPreview(view, this.joinRect, "JoinRegion");
+        }
+    };
+    
+    if (data.hasJoinAreaPreview) {
+        let joinAreaPreview = data.joinAreaPreviewRect;
+        if (!joinAreaPreview.intersects(overlapBox)){
+            throw "Error: Join Region preview does not intersect with the image overlap";
+        }
+        let intersectRect = joinAreaPreview.intersection(overlapBox);
+        if (data.useCropTargetToJoinRegion){
+            this.joinRect = intersectRect;
+        } else {
+            this.joinRect = extendSubRect(intersectRect, overlapBox, this.isJoinHorizontal());
+        }
+    } else if (data.hasJoinSize){
+        let halfSize = data.joinSize / 2;
+        if (this.isJoinHorizontal()){
+            let middle = data.joinPosition + (overlapBox.y0 + overlapBox.y1) / 2;
+            middle = Math.max(middle, overlapBox.y0);
+            middle = Math.min(middle, overlapBox.y1);
+            let top = Math.max(overlapBox.y0, Math.round(middle - halfSize));
+            let bot = Math.min(overlapBox.y1, Math.round(middle + halfSize));
+            this.joinRect = new Rect(overlapBox.x0, top, overlapBox.x1, bot);
+        } else {
+            let middle = data.joinPosition + (overlapBox.x0 + overlapBox.x1) / 2;
+            middle = Math.max(middle, overlapBox.x0);
+            middle = Math.min(middle, overlapBox.x1);
+            let left = Math.max(overlapBox.x0, Math.round(middle - halfSize));
+            let right = Math.min(overlapBox.x1, Math.round(middle + halfSize));
+            this.joinRect = new Rect(left, overlapBox.y0, right, overlapBox.y1);
+        }
+    } // else this.joinRect = new Rect(overlapBox); // defaults to this.
 }

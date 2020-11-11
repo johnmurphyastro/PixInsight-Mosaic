@@ -427,6 +427,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let apertureSection = new Control(this);
     apertureSection.sizer = new VerticalSizer;
     apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(apertureAdd_Control);
     apertureSection.sizer.add(apertureGrowthRate_Control);
     if (EXTRA_CONTROLS()){
         let apertureGrowthLimit_Control = photometryControls.createApertureGrowthLimitControl(
@@ -441,7 +442,6 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
 //      controlsHeight += apertureGrowthLimit_Control.height;
         apertureSection.sizer.add(apertureGrowthLimit_Control);
     }
-    apertureSection.sizer.add(apertureAdd_Control);
     apertureSection.sizer.add(apertureBgDelta_Control);
     let apertureBar = new SectionBar(this, "Star Aperture Size");
     apertureBar.setSection(apertureSection);

@@ -109,8 +109,9 @@ function PhotometricMosaicData() {
         // Join Region
         Parameters.set("hasJoinSize", this.hasJoinSize);
         Parameters.set("joinSize", this.joinSize);
+        Parameters.set("joinPosition", this.joinPosition);
         
-        // Join Region (Advanced settings)
+        // Join Region (from preview)
         Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
         Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
         Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
@@ -195,8 +196,10 @@ function PhotometricMosaicData() {
             this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
         if (Parameters.has("joinSize"))
             this.joinSize = Parameters.getInteger("joinSize");
+        if (Parameters.has("joinPosition"))
+            this.joinPosition = Parameters.getInteger("joinPosition");  
         
-        // Join Region (Advanced settings)
+        // Join Region (from preview)
         {
             let x = 0;
             let y = 0;
@@ -299,11 +302,12 @@ function PhotometricMosaicData() {
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
         
-        // Join Region
+        // Join Region (Centered)
         this.hasJoinSize = true;
         this.joinSize = 20;
+        this.joinPosition = 0;
         
-        // Join Region (Advanced settings)
+        // Join Region (From preview)
         this.hasJoinAreaPreview = false;
         this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
         this.useCropTargetToJoinRegion = false;
@@ -371,8 +375,9 @@ function PhotometricMosaicData() {
         // Join Region
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
         photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
+        PhotometricMosaicDialog.joinPosition_Control.setValue(this.joinPosition);
         
-        // Join Region (Advanced settings)
+        // Join Region (From preview)
         photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
         photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
         photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
@@ -781,7 +786,7 @@ function PhotometricMosaicDialog(data) {
     this.starSearchRadius_Control.toolTip =
             "<p>Search radius used to match the reference and target stars. " +
             "Larger values find more photometric stars but at the risk of matching " +
-            "the wrong star or even matching noise.</p>" +
+            "the wrong star.</p>" +
             "<p>You usually don't need to modify this parameter.</p>";
 
     this.starSearchRadius_Control.label.minWidth = labelWidth;
@@ -834,9 +839,10 @@ function PhotometricMosaicDialog(data) {
     let detectedStarsButton = new PushButton(this);
     detectedStarsButton.text = "Photometry stars ";
     detectedStarsButton.toolTip =
-            "<p>Displays all the stars detected in the reference and target images.</p>" +
-            "<p>These stars are cached until either the Photometric Mosaic dialog " +
-            "is closed or a modification invalidates the cache.</p>";
+            "<p>Displays the photometry stars.</p>" + 
+            "<p>Provides edit sliders for " +
+            "'Radius add', 'Growth rate' and 'Background delta'.</p>" +
+            "<p>These controls determine the photometry apertures.</p>";
     detectedStarsButton.onClick = function () {
         data.viewFlag = DISPLAY_DETECTED_STARS();
         this.dialog.ok();
@@ -846,11 +852,11 @@ function PhotometricMosaicDialog(data) {
     apertureGroupBox.sizer = new HorizontalSizer();
     apertureGroupBox.sizer.margin = 2;
     apertureGroupBox.sizer.spacing = 10;
+    apertureGroupBox.sizer.add(this.apertureAdd_Control);
     apertureGroupBox.sizer.add(this.apertureGrowthRate_Control);
     if (EXTRA_CONTROLS()){
         apertureGroupBox.sizer.add(this.apertureGrowthLimit_Control);
     }
-    apertureGroupBox.sizer.add(this.apertureAdd_Control);
     apertureGroupBox.sizer.add(this.apertureBgDelta_Control);
     apertureGroupBox.sizer.addStretch();
     
@@ -874,13 +880,14 @@ function PhotometricMosaicDialog(data) {
     let photometryGraphButton = new PushButton(this);
     photometryGraphButton.text = "Photometry graph";
     photometryGraphButton.toolTip =
-            "<p>Edit parameters and view a graph of the linear fit in real time.</p>" +
-            "<p>For each star detected within the overlap region, " +
-            "provided the star meets the photometry criteria, the star's reference flux " +
-            "is plotted against its target flux (arbitary units).</p>" +
-            "<p>The best fit lines are drawn through the points. " +
-            "Their gradient determines the scale factor for each color. </p>" +
-            "<p>Color (red, green and blue) is used to represent the data for each color channel.</p>";
+            "<p>Displays the photometry graph. " +
+            "Each star is plotted against its reference and target image flux. " +
+            "A best fit line is drawn through these points (Least squares fit). " +
+            "The gradient provides the brigtness scale factor.</p>" +
+            "<p>Provides edit sliders for " +
+            "'Limit stars %', 'Linear range' and 'Outlier removal'.</p>" +
+            "<p>These controls determine which stars are used to " +
+            "calculate the best fit line (and hence the scale). </p>";
     photometryGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_PHOTOMETRY_GRAPH();
         this.dialog.ok();
@@ -928,10 +935,8 @@ function PhotometricMosaicDialog(data) {
     let photometryBar = new SectionBar(this, "Photometry");
     photometryBar.setSection(photometrySection);
     photometryBar.onToggleSection = this.onToggleSection;
-    photometryBar.toolTip = "<p>Determines the photometry stars used " +
-            " to calculate the brightness scale factor.</p>" +
-            "<p>Display the 'Photometry graph' and check for outliers to the " +
-            "best fit line.</p>";
+    photometryBar.toolTip = "<p>Specifies photometry parameters. These are used " +
+            " to calculate the brightness scale factor.</p>";
     // SectionBar: "Photometric Scale" End
 
     // =======================================
@@ -977,10 +982,10 @@ function PhotometricMosaicDialog(data) {
     sampleStarRejectRadiusGroupBox.sizer = new HorizontalSizer();
     sampleStarRejectRadiusGroupBox.sizer.margin = 2;
     sampleStarRejectRadiusGroupBox.sizer.spacing = 10;
+    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
     sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthRate_Control);
     sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
     sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimitTarget_Control);
-    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
     sampleStarRejectRadiusGroupBox.sizer.addStretch();
     
     this.sampleSize_Control = sampleControls.createSampleSizeEdit(
@@ -999,8 +1004,10 @@ function PhotometricMosaicDialog(data) {
     let displaySamplesButton = new PushButton(this);
     displaySamplesButton.text = "Sample generation";
     displaySamplesButton.toolTip =
-            "<p>Edit parameters and view the grid of samples in real time.</p>" +
-            "<p>A surface spline is constructed from these samples to " +
+            "<p>Displays the generated samples, the stars used to reject samples, " +
+            "and the location of the join between the reference and target images.</p>" +
+            "<p>Provides edit sliders for all 'Sample Generation' section parameters.</p>" +
+            "<p>A surface spline is constructed from the generated samples to " +
             "model the relative gradient between the reference and target images.</p>" +
             "<p>Samples are rejected if they: " +
             "<ul><li>Contain one or more zero pixels in either image.</li>" +
@@ -1015,11 +1022,13 @@ function PhotometricMosaicDialog(data) {
     this.autoSampleGenerationCheckBox = new CheckBox(this);
     this.autoSampleGenerationCheckBox.text = "Auto";
     this.autoSampleGenerationCheckBox.toolTip = 
-            "<p>Automatically determine most settings.</p>" +
-            "<p>In the 'Star rejection radius' section, the 'Growth rate' and " +
-            "'Radius add' use settings from the Photometry section.</p>" +
-            "<p>'Sample size' can be calculated provided the images have been " +
-            "plate solved. Otherwise it is set to its default.</p>";
+            "<p>Calculates default values for the following parameters:</p>" +
+            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
+            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
+            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
+            "</ul>";
     this.autoSampleGenerationCheckBox.onCheck = function (checked){
         self.setSampleGenerationAutoValues(checked);
     };
@@ -1102,9 +1111,7 @@ function PhotometricMosaicDialog(data) {
             "<p>The overlap region is divided up into a grid of sample squares. " +
             "A sample's value is the median of the pixels it contains.</p>" +
             "<p>Samples are rejected if they contain one or more zero pixels in " +
-            "either image or if they are too close to a bright star.</p>" +
-            "<p>The surface spline resolution will depend on the sample size, " +
-            "how noisy each sample is, and how much smoothing is applied.</p>";
+            "either image or if they are too close to a bright star.</p>";
     
     this.setSampleGenerationAutoValues = function (checked){
         data.useAutoSampleGeneration = checked;
@@ -1139,8 +1146,8 @@ function PhotometricMosaicDialog(data) {
         if (data.useAutoSampleGeneration && data.targetView !== null){
             // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            // 0.015 deg = 54 arcsec
-            let limit = Math.max(3, Math.round(0.015 / pixelAngle));
+            // 0.005 deg = 18 arcsec
+            let limit = Math.max(3, Math.round(0.005 / pixelAngle));
             limit = Math.min(limit, self.sampleStarGrowthLimit_Control.upperBound);
             data.sampleStarGrowthLimit = limit;
             self.sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
@@ -1371,7 +1378,7 @@ function PhotometricMosaicDialog(data) {
 
     // ===========================================
     // SectionBar: Join Region
-    // GroupBox Join Region (User defined)
+    // GroupBox Join Region (From Preview)
     // ===========================================
     const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
@@ -1529,7 +1536,7 @@ function PhotometricMosaicDialog(data) {
     joinAreaFlagsHorizSizer.addStretch();
     
     this.joinAreaGroupBox = new GroupBox(this);
-    this.joinAreaGroupBox.title = "Join Region (User defined)";
+    this.joinAreaGroupBox.title = "Join Region (From preview)";
     this.joinAreaGroupBox.titleCheckBox = true;
     this.joinAreaGroupBox.onCheck = this.setHasJoinAreaPreview;
     this.joinAreaGroupBox.toolTip = JoinRegionTooltip;
@@ -1554,7 +1561,6 @@ function PhotometricMosaicDialog(data) {
     this.joinSize_Control = new NumericControl(this);
     this.joinSize_Control.real = false;
     this.joinSize_Control.label.text = "Join size:";
-    this.joinSize_Control.label.minWidth = REFERENCE_VIEW_STR_LEN;
     this.joinSize_Control.toolTip = "<p>Specifies the thickness of the Join Region. " +
             "For a horizontal join, this is the height. For a vertical join, the width. " +
             "The ideal Join size depends on the Mosaic Combination mode:" +
@@ -1570,8 +1576,16 @@ function PhotometricMosaicDialog(data) {
     };
     this.joinSize_Control.setRange(1, 250);
     this.joinSize_Control.slider.setRange(1, 250);
-    this.joinSize_Control.slider.minWidth = 250;
     this.joinSize_Control.setValue(data.joinSize);
+    
+    this.joinPosition_Control = sampleControls.createJoinPositionEdit(this, data);
+    this.joinPosition_Control.onValueUpdated = function (value){
+        data.joinPosition = value;
+        if (data.cache.overlap !== null){
+            let joinRegion = new JoinRegion(data);
+            joinRegion.createPreview(data.targetView);
+        }
+    };
     
     this.setHasJoinSize = function(checked){
         if (checked){
@@ -1580,6 +1594,7 @@ function PhotometricMosaicDialog(data) {
         data.hasJoinSize = checked;
         self.joinSizeGroupBox.checked = checked;
         self.joinSize_Control.enabled = checked;
+        self.joinPosition_Control.enabled = checked;
     };
     
     this.joinSizeGroupBox = new GroupBox(this);
@@ -1587,17 +1602,18 @@ function PhotometricMosaicDialog(data) {
     this.joinSizeGroupBox.toolTip = joinSizeTooltip;
     this.joinSizeGroupBox.titleCheckBox = true;
     this.joinSizeGroupBox.onCheck = this.setHasJoinSize;
-    this.joinSizeGroupBox.sizer = new VerticalSizer;
+    this.joinSizeGroupBox.sizer = new HorizontalSizer;
     this.joinSizeGroupBox.sizer.margin = 2;
-    this.joinSizeGroupBox.sizer.spacing = 4;
-    this.joinSizeGroupBox.sizer.add(this.joinSize_Control);
+    this.joinSizeGroupBox.sizer.spacing = 20;
+    this.joinSizeGroupBox.sizer.add(this.joinSize_Control, 100);
+    this.joinSizeGroupBox.sizer.add(this.joinPosition_Control);
     
     this.setHasJoinSize(data.hasJoinSize);
     this.setHasJoinAreaPreview(data.hasJoinAreaPreview); 
     
     let joinRegionSection = new Control(this);
     joinRegionSection.sizer = new VerticalSizer;
-    joinRegionSection.sizer.spacing = 2;
+    joinRegionSection.sizer.spacing = 4;
     joinRegionSection.sizer.add(this.joinSizeGroupBox);
     joinRegionSection.sizer.add(this.joinAreaGroupBox);
     let joinRegionBar = new SectionBar(this, "Join Region");
@@ -1771,6 +1787,8 @@ PhotometricMosaicDialog.prototype = new Dialog;
 
 // Photometric Mosaic main process
 function main() {
+    console.show();
+    console.abortEnabled = false; // Allowing abort would complicate cache strategy
     console.writeln("\n\n=== <b>" + TITLE() + " ", VERSION(), "</b> ===");
     const MAJOR = 1;
     const MINOR = 8;
@@ -1801,8 +1819,6 @@ function main() {
         data.viewFlag = 0;
         if (!photometricMosaicDialog.execute())
             break;
-        console.show();
-        console.abortEnabled = false; // Allowing abort would complicate cache strategy
 
         // User must select a reference and target view with the same dimensions and color depth
         if (data.targetView.isNull) {
@@ -1896,8 +1912,7 @@ function main() {
         // Run the script
         photometricMosaic(data, photometricMosaicDialog);
         data.saveParameters();  // Save script parameters to the history.
-        console.hide();
     }
-    
+    console.hide();
     return;
 }

@@ -262,19 +262,24 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     
     let displayOverlapRejectionCheckBox = new CheckBox(this);
     displayOverlapRejectionCheckBox.text = "Overlap rejection";
-    displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for either overlap correction " +
-            "or the target image correction.</p>" +
-            "<p>Overlap correction: Aim to reject samples that contain bright stars or filter halos. " +
-            "The unrejected samples will be used to correct the overlap region. " +
-            "The green line indicates the join path. Where possible this " +
-            "should avoid image corners, bright stars and star halos. " +
-            "Use the 'Join Region (Advanced settings)' section " +
-            "to change the position of the join.</p>" +
-            "<p>Target image correction: Aim to reject samples that contain bright stars, " +
-            "filter halos and other small local gradients - " +
-            "for example the scattered light around bright stars. " +
-            "The blue line indicates the target side of the overlapping pixels. " +
-            "The sample rejection is particularly important near this line.</p>";
+    displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for " +
+            "either <b>overlap</b> correction or <b>target image</b> correction.</p>" +
+            "<p><u>Overlap correction</u>:" +
+            "<ul><li><b>Green line</b>: This line indicates the path of the " +
+            "reference - target image join. Use the 'Join Region' section to position " +
+            "this line to avoid bright stars and image corners.</li>" +
+            "<li><b>Red circles</b>: Star rejection circles. The brighter stars " +
+            "should be completely within these circles. They do not need to include " +
+            "filter halos or scattered light.</li></ul>" +
+            "<p><u>Target image correction</u>:" +
+            "<ul><li><b>Blue line</b>: this line indicates the target side of the " +
+            "overlap region. This region determines the gradient correction that " +
+            "will be applied to the target image.</li>" +
+            "<li><b>Blue circles</b>: Star rejection circles. The brighter stars " +
+            "should be completely within these circles. Aim to include their " +
+            "filter halos and scattered light. This prevents local gradients " +
+            "around bright stars affecting the gradient correction across the target image. " +
+            "Rejecting local gradients is particularly important near the blue line.</li></ul>";
     displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
     displayOverlapRejectionCheckBox.onClick = function (checked) {
         self.enabled = false;
@@ -284,10 +289,40 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         self.enabled = true;
     };
     
+    let sampleControls = new SampleControls;
+    // ===================================================
+    // SectionBar: Join Position
+    // ===================================================
+    let joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
+    joinPosition_Control.onValueUpdated = function (value) {
+        data.joinPosition = value;
+        photometricMosaicDialog.joinPosition_Control.setValue(value);
+        let joinRegion = new JoinRegion(data);
+        let joinRect = joinRegion.joinRect;
+        let isHorizontal = joinRegion.isJoinHorizontal();
+        joinPath = createMidJoinPathLimittedByOverlap(data.targetView.image,
+                data.cache.overlap, joinRect, isHorizontal, data);
+        previewControl.forceRedraw();
+        joinRegion.createPreview(data.targetView);
+    };
+    joinPosition_Control.enabled = data.hasJoinSize;
+    let joinPositionSection = new Control(this);
+    joinPositionSection.sizer = new VerticalSizer;
+    joinPositionSection.sizer.add(joinPosition_Control);
+    let joinPositionBar = new SectionBar(this, "Join");
+    joinPositionBar.setSection(joinPositionSection);
+    joinPositionBar.onToggleSection = this.onToggleSection;
+    joinPositionBar.toolTip = "Shifts join position";
+    controlsHeight += joinPositionBar.height + 5;
+    if (!joinPosition_Control.enabled){
+        joinPositionSection.hide();
+    } else {
+        controlsHeight += joinPosition_Control.height;
+    }
+    
     // ===================================================
     // SectionBar: Sample rejection
     // ===================================================
-    let sampleControls = new SampleControls;
     const labelLength = this.font.width(sampleControls.growthLimit.text);
     
     let limitSampleStarsPercent_Control = 
@@ -354,10 +389,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     rejectRadiusGroupBox.sizer = new VerticalSizer();
     rejectRadiusGroupBox.sizer.margin = 2;
     rejectRadiusGroupBox.sizer.spacing = 2;
+    rejectRadiusGroupBox.sizer.add(sampleStarRadiusAdd_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthRate_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimit_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimitTarget_Control);
-    rejectRadiusGroupBox.sizer.add(sampleStarRadiusAdd_Control);
     
     controlsHeight += sampleStarGrowthRate_Control.height + 
             sampleStarGrowthLimit_Control.height + 
@@ -395,14 +430,12 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     controlsHeight += sampleSize_Control.height;
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
-    sampleGenerationSection.sizer.spacing = 2;
     sampleGenerationSection.sizer.add(sampleSize_Control);
-    sampleGenerationSection.sizer.addSpacing(5);
     let sampleGenerationBar = new SectionBar(this, "Sample Generation");
     sampleGenerationBar.setSection(sampleGenerationSection);
     sampleGenerationBar.onToggleSection = this.onToggleSection;
     sampleGenerationBar.toolTip = "Specifies generate samples settings";
-    controlsHeight += sampleGenerationBar.height + 5;
+    controlsHeight += sampleGenerationBar.height;
     // SectionBar "Sample Rejection" End
     
     /**
@@ -417,7 +450,13 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     
     let autoCheckBox = new CheckBox(this);
     autoCheckBox.text = "Auto";
-    autoCheckBox.toolTip = "Use calculated values for some fields";
+    autoCheckBox.toolTip = "<p>Calculates default values for the following parameters:</p>" +
+            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
+            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
+            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
+            "</ul>";
     autoCheckBox.onClick = function (checked) {
         photometricMosaicDialog.setSampleGenerationAutoValues(checked);
         if (checked){
@@ -453,6 +492,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     this.sizer.spacing = 2;
     this.sizer.add(previewControl);
     this.sizer.add(optionsSizer);
+    this.sizer.add(joinPositionBar);
+    this.sizer.add(joinPositionSection);
     this.sizer.add(rejectSamplesBar);
     this.sizer.add(rejectSamplesSection);
     this.sizer.add(sampleGenerationBar);

@@ -64,8 +64,7 @@ function PhotometryControls(){
         toolTip: "<p>Specifies the percentage of detected stars used for photometry. " +
             "The faintest stars are rejected.</p>" +
             "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
-            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
-            "<p>0% implies no stars will be used. The scale will default to one.</p>"
+            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -131,7 +130,7 @@ function PhotometryControls(){
         precision: 0,
         maxWidth: 400,
         toolTip: "<p>Number of outlier stars to remove.</p>" +
-            "<p>Outliers can be due to variable stars, or measurement issues.</p>" +
+            "<p>Outliers can be due to variable stars, or measurement errors.</p>" +
             "<p>Removing a few outliers can improve accuracy, but don't over do it.</p>"
     };
     /**
@@ -163,9 +162,11 @@ function PhotometryControls(){
         range: {min:0, max:3},
         precision: 2,
         maxWidth: 800,
-        toolTip: "<p>Aperture radius growth rate.</p>" +
-            "<p>The aperture radius increase depends on the star's peak value " +
-            "and this grow rate. Zero produces no growth.</p>"
+        toolTip: "<p>Determines the aperture size for bright stars.</p>" +
+            "<p>Adjust this control until the brightest stars entirely fit " +
+            "within the inner photometry aperture. " +
+            "Check both reference and target stars.</p>" +
+            "<p>It is not necessary to include diffraction spikes.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -196,8 +197,13 @@ function PhotometryControls(){
         range: {min:0, max:10},
         precision: 0,
         maxWidth: 250,
-        toolTip: "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>"
+        toolTip: "<p>This value is added to the aperture radius for all stars.</p>" +
+            "<p>Use this control to set the photometry aperture for <b>faint stars</b> " +
+            "(use 'Growth rate' for brighter stars).</p>" +
+            "<p>When correctly set, each faint reference and target star should " +
+            "be fully contained within the inner photometry aperture.</p>" +
+            "<p>Smaller apertures will introduce less noise, but it is vital that " +
+            "the whole star is within the aperture.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -228,7 +234,9 @@ function PhotometryControls(){
         range: {min:1, max:25},
         precision: 0,
         maxWidth: 250,
-        toolTip: "<p>Background annulus thickness.</p>"
+        toolTip: "<p>Background annulus thickness.</p>" +
+            "<p>This determines the square ring around the star, used to " +
+            "measure the background sky flux.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -292,6 +300,42 @@ function PhotometryControls(){
 function SampleControls(){
     let self = this;
     
+    this.joinPosition = {
+        real: false,
+        text: "Position (+/-):",
+        slider: {range: {min:-400, max:400}},
+        range: {min:-10000, max:10000},
+        precision: 0,
+        maxWidth: 800,
+        toolTip: "<p>Moves the join region the specified number of pixels " +
+                "from the center of the overlap bounding box.</p>"
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @param {Number} strLength
+     * @returns {NumericControl}
+     */
+    this.createJoinPositionControl = function(dialog, data, strLength){
+        let rect = data.cache.overlap.overlapBox;
+        let thickness = rect.width > rect.height ? rect.height : rect.width;
+        let max = Math.round(Math.max(0, (thickness - data.joinSize)/2));
+        let control = createNumericControl(dialog, self.joinPosition, strLength);
+        control.setRange(-max, max);
+        control.setValue(data.joinPosition);
+        return control;
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @returns {NumericEdit}
+     */
+    this.createJoinPositionEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.joinPosition);
+        control.setValue(data.joinPosition);
+        return control;
+    };
+    
     this.percentLimits = {
         real: false,
         text: "Limit stars %:",
@@ -300,18 +344,14 @@ function SampleControls(){
         precision: 0,
         maxWidth: 300,
         toolTip: "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
-            "<p>0% implies that no samples are rejected due to stars. This is " +
-            "OK provided that no star takes up more than half of a sample's area.</p>" +
+            "<p>0% implies that no samples are rejected due to stars.</p>" +
             "<p>100% implies that all detected stars are used to reject samples.</p>" +
             "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
             "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
             "<li>Bright stars can have significantly different profiles between " +
             "the reference and target images. This can affect how many of the " +
             "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is only necessary to reject bright stars. This script uses the " +
-            "median value from each sample, so any star that takes up less than " +
-            "half the sample area will have little effect. It is more important to " +
-            "include most of the samples than to reject faint stars.</p>"
+            "<p>It is more important to include enough samples than to reject faint stars.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -342,9 +382,10 @@ function SampleControls(){
         range: {min:0, max:3},
         precision: 2,
         maxWidth: 800,
-        toolTip: "<p>Increase to reject more samples around saturated stars.</p>" +
-            "<p>Read the Help sections on 'Join Region' to learn when these " +
-            "samples should be rejected.</p>"
+        toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
+            "<p>Use this control to set the rejection radius for bright, but unsaturated, stars " +
+            "(use 'Radius add' for faint stars).</p>" +
+            "<p>Should normally be set to the same value as the photometric 'Growth rate'.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -370,13 +411,19 @@ function SampleControls(){
     
     this.growthLimit = {
         real: false,
-        text: "Growth Limit (Overlap):",
+        text: "Growth limit (Overlap):",
         slider: {range: {min:3, max:300}},
         range: {min:3, max:300},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>"
+        toolTip: "<p>Limits the rejection radius for saturated stars. " +
+            "This setting is used when creating the surface spline that will be " +
+            "used to correct the overlap region.</p>" +
+            "<p>A 'Growth rate' suitable for unsaturated stars can produce large " +
+            "rejection circles for the brightest stars. This control limits the " +
+            "rejection radius growth to the specified number of pixels.</p>" +
+            "<p>Select the 'Overlap rejection' checkbox (Sample Generation dialog) " +
+            "to see the effects of this control.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -402,13 +449,20 @@ function SampleControls(){
     
     this.growthLimitTarget = {
         real: false,
-        text: "Growth Limit (Target):",
+        text: "Growth limit (Target):",
         slider: {range: {min:3, max:300}},
         range: {min:3, max:300},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Maximum star aperture growth.</p>" +
-            "<p>Limits the aperture radius growth to this number of pixels.</p>"
+        toolTip: "<p>Limits the rejection radius for saturated stars. " +
+            "This setting is used when creating the surface spline that will be " +
+            "used to correct the target image.</p>" +
+            "<p>The target image gradient correction needs to ignore local " +
+            "gradients - e.g. due to scattered light around bright stars. " +
+            "The rejection radius around very bright stars needs to be large " +
+            "enough to reject all samples that contain the star's scattered light.</p>" +
+            "<p>Unselect the 'Overlap rejection' checkbox (Sample Generation dialog) " +
+            "to see the effects of this control.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -439,8 +493,10 @@ function SampleControls(){
         range: {min:0, max:10},
         precision: 0,
         maxWidth: 250,
-        toolTip: "<p>Minimum star aperture growth.</p>" +
-            "<p>This value gets added to the aperture radius for all stars.</p>"
+        toolTip: "<p>This value is added to the rejection radius for all stars.</p>" +
+            "<p>Use this control to set the rejection radius for <b>faint stars</b> " +
+            "(use 'Growth rate' for brighter stars).</p>" +
+            "<p>Should normally be set to the same value as the photometric 'Radius add'.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -472,8 +528,12 @@ function SampleControls(){
         precision: 0,
         maxWidth: 300,
         toolTip: "<p>Specifies the size of the sample squares.</p>" +
-            "<p>The sample size should be greater than 2x the size of the largest " +
-            "star that's not rejected by 'Limit stars %'.</p>"
+            "<p>The sample size should be at least 2x the size of the largest " +
+            "star that's not rejected by 'Limit stars %'.</p>" +
+            "<p>The sample's value is the median of its pixels. " +
+            "They are used to create a surface spline that represents the relative gradient.</p>" +
+            "<p>Samples are rejected if they contain one or more black pixels, " +
+            "or if they are within a star's rejection radius.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog

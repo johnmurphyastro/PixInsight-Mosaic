@@ -132,6 +132,19 @@ function searchFits(view, name){
 
 /**
  * @param {View} view
+ * @param {Number} defaultValue This value will be returned if FOCALLEN header entry is not found.
+ * @returns {Number} Focal length in mm
+ */
+function getFocalLength(view, defaultValue){
+    for (let fitsKeyword of view.window.keywords) {
+        if (fitsKeyword.name === "FOCALLEN")
+            return fitsKeyword.numericValue;
+    }
+    return defaultValue;
+}
+
+/**
+ * @param {View} view
  * @param {Number} defaultValue This value will be returned if XPIXSZ header entry is not found.
  * @returns {Number} Pixel size in microns
  */

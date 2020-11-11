@@ -70,7 +70,6 @@ function photometricMosaic(data, photometricMosaicDialog)
     let referenceView = data.referenceView;
     let nChannels = targetView.image.isColor ? 3 : 1;      // L = 0; R=0, G=1, B=2
     let overlap;
-    let showJoinDirection = false;
     
     // let the MosaicCache know about any relevant input parameter changes
     // If any of these inputs have changed, the cache will be invalidated
@@ -78,7 +77,6 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     // Overlap bounding box and overlap bitmap
     if (data.cache.overlap === null){
-        showJoinDirection = true;
         // Create ref/tgt overlap bitmap (overlapMask) and its bounding box (ovelapBox)
         let overlapTime = new Date().getTime();
         // Add trim warning check here so it is only displayed once
@@ -100,44 +98,18 @@ function photometricMosaic(data, photometricMosaicDialog)
 
     // joinRect is the intersection between JoinAreaPreview and the overlap,
     // or the overlapBox if the preview was not specified
-    let isHorizontal;
-    let joinRect;
     let overlapBox = overlap.overlapBox;
     createPreview(targetView, overlapBox, "Overlap");
-    if (data.hasJoinAreaPreview) {
-        let joinAreaPreview = data.joinAreaPreviewRect;
-        if (!joinAreaPreview.intersects(overlapBox)){
-            let errorMsg = "Error: Join Region preview does not intersect with the image overlap";
-            new MessageBox(errorMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
-            return;
-        }
-        let intersectRect = joinAreaPreview.intersection(overlapBox);
-        isHorizontal = isJoinHorizontal(data, intersectRect, showJoinDirection);
-        if (data.useCropTargetToJoinRegion){
-            joinRect = intersectRect;
-        } else {
-            joinRect = extendSubRect(intersectRect, overlapBox, isHorizontal);
-        }
-        // Show the join area in a preview
-        createPreview(targetView, joinRect, "JoinRegion");
-    } else if (data.hasJoinSize){
-        isHorizontal = isJoinHorizontal(data, overlapBox, showJoinDirection);
-        let halfSize = data.joinSize / 2;
-        if (isHorizontal){
-            let middle = (overlapBox.y0 + overlapBox.y1) / 2;
-            let top = Math.max(overlapBox.y0, Math.round(middle - halfSize));
-            let bot = Math.min(overlapBox.y1, Math.round(middle + halfSize));
-            joinRect = new Rect(overlapBox.x0, top, overlapBox.x1, bot);
-        } else {
-            let middle = (overlapBox.x0 + overlapBox.x1) / 2;
-            let left = Math.max(overlapBox.x0, Math.round(middle - halfSize));
-            let right = Math.min(overlapBox.x1, Math.round(middle + halfSize));
-            joinRect = new Rect(left, overlapBox.y0, right, overlapBox.y1);
-        }
-        createPreview(targetView, joinRect, "JoinRegion");
-    } else {
-        isHorizontal = isJoinHorizontal(data, overlapBox, showJoinDirection);
-        joinRect = overlapBox;
+    let joinRect;
+    let isHorizontal;
+    try {
+        let joinRegion = new JoinRegion(data);
+        joinRect = joinRegion.joinRect;
+        isHorizontal = joinRegion.isJoinHorizontal();
+        joinRegion.createPreview(targetView);
+    } catch (e){
+        new MessageBox(e, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        return;
     }
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
@@ -281,7 +253,10 @@ function photometricMosaic(data, photometricMosaicDialog)
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let dialog = new SampleGridDialog("Sample Generation", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
                 data, maxSampleSize, joinPath, targetSide, photometricMosaicDialog);
+        console.hide();
+        targetView.window.bringToFront();
         dialog.execute();
+        console.show();
         return;
     }
     
@@ -541,27 +516,6 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
 }
 
 /**
- *
- * @param {PhotometricMosaicData} data
- * @param {Rect} joinRect
- * @param {Boolean} showConsoleInfo 
- * @returns {Boolean} True if the mosaic join is mostly horizontal
- */
-function isJoinHorizontal(data, joinRect, showConsoleInfo){
-    let isHorizontal = joinRect.width > joinRect.height;
-    if (showConsoleInfo){
-        if (data.useCropTargetToJoinRegion){
-            console.writeln("<b>Mode: Crop target image to Join Region</b>");
-        } else if (isHorizontal) {
-            console.writeln("<b>Horizontal join</b>");
-        } else {
-            console.writeln("<b>Vertical join</b>");
-        }
-    }
-    return isHorizontal;
-}
-
-/**
  * Create a preview if it does not already exist
  * @param {View} targetView
  * @param {Rect} rect
@@ -569,6 +523,13 @@ function isJoinHorizontal(data, joinRect, showConsoleInfo){
  */
 function createPreview(targetView, rect, previewName){
     let w = targetView.window;
+    
+    let preview = w.previewById(previewName);
+    if (!preview.isNull){
+        w.modifyPreview(preview, rect, previewName);
+        return;
+    }
+    
     let previews = w.previews;
     let found = false;
     for (let preview of previews){
