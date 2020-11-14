@@ -32,7 +32,8 @@ function createNumericControl(dialog, values, strLength){
     control.setRange(values.range.min, values.range.max);
     control.slider.setRange(values.slider.range.min, values.slider.range.max);
     control.setPrecision(values.precision);
-    control.maxWidth = values.maxWidth;
+    let maxWidth = dialog.logicalPixelsToPhysical(values.maxWidth);
+    control.maxWidth = Math.max(strLength + 50, maxWidth);
     return control;
 }
 
@@ -51,16 +52,41 @@ function createNumericEdit(dialog, values){
     return control;
 }
 
+/**
+ * Add onMouseRelease, onKeyRelease and onLeave listeners to ensure that the 
+ * supplied updateFunction is called when the NumericControl edit has finished.
+ * @param {NumericControl} control
+ * @param {Function({Number} controlValue)} updateFunction
+ */
+function addFinalUpdateListener(control, updateFunction){
+    let updateNeeded = false;
+    function finalUpdate(){
+        updateNeeded = false;
+        updateFunction(control.value);
+    }
+    control.slider.onMouseRelease = function (x, y, button, bState, modifiers) {
+        finalUpdate();
+    };
+    control.onKeyRelease = function (keyCode, modifiers) {
+        updateNeeded = true;
+    };
+    control.onLeave = function () {
+        if (updateNeeded){
+            finalUpdate();
+        }
+    };
+}
+
 function PhotometryControls(){
     let self = this;
     
     this.percentLimits = {
         real: true,
         text: "Limit stars %:",
-        slider: {range: {min:0, max:200}},
+        slider: {range: {min:0, max:500}},
         range: {min:0, max:100},
         precision: 2,
-        maxWidth: 500,
+        maxWidth: 800,
         toolTip: "<p>Specifies the percentage of detected stars used for photometry. " +
             "The faintest stars are rejected.</p>" +
             "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
@@ -337,12 +363,12 @@ function SampleControls(){
     };
     
     this.percentLimits = {
-        real: false,
+        real: true,
         text: "Limit stars %:",
-        slider: {range: {min:0, max:100}},
+        slider: {range: {min:0, max:500}},
         range: {min:0, max:100},
-        precision: 0,
-        maxWidth: 300,
+        precision: 2,
+        maxWidth: 800,
         toolTip: "<p>Specifies the percentage of the brightest detected stars that will be used to reject samples.</p>" +
             "<p>0% implies that no samples are rejected due to stars.</p>" +
             "<p>100% implies that all detected stars are used to reject samples.</p>" +
@@ -489,10 +515,10 @@ function SampleControls(){
     this.radiusAdd = {
         real: false,
         text: "Radius add:",
-        slider: {range: {min:0, max:10}},
-        range: {min:0, max:10},
+        slider: {range: {min:0, max:20}},
+        range: {min:0, max:20},
         precision: 0,
-        maxWidth: 250,
+        maxWidth: 400,
         toolTip: "<p>This value is added to the rejection radius for all stars.</p>" +
             "<p>Use this control to set the rejection radius for <b>faint stars</b> " +
             "(use 'Growth rate' for brighter stars).</p>" +
@@ -526,7 +552,7 @@ function SampleControls(){
         slider: {range: {min:2, max:150}},
         range: {min:2, max:150},
         precision: 0,
-        maxWidth: 300,
+        maxWidth: 400,
         toolTip: "<p>Specifies the size of the sample squares.</p>" +
             "<p>The sample size should be at least 2x the size of the largest " +
             "star that's not rejected by 'Limit stars %'.</p>" +

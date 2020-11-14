@@ -143,12 +143,21 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             
             if (drawOverlapRejectionFlag){
                 graphics.pen = new Pen(0xff00ff00, 2.0);
-                for (let i=1; i < joinPath.length; i++){
-                    let x = joinPath[i-1].x - bitmapOffset.x;
-                    let x2 = joinPath[i].x - bitmapOffset.x;
-                    let y = joinPath[i-1].y - bitmapOffset.y;
-                    let y2 = joinPath[i].y - bitmapOffset.y;
-                    graphics.drawLine(x, y, x2, y2);
+                if (data.useMosaicOverlay){
+                    // Overlay mosaic mode. Draw join path
+                    for (let i=1; i < joinPath.length; i++){
+                        let x = joinPath[i-1].x - bitmapOffset.x;
+                        let x2 = joinPath[i].x - bitmapOffset.x;
+                        let y = joinPath[i-1].y - bitmapOffset.y;
+                        let y2 = joinPath[i].y - bitmapOffset.y;
+                        graphics.drawLine(x, y, x2, y2);
+                    }
+                } else {
+                    // Random or Average mosaic mode. Draw Join Region rectangle
+                    let joinRegion = new JoinRegion(data);
+                    let joinRect = new Rect(joinRegion.joinRect);
+                    joinRect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
+                    graphics.drawRect(joinRect);
                 }
             } else {
                 graphics.pen = new Pen(0xff0000ff, 2.0);
@@ -168,49 +177,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         }
     }
     
-    let liveUpdate = false;
-    
-    /**
-     * @param {HorizontalSizer} horizontalSizer
-     */
-    function customControls (horizontalSizer){
-        let liveUpdate_control = new CheckBox(self);
-        liveUpdate_control.text = "Live update";
-        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
-        liveUpdate_control.onCheck = function (checked){
-            liveUpdate = checked;
-            update_Button.enabled = !checked;
-            if (checked){
-                self.enabled = false;
-                processEvents();
-                updateSampleGrid();
-                self.enabled = true;
-            }
-        };
-        liveUpdate_control.checked = liveUpdate;
-
-        let update_Button = new PushButton(self);
-        update_Button.text = "Update";
-        update_Button.toolTip = "<p>Update display</p>";
-        update_Button.onClick = function(){
-            self.enabled = false;
-            processEvents();
-            updateSampleGrid();
-            self.enabled = true;
-        };
-        update_Button.enabled = !liveUpdate_control.checked;
-        
-        horizontalSizer.addSpacing(20);
-        horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(6);
-        horizontalSizer.add(update_Button);
-        horizontalSizer.addSpacing(20);
-    }
-    
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, customControls, false);
+    let previewControl = new PreviewControl(this, bitmap, null, null, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -251,15 +221,15 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     refCheckBox.toolTip = "Display either the reference or target background.";
     refCheckBox.checked = true;
     refCheckBox.onClick = function (checked) {
-        self.enabled = false;
-        processEvents();
         selectedBitmap = checked ? REF : TGT;
         bitmap = getBitmap(selectedBitmap);
         previewControl.updateBitmap(bitmap);
-        updateSampleGrid();
-        self.enabled = true;
+        previewControl.forceRedraw();
     };
     
+    let joinPosition_Control;
+    let sampleStarGrowthLimit_Control;
+    let sampleStarGrowthLimitTarget_Control;
     let displayOverlapRejectionCheckBox = new CheckBox(this);
     displayOverlapRejectionCheckBox.text = "Overlap rejection";
     displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for " +
@@ -282,18 +252,42 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             "Rejecting local gradients is particularly important near the blue line.</li></ul>";
     displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
     displayOverlapRejectionCheckBox.onClick = function (checked) {
-        self.enabled = false;
+        joinPosition_Control.enabled = data.hasJoinSize && checked;
+        sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && checked;
+        sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
         drawOverlapRejectionFlag = checked;
-        processEvents();
-        updateSampleGrid();
-        self.enabled = true;
+        finalUpdateFunction();
     };
     
     let sampleControls = new SampleControls;
+    
+    /**
+     * When a slider is dragged, only fast draw operations are performed.
+     * When the drag has finished (or after the user has finished editing in the textbox)
+     * this method is called to perform all calculations.
+     * @param {Number} value NumericControl's value
+     */
+    function finalUpdateFunction(value){
+        self.enabled = false;
+        processEvents();
+        updateSampleGrid();
+        self.enabled = true;
+    }
+
     // ===================================================
     // SectionBar: Join Position
     // ===================================================
-    let joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
+    
+    /**
+     * Force the joinPosition to update after the user edits the textbox directly.
+     * @param {Number} value NumericControl's value
+     */
+    function finalJoinPosUpdateFunction(value){
+        self.enabled = false;
+        processEvents();
+        self.enabled = true;
+    }
+    joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
     joinPosition_Control.onValueUpdated = function (value) {
         data.joinPosition = value;
         photometricMosaicDialog.joinPosition_Control.setValue(value);
@@ -305,7 +299,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
         joinRegion.createPreview(data.targetView);
     };
-    joinPosition_Control.enabled = data.hasJoinSize;
+    addFinalUpdateListener(joinPosition_Control, finalJoinPosUpdateFunction);
+    joinPosition_Control.enabled = data.hasJoinSize && displayOverlapRejectionCheckBox.checked;
+    
     let joinPositionSection = new Control(this);
     joinPositionSection.sizer = new VerticalSizer;
     joinPositionSection.sizer.add(joinPosition_Control);
@@ -330,10 +326,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
+        previewControl.forceRedraw();
     };
+    addFinalUpdateListener(limitSampleStarsPercent_Control, finalUpdateFunction);
+    
     let filterGroupBox = new GroupBox(this);
     filterGroupBox.title = "Filter stars";
     filterGroupBox.sizer = new VerticalSizer();
@@ -349,41 +345,41 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     sampleStarGrowthRate_Control.onValueUpdated = function (value){
         data.sampleStarGrowthRate = value;
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
+        previewControl.forceRedraw();
     };
+    addFinalUpdateListener(sampleStarGrowthRate_Control, finalUpdateFunction);
+
     sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration;
-    let sampleStarGrowthLimit_Control = 
+    sampleStarGrowthLimit_Control = 
             sampleControls.createSampleStarGrowthLimitControl(this, data, labelLength);
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.sampleStarGrowthLimit = value;
         photometricMosaicDialog.sampleStarGrowthLimit_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
+        previewControl.forceRedraw();
     };
-    sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration;
-    let sampleStarGrowthLimitTarget_Control = 
+    addFinalUpdateListener(sampleStarGrowthLimit_Control, finalUpdateFunction);
+    sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && displayOverlapRejectionCheckBox.checked;
+    
+    sampleStarGrowthLimitTarget_Control = 
             sampleControls.createSampleStarGrowthLimitTargetControl(this, data, labelLength);
     sampleStarGrowthLimitTarget_Control.onValueUpdated = function (value) {
         data.sampleStarGrowthLimitTarget = value;
         photometricMosaicDialog.sampleStarGrowthLimitTarget_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
+        previewControl.forceRedraw();
     };
-    sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration;
+    addFinalUpdateListener(sampleStarGrowthLimitTarget_Control, finalUpdateFunction);
+    sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !displayOverlapRejectionCheckBox.checked;
+    
     let sampleStarRadiusAdd_Control = 
             sampleControls.createSampleStarAddControl(this, data, labelLength);
     sampleStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.sampleStarRadiusAdd = value;
         photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
+        previewControl.forceRedraw();
     };
+    addFinalUpdateListener(sampleStarRadiusAdd_Control, finalUpdateFunction);
     sampleStarRadiusAdd_Control.enabled = !data.useAutoSampleGeneration;
+    
     let rejectRadiusGroupBox = new GroupBox(this);
     rejectRadiusGroupBox.title = "Star rejection radius";
     rejectRadiusGroupBox.sizer = new VerticalSizer();
@@ -422,10 +418,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
         photometricMosaicDialog.sampleSize_Control.setValue(value);
-        if (liveUpdate){
-            updateSampleGrid();
-        }
     };
+    addFinalUpdateListener(sampleSize_Control, finalUpdateFunction);
+    
     sampleSize_Control.enabled = !data.useAutoSampleGeneration;
     controlsHeight += sampleSize_Control.height;
     let sampleGenerationSection = new Control(this);
@@ -460,16 +455,19 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     autoCheckBox.onClick = function (checked) {
         photometricMosaicDialog.setSampleGenerationAutoValues(checked);
         if (checked){
+            self.enabled = false;
             sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
             sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
             sampleStarGrowthLimitTarget_Control.setValue(data.sampleStarGrowthLimitTarget);
             sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
             sampleSize_Control.setValue(data.sampleSize);
+            processEvents();
             updateSampleGrid();
+            self.enabled = true;
         }
         sampleStarGrowthRate_Control.enabled = !checked;
-        sampleStarGrowthLimit_Control.enabled = !checked;
-        sampleStarGrowthLimitTarget_Control.enabled = !checked;
+        sampleStarGrowthLimit_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
+        sampleStarGrowthLimitTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
         sampleStarRadiusAdd_Control.enabled = !checked;
         sampleSize_Control.enabled = !checked;
     };

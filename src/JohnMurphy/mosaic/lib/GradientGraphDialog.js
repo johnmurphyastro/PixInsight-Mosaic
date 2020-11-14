@@ -148,6 +148,19 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
             "Mouse wheel: Zoom" +
             "\nLeft click: Display (x,y) in title bar";
     
+    /**
+     * When a slider is dragged, only fast draw operations are performed.
+     * When the drag has finished (or after the user has finished editing in the textbox)
+     * this method is called to perform all calculations.
+     * @param {Number} value NumericControl's value
+     */
+    function finalUpdateFunction(value){
+        self.enabled = false;
+        processEvents();
+        update(bitmapControl.width, bitmapControl.height, true);
+        self.enabled = true;
+    }
+    
     // Gradient controls
     let control;
     if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
@@ -176,6 +189,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     } else {
         smoothnessControl.setValue(data.overlapGradientSmoothness);
     }
+    addFinalUpdateListener(smoothnessControl, finalUpdateFunction);
     
     // ===========================
     // Color toggles
@@ -279,16 +293,6 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
         updateZoom( 1 );
     };
     
-    let update_Button = new PushButton(this);
-    update_Button.text = "Update";
-    update_Button.toolTip = "<p>Update display</p>";
-    update_Button.onClick = function(){
-        self.enabled = false;
-        processEvents();
-        update(bitmapControl.width, bitmapControl.height, true);
-        self.enabled = true;
-    };
-    
     let ok_Button = new PushButton(this);
     ok_Button.text = "OK";
     ok_Button.icon = this.scaledResource( ":/icons/ok.png" );
@@ -302,8 +306,6 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     zoomButton_Sizer.add(zoomIn_Button);
     zoomButton_Sizer.add(zoomOut_Button);
     zoomButton_Sizer.add(zoom11_Button);
-    zoomButton_Sizer.addSpacing(20);
-    zoomButton_Sizer.add(update_Button);
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);

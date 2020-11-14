@@ -202,27 +202,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let liveUpdate_control = new CheckBox(this);
     liveUpdate_control.text = "Live update";
     liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
-    liveUpdate_control.onCheck = function (checked){
-        update_Button.enabled = !checked;
-        if (checked){
-            self.enabled = false;
-            processEvents();
-            update(bitmapControl.width, bitmapControl.height);
-            self.enabled = true;
-        }
-    };
     liveUpdate_control.checked = false;
-    
-    let update_Button = new PushButton(this);
-    update_Button.text = "Update";
-    update_Button.toolTip = "<p>Update display</p>";
-    update_Button.onClick = function(){
-        self.enabled = false;
-        processEvents();
-        update(bitmapControl.width, bitmapControl.height);
-        self.enabled = true;
-    };
-    update_Button.enabled = !liveUpdate_control.checked;
     
     let ok_Button = new PushButton(this);
     ok_Button.text = "OK";
@@ -240,12 +220,11 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     zoomButton_Sizer.addSpacing(17);
     zoomButton_Sizer.add(liveUpdate_control);
     zoomButton_Sizer.addSpacing(6);
-    zoomButton_Sizer.add(update_Button);
     zoomButton_Sizer.addSpacing(17);
     zoomButton_Sizer.addStretch();
     zoomButton_Sizer.add(ok_Button);
     zoomButton_Sizer.addSpacing(10);
-    controlsHeight += update_Button.height;
+    controlsHeight += ok_Button.height;
     
     // ===========================
     // Color toggles
@@ -336,6 +315,26 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     
     controlsHeight += redRadioButton.height;
     
+    /**
+     * When a slider is dragged, only fast draw operations are performed.
+     * When the drag has finished (or after the user has finished editing in the textbox)
+     * this method is called to perform all calculations.
+     * @param {Number} value NumericControl's value
+     */
+    function finalUpdateFunction(value){
+        if (!liveUpdate_control.checked){
+            self.enabled = false;
+            processEvents();
+            update(bitmapControl.width, bitmapControl.height);
+            self.enabled = true;
+        } else {
+            // This is used during liveUpdate, but user has edited textbox directly
+            self.enabled = false;
+            processEvents();
+            self.enabled = true;
+        }
+    }
+    
     // ===================================================
     // SectionBar: Star filters
     // ===================================================
@@ -351,6 +350,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(limitPhotoStarsPercent_Control, finalUpdateFunction);
     controlsHeight += limitPhotoStarsPercent_Control.height;
     
     let linearRange_Control = photometryControls.createLinearRangeControl(
@@ -362,6 +362,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(linearRange_Control, finalUpdateFunction);
     controlsHeight += linearRange_Control.height;
     
     let outlierRemoval_Control = photometryControls.createOutlierRemovalControl(
@@ -373,6 +374,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(outlierRemoval_Control, finalUpdateFunction);
     controlsHeight += outlierRemoval_Control.height;
     
     let filterSection = new Control(this);
@@ -401,7 +403,9 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(apertureGrowthRate_Control, finalUpdateFunction);
 //    controlsHeight += apertureGrowthRate_Control.height;
+
     let apertureAdd_Control = photometryControls.createApertureAddControl(
             this, data, BACKGROUND_DELTA_STRLEN);
     apertureAdd_Control.onValueUpdated = function (value) {
@@ -412,7 +416,9 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(apertureAdd_Control, finalUpdateFunction);
 //    controlsHeight += apertureAdd_Control.height;
+
     let apertureBgDelta_Control = photometryControls.createApertureBgDeltaControl(
             this, data, BACKGROUND_DELTA_STRLEN);
     apertureBgDelta_Control.onValueUpdated = function (value) {
@@ -422,6 +428,8 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
             update(bitmapControl.width, bitmapControl.height);
         }
     };
+    addFinalUpdateListener(apertureBgDelta_Control, finalUpdateFunction);
+    
 //    controlsHeight += apertureBgDelta_Control.height;
     
     let apertureSection = new Control(this);
@@ -439,6 +447,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
                 update(bitmapControl.width, bitmapControl.height);
             }
         };
+        addFinalUpdateListener(apertureGrowthLimit_Control, finalUpdateFunction);
 //      controlsHeight += apertureGrowthLimit_Control.height;
         apertureSection.sizer.add(apertureGrowthLimit_Control);
     }

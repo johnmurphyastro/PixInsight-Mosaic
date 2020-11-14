@@ -160,9 +160,9 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             isHorizontal, isTargetAfterRef, scaleFactors)
     {
         let propagateSurfaceSplines = 
-                getSurfaceSplines(data, binnedColorSamplePairs, data.targetGradientSmoothness, 3);
+                getSurfaceSplines(data, binnedColorSamplePairs, data.targetGradientSmoothness, 3, false);
         let surfaceSplines = 
-                getSurfaceSplines(data, binnedColorSamplePairs, data.overlapGradientSmoothness, 3);
+                getSurfaceSplines(data, binnedColorSamplePairs, data.overlapGradientSmoothness, 3, true);
         
         let imageWindow = createCorrectedView(isHorizontal, isTargetAfterRef, 
                 scaleFactors, propagateSurfaceSplines, surfaceSplines, false, joinArea, data);
@@ -170,39 +170,10 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         imageWindow.zoomToFit();
     }
     
-    
-    let liveUpdate = false;
-    
     /**
      * @param {HorizontalSizer} horizontalSizer
      */
     function customControls (horizontalSizer){
-        let liveUpdate_control = new CheckBox(self);
-        liveUpdate_control.text = "Live update";
-        liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
-        liveUpdate_control.onCheck = function (checked){
-            liveUpdate = checked;
-            update_Button.enabled = !checked;
-            if (checked){
-                self.enabled = false;
-                processEvents();
-                update();
-                self.enabled = true;
-            }
-        };
-        liveUpdate_control.checked = liveUpdate;
-
-        let update_Button = new PushButton(self);
-        update_Button.text = "Update";
-        update_Button.toolTip = "<p>Update display</p>";
-        update_Button.onClick = function(){
-            self.enabled = false;
-            processEvents();
-            update();
-            self.enabled = true;
-        };
-        update_Button.enabled = !liveUpdate_control.checked;
-        
         let correctTarget_Button = new PushButton(self);
         correctTarget_Button.text = "Correct target";
         correctTarget_Button.setFixedWidth();
@@ -222,10 +193,6 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             self.enabled = true;
         };
         
-        horizontalSizer.addSpacing(20);
-        horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(6);
-        horizontalSizer.add(update_Button);
         horizontalSizer.addSpacing(20);
         horizontalSizer.add(correctTarget_Button);
         horizontalSizer.addSpacing(10);
@@ -296,6 +263,19 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         self.enabled = true;
     };
 
+
+    /**
+     * When a slider is dragged, only fast draw operations are performed.
+     * When the drag has finished (or after the user has finished editing in the textbox)
+     * this method is called to perform the final update.
+     * @param {Number} value NumericControl's value
+     */
+    function finalUpdateFunction(value){
+        self.enabled = false;
+        processEvents();
+        self.enabled = true;
+    }
+    
     // ===================================================
     // SectionBar: Star size
     // ===================================================
@@ -314,11 +294,11 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthRate_Control.setValue(data.maskStarGrowthRate);
     maskStarGrowthRate_Control.onValueUpdated = function (value) {
         data.maskStarGrowthRate = value;
-        if (liveUpdate) {
-            update();
-        }
+        update();
     };
+    addFinalUpdateListener(maskStarGrowthRate_Control, finalUpdateFunction);
     controlsHeight += maskStarGrowthRate_Control.height;
+    
     let maskStarGrowthLimit_Control = new NumericControl(this);
     maskStarGrowthLimit_Control.real = false;
     maskStarGrowthLimit_Control.label.text = "Growth Limit:";
@@ -332,11 +312,11 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthLimit_Control.setValue(data.maskStarGrowthLimit);
     maskStarGrowthLimit_Control.onValueUpdated = function (value) {
         data.maskStarGrowthLimit = value;
-        if (liveUpdate) {
-            update();
-        }
+        update();
     };
+    addFinalUpdateListener(maskStarGrowthLimit_Control, finalUpdateFunction);
     controlsHeight += maskStarGrowthLimit_Control.height;
+    
     let maskStarRadiusAdd_Control = new NumericControl(this);
     maskStarRadiusAdd_Control.real = true;
     maskStarRadiusAdd_Control.label.text = "Radius add:";
@@ -351,18 +331,17 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarRadiusAdd_Control.setValue(data.maskStarRadiusAdd);
     maskStarRadiusAdd_Control.onValueUpdated = function (value) {
         data.maskStarRadiusAdd = value;
-        if (liveUpdate) {
-            update();
-        }
+        update();
     };
+    addFinalUpdateListener(maskStarRadiusAdd_Control, finalUpdateFunction);
     controlsHeight += maskStarRadiusAdd_Control.height;
     
     let apertureSection = new Control(this);
     apertureSection.sizer = new VerticalSizer;
     apertureSection.sizer.spacing = 2;
+    apertureSection.sizer.add(maskStarRadiusAdd_Control);
     apertureSection.sizer.add(maskStarGrowthRate_Control);
     apertureSection.sizer.add(maskStarGrowthLimit_Control);
-    apertureSection.sizer.add(maskStarRadiusAdd_Control);
     let apertureBar = new SectionBar(this, "Star Size");
     apertureBar.setSection(apertureSection);
     apertureBar.onToggleSection = this.onToggleSection;
@@ -373,7 +352,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     // SectionBar: Star filters
     // ===================================================
     let limitMaskStars_Control = new NumericControl(this);
-    limitMaskStars_Control.real = false;
+    limitMaskStars_Control.real = true;
     limitMaskStars_Control.label.text = "Limit stars %:";
     limitMaskStars_Control.toolTip =
             "<p>Specifies the percentage of the brightest detected stars that will be used to " +
@@ -384,15 +363,15 @@ function MaskStarsDialog(joinArea, detectedStars, data,
             "only a small percentage of the detected stars need to be used.</p>";
     limitMaskStars_Control.label.setFixedWidth(starMaskLabelSize);
     limitMaskStars_Control.setRange(0, 100);
-    limitMaskStars_Control.slider.setRange(0, 100);
-    limitMaskStars_Control.maxWidth = 300;
+    limitMaskStars_Control.slider.setRange(0, 500);
+    limitMaskStars_Control.setPrecision(2);
+    limitMaskStars_Control.maxWidth = 800;
     limitMaskStars_Control.setValue(data.limitMaskStarsPercent);
     limitMaskStars_Control.onValueUpdated = function (value) {
         data.limitMaskStarsPercent = value;
-        if (liveUpdate) {
-            update();
-        }
+        update();
     };
+    addFinalUpdateListener(limitMaskStars_Control, finalUpdateFunction);
     controlsHeight += limitMaskStars_Control.height;
     
     let filterSection = new Control(this);

@@ -482,7 +482,7 @@ function Overlap(refImage, tgtImage){
  */
 function JoinRegion(data){
     let overlapBox = data.cache.overlap.overlapBox;
-    this.joinRect = new Rect(overlapBox);
+    this.joinRect = new Rect(overlapBox);   // initial default.
     
     /**
      * @returns {Boolean}

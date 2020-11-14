@@ -233,6 +233,20 @@ function calcApertureCorrection(apertureAdd, growthRate, growthLimit, starFlux){
 }
 
 /**
+ * Creates a pair of stars based on the input refStar and tgtStar, and data values.
+ * The input refStar and tgtStar were detected by StarDetector, and then the flux
+ * was recalculated using fixed aperture add and growth parameters.
+ * 
+ * The star aperture is calculated by:
+ * (1) The union of refStar's and tgtStar's original boundingBox.
+ * This is stored as a delta for top, left, bottom, right to keep the rectangle 
+ * center at the star's center.
+ * (2) An aperture inflation is calculated, using the max flux from refStar and tgtStar.
+ * (We use the flux from refStar and tgtStar for consistency - their flux is not 
+ * modified after the initial recalculation straight after StarDetector returned them.)
+ * The calculation also uses data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit
+ * (3) The new star fluxes for the two new stars are calculated using the new aperture
+ * 
  * @param {PhotometricMosaicData} data Values from user interface
  * @param {Image} refImage
  * @param {Image} tgtImage
@@ -252,44 +266,56 @@ function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
     function Delta (refStar, tgtStar){
         let refRect = refStar.getBoundingBox();
         let tgtRect = tgtStar.getBoundingBox();
-        this.top = Math.max(refStar.pos.y - refRect.y0, tgtStar.pos.y - tgtRect.y0);
-        this.left = Math.max(refStar.pos.x - refRect.x0, tgtStar.pos.x - tgtRect.x0);
-        this.bottom = Math.max(refRect.y1 - refStar.pos.y, tgtRect.y1 - tgtStar.pos.y);
-        this.right = Math.max(refRect.x1 - refStar.pos.x, tgtRect.x1 - tgtStar.pos.x);
-        
         let maxFlux = Math.max(refStar.getStarFlux(), tgtStar.getStarFlux());
-        let inflate = Math.round(calcApertureCorrection(
-                data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit, maxFlux));
-        this.top += inflate;
-        this.left += inflate;
-        this.bottom += inflate;
-        this.right += inflate;
+        let top = Math.max(refStar.pos.y - refRect.y0, tgtStar.pos.y - tgtRect.y0);
+        let left = Math.max(refStar.pos.x - refRect.x0, tgtStar.pos.x - tgtRect.x0);
+        let bottom = Math.max(refRect.y1 - refStar.pos.y, tgtRect.y1 - tgtStar.pos.y);
+        let right = Math.max(refRect.x1 - refStar.pos.x, tgtRect.x1 - tgtStar.pos.x);
+        
+        function calcAperture(star, apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+            let inflate = Math.round(calcApertureCorrection(
+                apertureAdd, apertureGrowthRate, apertureGrowthLimit, maxFlux));
+            let x0 = Math.round(star.pos.x - (left + inflate));
+            let y0 = Math.round(star.pos.y - (top + inflate));
+            let x1 = Math.round(star.pos.x + (right + inflate));
+            let y1 = Math.round(star.pos.y + (bottom + inflate));
+            return new Rect(x0, y0, x1, y1);
+        }
+        this.getRefAperture = function (apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+            return calcAperture(refStar, apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        };
+        this.getTgtAperture = function (apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+            return calcAperture(tgtStar, apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        };
     }
     
     let delta = new Delta(refStar, tgtStar);
-    
-    this.refStar = createStar(refImage, refStar, delta, data.apertureBgDelta, channel);
-    this.tgtStar = createStar(tgtImage, tgtStar, delta, data.apertureBgDelta, channel);
+    let refAperture = delta.getRefAperture(data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit);
+    this.refStar = refStar.factory(refImage, channel, refAperture, data.apertureBgDelta);
+    let tgtAperture = delta.getTgtAperture(data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit);
+    this.tgtStar = tgtStar.factory(tgtImage, channel, tgtAperture, data.apertureBgDelta);
     
     /**
-     * Create a star based on the supplied star, but with a larger star rectangle
-     * and a new background rectangle.
-     * The star's total flux and background level are calculated.
-     * @param {Image} image The image the star is from
-     * @param {Star} star Original star (not modified)
-     * @param {StarPair.Delta} delta Specifies how to inflate the star rectangle
-     * @param {Number} bkgDelta Distance between inner and outer rectangles
-     * @param {Number} channel Color channel
-     * @returns {Star}
+     * Use to allow fast draw of star apertures
+     * @param {Number} apertureAdd
+     * @param {Number} apertureGrowthRate
+     * @param {Number} apertureGrowthLimit
+     * @returns {Rect}
      */
-    function createStar(image, star, delta, bkgDelta, channel){
-        let x0 = Math.round(star.pos.x - delta.left);
-        let y0 = Math.round(star.pos.y - delta.top);
-        let x1 = Math.round(star.pos.x + delta.right);
-        let y1 = Math.round(star.pos.y + delta.bottom);
-        let aperture = new Rect(x0, y0, x1, y1);
-        return star.factory(image, channel, aperture, bkgDelta);
-    }
+    this.getRefAperture = function(apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+        return delta.getRefAperture(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+    };
+    
+    /**
+     * Use to allow fast draw of star apertures
+     * @param {Number} apertureAdd
+     * @param {Number} apertureGrowthRate
+     * @param {Number} apertureGrowthLimit
+     * @returns {Rect}
+     */
+    this.getTgtAperture = function(apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+        return delta.getTgtAperture(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+    };
 }
 
 /**

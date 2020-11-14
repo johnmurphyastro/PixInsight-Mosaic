@@ -129,7 +129,8 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
      */
     function createZoomedGraph(factor, width, height, selectedChannel, info){
         let smoothness;
-        if (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH()){
+        let isOverlapSurfaceSpline = (data.viewFlag === DISPLAY_OVERLAP_GRADIENT_GRAPH());
+        if (isOverlapSurfaceSpline){
             smoothness = data.overlapGradientSmoothness;
         } else {
             smoothness = data.targetGradientSmoothness;
@@ -138,7 +139,8 @@ function GradientGraph(tgtImage, isHorizontal, isTargetAfterRef,
         if (info){
             consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, selectedChannel);
         }      
-        let surfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, selectedChannel);
+        let surfaceSplines = getSurfaceSplines(
+                data, binnedColorSamplePairs, smoothness, selectedChannel, isOverlapSurfaceSpline);
         if (info){
             consoleInfo.end();
         }

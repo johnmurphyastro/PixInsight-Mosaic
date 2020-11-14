@@ -322,7 +322,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         try {
             let smoothness = data.targetGradientSmoothness;
             let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairsTarget, smoothness, 3);
-            propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairsTarget, smoothness, 3);
+            propagateSurfaceSplines = getSurfaceSplines(data, binnedColorSamplePairsTarget, smoothness, 3, false);
             consoleInfo.end();
         } catch (ex){
             new MessageBox("Propagate Surface Spline error.\n" + ex.message, 
@@ -345,7 +345,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     try {
         let smoothness = data.overlapGradientSmoothness;
         let consoleInfo = new SurfaceSplineInfo(binnedColorSamplePairs, smoothness, 3);
-        surfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3);
+        surfaceSplines = getSurfaceSplines(data, binnedColorSamplePairs, smoothness, 3, true);
         consoleInfo.end();
     } catch (ex){
         new MessageBox("Gradient Surface Spline error.\n" + ex.message, 
@@ -377,15 +377,17 @@ function photometricMosaic(data, photometricMosaicDialog)
  * @param {SamplePair[][]} binnedColorSamplePairs
  * @param {Number} smoothness
  * @param {Number} selectedChannel R=0, G=1, B=2, All=3
+ * @param {Boolean} isOverlapSampleGrid
  * @returns {SurfaceSpline[]}
  */
-function getSurfaceSplines(data, binnedColorSamplePairs, smoothness, selectedChannel){
+function getSurfaceSplines(data, binnedColorSamplePairs, smoothness, selectedChannel, isOverlapSampleGrid){
     let nChannels = binnedColorSamplePairs.length;
     let surfaceSplines = [];
     for (let c = 0; c < nChannels; c++) {
         if (selectedChannel === c || selectedChannel === 3){
             let samplePairs = binnedColorSamplePairs[c];
-            surfaceSplines[c] = data.cache.getSurfaceSpline(data, samplePairs, smoothness, c);
+            surfaceSplines[c] = data.cache.getSurfaceSpline(
+                    data, samplePairs, smoothness, c, isOverlapSampleGrid);
         } else {
             surfaceSplines[c] = null;
         }
