@@ -192,6 +192,7 @@ function PhotometryControls(){
             "<p>Adjust this control until the brightest stars entirely fit " +
             "within the inner photometry aperture. " +
             "Check both reference and target stars.</p>" +
+            "<p>The best value is usually between 0.5 and 1</p>" +
             "<p>It is not necessary to include diffraction spikes.</p>"
     };
     /**
@@ -333,8 +334,12 @@ function SampleControls(){
         range: {min:-10000, max:10000},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Moves the join region the specified number of pixels " +
-                "from the center of the overlap bounding box.</p>"
+        toolTip: "<p>Offsets the Join Region / Join Path " +
+                "from the center of the overlap bounding box.</p>" +
+                "<p>Select 'Overlap rejection' to view the " +
+                "Join Path (Overlay mode) or Join Region (Random or Average mode).</p>" +
+                "<p>The Join Region moves left/right (vertical join) or " +
+                "up/down (horizontal join).</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -411,7 +416,7 @@ function SampleControls(){
         toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
             "<p>Use this control to set the rejection radius for bright, but unsaturated, stars " +
             "(use 'Radius add' for faint stars).</p>" +
-            "<p>Should normally be set to the same value as the photometric 'Growth rate'.</p>"
+            "<p>Should normally be set to the same value as the photometry 'Growth rate'.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -522,7 +527,7 @@ function SampleControls(){
         toolTip: "<p>This value is added to the rejection radius for all stars.</p>" +
             "<p>Use this control to set the rejection radius for <b>faint stars</b> " +
             "(use 'Growth rate' for brighter stars).</p>" +
-            "<p>Should normally be set to the same value as the photometric 'Radius add'.</p>"
+            "<p>Should normally be set to the same value as the photometry 'Radius add'.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -588,6 +593,93 @@ function SampleControls(){
             control.setRange(self.sampleSize.range.min, maxSampleSize);
         }
         control.setValue(data.sampleSize);
+        return control;
+    };
+}
+
+//-------------------------------------------------------
+// Gradient Controls
+//-------------------------------------------------------
+function GradientControls(){
+    let self = this;
+    
+    this.overlapGradientSmoothness = {
+        real: true,
+        text: "Gradient smoothness:",
+        slider: {range: {min:-400, max:300}},
+        range: {min:-4, max:3},
+        precision: 1,
+        maxWidth: 800,
+        toolTip: "<p>A surface spline is created to model the relative " +
+        "gradient over the whole of the overlap region.</p>" +
+        "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
+        "the gradient but not the noise.</p>" +
+        "<p>This control specifies the logarithm of the smoothness. " +
+        "Larger values apply more smoothing.</p>"
+    };
+    
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @param {Number} strLength
+     * @returns {NumericControl}
+     */
+    this.createOverlapGradientSmoothnessControl = function(dialog, data, strLength){
+        let control = createNumericControl(dialog, self.overlapGradientSmoothness, strLength);
+        control.setValue(data.overlapGradientSmoothness);
+        return control;
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @returns {NumericEdit}
+     */
+    this.createOverlapGradientSmoothnessEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.overlapGradientSmoothness);
+        control.setValue(data.overlapGradientSmoothness);
+        return control;
+    };
+    
+    this.targetGradientSmoothness = {
+        real: true,
+        text: "Gradient smoothness:",
+        slider: {range: {min:-200, max:500}},
+        range: {min:-2, max:5},
+        precision: 1,
+        maxWidth: 800,
+        toolTip: "<p>The target image gradient correction is determined from the gradient " +
+        "along the target side edge of the Overlap's bounding box.</p>" +
+        "<p>However, this gradient will contain local variations " +
+        "(e.g. diffuse light around bright stars) that should not " +
+        "be extrapolated across the target image.</p>" +
+        "<p>Sufficient Smoothness should be applied to ensure that the " +
+        "gradient correction only follows the gradient trend, rather than " +
+        "these local variations.</p>" +
+        "<p>If the gradient contains a sharp peak, use 'Growth limit (Target)' in " +
+        "the 'Sample Generation' section to reject more samples around bright stars.</p>" +
+        "<p>This control specifies the logarithm of the smoothness. " +
+        "Larger values apply more smoothing.</p>"
+    };
+    
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @param {Number} strLength
+     * @returns {NumericControl}
+     */
+    this.createTargetGradientSmoothnessControl = function(dialog, data, strLength){
+        let control = createNumericControl(dialog, self.targetGradientSmoothness, strLength);
+        control.setValue(data.targetGradientSmoothness);
+        return control;
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @returns {NumericEdit}
+     */
+    this.createTargetGradientSmoothnessEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.targetGradientSmoothness);
+        control.setValue(data.targetGradientSmoothness);
         return control;
     };
 }

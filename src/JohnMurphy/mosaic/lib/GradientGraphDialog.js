@@ -162,33 +162,22 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     }
     
     // Gradient controls
-    let control;
+    let gradientControls = new GradientControls();
+    let smoothnessControl;
     if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
-        control = photometricMosaicDialog.targetGradientSmoothness_Control;
-    } else {
-        control = photometricMosaicDialog.overlapGradientSmoothness_Control;
-    }
-    let smoothnessControl = new NumericControl(this);
-    smoothnessControl.real = true;
-    smoothnessControl.setPrecision(1);
-    smoothnessControl.label.text = "Smoothness:";
-    smoothnessControl.toolTip = control.toolTip;
-    smoothnessControl.onValueUpdated = function (value) {
-        if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
+        smoothnessControl = gradientControls.createTargetGradientSmoothnessControl(this, data, 0);
+        smoothnessControl.onValueUpdated = function (value) {
             data.targetGradientSmoothness = value;
-        } else {
-            data.overlapGradientSmoothness = value;
-        }
-        control.setValue(value);
-    };
-    smoothnessControl.setRange(control.lowerBound, control.upperBound);
-    smoothnessControl.slider.setRange(control.slider.minValue, control.slider.maxValue);
-    smoothnessControl.slider.minWidth = 280;
-    if (data.viewFlag === DISPLAY_TARGET_GRADIENT_GRAPH()){
-        smoothnessControl.setValue(data.targetGradientSmoothness);
+            photometricMosaicDialog.targetGradientSmoothness_Control.setValue(value);
+        };
     } else {
-        smoothnessControl.setValue(data.overlapGradientSmoothness);
+        smoothnessControl = gradientControls.createOverlapGradientSmoothnessControl(this, data, 0);
+        smoothnessControl.onValueUpdated = function (value) {
+            data.overlapGradientSmoothness = value;
+            photometricMosaicDialog.overlapGradientSmoothness_Control.setValue(value);
+        }; 
     }
+    smoothnessControl.slider.minWidth = 280;
     addFinalUpdateListener(smoothnessControl, finalUpdateFunction);
     
     // ===========================
@@ -197,7 +186,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
     redRadioButton.toolTip = "<p>Display the red channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The 'Smoothness' setting will be applied to all color channels.</p>";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
@@ -211,7 +200,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
     greenRadioButton.toolTip = "<p>Display the green channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The 'Smoothness' setting will be applied to all color channels.</p>";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
@@ -225,7 +214,7 @@ function GradientGraphDialog(title, data, isColor, createZoomedGraph, photometri
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
     blueRadioButton.toolTip = "<p>Display the blue channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The 'Smoothness' setting will be applied to all color channels.</p>";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {

@@ -643,11 +643,9 @@ function PhotometricMosaicDialog(data) {
         "Designed to work with planned mosaics where the tiles form a regular grid.</b><br />" +
         "(1) Read help sections: <i>Prerequisites</i> and <i>Quick Start Guide</i>.<br />" +
         "(2) Use script <i>Image Analysis -> ImageSolver</i> to plate solve your stacked mosaic tiles.<br />" +
-        "(3) Use script <i>Utilities -> MosaicByCoordinates</i> to register plate solved tiles.<br />" +
-        "(4) Ensure the black areas surrounding each image really are black (Readout Data = 0.0).<br />" +
-        "(5) Use script <i>Mosaic -> TrimMosaicTile</i> to errode away soft or ragged image edges.<br />" +
-        "(6) Join frames into either rows or columns, " +
-        "and then join these strips to create the final mosaic.<br />" +
+        "(3) Use script <i>Utilities -> MosaicByCoordinates</i> to register the plate solved tiles.<br />" +
+        "(4) Use script <i>Mosaic -> TrimMosaicTile</i> to erode away soft or ragged image edges.<br />" +
+        "(5) Join frames into either rows or columns, and then join these strips to create the final mosaic.<br />" +
         "Copyright &copy; 2019-2020 John Murphy");
     let titleSection = new Control(this);
     titleSection.sizer = new VerticalSizer;
@@ -885,7 +883,7 @@ function PhotometricMosaicDialog(data) {
             "<p>Displays the photometry graph. " +
             "Each star is plotted against its reference and target image flux. " +
             "A best fit line is drawn through these points (Least squares fit). " +
-            "The gradient provides the brigtness scale factor.</p>" +
+            "The gradient provides the brightness scale factor.</p>" +
             "<p>Provides edit sliders for " +
             "'Limit stars %', 'Linear range' and 'Outlier removal'.</p>" +
             "<p>These controls determine which stars are used to " +
@@ -1187,25 +1185,12 @@ function PhotometricMosaicDialog(data) {
     // ===============================================================
     // Gradient controls
     let GRADIENT_LABEL_LEN = this.font.width("Taper length:");
-    this.overlapGradientSmoothness_Control = new NumericControl(this);
-    this.overlapGradientSmoothness_Control.real = true;
-    this.overlapGradientSmoothness_Control.setPrecision(1);
-    this.overlapGradientSmoothness_Control.label.text = "Smoothness:";
-    this.overlapGradientSmoothness_Control.label.minWidth = GRADIENT_LABEL_LEN;
-    this.overlapGradientSmoothness_Control.toolTip =
-        "<p>A surface spline is created to model the relative " +
-        "gradient over the whole of the overlap region.</p>" +
-        "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
-        "the gradient but not the noise.</p>" +
-        "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>";
+    let gradientControls = new GradientControls();
+    this.overlapGradientSmoothness_Control = 
+            gradientControls.createOverlapGradientSmoothnessEdit(this, data);
     this.overlapGradientSmoothness_Control.onValueUpdated = function (value) {
         data.overlapGradientSmoothness = value;
     };
-    this.overlapGradientSmoothness_Control.setRange(-4, 3);
-    this.overlapGradientSmoothness_Control.slider.setRange(-400, 300);
-    this.overlapGradientSmoothness_Control.slider.minWidth = 140;
-    this.overlapGradientSmoothness_Control.setValue(data.overlapGradientSmoothness);
     
     let overlapGradientGraphButton = new PushButton(this);
     overlapGradientGraphButton.text = "Overlap gradient";
@@ -1215,23 +1200,94 @@ function PhotometricMosaicDialog(data) {
         "the horizontal axis the join's X-Coordinate (horizontal join) " +
         "or Y-Coordinate (vertical join).</p>" +
         "<p>The plotted dots represent samples close to the join path.</p>" +
-        "<p>The curve shows the gradient along the path of the join. " +
-        "This path follows the center line of the join region's bounding box, " +
-        "or the boundary of the overlapping pixels if the center line leaves the " +
-        "overlap.</p>" +
-        "<p>The join path can be displayed within the 'Gradient Sample Generation' dialog.</p>";
+        "<p>The plotted curve shows the gradient along the path of the " +
+        "reference image - target image join.</p>" +
+        "<p>To view or edit the position of the join, use the 'Sample generation' dialog.</p>";
     overlapGradientGraphButton.onClick = function () {
         data.viewFlag = DISPLAY_OVERLAP_GRADIENT_GRAPH();
         this.dialog.ok();
     };
     
-    let taperTooltip = "<p>The gradient within the overlap region can be accurately " +
+    let gradientOverlapGroupBox = new GroupBox(this);
+    gradientOverlapGroupBox.title = "Overlap region";
+    gradientOverlapGroupBox.sizer = new HorizontalSizer();
+    gradientOverlapGroupBox.sizer.margin = 2;
+    gradientOverlapGroupBox.sizer.spacing = 10;
+    gradientOverlapGroupBox.sizer.add(this.overlapGradientSmoothness_Control);
+    gradientOverlapGroupBox.sizer.addStretch();
+    gradientOverlapGroupBox.sizer.add(overlapGradientGraphButton);
+    gradientOverlapGroupBox.toolTip = "<p>A surface spline is created to model the relative " +
+            "gradient over the whole of the overlap region.</p>" +
+            "<p>Smoothing is applied to this surface spline to ensure it follows " +
+            "the gradient but not the noise.</p>";
+    
+    // =============================================================
+    // SectionBar: "Gradient Correction" : Group box "Target Image"
+    // =============================================================
+    this.targetGradientSmoothness_Control = 
+            gradientControls.createTargetGradientSmoothnessEdit(this, data);
+    this.targetGradientSmoothness_Control.onValueUpdated = function (value) {
+        data.targetGradientSmoothness = value;
+    };
+    
+    let targetGradientGraphButton = new PushButton(this);
+    targetGradientGraphButton.text = "Target gradient";
+    targetGradientGraphButton.toolTip =
+        "<p>Edit the 'Smoothness' parameter and view the gradient that will be " +
+        "applied to the rest of the target image (i.e. outside the overlap region).</p>" +
+        "<p>The vertical axis represents the difference between the two images, " +
+        "the horizontal axis the join's X-Coordinate (horizontal join) " +
+        "or Y-Coordinate (vertical join).</p>" +
+        "<p>The plotted dots represent samples close to the target side boundary of the " +
+        "overlapping pixels.</p>" +
+        "<p>The plotted curve shows the gradient correction that will be applied to the target image.</p>";
+    targetGradientGraphButton.onClick = function () {
+        data.viewFlag = DISPLAY_TARGET_GRADIENT_GRAPH();
+        this.dialog.ok();
+    };
+    
+    this.setTargetGradientFlag = function (checked){
+        data.useTargetGradientCorrection = checked;
+        self.gradientTargetImageGroupBox.checked = checked;
+        self.targetGradientSmoothness_Control.enabled = checked;
+        targetGradientGraphButton.enabled = checked;
+        self.setTaperLengthAutoValue(data);
+    };
+    
+    this.gradientTargetImageGroupBox = new GroupBox(this);
+    this.gradientTargetImageGroupBox.title = "Target image";
+    this.gradientTargetImageGroupBox.titleCheckBox = true;
+    this.gradientTargetImageGroupBox.onCheck = this.setTargetGradientFlag;
+    this.gradientTargetImageGroupBox.sizer = new HorizontalSizer();
+    this.gradientTargetImageGroupBox.sizer.margin = 2;
+    this.gradientTargetImageGroupBox.sizer.spacing = 10;
+    this.gradientTargetImageGroupBox.sizer.add(this.targetGradientSmoothness_Control);
+    this.gradientTargetImageGroupBox.sizer.addStretch();
+    this.gradientTargetImageGroupBox.sizer.add(targetGradientGraphButton);
+    this.gradientTargetImageGroupBox.toolTip = 
+            "<p>If selected, a gradient correction is applied " +
+            "to the rest of the target image (i.e. outside the overlap region).</p>" +
+            "<p>If not selected, only the average background offset is applied.</p>" +
+            "<p>In most situations, this option should be selected.</p>";
+    
+    let gradientsHorizSizer = new HorizontalSizer();
+    gradientsHorizSizer.spacing = 20;
+    gradientsHorizSizer.add(gradientOverlapGroupBox, 50);
+    gradientsHorizSizer.add(this.gradientTargetImageGroupBox, 50);
+    
+    // ========================================================================================
+    // SectionBar: "Gradient Correction" : Group box "Overlap to Target transition"
+    // ========================================================================================
+    let taperTooltip = "<p>The taper length should be a similar size to the scale of " +
+        "local gradients - i.e. how far scattered light extends around bright stars.</p>" +
+        "<p>The gradient within the overlap region can be accurately " +
         "calculated, and only requires a small amount of smoothing to remove noise.</p>" +
-        "<p>The gradient over the rest of the target frame is only an estimate, so " +
-        "it is normal to apply a greater level of smoothing to this region " +
-        "(see 'Gradient Correction (Target image)' section).</p>" +
-        "<p>The taper length provides a tapered transition between these two different " +
-        "levels of smoothing. This transition zone is in the Target image area, " +
+        "<p>The gradient applied to the rest of the target frame is based on the " +
+        "gradient at the target side of the overlap region. Local variations in the " +
+        "gradient need to be filtered out by rejecting more samples around bright stars, " +
+        "and by applying more smoothing.</p>" +
+        "<p>The taper length provides a tapered transition between these two regions. " +
+        "This transition zone is in the Target image area, " +
         "starting from the edge of the overlap's bounding box.</p>";
     
     this.taperLength_Control = new NumericControl(this);
@@ -1275,109 +1331,24 @@ function PhotometricMosaicDialog(data) {
         self.taperLength_Control.enabled = !data.useAutoTaperLength;
     };
     
-    let taperLengthSizer = new HorizontalSizer(this);
-    taperLengthSizer.spacing = 4;
-    taperLengthSizer.add(this.taperLength_Control);
-    taperLengthSizer.addSpacing(20);
-    taperLengthSizer.add(this.autoTaperLengthCheckBox);
-    
-    let overlapGradientSizer = new HorizontalSizer(this);
-    overlapGradientSizer.spacing = 4;
-    overlapGradientSizer.add(this.overlapGradientSmoothness_Control);
-    overlapGradientSizer.addSpacing(20);
-    overlapGradientSizer.add(overlapGradientGraphButton);
-    
-    let gradientOverlapGroupBox = new GroupBox(this);
-    gradientOverlapGroupBox.title = "Overlap region";
-    gradientOverlapGroupBox.sizer = new VerticalSizer();
-    gradientOverlapGroupBox.sizer.margin = 2;
-    gradientOverlapGroupBox.sizer.spacing = 4;
-    gradientOverlapGroupBox.sizer.add(overlapGradientSizer);
-    gradientOverlapGroupBox.sizer.add(taperLengthSizer);
-    gradientOverlapGroupBox.toolTip = "<p>A surface spline is created to model the relative " +
-            "gradient over the whole of the overlap region.</p>" +
-            "<p>Smoothing is applied to this surface spline to ensure it follows " +
-            "the gradient but not the noise.</p>";
-    
-    // =============================================================
-    // SectionBar: "Gradient Correction" : Group box "Target Image"
-    // =============================================================
-    this.targetGradientSmoothness_Control = new NumericControl(this);
-    this.targetGradientSmoothness_Control.real = true;
-    this.targetGradientSmoothness_Control.setPrecision(1);
-    this.targetGradientSmoothness_Control.label.text = "Smoothness:";
-    this.targetGradientSmoothness_Control.label.minWidth = GRADIENT_LABEL_LEN;
-    this.targetGradientSmoothness_Control.toolTip =
-        "<p>The target image gradient correction is determined from the gradient " +
-        "along the target side edge of the Overlap's bounding box.</p>" +
-        "<p>However, this gradient will contain local variations " +
-        "(e.g. diffuse light around bright stars) that should not " +
-        "be extrapolated across the target image.</p>" +
-        "<p>Sufficient Smoothness should be applied to ensure that the " +
-        "gradient correction only follows the gradient trend, rather than " +
-        "these local variations.</p>" +
-        "<p>This control specifies the logarithm of the smoothness. " +
-        "Larger values apply more smoothing.</p>";
-    this.targetGradientSmoothness_Control.onValueUpdated = function (value) {
-        data.targetGradientSmoothness = value;
-    };
-    this.targetGradientSmoothness_Control.setRange(-2, 5);
-    this.targetGradientSmoothness_Control.slider.setRange(-100, 600);
-    this.targetGradientSmoothness_Control.slider.minWidth = 140;
-    this.targetGradientSmoothness_Control.setValue(data.targetGradientSmoothness);
-    
-    let targetGradientGraphButton = new PushButton(this);
-    targetGradientGraphButton.text = "Target gradient";
-    targetGradientGraphButton.toolTip =
-        "<p>Edit the 'Smoothness' parameter and view the gradient that will be " +
-        "applied to the rest of the target image (i.e. outside the overlap region).</p>" +
-        "<p>The vertical axis represents the difference between the two images, " +
-        "the horizontal axis the join's X-Coordinate (horizontal join) " +
-        "or Y-Coordinate (vertical join).</p>" +
-        "<p>The plotted dots represent samples close to the target side boundary of the " +
-        "overlapping pixels.</p>" +
-        "<p>The curve shows the gradient correction that will be applied to the target image.</p>";
-    targetGradientGraphButton.onClick = function () {
-        data.viewFlag = DISPLAY_TARGET_GRADIENT_GRAPH();
-        this.dialog.ok();
-    };
-    
-    this.setTargetGradientFlag = function (checked){
-        data.useTargetGradientCorrection = checked;
-        self.gradientTargetImageGroupBox.checked = checked;
-        self.targetGradientSmoothness_Control.enabled = checked;
-        targetGradientGraphButton.enabled = checked;
-        self.setTaperLengthAutoValue(data);
-    };
-    
-    this.gradientTargetImageGroupBox = new GroupBox(this);
-    this.gradientTargetImageGroupBox.title = "Target image";
-    this.gradientTargetImageGroupBox.titleCheckBox = true;
-    this.gradientTargetImageGroupBox.onCheck = this.setTargetGradientFlag;
-    this.gradientTargetImageGroupBox.sizer = new HorizontalSizer();
-    this.gradientTargetImageGroupBox.sizer.margin = 2;
-    this.gradientTargetImageGroupBox.sizer.spacing = 10;
-    this.gradientTargetImageGroupBox.sizer.add(this.targetGradientSmoothness_Control);
-    this.gradientTargetImageGroupBox.sizer.addSpacing(20);
-    this.gradientTargetImageGroupBox.sizer.add(targetGradientGraphButton);
-    this.gradientTargetImageGroupBox.toolTip = 
-            "<p>If selected, a gradient correction is applied " +
-            "to the rest of the target image (i.e. outside the overlap region).</p>" +
-            "<p>If not selected, only the average background offset is applied.</p>" +
-            "<p>In most situations, this option should be selected.</p>";
+    let gradientTaperGroupBox = new GroupBox(this);
+    gradientTaperGroupBox.title = "Overlap to Target transition";
+    gradientTaperGroupBox.sizer = new HorizontalSizer();
+    gradientTaperGroupBox.sizer.margin = 2;
+    gradientTaperGroupBox.sizer.add(this.taperLength_Control);
+    gradientTaperGroupBox.sizer.addSpacing(20);
+    gradientTaperGroupBox.sizer.add(this.autoTaperLengthCheckBox);
+    gradientTaperGroupBox.toolTip = taperTooltip;
     
     let gradientSection = new Control(this);
     gradientSection.sizer = new VerticalSizer(this);
     gradientSection.sizer.spacing = 4;
-    gradientSection.sizer.add(gradientOverlapGroupBox);
-    gradientSection.sizer.add(this.gradientTargetImageGroupBox);
+    gradientSection.sizer.add(gradientsHorizSizer);
+    gradientSection.sizer.add(gradientTaperGroupBox);
     let gradientBar = new SectionBar(this, "Gradient Correction");
     gradientBar.setSection(gradientSection);
     gradientBar.onToggleSection = this.onToggleSection;
-    gradientBar.toolTip = "<p>A surface spline is created to model the relative " +
-            "gradient over the whole of the overlap region.</p>" +
-            "<p>Smoothing is applied to this surface spline to ensure it follows " +
-            "the gradient but not the noise.</p>";
+//    gradientBar.toolTip = "<p></p>";
 
     this.setTargetGradientFlag(data.useTargetGradientCorrection);
     // SectionBar: "Gradient Correction" End
@@ -1570,8 +1541,7 @@ function PhotometricMosaicDialog(data) {
     this.joinSize_Control.toolTip = "<p>Specifies the thickness of the Join Region. " +
             "For a horizontal join, this is the height. For a vertical join, the width. " +
             "The ideal Join size depends on the Mosaic Combination mode:" +
-            "<ul><li>Overlay: The join runs along the middle of the Join Region. " +
-            "Join size is ignored.</li>" +
+            "<ul><li>Overlay: The join runs along the middle of the Join Region.</li>" +
             "<li>Random: Join size should be large enough to blend the two images " +
             "together, but small enough not to include too many stars.</li>" +
             "<li>Average: Determines the area that will benefit from a higher " +
@@ -1626,7 +1596,7 @@ function PhotometricMosaicDialog(data) {
     joinRegionBar.setSection(joinRegionSection);
     joinRegionBar.onToggleSection = this.onToggleSection;
     joinRegionBar.toolTip = 
-            "The Join Region determines were the reference - target image join occures";
+            "The Join Region determines were the reference - target image join occurs";
     // SectionBar "Join Region" End
 
 
@@ -1663,8 +1633,8 @@ function PhotometricMosaicDialog(data) {
             "this can lead to speckled pixels around the stars.</p>" +
             "<p>These speckled star artifacts can be fixed by using PixelMath " +
             "to apply either the reference or target image to the mosaic through " +
-            "a mask that only reveals the bright stars. The 'Mosaic Star Mask' " +
-            "section has been provided for this purpose.</p>";
+            "a mask that only reveals the bright stars. The 'Star Mask' dialog " +
+            "has been provided to create a suitable mask.</p>";
     this.mosaicRandom_Control.checked = data.useMosaicRandom;
     this.mosaicRandom_Control.onClick = function (checked) {
         data.useMosaicRandom = checked;
@@ -1688,11 +1658,15 @@ function PhotometricMosaicDialog(data) {
     let starsMaskButton = new PushButton(this);
     starsMaskButton.text = "Star mask";
     starsMaskButton.toolTip =
-            "<p>Creates a star mask.</p>" + 
+            "<p>Displays the 'Create Star Mask' dialog. Used to create a " +
+            "star mask for the Join Region, or to create a corrected target image.</p>" + 
             "<p>The 'Random' combine mode can leave speckle artifacts around stars. " +
             "The generated mask can be used to replace these stars with stars " +
-            "from the reference frame (Do NOT use the target frame).</p>" +
-            "<p>The required Pixel Math expression is simply the name of the reference image.</p>";
+            "from the reference frame.</p>" +
+            "<p>The required Pixel Math expression is simply the name of the reference image.</p>" +
+            "<p>It is also possible to replace the speckled stars with stars from the " +
+            "target frame, but the target image must first be corrected for scale and gradient. " +
+            "The 'Correct target' button creates a fully corrected target image.</p>";
     starsMaskButton.onClick = function () {
         data.viewFlag = DISPLAY_MOSAIC_MASK_STARS();
         this.dialog.ok();
@@ -1743,8 +1717,7 @@ function PhotometricMosaicDialog(data) {
             "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/PhotometricMosaic.html</p>" +
             "<p>C:/Program Files/PixInsight/doc/scripts/PhotometricMosaic/images/</p>";
     
-    let okTooltip = "<p>Applies the calculated scale and gradient to a copy of the target image.</p>" +
-            "<p>If 'Create Mosaic' is selected, a mosaic image is created and displayed.</p>";
+    let okTooltip = "<p>Create the mosaic using the specified combination mode.</p>";
 
     let buttons_Sizer = createWindowControlButtons(this.dialog, data, 
             helpWindowTitle, HELP_MSG, "PhotometricMosaic", okTooltip);
