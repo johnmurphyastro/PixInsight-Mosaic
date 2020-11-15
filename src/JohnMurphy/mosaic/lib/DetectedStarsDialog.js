@@ -319,7 +319,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
     redRadioButton.toolTip = "<p>Display the stars detected within the red channel</p>" +
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
@@ -332,7 +332,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
     greenRadioButton.toolTip = "<p>Display the stars detected within the green channel</p>" +
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
@@ -345,7 +345,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
     blueRadioButton.toolTip = "<p>Display the stars detected within the blue channel</p>" +
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {

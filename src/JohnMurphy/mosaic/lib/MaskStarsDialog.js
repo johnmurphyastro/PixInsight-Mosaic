@@ -215,7 +215,11 @@ function MaskStarsDialog(joinArea, detectedStars, data,
         drawMaskStars(viewport, translateX, translateY, scale, x0, y0, x1, y1);
     };
 
-    previewControl.ok_Button.toolTip = "<p>Create new mask image</p>";
+    previewControl.ok_Button.toolTip = "<p>Creates a new mask image.</p>" + 
+            "<p>The dialog remains open so that a number of mask images can be " +
+            "created. It is often useful to generate masks with a " +
+            "small, medium and large number of stars. " +
+            "Try each mask and compare the results.</p>";
     previewControl.ok_Button.onClick = function(){
         console.writeln("\n<b><u>Creating mosaic mask</u></b>");
         self.enabled = false;
@@ -284,8 +288,10 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthRate_Control.real = true;
     maskStarGrowthRate_Control.label.text = "Growth rate:";
     maskStarGrowthRate_Control.toolTip =
-            "<p>Increases the size of the brightest stars.</p>" +
-            "<p>It mainly affects stars that are saturated or close to saturation.</p>";
+            "<p>Determines the radius for bright stars.</p>" +
+            "<p>Use this control to increase the size of bright, but unsaturated, stars " +
+            "(use 'Radius add' for faint stars).</p>" +
+            "<p>Should normally be set to the same value as the photometry 'Growth rate'.</p>";
     maskStarGrowthRate_Control.label.setFixedWidth(starMaskLabelSize);
     maskStarGrowthRate_Control.setRange(0, 30);
     maskStarGrowthRate_Control.slider.setRange(0, 300);
@@ -304,8 +310,10 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarGrowthLimit_Control.label.text = "Growth Limit:";
     maskStarGrowthLimit_Control.label.setFixedWidth(starMaskLabelSize);
     maskStarGrowthLimit_Control.toolTip =
-            "<p>Maximum star growth.</p>" +
-            "<p>Limits the radius growth to this number of pixels.</p>";
+            "<p>Limits the size for bright saturated stars.</p>" +
+            "<p>A 'Growth rate' suitable for unsaturated stars can produce large " +
+            "circles for the brightest stars. This control limits the " +
+            "radius growth to the specified number of pixels.</p>";
     maskStarGrowthLimit_Control.setRange(3, 300);
     maskStarGrowthLimit_Control.slider.setRange(3, 300);
     maskStarGrowthLimit_Control.maxWidth = 800;
@@ -321,8 +329,11 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     maskStarRadiusAdd_Control.real = true;
     maskStarRadiusAdd_Control.label.text = "Radius add:";
     maskStarRadiusAdd_Control.toolTip =
-            "<p>Used to increases or decreases the radius of all mask stars.</p>" +
-            "<p>This is applied after the 'Multiply star radius'.</p>";
+            "<p>This value is added to the radius for all stars.</p>" +
+            "<p>Use this control to set the radius for <b>faint stars</b> " +
+            "(use 'Growth rate' for brighter stars).</p>" +
+            "<p>Should normally be set to a value equal to or greater than the " +
+            "photometry 'Radius add' value + 3.</p>";
     maskStarRadiusAdd_Control.label.setFixedWidth(starMaskLabelSize);
     maskStarRadiusAdd_Control.setRange(0, 30);
     maskStarRadiusAdd_Control.slider.setRange(0, 300);

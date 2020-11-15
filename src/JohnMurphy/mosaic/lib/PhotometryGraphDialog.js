@@ -201,7 +201,10 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     
     let liveUpdate_control = new CheckBox(this);
     liveUpdate_control.text = "Live update";
-    liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
+    liveUpdate_control.toolTip = 
+            "<p><b>Selected</b><br />Updates are applied continuously while the sliders are adjusted.</p>" +
+            "<p><b>Unselected</b><br />Updates are applied after a slider adjustment has finished.</p>" +
+            "<p>Deselect if controls are sluggish.</p>";
     liveUpdate_control.checked = false;
     
     let ok_Button = new PushButton(this);
@@ -232,7 +235,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let redRadioButton = new RadioButton(this);
     redRadioButton.text = "Red";
     redRadioButton.toolTip = "<p>Display the red channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     redRadioButton.checked = false;
     redRadioButton.onClick = function (checked) {
@@ -246,7 +249,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let greenRadioButton = new RadioButton(this);
     greenRadioButton.text = "Green";
     greenRadioButton.toolTip = "<p>Display the green channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     greenRadioButton.checked = false;
     greenRadioButton.onClick = function (checked) {
@@ -260,7 +263,7 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     let blueRadioButton = new RadioButton(this);
     blueRadioButton.text = "Blue";
     blueRadioButton.toolTip = "<p>Display the blue channel gradient</p>" + 
-            "<p>This is only used to unclutter the display. " +
+            "<p>This is only used to declutter the display. " +
             "The settings will be applied to all color channels.</p>";
     blueRadioButton.checked = false;
     blueRadioButton.onClick = function (checked) {

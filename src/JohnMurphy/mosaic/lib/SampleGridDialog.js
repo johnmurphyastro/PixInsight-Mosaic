@@ -235,9 +235,12 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for " +
             "either <b>overlap</b> correction or <b>target image</b> correction.</p>" +
             "<p><u>Overlap correction</u>:" +
-            "<ul><li><b>Green line</b>: This line indicates the path of the " +
-            "reference - target image join. Use the 'Join Region' section to position " +
-            "this line to avoid bright stars and image corners.</li>" +
+            "<ul><li><b>Green line</b>: Join Path (reference to target transition). " +
+            "Use 'Position (+/-)' to move the join to avoid bright stars and image corners.</li>" +
+            "<li><b>Green rectangle</b>: Join Region bounding box. " +
+            "Shown instead of the Join Path for 'Random' and 'Average' modes. " +
+            "Mosaiced pixels within this area will be randomly chosen or averaged. " +
+            "Use 'Join size' in the 'Join Region' section to set the rectangle thickness.</li>" +
             "<li><b>Red circles</b>: Star rejection circles. The brighter stars " +
             "should be completely within these circles. They do not need to include " +
             "filter halos or scattered light.</li></ul>" +

@@ -177,7 +177,7 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
     };
     
     /**
-     * @param {Number} channel Get sample rectanges for this color channel
+     * @param {Number} channel Get sample rectangles for this color channel
      * @returns {Rect[]} Array of sample grid rectangles 
      */
     this.getBinRectArray = function(channel){
