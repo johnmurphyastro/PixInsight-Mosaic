@@ -1648,7 +1648,7 @@ function PhotometricMosaicDialog(data) {
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
             "over the join, but this can also make the join more visible.</p>" +
             "<p>To average the whole of the overlap region, unselect " +
-            "both 'Join Region (Centered)' and 'Join Region (From preview) " +
+            "both 'Join Region (Centered)' and 'Join Region (From preview)' " +
             "within the 'Join Region' section.</p>";
     this.mosaicAverage_Control.checked = data.useMosaicAverage;
     this.mosaicAverage_Control.onClick = function (checked) {
