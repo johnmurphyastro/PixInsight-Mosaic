@@ -151,7 +151,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             graphics.clipRect = new Rect(x0, y0, x1, y1);
             graphics.translateTransformation(translateX, translateY);
             graphics.scaleTransformation(scale, scale);
-            graphics.pen = new Pen(0xffff0000, 1.5);
+            graphics.pen = new Pen(0xffff0000, 1.0);
             graphics.antialiasing = true;
             for (let i = 0; i < stars.length; ++i){
                 let star = stars[i];
@@ -291,12 +291,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
             "or the stars used for photometry (square aperture rings).</p>";
     photometricCheckBox.checked = true;
     photometricCheckBox.onClick = function (checked) {
-        apertureGrowthRate_Control.enabled = checked;
-        apertureAdd_Control.enabled = checked;
-        apertureBgDelta_Control.enabled = checked;
-        limitPhotoStarsPercent_Control.enabled = checked;
-        linearRange_Control.enabled = checked;
-        outlierRemoval_Control.enabled = checked;
+        enableControls(data.useAutoPhotometry, checked);
         starPairs = getStarPairs(selectedChannel);
         previewControl.updateBitmap(bitmap);
         update();
@@ -372,23 +367,6 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         blueRadioButton.enabled = false;
     }
     
-    let optionsSizer = new HorizontalSizer(this);
-    optionsSizer.margin = 0;
-    optionsSizer.spacing = 10;
-    optionsSizer.addSpacing(4);
-    optionsSizer.add(photometricCheckBox);
-    optionsSizer.add(refCheckBox);
-    optionsSizer.addSpacing(10);
-    optionsSizer.add(redRadioButton);
-    optionsSizer.add(greenRadioButton);
-    optionsSizer.add(blueRadioButton);
-    optionsSizer.add(allRadioButton);
-    optionsSizer.addStretch();
-    if (EXTRA_CONTROLS())
-        optionsSizer.add(oldPhotometricCheckBox);
-    
-    controlsHeight += refCheckBox.height;
-    
     /**
      * When a slider is dragged, only fast draw operations are performed.
      * When the drag has finished (or after the user has finished editing in the textbox)
@@ -415,6 +393,7 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         data.apertureGrowthRate = value;
         photometricMosaicDialog.apertureGrowthRate_Control.setValue(value);
         photometricMosaicDialog.setSampleStarGrowthRateAutoValue();
+        photometricMosaicDialog.setSampleStarGrowthRateTargetAutoValue();
         fastDraw = true;
         update();
         processEvents();
@@ -426,7 +405,6 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
         photometricMosaicDialog.apertureAdd_Control.setValue(value);
-        photometricMosaicDialog.setSampleStarRadiusAddAutoValue();
         fastDraw = true;
         update();
         processEvents();
@@ -531,7 +509,62 @@ function DetectedStarsDialog(title, refBitmap, tgtBitmap, detectedStars, data, p
         update();
         detectedStars.showConsoleInfo = true;
     }
+    
+    let autoCheckBox = new CheckBox(this);
+    autoCheckBox.text = "Auto";
+    autoCheckBox.toolTip = "<p>Automatically sets the following controls:</p>" +
+            "<ul><li><b>Radius add</b></li>" +
+            "<li><b>Growth rate</b></li>" +
+            "<li><b>Background delta</b></li>" +
+            "<li><b>Limit stars %</b></li>" +
+            "<li><b>Linear range</b></li>" +
+            "</ul>";
+    autoCheckBox.onClick = function (checked) {
+        photometricMosaicDialog.setPhotometryAutoValues(checked);
+        if (checked){
+            self.enabled = false;
+            apertureAdd_Control.setValue(data.apertureAdd);
+            apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+            apertureBgDelta_Control.setValue(data.apertureBgDelta);
+            limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+            linearRange_Control.setValue(data.linearRange);
+            processEvents();
+            update();
+            self.enabled = true;
+        }
+        enableControls(checked, photometricCheckBox.checked);
+    };
+    autoCheckBox.checked = data.useAutoPhotometry;
+    
+    function enableControls(auto, isPhotometricMode){
+        apertureAdd_Control.enabled = !auto && isPhotometricMode;
+        apertureGrowthRate_Control.enabled = !auto && isPhotometricMode;
+        apertureBgDelta_Control.enabled = !auto && isPhotometricMode;
+        limitPhotoStarsPercent_Control.enabled = !auto && isPhotometricMode;
+        linearRange_Control.enabled = !auto && isPhotometricMode;
+        outlierRemoval_Control.enabled = isPhotometricMode;
+    }
+    
+    enableControls(data.useAutoPhotometry, true);
 
+    let optionsSizer = new HorizontalSizer(this);
+    optionsSizer.margin = 0;
+    optionsSizer.spacing = 10;
+    optionsSizer.addSpacing(4);
+    optionsSizer.add(autoCheckBox);
+    optionsSizer.add(photometricCheckBox);
+    optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(10);
+    optionsSizer.add(redRadioButton);
+    optionsSizer.add(greenRadioButton);
+    optionsSizer.add(blueRadioButton);
+    optionsSizer.add(allRadioButton);
+    optionsSizer.addStretch();
+    if (EXTRA_CONTROLS())
+        optionsSizer.add(oldPhotometricCheckBox);
+    
+    controlsHeight += refCheckBox.height;
+    
     // Global sizer
     this.sizer = new VerticalSizer(this);
     this.sizer.margin = 2;

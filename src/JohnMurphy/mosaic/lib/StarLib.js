@@ -1,4 +1,4 @@
-/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes, GraphDialog, APERTURE_GROWTH, APERTURE_ADD, APERTURE_GROWTH_LIMIT, APERTURE_BKG_DELTA */
+/* global ImageWindow, ChannelExtraction, UndoFlag_NoSwapFile, MultiscaleLinearTransform, StdButton_Yes, GraphDialog, APERTURE_GROWTH, APERTURE_ADD */
 
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
@@ -19,11 +19,31 @@
 #define __PJSR_NO_STAR_DETECTOR_TEST_ROUTINES 1
 #define __PJSR_STAR_OBJECT_DEFINED  1
 
-#define APERTURE_ADD 1
-#define APERTURE_GROWTH 1.0
-#define APERTURE_GROWTH_LIMIT 10
-#define APERTURE_BKG_DELTA 10
 #include "StarDetector.jsh"
+
+/**
+ * Calculates the number of pixels equal to 12 arcseconds.
+ * If the pixel angular size cannot be found in the fits header, it defaults to 0.9 arcsec/pixel
+ * @param {View} view
+ * @returns {Number} Maximum star size in pixels
+ */
+function calcDefaultGrowthLimit(view){
+    // Default pixel scale is used if it is not found in the FITS header.
+    // Default = 0.00025 deg = 0.9 arcsec / pixel
+    let pixelAngle = getPixelAngularSize(view, 0.00025);
+    // 0.00333 deg = 12 arcsec
+    return 0.00333 / pixelAngle;
+}
+
+/**
+ * Set the outer photometry aperture thickness to 70 microns on the detector
+ * If the pixel size is not found in the FITS header, pixel size defaults to 6 microns
+ * @param {View} view
+ * @returns {Number} outer aperture thickness in pixels
+ */
+function calcDefaultApertureBgDelta(view){
+    return Math.round(70 / getPixelSize(view, 6));
+}
 
 function Star(pos, flux, size) {
     // Centroid position in pixels, image coordinates (from StarDetector).
@@ -272,27 +292,30 @@ function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
         let bottom = Math.max(refRect.y1 - refStar.pos.y, tgtRect.y1 - tgtStar.pos.y);
         let right = Math.max(refRect.x1 - refStar.pos.x, tgtRect.x1 - tgtStar.pos.x);
         
-        function calcAperture(star, apertureAdd, apertureGrowthRate, apertureGrowthLimit){
-            let inflate = Math.round(calcApertureCorrection(
-                apertureAdd, apertureGrowthRate, apertureGrowthLimit, maxFlux));
+        function calcAperture(star, inflate){
             let x0 = Math.round(star.pos.x - (left + inflate));
             let y0 = Math.round(star.pos.y - (top + inflate));
             let x1 = Math.round(star.pos.x + (right + inflate));
             let y1 = Math.round(star.pos.y + (bottom + inflate));
             return new Rect(x0, y0, x1, y1);
         }
-        this.getRefAperture = function (apertureAdd, apertureGrowthRate, apertureGrowthLimit){
-            return calcAperture(refStar, apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        this.getInflate = function (apertureAdd, apertureGrowthRate, apertureGrowthLimit){
+            return Math.round(calcApertureCorrection(
+                apertureAdd, apertureGrowthRate, apertureGrowthLimit, maxFlux));
         };
-        this.getTgtAperture = function (apertureAdd, apertureGrowthRate, apertureGrowthLimit){
-            return calcAperture(tgtStar, apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        this.getRefAperture = function (inflate){
+            return calcAperture(refStar, inflate);
+        };
+        this.getTgtAperture = function (inflate){
+            return calcAperture(tgtStar, inflate);
         };
     }
     
     let delta = new Delta(refStar, tgtStar);
-    let refAperture = delta.getRefAperture(data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit);
+    let inflate = delta.getInflate(data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit);
+    let refAperture = delta.getRefAperture(inflate);
     this.refStar = refStar.factory(refImage, channel, refAperture, data.apertureBgDelta);
-    let tgtAperture = delta.getTgtAperture(data.apertureAdd, data.apertureGrowthRate, data.apertureGrowthLimit);
+    let tgtAperture = delta.getTgtAperture(inflate);
     this.tgtStar = tgtStar.factory(tgtImage, channel, tgtAperture, data.apertureBgDelta);
     
     /**
@@ -303,7 +326,8 @@ function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
      * @returns {Rect}
      */
     this.getRefAperture = function(apertureAdd, apertureGrowthRate, apertureGrowthLimit){
-        return delta.getRefAperture(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        let inflate = delta.getInflate(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        return delta.getRefAperture(inflate);
     };
     
     /**
@@ -314,7 +338,8 @@ function StarPair(data, refImage, tgtImage, refStar, tgtStar, channel){
      * @returns {Rect}
      */
     this.getTgtAperture = function(apertureAdd, apertureGrowthRate, apertureGrowthLimit){
-        return delta.getTgtAperture(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        let inflate = delta.getInflate(apertureAdd, apertureGrowthRate, apertureGrowthLimit);
+        return delta.getTgtAperture(inflate);
     };
 }
 
@@ -445,6 +470,8 @@ function StarsDetected(refView, tgtView){
         view.image.getSamples(samples, overlapBox, channel);
         starImage.setSamples(samples);
         
+        let apertureBgDelta = calcDefaultApertureBgDelta(tgtView);
+        
         // In tests this was 8% slower, probably because we had to assign the whole area
 //        starImage.assign(view.image, new Rect(width, height), channel, channel); // 8% slower
         // Detect stars in target and reference images
@@ -455,17 +482,22 @@ function StarsDetected(refView, tgtView){
         starDetector.upperLimit = 1;
         // Noise reduction affects the accuracy of the photometry
         starDetector.applyHotPixelFilterToDetectionImage = false;
-        starDetector.bkgDelta = APERTURE_BKG_DELTA;
+        starDetector.bkgDelta = apertureBgDelta;
         
         const x0 = overlapBox.x0;
         const y0 = overlapBox.y0;
         let stars = starDetector.stars(starImage);
         starImage.free();
+        // Use 0.3 instead of 0.2 to compensate for smaller initial flux (smaller rectangle)
+        let apertureGrowth = APERTURE_GROWTH * 1.5;
+        let apertureGrowthLimit = Math.round(calcDefaultGrowthLimit(tgtView));
+        apertureGrowthLimit = Math.max(apertureGrowthLimit, 1);
+        
         for (let star of stars){
             star.moveBy(x0, y0);
             // Calculate the flux, this time using an inflated star aperture
             star.recalcStarFlux(view.image, channel, 
-                    APERTURE_ADD, APERTURE_GROWTH, APERTURE_GROWTH_LIMIT, APERTURE_BKG_DELTA);
+                    APERTURE_ADD, apertureGrowth, apertureGrowthLimit, apertureBgDelta);
         }
         return stars;
     }
@@ -931,14 +963,15 @@ function calcStarMaskRadius(star, data){
 /**
  * @param {Star} star
  * @param {PhotometricMosaicData} data
+ * @param {Number} growthRate data.sampleStarGrowthRate or data.sampleStarGrowthRateTarget
  * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
  * @returns {Number} Star radius
  */
-function calcSampleStarRejectionRadius(star, data, growthLimit){
+function calcSampleStarRejectionRadius(star, data, growthRate, growthLimit){
     let starBox = star.getBoundingBox();
     let r = Math.max(starBox.width, starBox.height) / 2;
-    let delta = calcApertureCorrection(data.sampleStarRadiusAdd, 
-            data.sampleStarGrowthRate, growthLimit, star.getStarFlux());
+    let delta = calcApertureCorrection(data.apertureAdd, 
+            growthRate, growthLimit, star.getStarFlux());
     return r + delta;
 }
 

@@ -90,7 +90,8 @@ function PhotometryControls(){
         toolTip: "<p>Specifies the percentage of detected stars used for photometry. " +
             "The faintest stars are rejected.</p>" +
             "<p>100% implies that all detected stars are used, up to a maximum of 1000.</p>" +
-            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>"
+            "<p>90% implies that the faintest 10% of detected stars are rejected.</p>" +
+            "<p>The default value of 100% usually works well.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -184,16 +185,17 @@ function PhotometryControls(){
     this.growthRate = {
         real: true,
         text: "Growth rate:",
-        slider: {range: {min:0, max:300}},
-        range: {min:0, max:3},
+        slider: {range: {min:0, max:100}},
+        range: {min:0, max:1},
         precision: 2,
         maxWidth: 800,
         toolTip: "<p>Determines the aperture size for bright stars.</p>" +
             "<p>Adjust this control until the brightest stars entirely fit " +
             "within the inner photometry aperture. " +
             "Check both reference and target stars.</p>" +
-            "<p>The best value is usually between 0.5 and 1</p>" +
-            "<p>It is not necessary to include diffraction spikes.</p>"
+            "<p>It is not necessary to include diffraction spikes.</p>" +
+            "<p>If the photometry stars are too faint for this control to have " +
+            "much effect, leave the control at its default of 0.2</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -230,7 +232,8 @@ function PhotometryControls(){
             "<p>When correctly set, each faint reference and target star should " +
             "be fully contained within the inner photometry aperture.</p>" +
             "<p>Smaller apertures will introduce less noise, but it is vital that " +
-            "the whole star is within the aperture.</p>"
+            "the whole star is within the aperture.</p>" +
+            "<p>The default value of 1 usually works well.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -291,8 +294,8 @@ function PhotometryControls(){
     this.apertureGrowthLimit = {
         real: false,
         text: "Growth Limit:",
-        slider: {range: {min:3, max:300}},
-        range: {min:3, max:300},
+        slider: {range: {min:1, max:300}},
+        range: {min:1, max:300},
         precision: 0,
         maxWidth: 800,
         toolTip: "<p>Maximum star aperture growth.</p>" +
@@ -335,10 +338,8 @@ function SampleControls(){
         precision: 0,
         maxWidth: 800,
         toolTip: "<p>Offsets the Join Region / Join Path " +
-                "from the center of the overlap bounding box.</p>" +
-                "<p>Select 'Overlap rejection' to view the " +
-                "Join Path (Overlay mode) or Join Region (Random or Average mode).</p>" +
-                "<p>The Join Region moves left/right (vertical join) or " +
+                "from the center of the overlap bounding box. " +
+                "It moves left/right (vertical join) or " +
                 "up/down (horizontal join).</p>"
     };
     /**
@@ -348,12 +349,14 @@ function SampleControls(){
      * @returns {NumericControl}
      */
     this.createJoinPositionControl = function(dialog, data, strLength){
-        let rect = data.cache.overlap.overlapBox;
-        let thickness = rect.width > rect.height ? rect.height : rect.width;
-        let max = Math.round(Math.max(0, (thickness - data.joinSize)/2));
         let control = createNumericControl(dialog, self.joinPosition, strLength);
-        control.setRange(-max, max);
+        self.setJoinPositionRange(control, data);
         control.setValue(data.joinPosition);
+        control.toolTip = self.joinPosition.toolTip + 
+                "<p>Select 'Overlap rejection' to view the " +
+                "Join Path / Join Region.</p>" +
+                "<p>If the mosaic combination mode is 'Overlay', the Join Path is displayed. " +
+                "For 'Random' or 'Average', the Join Region rectangle is drawn.</p>";
         return control;
     };
     /**
@@ -363,8 +366,20 @@ function SampleControls(){
      */
     this.createJoinPositionEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.joinPosition);
+        self.setJoinPositionRange(control, data);
         control.setValue(data.joinPosition);
+        control.toolTip = self.joinPosition.toolTip + 
+                "<p>View and edit the Join / Join Region position in the " +
+                "'Sample generation' dialog.</p>";
         return control;
+    };
+    this.setJoinPositionRange = function(control, data){
+        if (data.cache.overlap !== null){
+            let rect = data.cache.overlap.overlapBox;
+            let thickness = rect.width > rect.height ? rect.height : rect.width;
+            let max = Math.round(Math.max(0, (thickness - data.joinSize)/2));
+            control.setRange(-max, max);
+        }
     };
     
     this.percentLimits = {
@@ -382,7 +397,7 @@ function SampleControls(){
             "<li>Bright stars can have significantly different profiles between " +
             "the reference and target images. This can affect how many of the " +
             "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
-            "<p>It is more important to include enough samples than to reject faint stars.</p>"
+            "<p>However, it is more important to include enough samples than to reject faint stars.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -409,13 +424,12 @@ function SampleControls(){
     this.growthRate = {
         real: true,
         text: "Growth rate:",
-        slider: {range: {min:0, max:300}},
-        range: {min:0, max:3},
+        slider: {range: {min:0, max:200}},
+        range: {min:0, max:2},
         precision: 2,
         maxWidth: 800,
         toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
             "<p>Use this control to set the rejection radius for bright, but unsaturated, stars " +
-            "(use 'Radius add' for faint stars).</p>" +
             "<p>Should normally be set to the same value as the photometry 'Growth rate'.</p>"
     };
     /**
@@ -442,9 +456,9 @@ function SampleControls(){
     
     this.growthLimit = {
         real: false,
-        text: "Growth limit (Overlap):",
-        slider: {range: {min:3, max:300}},
-        range: {min:3, max:300},
+        text: "Growth limit:",
+        slider: {range: {min:1, max:400}},
+        range: {min:1, max:400},
         precision: 0,
         maxWidth: 800,
         toolTip: "<p>Limits the rejection radius for saturated stars. " +
@@ -480,9 +494,9 @@ function SampleControls(){
     
     this.growthLimitTarget = {
         real: false,
-        text: "Growth limit (Target):",
-        slider: {range: {min:3, max:300}},
-        range: {min:3, max:300},
+        text: "Growth limit:",
+        slider: {range: {min:1, max:400}},
+        range: {min:1, max:400},
         precision: 0,
         maxWidth: 800,
         toolTip: "<p>Limits the rejection radius for saturated stars. " +
@@ -517,17 +531,15 @@ function SampleControls(){
         return control;
     };
     
-    this.radiusAdd = {
-        real: false,
-        text: "Radius add:",
-        slider: {range: {min:0, max:20}},
-        range: {min:0, max:20},
-        precision: 0,
-        maxWidth: 400,
-        toolTip: "<p>This value is added to the rejection radius for all stars.</p>" +
-            "<p>Use this control to set the rejection radius for <b>faint stars</b> " +
-            "(use 'Growth rate' for brighter stars).</p>" +
-            "<p>Should normally be set to the same value as the photometry 'Radius add'.</p>"
+    this.growthRateTarget = {
+        real: true,
+        text: "Growth rate:",
+        slider: {range: {min:0, max:200}},
+        range: {min:0, max:2},
+        precision: 2,
+        maxWidth: 800,
+        toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
+            "<p>Use this control to set the rejection radius for bright, but unsaturated, stars</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -535,9 +547,9 @@ function SampleControls(){
      * @param {Number} strLength
      * @returns {NumericControl}
      */
-    this.createSampleStarAddControl = function(dialog, data, strLength){
-        let control = createNumericControl(dialog, self.radiusAdd, strLength);
-        control.setValue(data.sampleStarRadiusAdd);
+    this.createSampleStarGrowthRateTargetControl = function(dialog, data, strLength){
+        let control = createNumericControl(dialog, self.growthRateTarget, strLength);
+        control.setValue(data.sampleStarGrowthRateTarget);
         return control;
     };
     /**
@@ -545,9 +557,9 @@ function SampleControls(){
      * @param {PhotometricMosaicData} data
      * @returns {NumericEdit}
      */
-    this.createSampleStarAddEdit = function(dialog, data){
-        let control = createNumericEdit(dialog, self.radiusAdd);
-        control.setValue(data.sampleStarRadiusAdd);
+    this.createSampleStarGrowthRateTargetEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.growthRateTarget);
+        control.setValue(data.sampleStarGrowthRateTarget);
         return control;
     };
     

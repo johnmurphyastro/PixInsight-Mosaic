@@ -132,10 +132,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             } else  {
                 graphics.pen = new Pen(0xff0000ff, 1.0);
             }
-            let growthLimit = drawOverlapRejectionFlag ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
+            let growth = new SampleGrowthRateAndLimit(data, drawOverlapRejectionFlag);
             for (let i = 0; i < firstNstars; ++i){
                 let star = stars[i];
-                let radius = calcSampleStarRejectionRadius(star, data, growthLimit);
+                let radius = calcSampleStarRejectionRadius(star, data, growth.rate, growth.limit);
                 let x = star.pos.x - bitmapOffset.x;
                 let y = star.pos.y - bitmapOffset.y;
                 graphics.strokeCircle(x, y, radius);
@@ -228,7 +228,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     };
     
     let joinPosition_Control;
+    let sampleStarGrowthRate_Control;
     let sampleStarGrowthLimit_Control;
+    let sampleStarGrowthRateTarget_Control;
     let sampleStarGrowthLimitTarget_Control;
     let displayOverlapRejectionCheckBox = new CheckBox(this);
     displayOverlapRejectionCheckBox.text = "Overlap rejection";
@@ -256,7 +258,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
     displayOverlapRejectionCheckBox.onClick = function (checked) {
         joinPosition_Control.enabled = data.hasJoinSize && checked;
+        sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration && checked;
         sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && checked;
+        sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
         sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
         drawOverlapRejectionFlag = checked;
         finalUpdateFunction();
@@ -343,7 +347,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     controlsHeight += limitSampleStarsPercent_Control.height;
     controlsHeight += filterGroupBox.height + filterGroupBox.sizer.margin * 2;
         
-    let sampleStarGrowthRate_Control =
+    sampleStarGrowthRate_Control =
                 sampleControls.createSampleStarGrowthRateControl(this, data, labelLength);
     sampleStarGrowthRate_Control.onValueUpdated = function (value){
         data.sampleStarGrowthRate = value;
@@ -351,8 +355,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
     };
     addFinalUpdateListener(sampleStarGrowthRate_Control, finalUpdateFunction);
-
     sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration;
+    
     sampleStarGrowthLimit_Control = 
             sampleControls.createSampleStarGrowthLimitControl(this, data, labelLength);
     sampleStarGrowthLimit_Control.onValueUpdated = function (value) {
@@ -373,31 +377,38 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     addFinalUpdateListener(sampleStarGrowthLimitTarget_Control, finalUpdateFunction);
     sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !displayOverlapRejectionCheckBox.checked;
     
-    let sampleStarRadiusAdd_Control = 
-            sampleControls.createSampleStarAddControl(this, data, labelLength);
-    sampleStarRadiusAdd_Control.onValueUpdated = function (value) {
-        data.sampleStarRadiusAdd = value;
-        photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(value);
+    sampleStarGrowthRateTarget_Control =
+            sampleControls.createSampleStarGrowthRateTargetControl(this, data, labelLength);
+    sampleStarGrowthRateTarget_Control.onValueUpdated = function (value){
+        data.sampleStarGrowthRateTarget = value;
+        photometricMosaicDialog.sampleStarGrowthRateTarget_Control.setValue(value);
         previewControl.forceRedraw();
     };
-    addFinalUpdateListener(sampleStarRadiusAdd_Control, finalUpdateFunction);
-    sampleStarRadiusAdd_Control.enabled = !data.useAutoSampleGeneration;
+    addFinalUpdateListener(sampleStarGrowthRateTarget_Control, finalUpdateFunction);
+    sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !displayOverlapRejectionCheckBox.checked;
     
     let rejectRadiusGroupBox = new GroupBox(this);
-    rejectRadiusGroupBox.title = "Star rejection radius";
+    rejectRadiusGroupBox.title = "Overlap star rejection radius";
     rejectRadiusGroupBox.sizer = new VerticalSizer();
     rejectRadiusGroupBox.sizer.margin = 2;
     rejectRadiusGroupBox.sizer.spacing = 2;
-    rejectRadiusGroupBox.sizer.add(sampleStarRadiusAdd_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthRate_Control);
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimit_Control);
-    rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimitTarget_Control);
+    
+    let rejectRadiusTargetGroupBox = new GroupBox(this);
+    rejectRadiusTargetGroupBox.title = "Target star rejection radius";
+    rejectRadiusTargetGroupBox.sizer = new VerticalSizer();
+    rejectRadiusTargetGroupBox.sizer.margin = 2;
+    rejectRadiusTargetGroupBox.sizer.spacing = 2;
+    rejectRadiusTargetGroupBox.sizer.add(sampleStarGrowthRateTarget_Control);
+    rejectRadiusTargetGroupBox.sizer.add(sampleStarGrowthLimitTarget_Control);
     
     controlsHeight += sampleStarGrowthRate_Control.height + 
+            sampleStarGrowthRateTarget_Control.height +
             sampleStarGrowthLimit_Control.height + 
             sampleStarGrowthLimitTarget_Control.height + 
-            sampleStarRadiusAdd_Control.height + 
             rejectRadiusGroupBox.height + 
+            rejectRadiusTargetGroupBox.height + 
             rejectRadiusGroupBox.sizer.margin * 2 +
             rejectRadiusGroupBox.sizer.spacing * 2;
     
@@ -405,6 +416,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     rejectSamplesSection.sizer = new VerticalSizer;
     rejectSamplesSection.sizer.spacing = 2;
     rejectSamplesSection.sizer.add(rejectRadiusGroupBox);
+    rejectSamplesSection.sizer.add(rejectRadiusTargetGroupBox);
     rejectSamplesSection.sizer.add(filterGroupBox);
     let rejectSamplesBar = new SectionBar(this, "Sample Rejection");
     rejectSamplesBar.setSection(rejectSamplesSection);
@@ -461,17 +473,17 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             self.enabled = false;
             sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
             sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
+            sampleStarGrowthRateTarget_Control.setValue(data.sampleStarGrowthRateTarget);
             sampleStarGrowthLimitTarget_Control.setValue(data.sampleStarGrowthLimitTarget);
-            sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
             sampleSize_Control.setValue(data.sampleSize);
             processEvents();
             updateSampleGrid();
             self.enabled = true;
         }
-        sampleStarGrowthRate_Control.enabled = !checked;
+        sampleStarGrowthRate_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
         sampleStarGrowthLimit_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
+        sampleStarGrowthRateTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
         sampleStarGrowthLimitTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
-        sampleStarRadiusAdd_Control.enabled = !checked;
         sampleSize_Control.enabled = !checked;
     };
     autoCheckBox.checked = data.useAutoSampleGeneration;

@@ -15,6 +15,18 @@
 // =================================================================================
 //"use strict";
 
+function SampleGrowthRateAndLimit(data, isOverlapSampleGrid){
+    this.rate;
+    this.limit;
+    if (isOverlapSampleGrid){
+        this.rate = data.sampleStarGrowthRate;
+        this.limit = data.sampleStarGrowthLimit;
+    } else {
+        this.rate = data.sampleStarGrowthRateTarget;
+        this.limit = data.sampleStarGrowthLimitTarget;
+    }
+}
+
 function MosaicCache() {
     /**
     * User input data used to calculate stored values
@@ -77,10 +89,11 @@ function MosaicCache() {
     
     /**
      * @param {PhotometricMosaicData} data
-     * @param {Number} growthLimit
+     * @param {Boolean} isOverlapSampleGrid
      * @returns {String}
      */
-    function getSampleKey(data, growthLimit){
+    function getSampleKey(data, isOverlapSampleGrid){
+        let growth = new SampleGrowthRateAndLimit(data, isOverlapSampleGrid);      
         return "_" +
                 data.starFluxTolerance + "_" +
                 data.starSearchRadius + "_" +
@@ -92,10 +105,9 @@ function MosaicCache() {
                 data.limitPhotoStarsPercent + "_" +
                 data.linearRange + "_" +
                 data.outlierRemoval + "_" +
-                
-                data.sampleStarGrowthRate + "_" +
-                growthLimit + "_" +
-                data.sampleStarRadiusAdd + "_" +
+
+                growth.rate + "_" +
+                growth.limit + "_" +
                 data.limitSampleStarsPercent + "_" +
                 data.sampleSize + "_";
     }
@@ -108,12 +120,11 @@ function MosaicCache() {
      * @returns {SampleGridMap} Map of sample squares (all color channels)
      */
     this.getSampleGridMap = function (allStars, data, isOverlapSampleGrid){
-        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
-        let key = getSampleKey(data, growthLimit);
-        
+        let key = getSampleKey(data, isOverlapSampleGrid);
         let value = this.sampleGridMapMap.get(key);
         if (value === undefined){
-            value = createSampleGridMap(allStars, data, growthLimit);
+            let growth = new SampleGrowthRateAndLimit(data, isOverlapSampleGrid);  
+            value = createSampleGridMap(allStars, data, growth.rate, growth.limit);
             this.sampleGridMapMap.set(key, value);
         }
         return value;
@@ -129,9 +140,7 @@ function MosaicCache() {
      * @returns {SamplePair[][]} Returns SamplePair[] for each color
      */
     this.getSamplePairs = function (sampleGridMap, scaleFactors, isHorizontal, data, isOverlapSampleGrid){
-        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
-        let key = getSampleKey(data, growthLimit);
-        
+        let key = getSampleKey(data, isOverlapSampleGrid);
         let value = this.samplePairsMap.get(key);
         if (value === undefined){
             let tgtImage = data.targetView.image;
@@ -153,8 +162,7 @@ function MosaicCache() {
      * @returns {SurfaceSpline}
      */
     this.getSurfaceSpline = function (data, samplePairs, logSmoothing, channel, isOverlapSampleGrid){
-        let growthLimit = isOverlapSampleGrid ? data.sampleStarGrowthLimit : data.sampleStarGrowthLimitTarget;
-        let key = getSampleKey(data, growthLimit);
+        let key = getSampleKey(data, isOverlapSampleGrid);
         key += data.maxSamples + "_" + logSmoothing + "_" + channel + "_";
         
         let value = this.surfaceSplineMap.get(key);
@@ -175,14 +183,16 @@ function MosaicCache() {
         this.tgtColorStars = null;
         this.allStars = null;
         
-        for (let key of this.sampleGridMapMap.keys()) {
-            console.writeln("Clearing sampleGridMap: ", key);
-        }
-        for (let key of this.samplePairsMap.keys()) {
-            console.writeln("Clearing sampleGridMap: ", key);
-        }
-        for (let key of this.surfaceSplineMap.keys()) {
-            console.writeln("Clearing surfaceSpline: ", key);
+        if (EXTRA_CONTROLS()){
+            for (let key of this.sampleGridMapMap.keys()) {
+                console.writeln("Clearing sampleGridMap: ", key);
+            }
+            for (let key of this.samplePairsMap.keys()) {
+                console.writeln("Clearing sampleGridMap: ", key);
+            }
+            for (let key of this.surfaceSplineMap.keys()) {
+                console.writeln("Clearing surfaceSpline: ", key);
+            }
         }
         
         for (let surfaceSpline of this.surfaceSplineMap.values()) {

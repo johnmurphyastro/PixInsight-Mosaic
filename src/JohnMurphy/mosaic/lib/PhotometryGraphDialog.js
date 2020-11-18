@@ -304,20 +304,6 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
         self.enabled = true;
     };
     
-    let color_Sizer = new HorizontalSizer(this);
-    color_Sizer.margin = 0;
-    color_Sizer.spacing = 10;
-    color_Sizer.addSpacing(4);
-    color_Sizer.add(redRadioButton);
-    color_Sizer.add(greenRadioButton);
-    color_Sizer.add(blueRadioButton);
-    color_Sizer.add(allRadioButton);
-    color_Sizer.addSpacing(10);
-    color_Sizer.add(smallPoints);
-    color_Sizer.addStretch();
-    
-    controlsHeight += redRadioButton.height;
-    
     /**
      * When a slider is dragged, only fast draw operations are performed.
      * When the drag has finished (or after the user has finished editing in the textbox)
@@ -414,7 +400,6 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     apertureAdd_Control.onValueUpdated = function (value) {
         data.apertureAdd = value;
         photometricMosaicDialog.apertureAdd_Control.setValue(value);
-        photometricMosaicDialog.setSampleStarRadiusAddAutoValue();
         if (liveUpdate_control.checked){
             update(bitmapControl.width, bitmapControl.height);
         }
@@ -461,6 +446,57 @@ function PhotometryGraphDialog(title, width, height, data, photometricMosaicDial
     apertureBar.toolTip = "Specifies photometry star aperture settings";
     controlsHeight += apertureBar.height;
     //controlsHeight += apertureBar.height + apertureSection.sizer.spacing * 3;
+    
+    let autoCheckBox = new CheckBox(this);
+    autoCheckBox.text = "Auto";
+    autoCheckBox.toolTip = "<p>Automatically sets the following controls:</p>" +
+            "<ul><li><b>Radius add</b></li>" +
+            "<li><b>Growth rate</b></li>" +
+            "<li><b>Background delta</b></li>" +
+            "<li><b>Limit stars %</b></li>" +
+            "<li><b>Linear range</b></li>" +
+            "</ul>";
+    autoCheckBox.onClick = function (checked) {
+        photometricMosaicDialog.setPhotometryAutoValues(checked);
+        if (checked){
+            self.enabled = false;
+            apertureAdd_Control.setValue(data.apertureAdd);
+            apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+            apertureBgDelta_Control.setValue(data.apertureBgDelta);
+            limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+            linearRange_Control.setValue(data.linearRange);
+            processEvents();
+            update(bitmapControl.width, bitmapControl.height);
+            self.enabled = true;
+        }
+        enableControls(checked);
+    };
+    autoCheckBox.checked = data.useAutoPhotometry;
+    
+    function enableControls(auto){
+        apertureAdd_Control.enabled = !auto;
+        apertureGrowthRate_Control.enabled = !auto;
+        apertureBgDelta_Control.enabled = !auto;
+        limitPhotoStarsPercent_Control.enabled = !auto;
+        linearRange_Control.enabled = !auto;
+    }
+    
+    enableControls(data.useAutoPhotometry, true);
+    
+    let color_Sizer = new HorizontalSizer(this);
+    color_Sizer.margin = 0;
+    color_Sizer.spacing = 10;
+    color_Sizer.addSpacing(4);
+    color_Sizer.add(autoCheckBox);
+    color_Sizer.add(redRadioButton);
+    color_Sizer.add(greenRadioButton);
+    color_Sizer.add(blueRadioButton);
+    color_Sizer.add(allRadioButton);
+    color_Sizer.addSpacing(10);
+    color_Sizer.add(smallPoints);
+    color_Sizer.addStretch();
+    
+    controlsHeight += redRadioButton.height;
     
     //-------------
     // Global sizer

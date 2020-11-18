@@ -1,4 +1,4 @@
-/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog, StdButton_Yes, StdIcon_Question, StdButton_No, StdButton_Cancel, Settings, DataType_Float, KEYPREFIX, DataType_Int32, DataType_Boolean, StdButton_Abort, StdIcon_Warning, StdButton_Ignore */
+/* global ImageWindow, Parameters, View, TextAlign_Right, TextAlign_VertCenter, StdIcon_Error, StdButton_Ok, Dialog, StdButton_Yes, StdIcon_Question, StdButton_No, StdButton_Cancel, Settings, DataType_Float, KEYPREFIX, DataType_Int32, DataType_Boolean, StdButton_Abort, StdIcon_Warning, StdButton_Ignore, APERTURE_GROWTH, APERTURE_ADD, APERTURE_BKG_DELTA */
 // Version 1.0 (c) John Murphy 20th-Oct-2019
 //
 // ======== #license ===============================================================
@@ -18,6 +18,9 @@
 #include <pjsr/DataType.jsh>
 #include "DialogLib.js"
 #define KEYPREFIX "PhotometricMosaic"
+#define APERTURE_ADD 1
+#define APERTURE_GROWTH 0.2
+#define APERTURE_BKG_DELTA 10
 
 function EXTRA_CONTROLS(){return false;}
 /**
@@ -105,6 +108,7 @@ function PhotometricMosaicData() {
         Parameters.set("limitPhotoStarsPercent", this.limitPhotoStarsPercent);
         Parameters.set("linearRange", this.linearRange);
         Parameters.set("outlierRemoval", this.outlierRemoval);
+        Parameters.set("useAutoPhotometry", this.useAutoPhotometry);
         
         // Join Region
         Parameters.set("hasJoinSize", this.hasJoinSize);
@@ -123,7 +127,7 @@ function PhotometricMosaicData() {
         Parameters.set("sampleStarGrowthRate", this.sampleStarGrowthRate);
         Parameters.set("sampleStarGrowthLimit", this.sampleStarGrowthLimit);
         Parameters.set("sampleStarGrowthLimitTarget", this.sampleStarGrowthLimitTarget);
-        Parameters.set("sampleStarRadiusAdd", this.sampleStarRadiusAdd);
+        Parameters.set("sampleStarGrowthRateTarget", this.sampleStarGrowthRateTarget);
         Parameters.set("limitSampleStarsPercent", this.limitSampleStarsPercent);
         Parameters.set("sampleSize", this.sampleSize);
         Parameters.set("maxSamples", this.maxSamples);
@@ -190,6 +194,8 @@ function PhotometricMosaicData() {
             this.linearRange = Parameters.getReal("linearRange");
         if (Parameters.has("outlierRemoval"))
             this.outlierRemoval = Parameters.getInteger("outlierRemoval");
+        if (Parameters.has("useAutoPhotometry"))
+            this.useAutoPhotometry = Parameters.getBoolean("useAutoPhotometry");
         
         // Join Region
         if (Parameters.has("hasJoinSize"))
@@ -233,8 +239,8 @@ function PhotometricMosaicData() {
             this.sampleStarGrowthLimit = Parameters.getInteger("sampleStarGrowthLimit");
         if (Parameters.has("sampleStarGrowthLimitTarget"))
             this.sampleStarGrowthLimitTarget = Parameters.getInteger("sampleStarGrowthLimitTarget");
-        if (Parameters.has("sampleStarRadiusAdd"))
-            this.sampleStarRadiusAdd = Parameters.getInteger("sampleStarRadiusAdd");
+        if (Parameters.has("sampleStarGrowthRateTarget"))
+            this.sampleStarGrowthRateTarget = Parameters.getReal("sampleStarGrowthRateTarget");
         if (Parameters.has("limitSampleStarsPercent"))
             this.limitSampleStarsPercent = Parameters.getReal("limitSampleStarsPercent");
         if (Parameters.has("sampleSize"))
@@ -294,13 +300,14 @@ function PhotometricMosaicData() {
         this.starSearchRadius = 2.5;
         
         // Photometric Scale
-        this.apertureGrowthRate = 1.0;
+        this.apertureGrowthRate = APERTURE_GROWTH;
         this.apertureGrowthLimit = 300;
-        this.apertureAdd = 1;
-        this.apertureBgDelta = 10;
+        this.apertureAdd = APERTURE_ADD;
+        this.apertureBgDelta = APERTURE_BKG_DELTA;
         this.limitPhotoStarsPercent = 100;
         this.linearRange = 0.5;
         this.outlierRemoval = 0;
+        this.useAutoPhotometry = true;
         
         // Join Region (Centered)
         this.hasJoinSize = true;
@@ -313,10 +320,10 @@ function PhotometricMosaicData() {
         this.useCropTargetToJoinRegion = false;
         
         // Gradient Sample Generation
-        this.sampleStarGrowthRate = 1.0;
-        this.sampleStarGrowthLimit = 50;
-        this.sampleStarGrowthLimitTarget = 300;
-        this.sampleStarRadiusAdd = 1;
+        this.sampleStarGrowthRate = APERTURE_GROWTH;
+        this.sampleStarGrowthLimit = 10;
+        this.sampleStarGrowthLimitTarget = 100;
+        this.sampleStarGrowthRateTarget = 0.5;
         this.limitSampleStarsPercent = 35;
         this.sampleSize = 20;
         this.maxSamples = 3000;
@@ -346,6 +353,9 @@ function PhotometricMosaicData() {
         this.graphWidth = 1200; // gradient and photometry graph width
         this.graphHeight = 800; // gradient and photometry graph height
         
+        if (this.cache !== undefined){
+            this.cache.invalidate();
+        }
         this.cache = new MosaicCache();
         
     };
@@ -369,6 +379,7 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.limitPhotoStarsPercent_Control.setValue(this.limitPhotoStarsPercent);
         photometricMosaicDialog.linearRange_Control.setValue(this.linearRange);
         photometricMosaicDialog.outlierRemoval_Control.setValue(this.outlierRemoval);
+        photometricMosaicDialog.setPhotometryAutoValues(this.useAutoPhotometry);
         if (EXTRA_CONTROLS())
             photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
         
@@ -389,7 +400,7 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(this.sampleStarGrowthRate);
         photometricMosaicDialog.sampleStarGrowthLimit_Control.setValue(this.sampleStarGrowthLimit);
         photometricMosaicDialog.sampleStarGrowthLimitTarget_Control.setValue(this.sampleStarGrowthLimitTarget);
-        photometricMosaicDialog.sampleStarRadiusAdd_Control.setValue(this.sampleStarRadiusAdd);
+        photometricMosaicDialog.sampleStarGrowthRateTarget_Control.setValue(this.sampleStarGrowthRateTarget);
         photometricMosaicDialog.limitSampleStarsPercent_Control.setValue(this.limitSampleStarsPercent);
         photometricMosaicDialog.sampleSize_Control.setValue(this.sampleSize);
         if (EXTRA_CONTROLS()){
@@ -439,15 +450,21 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/limitPhotoStarsPercent", DataType_Float, data.limitPhotoStarsPercent );
     Settings.write( KEYPREFIX+"/linearRange", DataType_Float, data.linearRange );
     Settings.write( KEYPREFIX+"/outlierRemoval", DataType_Int32, data.outlierRemoval );
+    Settings.write( KEYPREFIX+"/useAutoPhotometry", DataType_Boolean, data.useAutoPhotometry );
 
     // Join Region
     Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
+    // No point saving the join area preview, because it wont be appropriate for the next join.
+    // Hence hasJoinSize defaults to true if hasJoinAreaPreview is selected.
+    // hasJoinSize is only set to false if hasJoinSize and hasJoinAreaPreview are both unselected.
+    let hasJoinSize = data.hasJoinSize || data.hasJoinAreaPreview;
+    Settings.write( KEYPREFIX+"/hasJoinSize", DataType_Boolean, hasJoinSize );
     
     // Gradient Sample Generation
     Settings.write( KEYPREFIX+"/sampleStarGrowthRate", DataType_Float, data.sampleStarGrowthRate );
     Settings.write( KEYPREFIX+"/sampleStarGrowthLimit", DataType_Int32, data.sampleStarGrowthLimit );
     Settings.write( KEYPREFIX+"/sampleStarGrowthLimitTarget", DataType_Int32, data.sampleStarGrowthLimitTarget );
-    Settings.write( KEYPREFIX+"/sampleStarRadiusAdd", DataType_Int32, data.sampleStarRadiusAdd );
+    Settings.write( KEYPREFIX+"/sampleStarGrowthRateTarget", DataType_Float, data.sampleStarGrowthRateTarget );
     Settings.write( KEYPREFIX+"/limitSampleStarsPercent", DataType_Float, data.limitSampleStarsPercent );
     Settings.write( KEYPREFIX+"/sampleSize", DataType_Int32, data.sampleSize );
     if (EXTRA_CONTROLS()){
@@ -528,12 +545,18 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/outlierRemoval", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.outlierRemoval = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/useAutoPhotometry", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.useAutoPhotometry = keyValue;
     
     // Join Region
     keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.joinSize = keyValue;
-    
+    keyValue = Settings.read( KEYPREFIX+"/hasJoinSize", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.hasJoinSize = keyValue;
+
     // Gradient Sample Generation
     keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthRate", DataType_Float );
     if ( Settings.lastReadOK )
@@ -544,9 +567,9 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthLimitTarget", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.sampleStarGrowthLimitTarget = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/sampleStarRadiusAdd", DataType_Int32 );
+    keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthRateTarget", DataType_Float );
     if ( Settings.lastReadOK )
-        data.sampleStarRadiusAdd = keyValue;
+        data.sampleStarGrowthRateTarget = keyValue;
     keyValue = Settings.read( KEYPREFIX+"/limitSampleStarsPercent", DataType_Float );
     if ( Settings.lastReadOK )
         data.limitSampleStarsPercent = keyValue;
@@ -692,11 +715,12 @@ function PhotometricMosaicDialog(data) {
     let targetImage_ViewList = new ViewList(this);
     targetImage_ViewList.getMainViews();
     targetImage_ViewList.minWidth = 470;
-    if (data.targetView !== null){
+    if (data.targetView !== null){ // TODO check if this is correct
         targetImage_ViewList.currentView = data.targetView;
     }
     targetImage_ViewList.onViewSelected = function (view) {
         data.targetView = view;
+        self.setApertureBgDeltaAutoValue();
         self.setSampleSizeAutoValue();
         self.setTaperLengthAutoValue(data);
         self.setSampleStarGrowthLimitAutoValue();
@@ -820,11 +844,11 @@ function PhotometricMosaicDialog(data) {
     this.apertureGrowthRate_Control.onValueUpdated = function (value){
         data.apertureGrowthRate = value;
         self.setSampleStarGrowthRateAutoValue();
+        self.setSampleStarGrowthRateTargetAutoValue();
     };
     this.apertureAdd_Control = photometryControls.createApertureAddEdit(this, data);
     this.apertureAdd_Control.onValueUpdated = function (value){
         data.apertureAdd = value;
-        self.setSampleStarRadiusAddAutoValue();
     };
     if (EXTRA_CONTROLS()){
         this.apertureGrowthLimit_Control = photometryControls.createApertureGrowthLimitEdit(this, data);
@@ -907,23 +931,46 @@ function PhotometricMosaicDialog(data) {
     starButtonGroupBox.title = "Edit / Display";
     starButtonGroupBox.sizer = new HorizontalSizer(starButtonGroupBox);
     starButtonGroupBox.sizer.margin = 2;
-    starButtonGroupBox.sizer.addSpacing(20);
+    starButtonGroupBox.sizer.addSpacing(10);
     starButtonGroupBox.sizer.add(detectedStarsButton);
+    starButtonGroupBox.sizer.addSpacing(10);
     
     let graphButtonGroupBox = new GroupBox(this);
     graphButtonGroupBox.title = "Edit / Display";
     graphButtonGroupBox.sizer = new HorizontalSizer(starButtonGroupBox);
     graphButtonGroupBox.sizer.margin = 2;
-    graphButtonGroupBox.sizer.addSpacing(20);
+    graphButtonGroupBox.sizer.addSpacing(10);
     graphButtonGroupBox.sizer.add(photometryGraphButton);
+    graphButtonGroupBox.sizer.addSpacing(10);
+    
+    this.autoPhotometryCheckBox = new CheckBox(this);
+    this.autoPhotometryCheckBox.text = "Auto";
+    this.autoPhotometryCheckBox.toolTip = "<p>Automatically sets the following controls:</p>" +
+            "<ul><li><b>Radius add</b></li>" +
+            "<li><b>Growth rate</b></li>" +
+            "<li><b>Background delta</b></li>" +
+            "<li><b>Limit stars %</b></li>" +
+            "<li><b>Linear range</b></li>" +
+            "</ul>";
+    this.autoPhotometryCheckBox.onCheck = function (checked){
+        self.setPhotometryAutoValues(checked);
+    };
+    
+    let photometryAutoGroupBox = new GroupBox(this);
+    photometryAutoGroupBox.sizer = new HorizontalSizer();
+    photometryAutoGroupBox.sizer.margin = 2;
+    photometryAutoGroupBox.sizer.addSpacing(10);
+    photometryAutoGroupBox.sizer.add(this.autoPhotometryCheckBox);
+    photometryAutoGroupBox.sizer.addSpacing(10);
     
     let apertureHorizSizer = new HorizontalSizer();
-    apertureHorizSizer.spacing = 10;
+    apertureHorizSizer.spacing = 12;
     apertureHorizSizer.add(apertureGroupBox, 100);
+    apertureHorizSizer.add(photometryAutoGroupBox);
     apertureHorizSizer.add(starButtonGroupBox);
     
     let filterHorizSizer = new HorizontalSizer();
-    filterHorizSizer.spacing = 10;
+    filterHorizSizer.spacing = 12;
     filterHorizSizer.add(filterGroupBox, 100);
     filterHorizSizer.add(graphButtonGroupBox);
 
@@ -938,6 +985,54 @@ function PhotometricMosaicDialog(data) {
     photometryBar.toolTip = "<p>Specifies photometry parameters. These are used " +
             " to calculate the brightness scale factor.</p>";
     // SectionBar: "Photometric Scale" End
+    
+    this.setPhotometryAutoValues = function (checked){
+        data.useAutoPhotometry = checked;
+        self.autoPhotometryCheckBox.checked = checked;
+        self.apertureAdd_Control.enabled = !checked;
+        self.apertureGrowthRate_Control.enabled = !checked;
+        self.apertureBgDelta_Control.enabled = !checked;
+        self.limitPhotoStarsPercent_Control.enabled = !checked;
+        self.linearRange_Control.enabled = !checked;
+        if (checked){
+            self.setApertureAddAutoValue();
+            self.setApertureGrowthRateAutoValue();
+            self.setApertureBgDeltaAutoValue();
+            self.setLimitPhotoStarsPercentAutoValue();
+            self.setLinearRangeAutoValue();
+        }
+    };
+    this.setApertureAddAutoValue = function(){
+        if (data.useAutoPhotometry){
+            data.apertureAdd = APERTURE_ADD;
+            self.apertureAdd_Control.setValue(data.apertureAdd);
+        } 
+    };
+    this.setApertureGrowthRateAutoValue = function(){
+        if (data.useAutoPhotometry){
+            data.apertureGrowthRate = APERTURE_GROWTH;
+            self.apertureGrowthRate_Control.setValue(data.apertureGrowthRate);
+        } 
+    };
+    this.setApertureBgDeltaAutoValue = function(){
+        if (data.useAutoPhotometry){
+            data.apertureBgDelta = calcDefaultApertureBgDelta(data.targetView);
+            self.apertureBgDelta_Control.setValue(data.apertureBgDelta);
+        } 
+    };
+    this.setLimitPhotoStarsPercentAutoValue = function(){
+        if (data.useAutoPhotometry){
+            data.limitPhotoStarsPercent = 100;
+            self.limitPhotoStarsPercent_Control.setValue(data.limitPhotoStarsPercent);
+        } 
+    };
+    this.setLinearRangeAutoValue = function(){
+        if (data.useAutoPhotometry){
+            data.linearRange = 0.5;
+            self.linearRange_Control.setValue(data.linearRange);
+        } 
+    };
+    this.setPhotometryAutoValues(data.useAutoPhotometry);
 
     // =======================================
     // SectionBar: "Sample Generation"
@@ -956,6 +1051,7 @@ function PhotometricMosaicDialog(data) {
     filterSampleStarsGroupBox.sizer.margin = 2;
     filterSampleStarsGroupBox.sizer.spacing = 10;
     filterSampleStarsGroupBox.sizer.add(this.limitSampleStarsPercent_Control);
+    filterSampleStarsGroupBox.sizer.addStretch();
     
     this.sampleStarGrowthRate_Control = sampleControls.createSampleStarGrowthRateEdit(this, data);    
     this.sampleStarGrowthRate_Control.onValueUpdated = function (value){
@@ -972,21 +1068,33 @@ function PhotometricMosaicDialog(data) {
         data.sampleStarGrowthLimitTarget = value;
     };
     
-    this.sampleStarRadiusAdd_Control = sampleControls.createSampleStarAddEdit(this, data);
-    this.sampleStarRadiusAdd_Control.onValueUpdated = function (value){
-        data.sampleStarRadiusAdd = value;
+    this.sampleStarGrowthRateTarget_Control = sampleControls.createSampleStarGrowthRateTargetEdit(this, data);
+    this.sampleStarGrowthRateTarget_Control.onValueUpdated = function (value){
+        data.sampleStarGrowthRateTarget = value;
     };
     
     let sampleStarRejectRadiusGroupBox = new GroupBox(this);
-    sampleStarRejectRadiusGroupBox.title = "Star rejection radius";
+    sampleStarRejectRadiusGroupBox.title = "Overlap star rejection radius";
     sampleStarRejectRadiusGroupBox.sizer = new HorizontalSizer();
     sampleStarRejectRadiusGroupBox.sizer.margin = 2;
     sampleStarRejectRadiusGroupBox.sizer.spacing = 10;
-    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarRadiusAdd_Control);
     sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthRate_Control);
     sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimit_Control);
-    sampleStarRejectRadiusGroupBox.sizer.add(this.sampleStarGrowthLimitTarget_Control);
     sampleStarRejectRadiusGroupBox.sizer.addStretch();
+    
+    let sampleStarRejectRadiusGroupBox2 = new GroupBox(this);
+    sampleStarRejectRadiusGroupBox2.title = "Target star rejection radius";
+    sampleStarRejectRadiusGroupBox2.sizer = new HorizontalSizer();
+    sampleStarRejectRadiusGroupBox2.sizer.margin = 2;
+    sampleStarRejectRadiusGroupBox2.sizer.spacing = 10;
+    sampleStarRejectRadiusGroupBox2.sizer.add(this.sampleStarGrowthRateTarget_Control);
+    sampleStarRejectRadiusGroupBox2.sizer.add(this.sampleStarGrowthLimitTarget_Control);
+    sampleStarRejectRadiusGroupBox2.sizer.addStretch();
+    
+    let sampleStarRejectRadiusSizer = new HorizontalSizer();
+    sampleStarRejectRadiusSizer.spacing = 12;
+    sampleStarRejectRadiusSizer.add(sampleStarRejectRadiusGroupBox, 50);
+    sampleStarRejectRadiusSizer.add(sampleStarRejectRadiusGroupBox2, 50);
     
     this.sampleSize_Control = sampleControls.createSampleSizeEdit(
             this, data, sampleControls.sampleSize.range.max);
@@ -1033,19 +1141,26 @@ function PhotometricMosaicDialog(data) {
         self.setSampleGenerationAutoValues(checked);
     };
     
+    let sampleAutoGroupBox = new GroupBox(this);
+    sampleAutoGroupBox.sizer = new HorizontalSizer();
+    sampleAutoGroupBox.sizer.margin = 2;
+    sampleAutoGroupBox.sizer.addSpacing(10);
+    sampleAutoGroupBox.sizer.add(this.autoSampleGenerationCheckBox);
+    sampleAutoGroupBox.sizer.addSpacing(10);
+    
     let editDisplayGroupBox = new GroupBox(this);
     editDisplayGroupBox.title = "Edit / Display";
     editDisplayGroupBox.sizer = new HorizontalSizer();
     editDisplayGroupBox.sizer.margin = 2;
-    editDisplayGroupBox.sizer.spacing = 10;
-    editDisplayGroupBox.sizer.addSpacing(20);
-    editDisplayGroupBox.sizer.add(this.autoSampleGenerationCheckBox);
+    editDisplayGroupBox.sizer.addSpacing(10);
     editDisplayGroupBox.sizer.add(displaySamplesButton);
+    editDisplayGroupBox.sizer.addSpacing(10);
     
     let generateSamplesHorizSizer = new HorizontalSizer();
-    generateSamplesHorizSizer.spacing = 10;
-    generateSamplesHorizSizer.add(filterSampleStarsGroupBox);
-    generateSamplesHorizSizer.add(sampleSizeGroupBox, 100);
+    generateSamplesHorizSizer.spacing = 12;
+    generateSamplesHorizSizer.add(filterSampleStarsGroupBox, 50);
+    generateSamplesHorizSizer.add(sampleSizeGroupBox, 50);
+    generateSamplesHorizSizer.add(sampleAutoGroupBox);
     generateSamplesHorizSizer.add(editDisplayGroupBox);
     
     let maxSamplesSizer;
@@ -1096,7 +1211,7 @@ function PhotometricMosaicDialog(data) {
     let sampleGenerationSection = new Control(this);
     sampleGenerationSection.sizer = new VerticalSizer;
     sampleGenerationSection.sizer.spacing = 4;
-    sampleGenerationSection.sizer.add(sampleStarRejectRadiusGroupBox);
+    sampleGenerationSection.sizer.add(sampleStarRejectRadiusSizer);
     sampleGenerationSection.sizer.add(generateSamplesHorizSizer);
     if (EXTRA_CONTROLS()){
         sampleGenerationSection.sizer.add(maxSamplesSizer);
@@ -1119,18 +1234,18 @@ function PhotometricMosaicDialog(data) {
         self.sampleStarGrowthRate_Control.enabled = !checked;
         self.sampleStarGrowthLimit_Control.enabled = !checked;
         self.sampleStarGrowthLimitTarget_Control.enabled = !checked;
-        self.sampleStarRadiusAdd_Control.enabled = !checked;
+        self.sampleStarGrowthRateTarget_Control.enabled = !checked;
         self.sampleSize_Control.enabled = !checked;
         if (checked){
             self.setSampleSizeAutoValue();
             self.setSampleStarGrowthRateAutoValue();
             self.setSampleStarGrowthLimitAutoValue();
             self.setSampleStarGrowthLimitTargetAutoValue();
-            self.setSampleStarRadiusAddAutoValue();
+            self.setSampleStarGrowthRateTargetAutoValue();
         }
     };
     this.setSampleSizeAutoValue = function(){
-        if (data.useAutoSampleGeneration && data.targetView !== null){
+        if (data.useAutoSampleGeneration){
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
             // Make sure we sample at least 70 x 70 microns on the sensor
             let minSampleSize = Math.round(70 / getPixelSize(data.targetView, 5));
@@ -1143,22 +1258,18 @@ function PhotometricMosaicDialog(data) {
         } 
     };
     this.setSampleStarGrowthLimitAutoValue = function(){
-        if (data.useAutoSampleGeneration && data.targetView !== null){
-            // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
-            let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            // 0.005 deg = 18 arcsec
-            let limit = Math.max(3, Math.round(0.005 / pixelAngle));
+        if (data.useAutoSampleGeneration){
+            let limit = Math.round(calcDefaultGrowthLimit(data.targetView));
+            limit = Math.max(limit, 1);
             limit = Math.min(limit, self.sampleStarGrowthLimit_Control.upperBound);
             data.sampleStarGrowthLimit = limit;
             self.sampleStarGrowthLimit_Control.setValue(data.sampleStarGrowthLimit);
         }
     };
     this.setSampleStarGrowthLimitTargetAutoValue = function(){
-        if (data.useAutoSampleGeneration && data.targetView !== null){
-            // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
-            let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            // 0.05 = 180 arcsec
-            let limit = Math.max(3, Math.round(0.05 / pixelAngle));
+        if (data.useAutoSampleGeneration){
+            let limit = Math.round(10 * calcDefaultGrowthLimit(data.targetView));
+            limit = Math.max(limit, 10);
             limit = Math.min(limit, self.sampleStarGrowthLimitTarget_Control.upperBound);
             data.sampleStarGrowthLimitTarget = limit;
             self.sampleStarGrowthLimitTarget_Control.setValue(limit);
@@ -1166,14 +1277,14 @@ function PhotometricMosaicDialog(data) {
     };
     this.setSampleStarGrowthRateAutoValue = function(){
         if (data.useAutoSampleGeneration){
-            data.sampleStarGrowthRate = data.apertureGrowthRate;
+            data.sampleStarGrowthRate = Math.max(0.1, data.apertureGrowthRate);
             self.sampleStarGrowthRate_Control.setValue(data.sampleStarGrowthRate);
         }
     };
-    this.setSampleStarRadiusAddAutoValue = function(){
+    this.setSampleStarGrowthRateTargetAutoValue = function(){
         if (data.useAutoSampleGeneration){
-            data.sampleStarRadiusAdd = data.apertureAdd;
-            self.sampleStarRadiusAdd_Control.setValue(data.sampleStarRadiusAdd);
+            data.sampleStarGrowthRateTarget = Math.max(0.5, data.apertureGrowthRate * 2);
+            self.sampleStarGrowthRateTarget_Control.setValue(data.sampleStarGrowthRateTarget);
         }
     };
     this.setSampleGenerationAutoValues(data.useAutoSampleGeneration);
@@ -1216,6 +1327,7 @@ function PhotometricMosaicDialog(data) {
     gradientOverlapGroupBox.sizer.add(this.overlapGradientSmoothness_Control);
     gradientOverlapGroupBox.sizer.addStretch();
     gradientOverlapGroupBox.sizer.add(overlapGradientGraphButton);
+    gradientOverlapGroupBox.sizer.addSpacing(10);
     gradientOverlapGroupBox.toolTip = "<p>A surface spline is created to model the relative " +
             "gradient over the whole of the overlap region.</p>" +
             "<p>Smoothing is applied to this surface spline to ensure it follows " +
@@ -1264,6 +1376,7 @@ function PhotometricMosaicDialog(data) {
     this.gradientTargetImageGroupBox.sizer.add(this.targetGradientSmoothness_Control);
     this.gradientTargetImageGroupBox.sizer.addStretch();
     this.gradientTargetImageGroupBox.sizer.add(targetGradientGraphButton);
+    this.gradientTargetImageGroupBox.sizer.addSpacing(10);
     this.gradientTargetImageGroupBox.toolTip = 
             "<p>If selected, a gradient correction is applied " +
             "to the rest of the target image (i.e. outside the overlap region).</p>" +
@@ -1271,7 +1384,7 @@ function PhotometricMosaicDialog(data) {
             "<p>In most situations, this option should be selected.</p>";
     
     let gradientsHorizSizer = new HorizontalSizer();
-    gradientsHorizSizer.spacing = 20;
+    gradientsHorizSizer.spacing = 12;
     gradientsHorizSizer.add(gradientOverlapGroupBox, 50);
     gradientsHorizSizer.add(this.gradientTargetImageGroupBox, 50);
     
@@ -1315,11 +1428,8 @@ function PhotometricMosaicDialog(data) {
     this.setTaperLengthAutoValue = function(data){
         if (data.useAutoTaperLength){
             let taperLength;
-            if (data.useTargetGradientCorrection){
-                // default pixel scale: 0.00025 deg = 0.9 arcsec / pixel
-                // 0.075 deg = 270 arcsec
-                let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-                taperLength = Math.max(10, Math.round(0.075 / pixelAngle));
+            if (data.useTargetGradientCorrection){ // TODO if targetView is null?
+                taperLength = Math.max(10, Math.round(5 * calcDefaultGrowthLimit(data.targetView)));
             } else {
                 // No target image gradient correction. This requires a longer tager
                 taperLength = 1000;
@@ -1541,7 +1651,9 @@ function PhotometricMosaicDialog(data) {
     this.joinSize_Control.toolTip = "<p>Specifies the thickness of the Join Region. " +
             "For a horizontal join, this is the height. For a vertical join, the width. " +
             "The ideal Join size depends on the Mosaic Combination mode:" +
-            "<ul><li>Overlay: The join runs along the middle of the Join Region.</li>" +
+            "<ul><li>Overlay: The join runs along the middle of the Join Region. " +
+            "Reference pixels overlay target pixels on the reference side of the join, " +
+            "Target pixels overlay reference pixels on the target side of the join.</li>" +
             "<li>Random: Join size should be large enough to blend the two images " +
             "together, but small enough not to include too many stars.</li>" +
             "<li>Average: Determines the area that will benefit from a higher " +
@@ -1549,12 +1661,16 @@ function PhotometricMosaicDialog(data) {
             
     this.joinSize_Control.onValueUpdated = function (value) {
         data.joinSize = value;
+        sampleControls.setJoinPositionRange(self.joinPosition_Control, data);
     };
     this.joinSize_Control.setRange(1, 250);
     this.joinSize_Control.slider.setRange(1, 250);
     this.joinSize_Control.setValue(data.joinSize);
     
     this.joinPosition_Control = sampleControls.createJoinPositionEdit(this, data);
+    this.joinPosition_Control.onEnter = function (){
+        sampleControls.setJoinPositionRange(self.joinPosition_Control, data);
+    };
     this.joinPosition_Control.onValueUpdated = function (value){
         data.joinPosition = value;
         if (data.cache.overlap !== null){
@@ -1894,6 +2010,9 @@ function main() {
         // Run the script
         photometricMosaic(data, photometricMosaicDialog);
         data.saveParameters();  // Save script parameters to the history.
+    }
+    if (data.cache !== undefined){
+        data.cache.invalidate();
     }
     console.hide();
     return;

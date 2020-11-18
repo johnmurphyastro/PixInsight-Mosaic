@@ -136,9 +136,11 @@ function searchFits(view, name){
  * @returns {Number} Focal length in mm
  */
 function getFocalLength(view, defaultValue){
-    for (let fitsKeyword of view.window.keywords) {
-        if (fitsKeyword.name === "FOCALLEN")
-            return fitsKeyword.numericValue;
+    if (!view.isNull){
+        for (let fitsKeyword of view.window.keywords) {
+            if (fitsKeyword.name === "FOCALLEN")
+                return fitsKeyword.numericValue;
+        }
     }
     return defaultValue;
 }
@@ -149,9 +151,11 @@ function getFocalLength(view, defaultValue){
  * @returns {Number} Pixel size in microns
  */
 function getPixelSize(view, defaultValue){
-    for (let fitsKeyword of view.window.keywords) {
-        if (fitsKeyword.name === "XPIXSZ")
-            return fitsKeyword.numericValue;
+    if (!view.isNull){
+        for (let fitsKeyword of view.window.keywords) {
+            if (fitsKeyword.name === "XPIXSZ")
+                return fitsKeyword.numericValue;
+        }
     }
     return defaultValue;
 }
@@ -164,9 +168,11 @@ function getPixelSize(view, defaultValue){
  * @returns {Number} pixel angular size in degrees
  */
 function getPixelAngularSize(view, defaultValue){
-    for (let fitsKeyword of view.window.keywords) {
-        if (fitsKeyword.name === "CDELT1")
-            return Math.abs(fitsKeyword.numericValue);
+    if (!view.isNull){
+        for (let fitsKeyword of view.window.keywords) {
+            if (fitsKeyword.name === "CDELT1")
+                return Math.abs(fitsKeyword.numericValue);
+        }
     }
     return defaultValue;
 }

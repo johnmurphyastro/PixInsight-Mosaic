@@ -42,11 +42,11 @@ function SamplePair(targetMedian, referenceMedian, rect) {
  * Create SamplePair[] for each color channel
  * @param {Star[]} stars Stars from all channels, target and reference images merged and sorted
  * @param {PhotometricMosaicData} data User settings
+ * @param {Number} growthRate data.sampleStarGrowthRate or data.sampleStarGrowthRateTarget
  * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
  * @returns {SampleGridMap} Map of sample squares (all color channels)
  */
-function createSampleGridMap(stars, data, growthLimit) {
-    // data.targetView.image, data.referenceView.image, data.cache.overlap.overlapBox
+function createSampleGridMap(stars, data, growthRate, growthLimit) {
     let targetImage = data.targetView.image;
     let referenceImage = data.referenceView.image;
     let sampleRect = data.cache.overlap.overlapBox;
@@ -61,7 +61,7 @@ function createSampleGridMap(stars, data, growthLimit) {
     let nChannels = referenceImage.isColor ? 3 : 1;
     let sampleGridMap = new SampleGridMap(sampleRect, data.sampleSize, nChannels);
     sampleGridMap.addSampleBins(targetImage, referenceImage);
-    sampleGridMap.removeBinRectWithStars(stars, data, firstNstars, growthLimit);
+    sampleGridMap.removeBinRectWithStars(stars, data, firstNstars, growthRate, growthLimit);
     
     return sampleGridMap;
 }
@@ -136,15 +136,16 @@ function SampleGridMap(overlapBox, sampleSize, nChannels){
      * @param {Star[]} stars Must be sorted by flux before calling this function
      * @param {PhotometricMosaicData} data 
      * @param {Number} firstNstars Only use this number of the brightest stars
+     * @param {Number} growthRate data.sampleStarGrowthRate or data.sampleStarGrowthRateTarget
      * @param {Number} growthLimit data.sampleStarGrowthLimit or data.sampleStarGrowthLimitTarget
      */
-    this.removeBinRectWithStars = function(stars, data, firstNstars, growthLimit){
+    this.removeBinRectWithStars = function(stars, data, firstNstars, growthRate, growthLimit){
         for (let i=0; i<firstNstars; i++){
             let star = stars[i];
             // This will allow the star to clip the box corner, but that will
             // not significantly affect the bin's median value
             // Increase protection for saturated or almost saturated stars
-            let starRadius = calcSampleStarRejectionRadius(star, data, growthLimit);
+            let starRadius = calcSampleStarRejectionRadius(star, data, growthRate, growthLimit);
             removeBinsInCircle(star.pos, starRadius);
         }
     };
