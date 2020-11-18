@@ -147,7 +147,6 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
         liveUpdate_control.toolTip = "<p>Live update. Deselect if controls are sluggish.</p>";
         liveUpdate_control.onCheck = function (checked){
             liveUpdate = checked;
-            update_Button.enabled = !checked;
             if (checked){
                 self.enabled = false;
                 processEvents();
@@ -156,29 +155,16 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
             }
         };
         liveUpdate_control.checked = liveUpdate;
-
-        let update_Button = new PushButton(self);
-        update_Button.text = "Update";
-        update_Button.toolTip = "<p>Update display</p>";
-        update_Button.onClick = function(){
-            self.enabled = false;
-            processEvents();
-            updateSampleGrid();
-            self.enabled = true;
-        };
-        update_Button.enabled = !liveUpdate_control.checked;
         
         horizontalSizer.addSpacing(20);
         horizontalSizer.add(liveUpdate_control);
-        horizontalSizer.addSpacing(6);
-        horizontalSizer.add(update_Button);
         horizontalSizer.addSpacing(20);
     }
     
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, refBitmap, null, customControls, false);
+    let previewControl = new PreviewControl(this, refBitmap, 1800, 950, null, customControls, false);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();
@@ -206,10 +192,6 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
         showUnbinnedSamples = checked;
         self.enabled = false;
         processEvents();
-        if (!liveUpdate){
-            // Ensure binning has been updated before drawing unbinned samples
-            updateSampleGrid();
-        }
         previewControl.forceRedraw();
         self.enabled = true;
     };
@@ -219,6 +201,21 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
     optionsSizer.addSpacing(4);
     optionsSizer.add(unbinnedCheckBox);
     optionsSizer.addStretch();
+    
+    /**
+     * When a slider is dragged, only fast draw operations are performed.
+     * When the drag has finished (or after the user has finished editing in the textbox)
+     * this method is called to perform all calculations.
+     * @param {Number} value NumericControl's value
+     */
+    function finalUpdateFunction(value){
+        if (!liveUpdate){
+            self.enabled = false;
+            processEvents();
+            updateSampleGrid();
+            self.enabled = true;
+        }
+    }
     
     let maxSamples_Control = createMaxSamplesControl(this, data);
     maxSamples_Control.onValueUpdated = function (value) {
@@ -231,6 +228,7 @@ function BinnedSampleGridDialog(title, refBitmap, samplePairs,
             self.enabled = true;
         }
     };
+    addFinalUpdateListener(maxSamples_Control, finalUpdateFunction);
     
     /**
      * @returns {SamplePair[]}

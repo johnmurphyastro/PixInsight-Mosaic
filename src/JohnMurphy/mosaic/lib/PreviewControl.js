@@ -127,12 +127,14 @@ function extractOverlapImage(refView, imageRect, maskSamples){
  * 
  * @param {UIObject} parent
  * @param {Bitmap} image image The unscaled bitmap to display. It is not modified.
+ * @param {Number} maxWidth
+ * @param {Number} maxHeight
  * @param {width:, height:} metadata Specifies dimensions of drawing region if image = null
  * @param {Function(HorizontalSizer)} customControls e.g. add 'Live update' and 'Update' controls
  * @param {Boolean} includeCancelButton If true, add a cancel button after the OK button
  * @returns {PreviewControl}
  */
-function PreviewControl(parent, image, metadata, customControls, includeCancelButton) {
+function PreviewControl(parent, image, maxWidth, maxHeight, metadata, customControls, includeCancelButton) {
     this.__base__ = Frame;
     this.__base__(parent);
     
@@ -491,8 +493,8 @@ function PreviewControl(parent, image, metadata, customControls, includeCancelBu
     
     this.setImage(image, metadata);
     
-    this.width = Math.min(this.logicalPixelsToPhysical(1800), image.width);
-    this.height = Math.min(this.logicalPixelsToPhysical(700), image.height);
+    this.width = Math.min(this.logicalPixelsToPhysical(maxWidth), image.width);
+    this.height = Math.min(this.logicalPixelsToPhysical(maxHeight), image.height);
 }
 
 PreviewControl.prototype = new Frame;

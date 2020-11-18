@@ -201,7 +201,7 @@ function MaskStarsDialog(joinArea, detectedStars, data,
     // =================================
     // Sample Generation Preview frame
     // =================================
-    let previewControl = new PreviewControl(this, bitmap, null, customControls, true);
+    let previewControl = new PreviewControl(this, bitmap, 1800, 850, null, customControls, true);
     previewControl.updateZoomText = function (text){
         zoomText = text;
         setTitle();

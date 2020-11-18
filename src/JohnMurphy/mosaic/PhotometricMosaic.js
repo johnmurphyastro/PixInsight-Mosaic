@@ -490,9 +490,10 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
     fitsHeaderImages(keywords, data);
     fitsHeaderStarDetection(keywords, data);
     fitsHeaderPhotometry(keywords, data);
-    fitsHeaderGradient(keywords, data, true, true);
+    fitsHeaderGradient(keywords, data);
     fitsHeaderOrientation(keywords, isHorizontal, isTargetAfterRef);
     if (createMosaicFlag){
+        fitsHeaderJoin(keywords, data, joinRect);
         fitsHeaderMosaic(keywords, data);
     }
     fitsHeaderScale(keywords, scaleFactors);

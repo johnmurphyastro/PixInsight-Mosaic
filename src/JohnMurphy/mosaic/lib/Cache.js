@@ -16,8 +16,6 @@
 //"use strict";
 
 function SampleGrowthRateAndLimit(data, isOverlapSampleGrid){
-    this.rate;
-    this.limit;
     if (isOverlapSampleGrid){
         this.rate = data.sampleStarGrowthRate;
         this.limit = data.sampleStarGrowthLimit;
@@ -188,7 +186,7 @@ function MosaicCache() {
                 console.writeln("Clearing sampleGridMap: ", key);
             }
             for (let key of this.samplePairsMap.keys()) {
-                console.writeln("Clearing sampleGridMap: ", key);
+                console.writeln("Clearing samplePairs: ", key);
             }
             for (let key of this.surfaceSplineMap.keys()) {
                 console.writeln("Clearing surfaceSpline: ", key);

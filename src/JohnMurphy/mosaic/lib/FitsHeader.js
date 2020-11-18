@@ -206,6 +206,12 @@ function fitsHeaderPhotometry(keywords, data){
         SCRIPT_NAME() + ".starFluxTolerance: " + data.starFluxTolerance));
     keywords.push(new FITSKeyword("HISTORY", "",
         SCRIPT_NAME() + ".starSearchRadius: " + data.starSearchRadius));
+        keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".apertureAdd: " + data.apertureAdd));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".apertureGrowthRate: " + data.apertureGrowthRate));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".apertureBgDelta: " + data.apertureBgDelta));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitPhotometricStarsPercent: " + data.limitPhotoStarsPercent));
     keywords.push(new FITSKeyword("HISTORY", "", 
@@ -217,26 +223,44 @@ function fitsHeaderPhotometry(keywords, data){
 /**
  * @param {FITSKeyword} keywords
  * @param {PhotometricMosaicData} data
- * @param {Boolean} includeGradient 
- * @param {Boolean} includePropagate 
+ * @param {Rect} joinRect
  */
-function fitsHeaderGradient(keywords, data, includeGradient, includePropagate){
+function fitsHeaderJoin(keywords, data, joinRect){
+    if (data.hasJoinSize){
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".joinSize: " + data.joinSize));
+        keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".joinPosition: " + data.joinPosition));
+    }
+    keywords.push(new FITSKeyword("HISTORY", "", 
+            SCRIPT_NAME() + ".joinArea: " + joinRect));
+}
+
+/**
+ * @param {FITSKeyword} keywords
+ * @param {PhotometricMosaicData} data
+ */
+function fitsHeaderGradient(keywords, data){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".overlapStarGrowthRate: " + data.sampleStarGrowthRate));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".overlapStarGrowthLimit: " + data.sampleStarGrowthLimit));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".targetStarGrowthRate: " + data.sampleStarGrowthRateTarget));
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".targetStarGrowthLimit: " + data.sampleStarGrowthLimitTarget));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".sampleSize: " + data.sampleSize));
     keywords.push(new FITSKeyword("HISTORY", "", 
         SCRIPT_NAME() + ".limitSampleStarsPercent: " + data.limitSampleStarsPercent));
-    if (includePropagate){
-        if (data.useTargetGradientCorrection){
-            keywords.push(new FITSKeyword("HISTORY", "", 
-                SCRIPT_NAME() + ".targetGradientSmoothness: " + data.targetGradientSmoothness));
-        }
-    }
-    if (includeGradient){
+    keywords.push(new FITSKeyword("HISTORY", "", 
+        SCRIPT_NAME() + ".overlapGradientSmoothness: " + data.overlapGradientSmoothness));
+    if (data.useTargetGradientCorrection){
         keywords.push(new FITSKeyword("HISTORY", "", 
-            SCRIPT_NAME() + ".overlapGradientSmoothness: " + data.overlapGradientSmoothness));
-        keywords.push(new FITSKeyword("HISTORY", "",
-            SCRIPT_NAME() + ".taperLength: " + data.taperLength));
+            SCRIPT_NAME() + ".targetGradientSmoothness: " + data.targetGradientSmoothness));
     }
+    keywords.push(new FITSKeyword("HISTORY", "",
+        SCRIPT_NAME() + ".taperLength: " + data.taperLength));
 }
 
 /**
