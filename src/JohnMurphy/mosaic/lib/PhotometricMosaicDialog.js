@@ -111,12 +111,10 @@ function PhotometricMosaicData() {
         Parameters.set("useAutoPhotometry", this.useAutoPhotometry);
         
         // Join Region
-        Parameters.set("hasJoinSize", this.hasJoinSize);
         Parameters.set("joinSize", this.joinSize);
         Parameters.set("joinPosition", this.joinPosition);
         
-        // Join Region (from preview)
-        Parameters.set("hasJoinAreaPreview", this.hasJoinAreaPreview);
+        // Replace/Update Region
         Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
         Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
         Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
@@ -149,7 +147,7 @@ function PhotometricMosaicData() {
         Parameters.set("maskStarRadiusAdd", this.maskStarRadiusAdd);
         Parameters.set("useAutoMaskStarSize", this.useAutoMaskStarSize);
         
-        // Create Mosaic
+        // Mosaic Join Mode
         Parameters.set("useMosaicOverlay", this.useMosaicOverlay);
         Parameters.set("useMosaicRandom", this.useMosaicRandom);
         Parameters.set("useMosaicAverage", this.useMosaicAverage); 
@@ -198,22 +196,17 @@ function PhotometricMosaicData() {
             this.useAutoPhotometry = Parameters.getBoolean("useAutoPhotometry");
         
         // Join Region
-        if (Parameters.has("hasJoinSize"))
-            this.hasJoinSize = Parameters.getBoolean("hasJoinSize");
         if (Parameters.has("joinSize"))
             this.joinSize = Parameters.getInteger("joinSize");
         if (Parameters.has("joinPosition"))
             this.joinPosition = Parameters.getInteger("joinPosition");  
         
-        // Join Region (from preview)
+        // Replace/Update Region
         {
             let x = 0;
             let y = 0;
             let w = 1;
             let h = 1;
-            
-            if (Parameters.has("hasJoinAreaPreview"))
-                this.hasJoinAreaPreview = Parameters.getBoolean("hasJoinAreaPreview");
             if (Parameters.has("joinAreaPreviewLeft")){
                 x = Parameters.getInteger("joinAreaPreviewLeft");
             }
@@ -276,7 +269,7 @@ function PhotometricMosaicData() {
         if (Parameters.has("useAutoMaskStarSize"))
             this.useAutoMaskStarSize = Parameters.getBoolean("useAutoMaskStarSize");
         
-        // Create Mosaic
+        // Mosaic Join Mode
         if (Parameters.has("useMosaicOverlay"))
             this.useMosaicOverlay = Parameters.getBoolean("useMosaicOverlay");
         if (Parameters.has("useMosaicRandom"))
@@ -309,13 +302,11 @@ function PhotometricMosaicData() {
         this.outlierRemoval = 0;
         this.useAutoPhotometry = true;
         
-        // Join Region (Centered)
-        this.hasJoinSize = true;
+        // Join Region
         this.joinSize = 20;
         this.joinPosition = 0;
         
-        // Join Region (From preview)
-        this.hasJoinAreaPreview = false;
+        // Replace/Update Region
         this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
         this.useCropTargetToJoinRegion = false;
         
@@ -345,7 +336,7 @@ function PhotometricMosaicData() {
         this.maskStarRadiusAdd = 5;
         this.useAutoMaskStarSize = true;
         
-        // Create Mosaic
+        // Mosaic Join Mode
         this.useMosaicOverlay = true;
         this.useMosaicRandom = false;
         this.useMosaicAverage = false;
@@ -383,18 +374,21 @@ function PhotometricMosaicData() {
         if (EXTRA_CONTROLS())
             photometricMosaicDialog.apertureGrowthLimit_Control.setValue(this.apertureGrowthLimit);
         
+        // Mosaic Join Mode
+        photometricMosaicDialog.mosaicOverlay_Control.checked = this.useMosaicOverlay;
+        photometricMosaicDialog.mosaicRandom_Control.checked = this.useMosaicRandom;
+        photometricMosaicDialog.mosaicAverage_Control.checked = this.useMosaicAverage;
+        
         // Join Region
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
-        photometricMosaicDialog.setHasJoinSize(this.hasJoinSize);
         photometricMosaicDialog.joinPosition_Control.setValue(this.joinPosition);
         
-        // Join Region (From preview)
-        photometricMosaicDialog.setHasJoinAreaPreview(this.hasJoinAreaPreview);
+        // Replace/Update Region
         photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
         photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
         photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
         photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        photometricMosaicDialog.cropTargetToJoinRegion_Control.checked = this.useCropTargetToJoinRegion;
+        photometricMosaicDialog.setHasJoinAreaPreview(this.useCropTargetToJoinRegion);
         
         // Gradient Sample Generation
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(this.sampleStarGrowthRate);
@@ -417,11 +411,6 @@ function PhotometricMosaicData() {
         // Gradient Correction (Target image)
         photometricMosaicDialog.targetGradientSmoothness_Control.setValue(this.targetGradientSmoothness);
         photometricMosaicDialog.setTargetGradientFlag(this.useTargetGradientCorrection);
-        
-        // Create Mosaic
-        photometricMosaicDialog.mosaicOverlay_Control.checked = this.useMosaicOverlay;
-        photometricMosaicDialog.mosaicRandom_Control.checked = this.useMosaicRandom;
-        photometricMosaicDialog.mosaicAverage_Control.checked = this.useMosaicAverage;
     };
     
     // Initialise the script's data
@@ -454,11 +443,6 @@ function saveSettings(data){
 
     // Join Region
     Settings.write( KEYPREFIX+"/joinSize", DataType_Int32, data.joinSize );
-    // No point saving the join area preview, because it wont be appropriate for the next join.
-    // Hence hasJoinSize defaults to true if hasJoinAreaPreview is selected.
-    // hasJoinSize is only set to false if hasJoinSize and hasJoinAreaPreview are both unselected.
-    let hasJoinSize = data.hasJoinSize || data.hasJoinAreaPreview;
-    Settings.write( KEYPREFIX+"/hasJoinSize", DataType_Boolean, hasJoinSize );
     
     // Gradient Sample Generation
     Settings.write( KEYPREFIX+"/sampleStarGrowthRate", DataType_Float, data.sampleStarGrowthRate );
@@ -488,7 +472,7 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/maskStarRadiusAdd", DataType_Float, data.maskStarRadiusAdd );
     Settings.write( KEYPREFIX+"/useAutoMaskStarSize", DataType_Boolean, data.useAutoMaskStarSize );
     
-    // Create Mosaic
+    // Mosaic Join Mode
     Settings.write( KEYPREFIX+"/useMosaicOverlay", DataType_Boolean, data.useMosaicOverlay );
     Settings.write( KEYPREFIX+"/useMosaicRandom", DataType_Boolean, data.useMosaicRandom );
     Settings.write( KEYPREFIX+"/useMosaicAverage", DataType_Boolean, data.useMosaicAverage );
@@ -553,9 +537,6 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/joinSize", DataType_Int32 );
     if ( Settings.lastReadOK )
         data.joinSize = keyValue;
-    keyValue = Settings.read( KEYPREFIX+"/hasJoinSize", DataType_Boolean );
-    if ( Settings.lastReadOK )
-        data.hasJoinSize = keyValue;
 
     // Gradient Sample Generation
     keyValue = Settings.read( KEYPREFIX+"/sampleStarGrowthRate", DataType_Float );
@@ -621,7 +602,7 @@ function restoreSettings(data){
     if ( Settings.lastReadOK )
         data.useAutoMaskStarSize = keyValue;
     
-    // Create Mosaic
+    // Mosaic Join Mode
     keyValue = Settings.read( KEYPREFIX+"/useMosaicOverlay", DataType_Boolean );
     if ( Settings.lastReadOK )
         data.useMosaicOverlay = keyValue;
@@ -1073,6 +1054,27 @@ function PhotometricMosaicDialog(data) {
         data.sampleStarGrowthRateTarget = value;
     };
     
+    this.autoSampleGenerationCheckBox = new CheckBox(this);
+    this.autoSampleGenerationCheckBox.text = "Auto";
+    this.autoSampleGenerationCheckBox.toolTip = 
+            "<p>Calculates default values for the following parameters:</p>" +
+            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
+            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
+            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
+            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
+            "</ul>";
+    this.autoSampleGenerationCheckBox.onCheck = function (checked){
+        self.setSampleGenerationAutoValues(checked);
+    };
+    
+    let sampleAutoGroupBox = new GroupBox(this);
+    sampleAutoGroupBox.sizer = new HorizontalSizer();
+    sampleAutoGroupBox.sizer.margin = 2;
+    sampleAutoGroupBox.sizer.addSpacing(10);
+    sampleAutoGroupBox.sizer.add(this.autoSampleGenerationCheckBox);
+    sampleAutoGroupBox.sizer.addSpacing(10);
+    
     let sampleStarRejectRadiusGroupBox = new GroupBox(this);
     sampleStarRejectRadiusGroupBox.title = "Overlap star rejection radius";
     sampleStarRejectRadiusGroupBox.sizer = new HorizontalSizer();
@@ -1095,12 +1097,48 @@ function PhotometricMosaicDialog(data) {
     sampleStarRejectRadiusSizer.spacing = 12;
     sampleStarRejectRadiusSizer.add(sampleStarRejectRadiusGroupBox, 50);
     sampleStarRejectRadiusSizer.add(sampleStarRejectRadiusGroupBox2, 50);
+    sampleStarRejectRadiusSizer.add(sampleAutoGroupBox);
     
     this.sampleSize_Control = sampleControls.createSampleSizeEdit(
             this, data, sampleControls.sampleSize.range.max);
     this.sampleSize_Control.onValueUpdated = function (value) {
         data.sampleSize = value;
     };
+    
+    // =======================================
+    // GroupBox: "Join"
+    // =======================================
+    this.joinPosition_Control = sampleControls.createJoinPositionEdit(this, data);
+    this.joinPosition_Control.onValueUpdated = function (value){
+        data.joinPosition = value;
+        if (data.cache.overlap !== null){
+            let joinRegion = new JoinRegion(data);
+            joinRegion.createPreview(data.targetView);
+        }
+    };
+
+    let joinSizeTooltip = 
+        "<p>Limits the Join Region to a long thin rectangle that is centered within the overlap region.</p>" +
+        "<p>In most cases this option produces excellent results.</p>" +
+        "<p>For more information on how to use a Join Region, read the Help sections:" +
+        "<ul><li>Join Region: Taking control of the join</li>" +
+        "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
+
+    this.joinSize_Control = sampleControls.createJoinSizeEdit(this, data);
+    this.joinSize_Control.onValueUpdated = function (value) {
+        data.joinSize = value;
+        setJoinPositionRange(self.joinPosition_Control, data, true);
+    };
+    
+    this.joinSizeGroupBox = new GroupBox(this);
+    this.joinSizeGroupBox.title = "Join";
+    this.joinSizeGroupBox.toolTip = joinSizeTooltip;
+    this.joinSizeGroupBox.sizer = new HorizontalSizer;
+    this.joinSizeGroupBox.sizer.margin = 2;
+    this.joinSizeGroupBox.sizer.spacing = 10;
+    this.joinSizeGroupBox.sizer.add(this.joinSize_Control, 100);
+    this.joinSizeGroupBox.sizer.add(this.joinPosition_Control);
+    this.joinSizeGroupBox.sizer.addStretch();
     
     let sampleSizeGroupBox = new GroupBox(this);
     sampleSizeGroupBox.title = "Samples";
@@ -1127,27 +1165,6 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    this.autoSampleGenerationCheckBox = new CheckBox(this);
-    this.autoSampleGenerationCheckBox.text = "Auto";
-    this.autoSampleGenerationCheckBox.toolTip = 
-            "<p>Calculates default values for the following parameters:</p>" +
-            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
-            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
-            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
-            "</ul>";
-    this.autoSampleGenerationCheckBox.onCheck = function (checked){
-        self.setSampleGenerationAutoValues(checked);
-    };
-    
-    let sampleAutoGroupBox = new GroupBox(this);
-    sampleAutoGroupBox.sizer = new HorizontalSizer();
-    sampleAutoGroupBox.sizer.margin = 2;
-    sampleAutoGroupBox.sizer.addSpacing(10);
-    sampleAutoGroupBox.sizer.add(this.autoSampleGenerationCheckBox);
-    sampleAutoGroupBox.sizer.addSpacing(10);
-    
     let editDisplayGroupBox = new GroupBox(this);
     editDisplayGroupBox.title = "Edit / Display";
     editDisplayGroupBox.sizer = new HorizontalSizer();
@@ -1158,9 +1175,9 @@ function PhotometricMosaicDialog(data) {
     
     let generateSamplesHorizSizer = new HorizontalSizer();
     generateSamplesHorizSizer.spacing = 12;
-    generateSamplesHorizSizer.add(filterSampleStarsGroupBox, 50);
-    generateSamplesHorizSizer.add(sampleSizeGroupBox, 50);
-    generateSamplesHorizSizer.add(sampleAutoGroupBox);
+    generateSamplesHorizSizer.add(filterSampleStarsGroupBox, 33);
+    generateSamplesHorizSizer.add(this.joinSizeGroupBox, 33);
+    generateSamplesHorizSizer.add(sampleSizeGroupBox, 33);
     generateSamplesHorizSizer.add(editDisplayGroupBox);
     
     let maxSamplesSizer;
@@ -1464,7 +1481,7 @@ function PhotometricMosaicDialog(data) {
     // SectionBar: "Gradient Correction" End
 
     // ===========================================
-    // SectionBar: Join Region
+    // SectionBar: Replace/Update Region
     // GroupBox Join Region (From Preview)
     // ===========================================
     const getAreaFromPreviewStr = "From preview:";
@@ -1545,7 +1562,6 @@ function PhotometricMosaicDialog(data) {
     function previewUpdateActions(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
-            dialog.joinAreaGroupBox.checked = data.hasJoinAreaPreview;
             data.joinAreaPreviewRect = view.window.previewRect(view);
             dialog.rectangleX0_Control.setValue(data.joinAreaPreviewRect.x0);
             dialog.rectangleY0_Control.setValue(data.joinAreaPreviewRect.y0);
@@ -1590,134 +1606,47 @@ function PhotometricMosaicDialog(data) {
     joinAreaHorizSizer2.add(previewUpdateButton);
     
     this.setHasJoinAreaPreview = function(checked){
-        data.hasJoinAreaPreview = checked;
-        self.joinAreaGroupBox.checked = checked;
+        joinRegionBar.checkBox.checked = checked;
+        data.useCropTargetToJoinRegion = checked;
         self.rectangleX0_Control.enabled = checked;
         self.rectangleWidth_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
         self.rectangleHeight_Control.enabled = checked;
-        self.cropTargetToJoinRegion_Control.enabled = checked;
-        if (checked){
-            self.setHasJoinSize(false);
-        } else {
-            data.useCropTargetToJoinRegion = false;
-            self.cropTargetToJoinRegion_Control.checked = false; 
-        }
+        enableJoinSizeControl();
+        self.joinPosition_Control.enabled = !checked;
+        self.gradientTargetImageGroupBox.enabled = !checked;  
     };
-    
-    this.cropTargetToJoinRegion_Control = new CheckBox(this);
-    this.cropTargetToJoinRegion_Control.text = "Crop target";
-    this.cropTargetToJoinRegion_Control.toolTip = 
-        "<p>Restricts target image pixels to the user specified rectangle. " +
-        "All target pixels outside this rectangle are ignored.</p>" +
-        "<p>This can be used to fix a small area of the mosaic or to add a high res image to a wider mosaic.</p>" +
-        "<p>This option only supports the mosaic combination modes 'Overlay' and 'Average'.</p>";
-    this.cropTargetToJoinRegion_Control.onCheck = function (checked){
-        data.useCropTargetToJoinRegion = checked;
-    };
-    this.cropTargetToJoinRegion_Control.checked = data.useCropTargetToJoinRegion;
-    
-    let joinAreaFlagsHorizSizer = new HorizontalSizer(this);
-    joinAreaFlagsHorizSizer.addSpacing(GET_AREA_FROM_PREVIEW_STRLEN + 4);
-    joinAreaFlagsHorizSizer.add(this.cropTargetToJoinRegion_Control);
-    joinAreaFlagsHorizSizer.addStretch();
     
     this.joinAreaGroupBox = new GroupBox(this);
-    this.joinAreaGroupBox.title = "Join Region (From preview)";
-    this.joinAreaGroupBox.titleCheckBox = true;
-    this.joinAreaGroupBox.onCheck = this.setHasJoinAreaPreview;
+    this.joinAreaGroupBox.title = "Area of mosiac to be replaced";
     this.joinAreaGroupBox.toolTip = JoinRegionTooltip;
     this.joinAreaGroupBox.sizer = new VerticalSizer(this);
     this.joinAreaGroupBox.sizer.margin = 2;
     this.joinAreaGroupBox.sizer.spacing = 4;
     this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer1);
     this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer2);
-    this.joinAreaGroupBox.sizer.add(joinAreaFlagsHorizSizer);
     // GroupBox "Join Region (User defined)" End
-
-    // =======================================
-    // GroupBox: "Join Region (Centered)"
-    // =======================================
-    let joinSizeTooltip = 
-        "<p>Limits the Join Region to a long thin rectangle that is centered within the overlap region.</p>" +
-        "<p>In most cases this option produces excellent results.</p>" +
-        "<p>For more information on how to use a Join Region, read the Help sections:" +
-        "<ul><li>Join Region: Taking control of the join</li>" +
-        "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
-
-    this.joinSize_Control = new NumericControl(this);
-    this.joinSize_Control.real = false;
-    this.joinSize_Control.label.text = "Join size:";
-    this.joinSize_Control.toolTip = "<p>Specifies the thickness of the Join Region. " +
-            "For a horizontal join, this is the height. For a vertical join, the width. " +
-            "The ideal Join size depends on the Mosaic Combination mode:" +
-            "<ul><li>Overlay: The join runs along the middle of the Join Region. " +
-            "Reference pixels overlay target pixels on the reference side of the join, " +
-            "Target pixels overlay reference pixels on the target side of the join.</li>" +
-            "<li>Random: Join size should be large enough to blend the two images " +
-            "together, but small enough not to include too many stars.</li>" +
-            "<li>Average: Determines the area that will benefit from a higher " +
-            "signal to noise ratio.</li></ul></p>";
-            
-    this.joinSize_Control.onValueUpdated = function (value) {
-        data.joinSize = value;
-        sampleControls.setJoinPositionRange(self.joinPosition_Control, data);
-    };
-    this.joinSize_Control.setRange(1, 250);
-    this.joinSize_Control.slider.setRange(1, 250);
-    this.joinSize_Control.setValue(data.joinSize);
-    
-    this.joinPosition_Control = sampleControls.createJoinPositionEdit(this, data);
-    this.joinPosition_Control.onEnter = function (){
-        sampleControls.setJoinPositionRange(self.joinPosition_Control, data);
-    };
-    this.joinPosition_Control.onValueUpdated = function (value){
-        data.joinPosition = value;
-        if (data.cache.overlap !== null){
-            let joinRegion = new JoinRegion(data);
-            joinRegion.createPreview(data.targetView);
-        }
-    };
-    
-    this.setHasJoinSize = function(checked){
-        if (checked){
-            self.setHasJoinAreaPreview(false);
-        }
-        data.hasJoinSize = checked;
-        self.joinSizeGroupBox.checked = checked;
-        self.joinSize_Control.enabled = checked;
-        self.joinPosition_Control.enabled = checked;
-    };
-    
-    this.joinSizeGroupBox = new GroupBox(this);
-    this.joinSizeGroupBox.title = "Join Region (Centered)";
-    this.joinSizeGroupBox.toolTip = joinSizeTooltip;
-    this.joinSizeGroupBox.titleCheckBox = true;
-    this.joinSizeGroupBox.onCheck = this.setHasJoinSize;
-    this.joinSizeGroupBox.sizer = new HorizontalSizer;
-    this.joinSizeGroupBox.sizer.margin = 2;
-    this.joinSizeGroupBox.sizer.spacing = 20;
-    this.joinSizeGroupBox.sizer.add(this.joinSize_Control, 100);
-    this.joinSizeGroupBox.sizer.add(this.joinPosition_Control);
-    
-    this.setHasJoinSize(data.hasJoinSize);
-    this.setHasJoinAreaPreview(data.hasJoinAreaPreview); 
     
     let joinRegionSection = new Control(this);
     joinRegionSection.sizer = new VerticalSizer;
     joinRegionSection.sizer.spacing = 4;
-    joinRegionSection.sizer.add(this.joinSizeGroupBox);
     joinRegionSection.sizer.add(this.joinAreaGroupBox);
-    let joinRegionBar = new SectionBar(this, "Join Region");
+    let joinRegionBar = new SectionBar(this, "Replace/Update Region");
+    joinRegionBar.enableCheckBox();
+    joinRegionBar.checkBox.onCheck = this.setHasJoinAreaPreview;
     joinRegionBar.setSection(joinRegionSection);
     joinRegionBar.onToggleSection = this.onToggleSection;
     joinRegionBar.toolTip = 
-            "The Join Region determines were the reference - target image join occurs";
+            "<p>This section is used to add extra data inside a completed mosaic. " +
+            "<p>For example, extra data could be added to improve the signal to noise " +
+            "of an existing region (use 'Average' mode).</p>" +
+            "<p>Alternatively, an area with poor resolution - for example areas " +
+            "that were close to image corners - can be replaced (use 'Overlay' mode).</p>";
     // SectionBar "Join Region" End
 
 
     // =======================================
-    // SectionBar: "Create Mosaic"
+    // SectionBar: "Mosaic Join Mode"
     // =======================================
     let overlay_Label = new Label(this);
     overlay_Label.text = "Combination mode:";
@@ -1735,9 +1664,7 @@ function PhotometricMosaicDialog(data) {
             "a Join Region at one side of the overlap region.</p>";
     this.mosaicOverlay_Control.checked = data.useMosaicOverlay;
     this.mosaicOverlay_Control.onClick = function (checked) {
-        data.useMosaicOverlay = checked;
-        data.useMosaicRandom = !checked;
-        data.useMosaicAverage = !checked;
+        updateMosaicMode(true, false, false);
     };
 
     this.mosaicRandom_Control = new RadioButton(this);
@@ -1753,10 +1680,9 @@ function PhotometricMosaicDialog(data) {
             "has been provided to create a suitable mask.</p>";
     this.mosaicRandom_Control.checked = data.useMosaicRandom;
     this.mosaicRandom_Control.onClick = function (checked) {
-        data.useMosaicRandom = checked;
-        data.useMosaicOverlay = !checked;
-        data.useMosaicAverage = !checked;
+        updateMosaicMode(false, true, false);
     };
+    
     this.mosaicAverage_Control = new RadioButton(this);
     this.mosaicAverage_Control.text = "Average";
     this.mosaicAverage_Control.toolTip = "<p>Over the join region, " +
@@ -1768,11 +1694,42 @@ function PhotometricMosaicDialog(data) {
             "within the 'Join Region' section.</p>";
     this.mosaicAverage_Control.checked = data.useMosaicAverage;
     this.mosaicAverage_Control.onClick = function (checked) {
-        data.useMosaicAverage = checked;
-        data.useMosaicRandom = !checked;
-        data.useMosaicOverlay = !checked;
+        updateMosaicMode(false, false, true);
     };
     
+    /**
+     * Sets the boolean flags.
+     * Updates the data.joinPosition
+     * Updates the join position control's range and value.
+     * Enables/disables the Join Size control.
+     * @param {Boolean} isOverlay
+     * @param {Boolean} isRandom
+     * @param {Boolean} isAverage
+     */
+    function updateMosaicMode(isOverlay, isRandom, isAverage){
+        data.useMosaicOverlay = isOverlay;
+        data.useMosaicRandom = isRandom;
+        data.useMosaicAverage = isAverage;
+        if (data.cache.overlap !== null){
+            // If changing from overlay to random or average, join position may change.
+            // The join position range will almost always change
+            let joinRegion = new JoinRegion(data);
+            // Update data.joinPosition
+            joinRegion.updateJoinPosition();
+            // Update control range and value
+            let range = joinRegion.getJoinPositionRange();
+            self.joinPosition_Control.setRange(range.min, range.max);
+            self.joinPosition_Control.setValue(data.joinPosition);
+        }
+        enableJoinSizeControl();
+    }
+    
+    function enableJoinSizeControl(){
+        self.joinSize_Control.enabled = 
+                !self.mosaicOverlay_Control.checked && !data.useCropTargetToJoinRegion;
+    }
+    // this also calls enableJoinSizeControl()
+    this.setHasJoinAreaPreview(data.useCropTargetToJoinRegion);
     
     let starsMaskButton = new PushButton(this);
     starsMaskButton.text = "Star mask";
@@ -1819,7 +1776,7 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer.add(starsMaskButton);
     mosaicSection.sizer.spacing = 6;
     mosaicSection.sizer.add(joinMaskButton);
-    this.mosaicBar = new SectionBar(this, "Create Mosaic");
+    this.mosaicBar = new SectionBar(this, "Mosaic Join Mode");
     this.mosaicBar.setSection(mosaicSection);
     this.mosaicBar.onToggleSection = this.onToggleSection;
     // SectionBar: "Create Mosaic" End
@@ -1857,14 +1814,14 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(photometrySearchSection);
     this.sizer.add(photometryBar);
     this.sizer.add(photometrySection);
+    this.sizer.add(this.mosaicBar);
+    this.sizer.add(mosaicSection);
     this.sizer.add(joinRegionBar);
     this.sizer.add(joinRegionSection);
     this.sizer.add(sampleGenerationBar);
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
     this.sizer.add(gradientSection);
-    this.sizer.add(this.mosaicBar);
-    this.sizer.add(mosaicSection);
     this.sizer.addSpacing(5);
     this.sizer.add(buttons_Sizer);
     
@@ -1936,7 +1893,7 @@ function main() {
             (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.hasJoinAreaPreview){
+        if (data.useCropTargetToJoinRegion){
             if (data.joinAreaPreviewRect.x1 > data.targetView.image.width || 
                     data.joinAreaPreviewRect.y1 > data.referenceView.image.height){
                 (new MessageBox("ERROR: Join Region Preview extends beyond the edge of the image\n" +
@@ -2008,8 +1965,13 @@ function main() {
         }
 
         // Run the script
-        photometricMosaic(data, photometricMosaicDialog);
-        data.saveParameters();  // Save script parameters to the history.
+        try {
+            photometricMosaic(data, photometricMosaicDialog);
+            data.saveParameters();  // Save script parameters to the history.
+        } catch (e){
+            console.criticalln(e);
+            new MessageBox("" + e, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+        }
     }
     if (data.cache !== undefined){
         data.cache.invalidate();

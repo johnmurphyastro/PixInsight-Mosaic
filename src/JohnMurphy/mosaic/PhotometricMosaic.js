@@ -90,6 +90,8 @@ function photometricMosaic(data, photometricMosaicDialog)
             return;
         }
         data.cache.setOverlap(overlap);
+        setJoinSizeRange(photometricMosaicDialog.joinSize_Control, data, true);
+        setJoinPositionRange(photometricMosaicDialog.joinPosition_Control, data, true);
         console.writeln(getElapsedTime(overlapTime) + "\n");
         processEvents();
     } else {
@@ -100,17 +102,14 @@ function photometricMosaic(data, photometricMosaicDialog)
     // or the overlapBox if the preview was not specified
     let overlapBox = overlap.overlapBox;
     createPreview(targetView, overlapBox, "Overlap");
-    let joinRect;
-    let isHorizontal;
-    try {
-        let joinRegion = new JoinRegion(data);
-        joinRect = joinRegion.joinRect;
-        isHorizontal = joinRegion.isJoinHorizontal();
-        joinRegion.createPreview(targetView);
-    } catch (e){
-        new MessageBox(e, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+    let joinRegion = new JoinRegion(data);
+    let joinRect = joinRegion.joinRect;
+    if (joinRect === null){
+        new MessageBox(joinRegion.errMsg, TITLE(), StdIcon_Error, StdButton_Ok).execute();
         return;
     }
+    let isHorizontal = joinRegion.isJoinHorizontal();
+    joinRegion.createPreview(targetView);
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
         createJoinMask(targetView, overlap, joinRect);

@@ -48,6 +48,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     let bitmap = getBitmap(selectedBitmap);
     let bitmapOffset = getBitmapOffset(data);
     let drawOverlapRejectionFlag = true;
+    let showGridFlag = true;
     
     /**
      * Return bitmap of the reference or target image
@@ -111,11 +112,14 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             graphics.scaleTransformation(scale, scale);
             graphics.pen = new Pen(0xffff0000);
             graphics.antialiasing = false;
-            // Draw the sample grid
-            for (let binRect of sampleGridMap.getBinRectArray(0)){
-                let rect = new Rect(binRect);
-                rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
-                graphics.drawRect(rect);
+            
+            if (showGridFlag){
+                // Draw the sample grid
+                for (let binRect of sampleGridMap.getBinRectArray(0)){
+                    let rect = new Rect(binRect);
+                    rect.translateBy(-bitmapOffset.x, -bitmapOffset.y);
+                    graphics.drawRect(rect);
+                }
             }
 
             // Draw circles around the stars used to reject grid sample squares
@@ -141,9 +145,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
                 graphics.strokeCircle(x, y, radius);
             }
             
+            graphics.antialiasing = false;
             if (drawOverlapRejectionFlag){
                 graphics.pen = new Pen(0xff00ff00, 2.0);
-                if (data.useMosaicOverlay){
+                if (data.useMosaicOverlay && !data.useCropTargetToJoinRegion){
                     // Overlay mosaic mode. Draw join path
                     for (let i=1; i < joinPath.length; i++){
                         let x = joinPath[i-1].x - bitmapOffset.x;
@@ -227,6 +232,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
     };
     
+    let joinSize_Control;
     let joinPosition_Control;
     let sampleStarGrowthRate_Control;
     let sampleStarGrowthLimit_Control;
@@ -257,7 +263,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             "Rejecting local gradients is particularly important near the blue line.</li></ul>";
     displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
     displayOverlapRejectionCheckBox.onClick = function (checked) {
-        joinPosition_Control.enabled = data.hasJoinSize && checked;
+        joinSize_Control.enabled = !data.useMosaicOverlay && !data.useCropTargetToJoinRegion && checked;
+        joinPosition_Control.enabled = !data.useCropTargetToJoinRegion && checked;
         sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration && checked;
         sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && checked;
         sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
@@ -265,6 +272,12 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         drawOverlapRejectionFlag = checked;
         finalUpdateFunction();
     };
+    if (data.useCropTargetToJoinRegion){
+        // Only the overlap - join region is used. The rest of the target image is 
+        // not modified, so target image gradient correction is not used.
+        displayOverlapRejectionCheckBox.checked = true;
+        displayOverlapRejectionCheckBox.enabled = false;
+    }
     
     let sampleControls = new SampleControls;
     
@@ -284,20 +297,59 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     // ===================================================
     // SectionBar: Join Position
     // ===================================================
-    
     /**
      * Force the joinPosition to update after the user edits the textbox directly.
      * @param {Number} value NumericControl's value
      */
-    function finalJoinPosUpdateFunction(value){
+    function finalJoinSizeUpdateFunction(value){
         self.enabled = false;
         processEvents();
+        previewControl.forceRedraw();
         self.enabled = true;
+        // If the join size has increased, the join position range must be reduced.
+        // If data.joinPosition is out of range, it must be updated.
+        setJoinPositionRange(joinPosition_Control, data, true);
+        setJoinPositionRange(photometricMosaicDialog.joinPosition_Control, data, false);
+        // Update the main dialog's join and position values
+        // This had to be done after updating the ranges and data.joinPosition
+        photometricMosaicDialog.joinSize_Control.setValue(value);
+        photometricMosaicDialog.joinPosition_Control.setValue(data.joinPosition);
     }
+    /**
+     * Force the joinPosition to update after the user edits the textbox directly.
+     * @param {Number} value NumericControl's value
+     */
+    function finalJoinPositionUpdateFunction(value){
+        self.enabled = false;
+        processEvents();
+        previewControl.forceRedraw();
+        self.enabled = true;
+        // Update the main dialog's position value
+        photometricMosaicDialog.joinPosition_Control.setValue(value);
+    }
+    
+    joinSize_Control = sampleControls.createJoinSizeControl(this, data, 0);
+    joinSize_Control.onValueUpdated = function (value) {
+        data.joinSize = value;
+        let joinRegion = new JoinRegion(data);
+        // Update data.joinPosition. Necessary if the joinSize has increased
+        joinRegion.updateJoinPosition();
+        // Update the join position control.
+        // The main dialog's control will be update at the end of the drag
+        joinPosition_Control.setValue(data.joinPosition);
+        // Draw the rectangle, and update the target view's JoinRegion preview
+        previewControl.forceRedraw();
+        joinRegion.createPreview(data.targetView);
+    };
+    addFinalUpdateListener(joinSize_Control, finalJoinSizeUpdateFunction);
+    joinSize_Control.enabled = 
+            !data.useMosaicOverlay &&
+            !data.useCropTargetToJoinRegion && 
+            displayOverlapRejectionCheckBox.checked;
+    
     joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
     joinPosition_Control.onValueUpdated = function (value) {
         data.joinPosition = value;
-        photometricMosaicDialog.joinPosition_Control.setValue(value);
         let joinRegion = new JoinRegion(data);
         let joinRect = joinRegion.joinRect;
         let isHorizontal = joinRegion.isJoinHorizontal();
@@ -306,11 +358,12 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
         joinRegion.createPreview(data.targetView);
     };
-    addFinalUpdateListener(joinPosition_Control, finalJoinPosUpdateFunction);
-    joinPosition_Control.enabled = data.hasJoinSize && displayOverlapRejectionCheckBox.checked;
+    addFinalUpdateListener(joinPosition_Control, finalJoinPositionUpdateFunction);
+    joinPosition_Control.enabled = !data.useCropTargetToJoinRegion && displayOverlapRejectionCheckBox.checked;
     
     let joinPositionSection = new Control(this);
     joinPositionSection.sizer = new VerticalSizer;
+    joinPositionSection.sizer.add(joinSize_Control);
     joinPositionSection.sizer.add(joinPosition_Control);
     let joinPositionBar = new SectionBar(this, "Join");
     joinPositionBar.setSection(joinPositionSection);
@@ -320,6 +373,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     if (!joinPosition_Control.enabled){
         joinPositionSection.hide();
     } else {
+        controlsHeight += joinSize_Control.height;
         controlsHeight += joinPosition_Control.height;
     }
     
@@ -484,15 +538,28 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         sampleStarGrowthLimit_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
         sampleStarGrowthRateTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
         sampleStarGrowthLimitTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
-        sampleSize_Control.enabled = !checked;
+        sampleSize_Control.enabled = !checked && showGridFlag;
     };
     autoCheckBox.checked = data.useAutoSampleGeneration;
+    
+    let gridCheckBox = new CheckBox(this);
+    gridCheckBox.text = "Grid";
+    gridCheckBox.toolTip = "Show / hide sample grid.";
+    gridCheckBox.checked = true;
+    gridCheckBox.onClick = function (checked) {
+        showGridFlag = checked;
+        previewControl.forceRedraw();
+        sampleSize_Control.enabled = !autoCheckBox.checked && showGridFlag;
+    };
+    
     let optionsSizer = new HorizontalSizer(this);
     optionsSizer.margin = 0;
     optionsSizer.addSpacing(4);
     optionsSizer.add(autoCheckBox);
     optionsSizer.addSpacing(20);
     optionsSizer.add(refCheckBox);
+    optionsSizer.addSpacing(20);
+    optionsSizer.add(gridCheckBox);
     optionsSizer.addSpacing(20);
     optionsSizer.add(displayOverlapRejectionCheckBox);
     optionsSizer.addStretch();

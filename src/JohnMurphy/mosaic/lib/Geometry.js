@@ -173,20 +173,6 @@ function isImageRightOfOverlap(image, overlap, nChannels){
 }
 
 /**
- * Extend the subRect rectangle in the specified direction to the superRect size
- * @param {Rect} subRect Small rectangle (not modified)
- * @param {Rect} superRect Large rectangle (not modified)
- * @param {Rect} isHorizontal extend small rectangle in this direction
- * @returns {Rect} The extended subRect
- */
-function extendSubRect(subRect, superRect, isHorizontal){
-    if (isHorizontal){
-        return new Rect(superRect.x0, subRect.y0, superRect.x1, subRect.y1);
-    }
-    return new Rect(subRect.x0, superRect.y0, subRect.x1, superRect.y1);
-}
-
-/**
  * 
  * @param {Image} refImage
  * @param {Image} tgtImage
@@ -477,57 +463,84 @@ function Overlap(refImage, tgtImage){
 }
 
 /**
- * Creates a JoinRegion
+ * Creates a JoinRegion.
+ * Updates data.joinSize to be less than or equal to overlap thickness
  * @param {PhotometricMosaicData} data
  */
 function JoinRegion(data){
     let overlapBox = data.cache.overlap.overlapBox;
-    this.joinRect = new Rect(overlapBox);   // initial default.
+    let isHorizontal = overlapBox.width > overlapBox.height;
+    let maxJoinSize = isHorizontal ? overlapBox.height : overlapBox.width;
+    
+    /**
+     * @returns {Number} returns data.joinSize, or zero if in mosaic overlay mode
+     */
+    function getJoinSize(){
+        return data.useMosaicOverlay ? 0 : data.joinSize;
+    };
+    
+    data.joinSize = Math.min(data.joinSize, maxJoinSize);
+    let totalRange = maxJoinSize - getJoinSize();
+    let pMid = Math.floor(totalRange / 2.0); // The mid y0 position
+    let pMin = -pMid;
+    let pMax = totalRange - pMid;
     
     /**
      * @returns {Boolean}
      */
     this.isJoinHorizontal = function(){
-        return this.joinRect.width > this.joinRect.height;
+        return isHorizontal;
+    };
+    
+    this.getMaxJoinSize = function(){
+        return maxJoinSize;
+    };
+    
+    this.getJoinPositionRange = function(){
+        return {min: pMin, max: pMax};
     };
     
     /**
-     * If the Join mode is hasJoinSize or hasJoinAreaPreview, create the preview of the join.
+     * Updates data.joinPosition, ensuring it is between the min and max values.
+     */
+    this.updateJoinPosition = function(){
+        data.joinPosition = Math.max(pMin, data.joinPosition);
+        data.joinPosition = Math.min(pMax, data.joinPosition);
+    };
+    
+    /**
+     * In overlay mode, this preview will have zero thickness (appears as a line)
+     * In Random or Average mode, the preview will show the area affected by the
+     * Average / Random combien.
+     * If useCropTargetToJoinRegion, this will show the area in the mosaic that 
+     * will be replaced or averaged with the target image. All target pixels 
+     * outside the Join Region will be ignored
      * @param {View} view
      */
     this.createPreview = function(view){
-        if (data.hasJoinSize || data.hasJoinAreaPreview){
-            createPreview(view, this.joinRect, "JoinRegion");
-        }
+        createPreview(view, this.joinRect, "JoinRegion");
     };
     
-    if (data.hasJoinAreaPreview) {
+    if (data.useCropTargetToJoinRegion) {
         let joinAreaPreview = data.joinAreaPreviewRect;
         if (!joinAreaPreview.intersects(overlapBox)){
-            throw "Error: Join Region preview does not intersect with the image overlap";
+            this.joinRect = null;
+            this.errMsg = "<p>'Replace/Update Region' error.</p>" +
+                "<p>The specified area<br />" + joinAreaPreview + 
+                "<br /><br />does not intersect with the image overlap<br />" + 
+                overlapBox + "</p>";
+            return;
         }
-        let intersectRect = joinAreaPreview.intersection(overlapBox);
-        if (data.useCropTargetToJoinRegion){
-            this.joinRect = intersectRect;
+        this.joinRect = joinAreaPreview.intersection(overlapBox);
+    } else {
+        if (isHorizontal){
+            let y0 = overlapBox.y0 + pMid + data.joinPosition;
+            let y1 = y0 + getJoinSize();
+            this.joinRect = new Rect(overlapBox.x0, y0, overlapBox.x1, y1);
         } else {
-            this.joinRect = extendSubRect(intersectRect, overlapBox, this.isJoinHorizontal());
+            let x0 = overlapBox.x0 + pMid + data.joinPosition;
+            let x1 = x0 + getJoinSize();
+            this.joinRect = new Rect(x0, overlapBox.y0, x1, overlapBox.y1);
         }
-    } else if (data.hasJoinSize){
-        let halfSize = data.joinSize / 2;
-        if (this.isJoinHorizontal()){
-            let middle = data.joinPosition + (overlapBox.y0 + overlapBox.y1) / 2;
-            middle = Math.max(middle, overlapBox.y0);
-            middle = Math.min(middle, overlapBox.y1);
-            let top = Math.max(overlapBox.y0, Math.round(middle - halfSize));
-            let bot = Math.min(overlapBox.y1, Math.round(middle + halfSize));
-            this.joinRect = new Rect(overlapBox.x0, top, overlapBox.x1, bot);
-        } else {
-            let middle = data.joinPosition + (overlapBox.x0 + overlapBox.x1) / 2;
-            middle = Math.max(middle, overlapBox.x0);
-            middle = Math.min(middle, overlapBox.x1);
-            let left = Math.max(overlapBox.x0, Math.round(middle - halfSize));
-            let right = Math.min(overlapBox.x1, Math.round(middle + halfSize));
-            this.joinRect = new Rect(left, overlapBox.y0, right, overlapBox.y1);
-        }
-    } // else this.joinRect = new Rect(overlapBox); // defaults to this.
+    }
 }

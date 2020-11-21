@@ -330,6 +330,52 @@ function PhotometryControls(){
 function SampleControls(){
     let self = this;
     
+    this.joinSize = {
+        real: false,
+        text: "Size:",
+        slider: {range: {min:1, max:1000}},
+        range: {min:1, max:250},
+        precision: 0,
+        maxWidth: 800,
+        toolTip: "<p>Specifies the thickness of the Join Region. " +
+            "For a horizontal join, this is the height. For a vertical join, the width. " +
+            "The ideal Join size depends on the Mosaic Combination mode:" +
+            "<ul><li>Overlay: The join runs along the middle of the Join Region. " +
+            "Reference pixels overlay target pixels on the reference side of the join, " +
+            "Target pixels overlay reference pixels on the target side of the join.</li>" +
+            "<li>Random: Join size should be large enough to blend the two images " +
+            "together, but small enough not to include too many stars.</li>" +
+            "<li>Average: Determines the area that will benefit from a higher " +
+            "signal to noise ratio.</li></ul></p>"
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @param {Number} strLength
+     * @returns {NumericControl}
+     */
+    this.createJoinSizeControl = function(dialog, data, strLength){
+        let control = createNumericControl(dialog, self.joinSize, strLength);
+        setJoinSizeRange(control, data, false);
+        control.setValue(data.joinSize);
+        control.toolTip = self.joinSize.toolTip + 
+                "<p>Select 'Overlap rejection' to view the Join Region.</p>";
+        return control;
+    };
+    /**
+     * @param {PhotometricMosaicDialog} dialog
+     * @param {PhotometricMosaicData} data
+     * @returns {NumericEdit}
+     */
+    this.createJoinSizeEdit = function(dialog, data){
+        let control = createNumericEdit(dialog, self.joinSize);
+        setJoinSizeRange(control, data, false);
+        control.setValue(data.joinSize);
+        control.toolTip = self.joinSize.toolTip + 
+                "<p>View and edit the Join Region in the 'Sample generation' dialog.</p>";
+        return control;
+    };
+    
     this.joinPosition = {
         real: false,
         text: "Position (+/-):",
@@ -350,7 +396,7 @@ function SampleControls(){
      */
     this.createJoinPositionControl = function(dialog, data, strLength){
         let control = createNumericControl(dialog, self.joinPosition, strLength);
-        self.setJoinPositionRange(control, data);
+        setJoinPositionRange(control, data, false);
         control.setValue(data.joinPosition);
         control.toolTip = self.joinPosition.toolTip + 
                 "<p>Select 'Overlap rejection' to view the " +
@@ -366,20 +412,12 @@ function SampleControls(){
      */
     this.createJoinPositionEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.joinPosition);
-        self.setJoinPositionRange(control, data);
+        setJoinPositionRange(control, data, false);
         control.setValue(data.joinPosition);
         control.toolTip = self.joinPosition.toolTip + 
                 "<p>View and edit the Join / Join Region position in the " +
                 "'Sample generation' dialog.</p>";
         return control;
-    };
-    this.setJoinPositionRange = function(control, data){
-        if (data.cache.overlap !== null){
-            let rect = data.cache.overlap.overlapBox;
-            let thickness = rect.width > rect.height ? rect.height : rect.width;
-            let max = Math.round(Math.max(0, (thickness - data.joinSize)/2));
-            control.setRange(-max, max);
-        }
     };
     
     this.percentLimits = {
@@ -695,3 +733,36 @@ function GradientControls(){
         return control;
     };
 }
+
+/**
+ * Sets the JoinPosition control min, max range. The range depends on data.joinSize
+ * @param {Control} control Update this controls min, max range
+ * @param {PhotometricMosaicData} data
+ * @param {Boolean} updateData If true, update data.joinPosition to be within range
+ */
+function setJoinPositionRange(control, data, updateData){
+    if (data.cache.overlap !== null){
+        let joinRegion = new JoinRegion(data);
+        let range = joinRegion.getJoinPositionRange();
+        control.setRange(range.min, range.max);
+        if (updateData){
+            data.joinPosition = control.value;
+        }
+    }
+};
+
+/**
+ * Sets the JoinSize control min, max range. This only depends on the overlap bounding box.
+ * @param {Control} control Update this controls min, max range
+ * @param {PhotometricMosaicData} data
+ * @param {Boolean} updateData If true, update data.joinSize to be within range
+ */
+function setJoinSizeRange(control, data, updateData){
+    if (data.cache.overlap !== null){
+        let joinRegion = new JoinRegion(data);
+        control.setRange(1, joinRegion.getMaxJoinSize());
+        if (updateData){
+            data.joinSize = control.value;
+        }
+    }
+};
