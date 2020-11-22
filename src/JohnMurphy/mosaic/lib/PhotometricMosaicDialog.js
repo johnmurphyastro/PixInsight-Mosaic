@@ -115,11 +115,11 @@ function PhotometricMosaicData() {
         Parameters.set("joinPosition", this.joinPosition);
         
         // Replace/Update Region
-        Parameters.set("joinAreaPreviewLeft", this.joinAreaPreviewRect.x0);
-        Parameters.set("joinAreaPreviewTop", this.joinAreaPreviewRect.y0);
-        Parameters.set("joinAreaPreviewWidth", this.joinAreaPreviewRect.width);
-        Parameters.set("joinAreaPreviewHeight", this.joinAreaPreviewRect.height);
-        Parameters.set("useCropTargetToJoinRegion", this.useCropTargetToJoinRegion);
+        Parameters.set("cropTargetPreviewLeft", this.cropTargetPreviewRect.x0);
+        Parameters.set("cropTargetPreviewTop", this.cropTargetPreviewRect.y0);
+        Parameters.set("cropTargetPreviewWidth", this.cropTargetPreviewRect.width);
+        Parameters.set("cropTargetPreviewHeight", this.cropTargetPreviewRect.height);
+        Parameters.set("useCropTargetToReplaceRegion", this.useCropTargetToReplaceRegion);
         
         // Gradient Sample Generation
         Parameters.set("sampleStarGrowthRate", this.sampleStarGrowthRate);
@@ -207,22 +207,22 @@ function PhotometricMosaicData() {
             let y = 0;
             let w = 1;
             let h = 1;
-            if (Parameters.has("joinAreaPreviewLeft")){
-                x = Parameters.getInteger("joinAreaPreviewLeft");
+            if (Parameters.has("cropTargetPreviewLeft")){
+                x = Parameters.getInteger("cropTargetPreviewLeft");
             }
-            if (Parameters.has("joinAreaPreviewTop")){
-                y = Parameters.getInteger("joinAreaPreviewTop");
+            if (Parameters.has("cropTargetPreviewTop")){
+                y = Parameters.getInteger("cropTargetPreviewTop");
             }
-            if (Parameters.has("joinAreaPreviewWidth")){
-                w = Parameters.getInteger("joinAreaPreviewWidth");
+            if (Parameters.has("cropTargetPreviewWidth")){
+                w = Parameters.getInteger("cropTargetPreviewWidth");
             }
-            if (Parameters.has("joinAreaPreviewHeight")){
-                h = Parameters.getInteger("joinAreaPreviewHeight");
+            if (Parameters.has("cropTargetPreviewHeight")){
+                h = Parameters.getInteger("cropTargetPreviewHeight");
             }
-            this.joinAreaPreviewRect = new Rect(x, y, x + w, y + h);
+            this.cropTargetPreviewRect = new Rect(x, y, x + w, y + h);
             
-            if (Parameters.has("useCropTargetToJoinRegion"))
-                this.useCropTargetToJoinRegion = Parameters.getBoolean("useCropTargetToJoinRegion");
+            if (Parameters.has("useCropTargetToReplaceRegion"))
+                this.useCropTargetToReplaceRegion = Parameters.getBoolean("useCropTargetToReplaceRegion");
         }
         
         // Gradient Sample Generation
@@ -307,8 +307,8 @@ function PhotometricMosaicData() {
         this.joinPosition = 0;
         
         // Replace/Update Region
-        this.joinAreaPreviewRect = new Rect(0, 0, 1, 1);
-        this.useCropTargetToJoinRegion = false;
+        this.cropTargetPreviewRect = new Rect(0, 0, 1, 1);
+        this.useCropTargetToReplaceRegion = false;
         
         // Gradient Sample Generation
         this.sampleStarGrowthRate = APERTURE_GROWTH;
@@ -384,11 +384,11 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.joinPosition_Control.setValue(this.joinPosition);
         
         // Replace/Update Region
-        photometricMosaicDialog.rectangleX0_Control.setValue(this.joinAreaPreviewRect.x0);
-        photometricMosaicDialog.rectangleY0_Control.setValue(this.joinAreaPreviewRect.y0);
-        photometricMosaicDialog.rectangleWidth_Control.setValue(this.joinAreaPreviewRect.width);
-        photometricMosaicDialog.rectangleHeight_Control.setValue(this.joinAreaPreviewRect.height);
-        photometricMosaicDialog.setHasJoinAreaPreview(this.useCropTargetToJoinRegion);
+        photometricMosaicDialog.rectangleX0_Control.setValue(this.cropTargetPreviewRect.x0);
+        photometricMosaicDialog.rectangleY0_Control.setValue(this.cropTargetPreviewRect.y0);
+        photometricMosaicDialog.rectangleWidth_Control.setValue(this.cropTargetPreviewRect.width);
+        photometricMosaicDialog.rectangleHeight_Control.setValue(this.cropTargetPreviewRect.height);
+        photometricMosaicDialog.setUseCropTargetToReplaceRegion(this.useCropTargetToReplaceRegion);
         
         // Gradient Sample Generation
         photometricMosaicDialog.sampleStarGrowthRate_Control.setValue(this.sampleStarGrowthRate);
@@ -1520,30 +1520,30 @@ function PhotometricMosaicDialog(data) {
     
     let x0ToolTip = "X-coordinate of Join Region's top left corner";
     this.rectangleX0_Control = createPreviewNumericEdit("Left:", x0ToolTip,
-            data.joinAreaPreviewRect.x0, 50);
+            data.cropTargetPreviewRect.x0, 50);
     this.rectangleX0_Control.label.setFixedWidth(
             this.font.width("Left:") + GET_AREA_FROM_PREVIEW_STRLEN + 4);
     this.rectangleX0_Control.onValueUpdated = function (value){
-        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
+        data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
     let y0ToolTip = "Y-coordinate of Join Region's top left corner";
     this.rectangleY0_Control = createPreviewNumericEdit("Top:", y0ToolTip,
-            data.joinAreaPreviewRect.y0, 50);
+            data.cropTargetPreviewRect.y0, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
-        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
+        data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
     this.rectangleWidth_Control = createPreviewNumericEdit("Width:", "Join Region width",
-            data.joinAreaPreviewRect.width, 50);
+            data.cropTargetPreviewRect.width, 50);
     this.rectangleWidth_Control.onValueUpdated = function (value){
-        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
+        data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
     this.rectangleHeight_Control = createPreviewNumericEdit("Height:", "Join Region height",
-            data.joinAreaPreviewRect.height, 50);
+            data.cropTargetPreviewRect.height, 50);
     this.rectangleHeight_Control.onValueUpdated = function (value){
-        data.joinAreaPreviewRect = getJoinAreaPreviewRect();
+        data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
     
-    function getJoinAreaPreviewRect(){
+    function getCropTargetPreviewRect(){
         let x = self.rectangleX0_Control.value;
         let y = self.rectangleY0_Control.value;
         let w = self.rectangleWidth_Control.value;
@@ -1551,26 +1551,26 @@ function PhotometricMosaicDialog(data) {
         return new Rect(x, y, x + w, y + h);
     }
 
-    let joinAreaHorizSizer1 = new HorizontalSizer(this); 
-    joinAreaHorizSizer1.spacing = 10;
-    joinAreaHorizSizer1.add(this.rectangleX0_Control);
-    joinAreaHorizSizer1.add(this.rectangleY0_Control);
-    joinAreaHorizSizer1.add(this.rectangleWidth_Control);
-    joinAreaHorizSizer1.add(this.rectangleHeight_Control);
-    joinAreaHorizSizer1.addStretch();
+    let cropTargetHorizSizer1 = new HorizontalSizer(this); 
+    cropTargetHorizSizer1.spacing = 10;
+    cropTargetHorizSizer1.add(this.rectangleX0_Control);
+    cropTargetHorizSizer1.add(this.rectangleY0_Control);
+    cropTargetHorizSizer1.add(this.rectangleWidth_Control);
+    cropTargetHorizSizer1.add(this.rectangleHeight_Control);
+    cropTargetHorizSizer1.addStretch();
 
     function previewUpdateActions(dialog){
         let view = dialog.previewImage_ViewList.currentView;
         if (view !== null && view.isPreview) {
-            data.joinAreaPreviewRect = view.window.previewRect(view);
-            dialog.rectangleX0_Control.setValue(data.joinAreaPreviewRect.x0);
-            dialog.rectangleY0_Control.setValue(data.joinAreaPreviewRect.y0);
-            dialog.rectangleWidth_Control.setValue(data.joinAreaPreviewRect.width);
-            dialog.rectangleHeight_Control.setValue(data.joinAreaPreviewRect.height);
+            data.cropTargetPreviewRect = view.window.previewRect(view);
+            dialog.rectangleX0_Control.setValue(data.cropTargetPreviewRect.x0);
+            dialog.rectangleY0_Control.setValue(data.cropTargetPreviewRect.y0);
+            dialog.rectangleWidth_Control.setValue(data.cropTargetPreviewRect.width);
+            dialog.rectangleHeight_Control.setValue(data.cropTargetPreviewRect.height);
             
-            dialog.setHasJoinAreaPreview(true);
+            dialog.setUseCropTargetToReplaceRegion(true);
         } else {
-            dialog.setHasJoinAreaPreview(false);
+            dialog.setUseCropTargetToReplaceRegion(false);
         }
     };
 
@@ -1598,16 +1598,16 @@ function PhotometricMosaicDialog(data) {
         previewUpdateActions(this.dialog);
     };
 
-    let joinAreaHorizSizer2 = new HorizontalSizer(this);
-    joinAreaHorizSizer2.spacing = 4;
-    joinAreaHorizSizer2.add(previewImage_Label);
-    joinAreaHorizSizer2.add(this.previewImage_ViewList, 100);
-    joinAreaHorizSizer2.addSpacing(10);
-    joinAreaHorizSizer2.add(previewUpdateButton);
+    let cropTargetHorizSizer2 = new HorizontalSizer(this);
+    cropTargetHorizSizer2.spacing = 4;
+    cropTargetHorizSizer2.add(previewImage_Label);
+    cropTargetHorizSizer2.add(this.previewImage_ViewList, 100);
+    cropTargetHorizSizer2.addSpacing(10);
+    cropTargetHorizSizer2.add(previewUpdateButton);
     
-    this.setHasJoinAreaPreview = function(checked){
-        joinRegionBar.checkBox.checked = checked;
-        data.useCropTargetToJoinRegion = checked;
+    this.setUseCropTargetToReplaceRegion = function(checked){
+        replaceUpdateBar.checkBox.checked = checked;
+        data.useCropTargetToReplaceRegion = checked;
         self.rectangleX0_Control.enabled = checked;
         self.rectangleWidth_Control.enabled = checked;
         self.rectangleY0_Control.enabled = checked;
@@ -1617,26 +1617,26 @@ function PhotometricMosaicDialog(data) {
         self.gradientTargetImageGroupBox.enabled = !checked;  
     };
     
-    this.joinAreaGroupBox = new GroupBox(this);
-    this.joinAreaGroupBox.title = "Area of mosiac to be replaced";
-    this.joinAreaGroupBox.toolTip = JoinRegionTooltip;
-    this.joinAreaGroupBox.sizer = new VerticalSizer(this);
-    this.joinAreaGroupBox.sizer.margin = 2;
-    this.joinAreaGroupBox.sizer.spacing = 4;
-    this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer1);
-    this.joinAreaGroupBox.sizer.add(joinAreaHorizSizer2);
+    this.cropTargetGroupBox = new GroupBox(this);
+    this.cropTargetGroupBox.title = "Area of mosiac to be replaced";
+    this.cropTargetGroupBox.toolTip = JoinRegionTooltip;
+    this.cropTargetGroupBox.sizer = new VerticalSizer(this);
+    this.cropTargetGroupBox.sizer.margin = 2;
+    this.cropTargetGroupBox.sizer.spacing = 4;
+    this.cropTargetGroupBox.sizer.add(cropTargetHorizSizer1);
+    this.cropTargetGroupBox.sizer.add(cropTargetHorizSizer2);
     // GroupBox "Join Region (User defined)" End
     
-    let joinRegionSection = new Control(this);
-    joinRegionSection.sizer = new VerticalSizer;
-    joinRegionSection.sizer.spacing = 4;
-    joinRegionSection.sizer.add(this.joinAreaGroupBox);
-    let joinRegionBar = new SectionBar(this, "Replace/Update Region");
-    joinRegionBar.enableCheckBox();
-    joinRegionBar.checkBox.onCheck = this.setHasJoinAreaPreview;
-    joinRegionBar.setSection(joinRegionSection);
-    joinRegionBar.onToggleSection = this.onToggleSection;
-    joinRegionBar.toolTip = 
+    let replaceUpdateSection = new Control(this);
+    replaceUpdateSection.sizer = new VerticalSizer;
+    replaceUpdateSection.sizer.spacing = 4;
+    replaceUpdateSection.sizer.add(this.cropTargetGroupBox);
+    let replaceUpdateBar = new SectionBar(this, "Replace/Update Region");
+    replaceUpdateBar.enableCheckBox();
+    replaceUpdateBar.checkBox.onCheck = this.setUseCropTargetToReplaceRegion;
+    replaceUpdateBar.setSection(replaceUpdateSection);
+    replaceUpdateBar.onToggleSection = this.onToggleSection;
+    replaceUpdateBar.toolTip = 
             "<p>This section is used to add extra data inside a completed mosaic. " +
             "<p>For example, extra data could be added to improve the signal to noise " +
             "of an existing region (use 'Average' mode).</p>" +
@@ -1726,10 +1726,10 @@ function PhotometricMosaicDialog(data) {
     
     function enableJoinSizeControl(){
         self.joinSize_Control.enabled = 
-                !self.mosaicOverlay_Control.checked && !data.useCropTargetToJoinRegion;
+                !self.mosaicOverlay_Control.checked && !data.useCropTargetToReplaceRegion;
     }
     // this also calls enableJoinSizeControl()
-    this.setHasJoinAreaPreview(data.useCropTargetToJoinRegion);
+    this.setUseCropTargetToReplaceRegion(data.useCropTargetToReplaceRegion);
     
     let starsMaskButton = new PushButton(this);
     starsMaskButton.text = "Star mask";
@@ -1816,8 +1816,8 @@ function PhotometricMosaicDialog(data) {
     this.sizer.add(photometrySection);
     this.sizer.add(this.mosaicBar);
     this.sizer.add(mosaicSection);
-    this.sizer.add(joinRegionBar);
-    this.sizer.add(joinRegionSection);
+    this.sizer.add(replaceUpdateBar);
+    this.sizer.add(replaceUpdateSection);
     this.sizer.add(sampleGenerationBar);
     this.sizer.add(sampleGenerationSection);
     this.sizer.add(gradientBar);
@@ -1827,7 +1827,7 @@ function PhotometricMosaicDialog(data) {
     
     starDetectionSection.hide();
     photometrySearchSection.hide();
-    joinRegionSection.hide();
+    replaceUpdateSection.hide();
 
     //-------------------------------------------------------
     // Set all the window data
@@ -1867,6 +1867,7 @@ function main() {
         restoreSettings(data);
     }
 
+    let exception = null;
     let checkedRefViewId = "";
     let checkedTgtViewId = "";
     let photometricMosaicDialog = new PhotometricMosaicDialog(data);
@@ -1893,9 +1894,9 @@ function main() {
             (new MessageBox("ERROR: Both images must have the same dimensions", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.useCropTargetToJoinRegion){
-            if (data.joinAreaPreviewRect.x1 > data.targetView.image.width || 
-                    data.joinAreaPreviewRect.y1 > data.referenceView.image.height){
+        if (data.useCropTargetToReplaceRegion){
+            if (data.cropTargetPreviewRect.x1 > data.targetView.image.width || 
+                    data.cropTargetPreviewRect.y1 > data.referenceView.image.height){
                 (new MessageBox("ERROR: Join Region Preview extends beyond the edge of the image\n" +
                 "Have you selected the wrong preview?", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
                 continue;
@@ -1910,8 +1911,8 @@ function main() {
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.useCropTargetToJoinRegion && data.useMosaicRandom){
-            (new MessageBox("Valid mosaic combination modes for the 'Crop target' option are\nOverlay and Average", 
+        if (data.useCropTargetToReplaceRegion && data.useMosaicRandom){
+            (new MessageBox("The 'Replace/Update Region' option is incompatible with the 'Random' mosaic mode.", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
@@ -1969,13 +1970,18 @@ function main() {
             photometricMosaic(data, photometricMosaicDialog);
             data.saveParameters();  // Save script parameters to the history.
         } catch (e){
-            console.criticalln(e);
+            exception = e;
             new MessageBox("" + e, TITLE(), StdIcon_Error, StdButton_Ok).execute();
+            break;
         }
     }
     if (data.cache !== undefined){
         data.cache.invalidate();
     }
-    console.hide();
+    if (exception === null){
+        console.hide();
+    } else {
+        throw exception;
+    }
     return;
 }

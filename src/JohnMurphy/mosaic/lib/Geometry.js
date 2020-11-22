@@ -512,26 +512,32 @@ function JoinRegion(data){
      * In overlay mode, this preview will have zero thickness (appears as a line)
      * In Random or Average mode, the preview will show the area affected by the
      * Average / Random combien.
-     * If useCropTargetToJoinRegion, this will show the area in the mosaic that 
+     * If useCropTargetToReplaceRegion, this will show the area in the mosaic that 
      * will be replaced or averaged with the target image. All target pixels 
      * outside the Join Region will be ignored
      * @param {View} view
      */
     this.createPreview = function(view){
-        createPreview(view, this.joinRect, "JoinRegion");
+        let name;
+        if (data.useCropTargetToReplaceRegion){
+            name = data.useMosaicOverlay ? "Replace" : "Update";
+        } else {
+            name = "JoinRegion";
+        }
+        createPreview(view, this.joinRect, name);
     };
     
-    if (data.useCropTargetToJoinRegion) {
-        let joinAreaPreview = data.joinAreaPreviewRect;
-        if (!joinAreaPreview.intersects(overlapBox)){
+    if (data.useCropTargetToReplaceRegion) {
+        let cropAreaPreview = data.cropTargetPreviewRect;
+        if (!cropAreaPreview.intersects(overlapBox)){
             this.joinRect = null;
             this.errMsg = "<p>'Replace/Update Region' error.</p>" +
-                "<p>The specified area<br />" + joinAreaPreview + 
+                "<p>The specified area<br />" + cropAreaPreview + 
                 "<br /><br />does not intersect with the image overlap<br />" + 
                 overlapBox + "</p>";
             return;
         }
-        this.joinRect = joinAreaPreview.intersection(overlapBox);
+        this.joinRect = cropAreaPreview.intersection(overlapBox);
     } else {
         if (isHorizontal){
             let y0 = overlapBox.y0 + pMid + data.joinPosition;

@@ -226,7 +226,7 @@ function fitsHeaderPhotometry(keywords, data){
  * @param {Rect} joinRect
  */
 function fitsHeaderJoin(keywords, data, joinRect){
-    if (!data.useCropTargetToJoinRegion){
+    if (!data.useCropTargetToReplaceRegion){
         if (!data.useMosaicOverlay){
             keywords.push(new FITSKeyword("HISTORY", "", 
                 SCRIPT_NAME() + ".joinSize: " + data.joinSize));

@@ -112,7 +112,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     joinRegion.createPreview(targetView);
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(targetView, overlap, joinRect);
+        createJoinMask(data, joinRect);
         return;
     }
 
@@ -193,7 +193,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     let isTargetAfterRef;
     let isAmbiguousFlag = false;
-    if (data.useCropTargetToJoinRegion){
+    if (data.useCropTargetToReplaceRegion){
         isTargetAfterRef = null;
     } else if (isHorizontal){
         isTargetAfterRef = isImageBelowOverlap(targetView.image, overlapBox, nChannels);

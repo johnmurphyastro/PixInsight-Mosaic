@@ -148,7 +148,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             graphics.antialiasing = false;
             if (drawOverlapRejectionFlag){
                 graphics.pen = new Pen(0xff00ff00, 2.0);
-                if (data.useMosaicOverlay && !data.useCropTargetToJoinRegion){
+                if (data.useMosaicOverlay && !data.useCropTargetToReplaceRegion){
                     // Overlay mosaic mode. Draw join path
                     for (let i=1; i < joinPath.length; i++){
                         let x = joinPath[i-1].x - bitmapOffset.x;
@@ -263,8 +263,8 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             "Rejecting local gradients is particularly important near the blue line.</li></ul>";
     displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
     displayOverlapRejectionCheckBox.onClick = function (checked) {
-        joinSize_Control.enabled = !data.useMosaicOverlay && !data.useCropTargetToJoinRegion && checked;
-        joinPosition_Control.enabled = !data.useCropTargetToJoinRegion && checked;
+        joinSize_Control.enabled = !data.useMosaicOverlay && !data.useCropTargetToReplaceRegion && checked;
+        joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && checked;
         sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration && checked;
         sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && checked;
         sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
@@ -272,7 +272,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         drawOverlapRejectionFlag = checked;
         finalUpdateFunction();
     };
-    if (data.useCropTargetToJoinRegion){
+    if (data.useCropTargetToReplaceRegion){
         // Only the overlap - join region is used. The rest of the target image is 
         // not modified, so target image gradient correction is not used.
         displayOverlapRejectionCheckBox.checked = true;
@@ -344,7 +344,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     addFinalUpdateListener(joinSize_Control, finalJoinSizeUpdateFunction);
     joinSize_Control.enabled = 
             !data.useMosaicOverlay &&
-            !data.useCropTargetToJoinRegion && 
+            !data.useCropTargetToReplaceRegion && 
             displayOverlapRejectionCheckBox.checked;
     
     joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
@@ -359,7 +359,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         joinRegion.createPreview(data.targetView);
     };
     addFinalUpdateListener(joinPosition_Control, finalJoinPositionUpdateFunction);
-    joinPosition_Control.enabled = !data.useCropTargetToJoinRegion && displayOverlapRejectionCheckBox.checked;
+    joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && displayOverlapRejectionCheckBox.checked;
     
     let joinPositionSection = new Control(this);
     joinPositionSection.sizer = new VerticalSizer;
