@@ -917,18 +917,21 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
 }
 
 /**
- * @param {View} tgtView Used to access the target view fullId
- * @param {Overlap} overlap Specifies the overlapping pixels
+ * If overlay mode, return mask of overlap. Otherwise mask uses joinRect.
+ * @param {PhotometricMosaicData} data
  * @param {Rect} joinRect Restricts the mask to join instead of using all overlap pixels
  */
-function createJoinMask(tgtView, overlap, joinRect){
+function createJoinMask(data, joinRect){
+    let tgtView = data.targetView;
+    let overlap = data.cache.overlap;
     const width = tgtView.image.width;
     const height = tgtView.image.height;
     const overlapMask = overlap.getFullImageMask(width, height);
     const maskValue = 0.8;
     // Restrict the mask to the joinRect rather than using the whole overlap
-    let maskSamples = new Float32Array(joinRect.area);
-    overlapMask.getSamples(maskSamples, joinRect);
+    let maskRect = data.useMosaicOverlay ? overlap.overlapBox : joinRect;
+    let maskSamples = new Float32Array(maskRect.area);
+    overlapMask.getSamples(maskSamples, maskRect);
     overlapMask.free();
     for (let i = 0; i < maskSamples.length; i++){
         // When overlapMask is 1, mask will be transparent, which is what we want.
@@ -942,7 +945,7 @@ function createJoinMask(tgtView, overlap, joinRect){
     let view = w.mainView;
     view.beginProcess(UndoFlag_NoSwapFile);
     view.image.fill(maskValue);
-    view.image.setSamples(maskSamples, joinRect);
+    view.image.setSamples(maskSamples, maskRect);
     view.endProcess();
     w.show();
 }
