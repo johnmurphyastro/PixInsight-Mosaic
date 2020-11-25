@@ -1646,7 +1646,7 @@ function PhotometricMosaicDialog(data) {
     };
     
     this.cropTargetGroupBox = new GroupBox(this);
-    this.cropTargetGroupBox.title = "Area of mosiac to be replaced/updated";
+    this.cropTargetGroupBox.title = "Area of mosaic to be replaced/updated";
     this.cropTargetGroupBox.toolTip = replaceUpdateRegionTooltip;
     this.cropTargetGroupBox.sizer = new VerticalSizer(this);
     this.cropTargetGroupBox.sizer.margin = 2;
@@ -1714,7 +1714,7 @@ function PhotometricMosaicDialog(data) {
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
             "over the join, but this can also make the join more visible.</p>" +
             "<p>To average the whole of the overlap region, " +
-            "set the Join Region to its maximum size.</p>";
+            "set the Join Size to its maximum size.</p>";
     this.mosaicAverage_Control.checked = data.useMosaicAverage;
     this.mosaicAverage_Control.onClick = function (checked) {
         updateMosaicMode(false, false, true);
@@ -1774,14 +1774,14 @@ function PhotometricMosaicDialog(data) {
     this.joinMask_CheckBox = new CheckBox(this);
     this.joinMask_CheckBox.text = "Join mask";
     this.joinMask_CheckBox.toolTip =
-            "<p>Create a mask of the join. Appy this to the mosaic to view " +
+            "<p>Create a mask of the join. Apply this to the mosaic to view " +
             "the position of the join. Use <b>Ctrl K</b> to show/hide the mask " +
             "to judge the join's quality.</p>" + 
             "<p><u>Mosaic Join Mode: Overlay</u><br />" +
             "The mask is a line that indicates the path of the join.</p>" +
             "<p><u>Mosaic Join Mode: Random or Average</u><br />" +
             "The mask reveals the Join Region. Within this area the " +
-            "mosaic pixels where either randomly choosen from the reference " +
+            "mosaic pixels were either randomly chosen from the reference " +
             "and target image, or averaged.</p>";
     this.joinMask_CheckBox.onCheck = function (checked) {
         data.createJoinMask = checked;

@@ -200,7 +200,8 @@ function PhotometryControls(){
             "<p>Adjust this control until the brightest stars entirely fit " +
             "within the inner photometry aperture. " +
             "Check both reference and target stars.</p>" +
-            "<p>It is not necessary to include diffraction spikes.</p>" +
+            "<p>It is not necessary to include diffraction spikes, " +
+            "filter halos or scattered light.</p>" +
             "<p>If the photometry stars are too faint for this control to have " +
             "much effect, leave the control at its default of 0.2</p>"
     };
@@ -472,7 +473,7 @@ function SampleControls(){
         let control = createNumericEdit(dialog, self.percentLimits);
         control.setValue(data.limitSampleStarsPercent);
         control.toolTip = self.percentLimits.toolTip + 
-                "<p>Use the 'Sample Generation' dialog to edit and view the pecentage of stars used.</p>";
+                "<p>Use the 'Sample Generation' dialog to edit and view the percentage of stars used.</p>";
         return control;
     };
 
