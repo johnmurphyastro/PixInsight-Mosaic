@@ -112,6 +112,9 @@ function PhotometryControls(){
     this.createLimitPhotoStarsPercentEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.percentLimits);
         control.setValue(data.limitPhotoStarsPercent);
+        control.toolTip = self.percentLimits.toolTip + 
+                "<p>Use the 'Photometry Graph' dialog to edit and view " +
+                "the number of stars to include.</p>";
         return control;
     };
     
@@ -146,6 +149,8 @@ function PhotometryControls(){
     this.createLinearRangeEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.linearRange);
         control.setValue(data.linearRange);
+        control.toolTip = self.linearRange.toolTip + 
+                "<p>Use the 'Photometry Graph' dialog to edit and view the 'Linear range'.</p>";
         return control;
     };
 
@@ -179,6 +184,8 @@ function PhotometryControls(){
     this.createOutlierRemovalEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.outlierRemoval);
         control.setValue(data.outlierRemoval);
+        control.toolTip = self.outlierRemoval.toolTip + 
+                "<p>Use the 'Photometry Graph' dialog to edit and view the outliers.</p>";
         return control;
     };
     
@@ -216,6 +223,8 @@ function PhotometryControls(){
     this.createApertureGrowthRateEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthRate);
         control.setValue(data.apertureGrowthRate);
+        control.toolTip = self.growthRate.toolTip + 
+                "<p>Use the 'Photometry Stars' dialog to edit and view the 'Growth rate'.</p>";
         return control;
     };
     
@@ -254,6 +263,8 @@ function PhotometryControls(){
     this.createApertureAddEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.apertureAdd);
         control.setValue(data.apertureAdd);
+        control.toolTip = self.apertureAdd.toolTip + 
+                "<p>Use the 'Photometry Stars' dialog to edit and view the 'Radius add'.</p>";
         return control;
     };
     
@@ -287,6 +298,8 @@ function PhotometryControls(){
     this.createApertureBgDeltaEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.apertureBgDelta);
         control.setValue(data.apertureBgDelta);
+        control.toolTip = self.apertureBgDelta.toolTip + 
+                "<p>Use the 'Photometry Stars' dialog to edit and view the 'Background delta'.</p>";
         return control;
     };
     
@@ -320,6 +333,8 @@ function PhotometryControls(){
     this.createApertureGrowthLimitEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.apertureGrowthLimit);
         control.setValue(data.apertureGrowthLimit);
+        control.toolTip = self.apertureGrowthLimit.toolTip + 
+                "<p>Use the 'Photometry Stars' dialog to edit and view the 'Growth limit'.</p>";
         return control;
     };
 }
@@ -337,16 +352,16 @@ function SampleControls(){
         range: {min:1, max:250},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Specifies the thickness of the Join Region. " +
-            "For a horizontal join, this is the height. For a vertical join, the width. " +
-            "The ideal Join size depends on the Mosaic Combination mode:" +
-            "<ul><li>Overlay: The join runs along the middle of the Join Region. " +
-            "Reference pixels overlay target pixels on the reference side of the join, " +
-            "Target pixels overlay reference pixels on the target side of the join.</li>" +
-            "<li>Random: Join size should be large enough to blend the two images " +
+        toolTip: "<p>This control is only relevant for the Mosaic Join Modes " +
+            "'Random' and 'Average'. These two join modes operate on a strip of " +
+            "pixels (Join Region) that runs along the length of the Overlap bounding box. " +
+            "This control determines the thickness of this Join Region.</p>" +
+            "<p>The ideal Join size depends on the Mosaic Combination mode:" +
+            "<ul><li>Random: Join size should be large enough to blend the two images " +
             "together, but small enough not to include too many stars.</li>" +
             "<li>Average: Determines the area that will benefit from a higher " +
-            "signal to noise ratio.</li></ul></p>"
+            "signal to noise ratio. To include the whole of the overlap area, " +
+            "set the join size to its maximum value.</li></ul></p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -359,7 +374,7 @@ function SampleControls(){
         setJoinSizeRange(control, data, false);
         control.setValue(data.joinSize);
         control.toolTip = self.joinSize.toolTip + 
-                "<p>Select 'Overlap rejection' to view the Join Region.</p>";
+                "<p>Unselect 'Target model' to edit and view the effects of the join size.</p>";
         return control;
     };
     /**
@@ -372,7 +387,7 @@ function SampleControls(){
         setJoinSizeRange(control, data, false);
         control.setValue(data.joinSize);
         control.toolTip = self.joinSize.toolTip + 
-                "<p>View and edit the Join Region in the 'Sample generation' dialog.</p>";
+                "<p>Use the 'Sample Generation' dialog to edit and view the Join Region.</p>";
         return control;
     };
     
@@ -383,10 +398,11 @@ function SampleControls(){
         range: {min:-10000, max:10000},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Offsets the Join Region / Join Path " +
+        toolTip: "<p>Offsets the Join Region or Join Path " +
                 "from the center of the overlap bounding box. " +
                 "It moves left/right (vertical join) or " +
-                "up/down (horizontal join).</p>"
+                "up/down (horizontal join).</p>" +
+                "<p>Try to avoid bright stars and image corners.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -399,10 +415,9 @@ function SampleControls(){
         setJoinPositionRange(control, data, false);
         control.setValue(data.joinPosition);
         control.toolTip = self.joinPosition.toolTip + 
-                "<p>Select 'Overlap rejection' to view the " +
-                "Join Path / Join Region.</p>" +
                 "<p>If the mosaic combination mode is 'Overlay', the Join Path is displayed. " +
-                "For 'Random' or 'Average', the Join Region rectangle is drawn.</p>";
+                "For 'Random' or 'Average', the Join Region rectangle is drawn.</p>" + 
+                "<p>Unselect 'Target model' to edit and view the effects of the position</p>";
         return control;
     };
     /**
@@ -415,8 +430,8 @@ function SampleControls(){
         setJoinPositionRange(control, data, false);
         control.setValue(data.joinPosition);
         control.toolTip = self.joinPosition.toolTip + 
-                "<p>View and edit the Join / Join Region position in the " +
-                "'Sample generation' dialog.</p>";
+                "<p>Use the 'Sample Generation' dialog to edit and view the " +
+                "Join Path/Join Region position.</p>";
         return control;
     };
     
@@ -433,8 +448,8 @@ function SampleControls(){
             "<p>Samples that contain bright stars are rejected for two reasons: </p>" +
             "<ul><li>Bright pixels are more affected by any errors in the calculated scale.</li>" +
             "<li>Bright stars can have significantly different profiles between " +
-            "the reference and target images. This can affect how many of the " +
-            "pixels illuminated by a star fall into a neighboring sample.</li></ul>" +
+            "the reference and target images. These variations are too rapid for " +
+            "the surface spline to follow and can reduce the accuracy of the resulting model.</li></ul>" +
             "<p>However, it is more important to include enough samples than to reject faint stars.</p>"
     };
     /**
@@ -456,19 +471,24 @@ function SampleControls(){
     this.createLimitSampleStarsPercentEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.percentLimits);
         control.setValue(data.limitSampleStarsPercent);
+        control.toolTip = self.percentLimits.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the pecentage of stars used.</p>";
         return control;
     };
-    
+
     this.growthRate = {
         real: true,
-        text: "Growth rate:",
+        text: "Star growth rate:",
         slider: {range: {min:0, max:200}},
         range: {min:0, max:2},
         precision: 2,
         maxWidth: 800,
-        toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
-            "<p>Use this control to set the rejection radius for bright, but unsaturated, stars " +
-            "<p>Should normally be set to the same value as the photometry 'Growth rate'.</p>"
+        toolTip: "<p>This control is used to reject samples that contain bright stars. " +
+            "The surviving samples are used to create the background gradient model for the Overlap region.</p>" +
+            "<p>Adjust this control until the rejection circles surround the stars. " +
+            "It is not necessary for the rejection circles to include filter halos " +
+            "or the scattered light around bright stars.</p>" +
+            "<p>It should normally be set to a similar value to the photometry 'Growth rate'.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -479,6 +499,9 @@ function SampleControls(){
     this.createSampleStarGrowthRateControl = function(dialog, data, strLength){
         let control = createNumericControl(dialog, self.growthRate, strLength);
         control.setValue(data.sampleStarGrowthRate);
+        control.toolTip = self.growthRate.toolTip + 
+                "<p>Unselect 'Auto' and 'Target model' checkboxes " +
+                "to edit and view the effects of this control.</p>";
         return control;
     };
     /**
@@ -489,6 +512,8 @@ function SampleControls(){
     this.createSampleStarGrowthRateEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthRate);
         control.setValue(data.sampleStarGrowthRate);
+        control.toolTip = self.growthRate.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the growth rate.</p>";
         return control;
     };
     
@@ -499,14 +524,9 @@ function SampleControls(){
         range: {min:1, max:400},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Limits the rejection radius for saturated stars. " +
-            "This setting is used when creating the surface spline that will be " +
-            "used to correct the overlap region.</p>" +
-            "<p>A 'Growth rate' suitable for unsaturated stars can produce large " +
-            "rejection circles for the brightest stars. This control limits the " +
-            "rejection radius growth to the specified number of pixels.</p>" +
-            "<p>Select the 'Overlap rejection' checkbox (Sample Generation dialog) " +
-            "to see the effects of this control.</p>"
+        toolTip: "<p>This control limits the effects of the Overlap 'Star growth rate' control " +
+            "to a maximum rejection radius. This can sometimes be necessary for the " +
+            "brightest stars.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -517,6 +537,9 @@ function SampleControls(){
     this.createSampleStarGrowthLimitControl = function(dialog, data, strLength){
         let control = createNumericControl(dialog, self.growthLimit, strLength);
         control.setValue(data.sampleStarGrowthLimit);
+        control.toolTip = self.growthLimit.toolTip + 
+                "<p>Unselect 'Auto' and 'Target model' checkboxes " +
+                "to edit and view the effects of this control.</p>";
         return control;
     };
     /**
@@ -527,6 +550,8 @@ function SampleControls(){
     this.createSampleStarGrowthLimitEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthLimit);
         control.setValue(data.sampleStarGrowthLimit);
+        control.toolTip = self.growthLimit.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the effects of the growth limit.</p>";
         return control;
     };
     
@@ -537,15 +562,9 @@ function SampleControls(){
         range: {min:1, max:400},
         precision: 0,
         maxWidth: 800,
-        toolTip: "<p>Limits the rejection radius for saturated stars. " +
-            "This setting is used when creating the surface spline that will be " +
-            "used to correct the target image.</p>" +
-            "<p>The target image gradient correction needs to ignore local " +
-            "gradients - e.g. due to scattered light around bright stars. " +
-            "The rejection radius around very bright stars needs to be large " +
-            "enough to reject all samples that contain the star's scattered light.</p>" +
-            "<p>Unselect the 'Overlap rejection' checkbox (Sample Generation dialog) " +
-            "to see the effects of this control.</p>"
+        toolTip: "<p>This control limits the effects of the target image 'Star growth rate' control " +
+            "to a maximum rejection radius. This can sometimes be necessary for the " +
+            "brightest stars.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -556,6 +575,9 @@ function SampleControls(){
     this.createSampleStarGrowthLimitTargetControl = function(dialog, data, strLength){
         let control = createNumericControl(dialog, self.growthLimitTarget, strLength);
         control.setValue(data.sampleStarGrowthLimitTarget);
+        control.toolTip = self.growthLimitTarget.toolTip + 
+                "<p>Unselect 'Auto' and select 'Target model' checkboxes " +
+                "to edit and view the effects of this control.</p>";
         return control;
     };
     /**
@@ -566,18 +588,24 @@ function SampleControls(){
     this.createSampleStarGrowthLimitTargetEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthLimitTarget);
         control.setValue(data.sampleStarGrowthLimitTarget);
+        control.toolTip = self.growthLimitTarget.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the effects of the growth limit.</p>";
         return control;
     };
     
     this.growthRateTarget = {
         real: true,
-        text: "Growth rate:",
+        text: "Star growth rate:",
         slider: {range: {min:0, max:200}},
         range: {min:0, max:2},
         precision: 2,
         maxWidth: 800,
-        toolTip: "<p>Determines the rejection radius for bright stars.</p>" +
-            "<p>Use this control to set the rejection radius for bright, but unsaturated, stars</p>"
+        toolTip: "<p>This control determines which samples are used when creating the " +
+            "background gradient model for the rest of the target image.</p>" +
+            "<p>The target image gradient correction needs to ignore local " +
+            "gradients - e.g. due to scattered light around bright stars. " +
+            "Hence the aim is to reject all samples that contain any light from bright stars. " +
+            "This includes diffraction spikes, filter halos, and the star's scattered light.</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
@@ -588,6 +616,9 @@ function SampleControls(){
     this.createSampleStarGrowthRateTargetControl = function(dialog, data, strLength){
         let control = createNumericControl(dialog, self.growthRateTarget, strLength);
         control.setValue(data.sampleStarGrowthRateTarget);
+        control.toolTip = self.growthRateTarget.toolTip + 
+                "<p>Unselect 'Auto' and select 'Target model' checkboxes " +
+                "to edit and view the effects of this control.</p>";
         return control;
     };
     /**
@@ -598,6 +629,8 @@ function SampleControls(){
     this.createSampleStarGrowthRateTargetEdit = function(dialog, data){
         let control = createNumericEdit(dialog, self.growthRateTarget);
         control.setValue(data.sampleStarGrowthRateTarget);
+        control.toolTip = self.growthRateTarget.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the effects of the growth rate.</p>";
         return control;
     };
     
@@ -612,7 +645,7 @@ function SampleControls(){
             "<p>The sample size should be at least 2x the size of the largest " +
             "star that's not rejected by 'Limit stars %'.</p>" +
             "<p>The sample's value is the median of its pixels. " +
-            "They are used to create a surface spline that represents the relative gradient.</p>" +
+            "They are used to create a surface spline that models the relative gradient.</p>" +
             "<p>Samples are rejected if they contain one or more black pixels, " +
             "or if they are within a star's rejection radius.</p>"
     };
@@ -629,6 +662,9 @@ function SampleControls(){
             control.setRange(self.sampleSize.range.min, maxSampleSize);
         }
         control.setValue(data.sampleSize);
+        control.toolTip = self.sampleSize.toolTip + 
+                "<p>Unselect the 'Auto' checkbox " +
+                "to edit and view the effects of this control.</p>";
         return control;
     };
     /**
@@ -643,6 +679,8 @@ function SampleControls(){
             control.setRange(self.sampleSize.range.min, maxSampleSize);
         }
         control.setValue(data.sampleSize);
+        control.toolTip = self.sampleSize.toolTip + 
+                "<p>Use the 'Sample Generation' dialog to edit and view the effects of the sample size.</p>";
         return control;
     };
 }
@@ -656,14 +694,17 @@ function GradientControls(){
     this.overlapGradientSmoothness = {
         real: true,
         text: "Gradient smoothness:",
-        slider: {range: {min:-400, max:300}},
-        range: {min:-4, max:3},
+        slider: {range: {min:-500, max:200}},
+        range: {min:-5, max:2},
         precision: 1,
         maxWidth: 800,
         toolTip: "<p>A surface spline is created to model the relative " +
         "gradient over the whole of the overlap region.</p>" +
         "<p>Smoothing needs to be applied to this surface spline to ensure it follows " +
-        "the gradient but not the noise.</p>" +
+        "the gradient but not the noise. However, if there is a bright star " +
+        "near the join line (Overlay mode), or within the Join Region " +
+        "(Random or Average mode) the smoothing should be reduced to allow the " +
+        "surface spline to follow any gradient peak / trough.</p>" +
         "<p>This control specifies the logarithm of the smoothness. " +
         "Larger values apply more smoothing.</p>"
     };
@@ -693,8 +734,8 @@ function GradientControls(){
     this.targetGradientSmoothness = {
         real: true,
         text: "Gradient smoothness:",
-        slider: {range: {min:-200, max:500}},
-        range: {min:-2, max:5},
+        slider: {range: {min:-300, max:400}},
+        range: {min:-3, max:4},
         precision: 1,
         maxWidth: 800,
         toolTip: "<p>The target image gradient correction is determined from the gradient " +
@@ -705,8 +746,16 @@ function GradientControls(){
         "<p>Sufficient Smoothness should be applied to ensure that the " +
         "gradient correction only follows the gradient trend, rather than " +
         "these local variations.</p>" +
-        "<p>If the gradient contains a sharp peak, use 'Growth limit (Target)' in " +
-        "the 'Sample Generation' section to reject more samples around bright stars.</p>" +
+        "<p>If the gradient contains a sharp peak due to a nearby bright star, " +
+        "more samples need to be rejected around that star. To do this:" +
+        "<ul><li>Display the 'Sample Generation' dialog. " +
+        "Deselect 'Auto' and select 'Target model'.</li>" +
+        "<li>A blue line indicates the target side of the overlap. " +
+        "Samples near this line need to be rejected if they contain <i>any</i> " +
+        "scattered light from a bright star.</li>" +
+        "<li>To increase the bright star's rejection radius, " +
+        "in the 'Target model sample rejection' group box, increase the " +
+        "'Growth limit'. Then, if necessary, increase 'Star growth rate'.</li></ul>" +
         "<p>This control specifies the logarithm of the smoothness. " +
         "Larger values apply more smoothing.</p>"
     };

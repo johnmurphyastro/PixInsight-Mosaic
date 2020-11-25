@@ -508,25 +508,6 @@ function JoinRegion(data){
         data.joinPosition = Math.min(pMax, data.joinPosition);
     };
     
-    /**
-     * In overlay mode, this preview will have zero thickness (appears as a line)
-     * In Random or Average mode, the preview will show the area affected by the
-     * Average / Random combien.
-     * If useCropTargetToReplaceRegion, this will show the area in the mosaic that 
-     * will be replaced or averaged with the target image. All target pixels 
-     * outside the Join Region will be ignored
-     * @param {View} view
-     */
-    this.createPreview = function(view){
-        let name;
-        if (data.useCropTargetToReplaceRegion){
-            name = data.useMosaicOverlay ? "Replace" : "Update";
-        } else {
-            name = "JoinRegion";
-        }
-        createPreview(view, this.joinRect, name);
-    };
-    
     if (data.useCropTargetToReplaceRegion) {
         let cropAreaPreview = data.cropTargetPreviewRect;
         if (!cropAreaPreview.intersects(overlapBox)){

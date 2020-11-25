@@ -238,21 +238,21 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     let sampleStarGrowthLimit_Control;
     let sampleStarGrowthRateTarget_Control;
     let sampleStarGrowthLimitTarget_Control;
-    let displayOverlapRejectionCheckBox = new CheckBox(this);
-    displayOverlapRejectionCheckBox.text = "Overlap rejection";
-    displayOverlapRejectionCheckBox.toolTip = "<p>Show the sample rejection for " +
-            "either <b>overlap</b> correction or <b>target image</b> correction.</p>" +
-            "<p><u>Overlap correction</u>:" +
-            "<ul><li><b>Green line</b>: Join Path (reference to target transition). " +
+    let displayTargetModelCheckBox = new CheckBox(this);
+    displayTargetModelCheckBox.text = "Target model";
+    displayTargetModelCheckBox.toolTip = "<p>Show the sample rejection for " +
+            "either the <b>overlap</b> surface spline model or the <b>target image</b> " +
+            "surface spline model.</p>" +
+            "<p><u>Overlap model</u>:" +
+            "<ul><li><b>Green line</b>: Join Path (join between reference and target images). " +
             "Use 'Position (+/-)' to move the join to avoid bright stars and image corners.</li>" +
             "<li><b>Green rectangle</b>: Join Region bounding box. " +
             "Shown instead of the Join Path for 'Random' and 'Average' modes. " +
-            "Mosaiced pixels within this area will be randomly chosen or averaged. " +
-            "Use 'Join size' in the 'Join Region' section to set the rectangle thickness.</li>" +
-            "<li><b>Red circles</b>: Star rejection circles. The brighter stars " +
-            "should be completely within these circles. They do not need to include " +
-            "filter halos or scattered light.</li></ul>" +
-            "<p><u>Target image correction</u>:" +
+            "Mosaiced pixels within this area will be randomly chosen or averaged respectively. " +
+            "Use 'Size' in the 'Join' section to set the rectangle thickness.</li>" +
+            "<li><b>Red circles</b>: Star rejection circles. These circles should surround " +
+            "the bright stars, but do not need to include filter halos or scattered light.</li></ul>" +
+            "<p><u>Target image model</u>:" +
             "<ul><li><b>Blue line</b>: this line indicates the target side of the " +
             "overlap region. This region determines the gradient correction that " +
             "will be applied to the target image.</li>" +
@@ -261,22 +261,22 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             "filter halos and scattered light. This prevents local gradients " +
             "around bright stars affecting the gradient correction across the target image. " +
             "Rejecting local gradients is particularly important near the blue line.</li></ul>";
-    displayOverlapRejectionCheckBox.checked = drawOverlapRejectionFlag;
-    displayOverlapRejectionCheckBox.onClick = function (checked) {
-        joinSize_Control.enabled = !data.useMosaicOverlay && !data.useCropTargetToReplaceRegion && checked;
-        joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && checked;
-        sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration && checked;
-        sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && checked;
-        sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
-        sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !checked;
-        drawOverlapRejectionFlag = checked;
+    displayTargetModelCheckBox.checked = !drawOverlapRejectionFlag;
+    displayTargetModelCheckBox.onClick = function (checked) {
+        joinSize_Control.enabled = !data.useMosaicOverlay && !data.useCropTargetToReplaceRegion && !checked;
+        joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && !checked;
+        sampleStarGrowthRate_Control.enabled = !data.useAutoSampleGeneration && !checked;
+        sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && !checked;
+        sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && checked;
+        sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && checked;
+        drawOverlapRejectionFlag = !checked;
         finalUpdateFunction();
     };
-    if (data.useCropTargetToReplaceRegion){
+    if (data.useCropTargetToReplaceRegion || !data.useTargetGradientCorrection){
         // Only the overlap - join region is used. The rest of the target image is 
         // not modified, so target image gradient correction is not used.
-        displayOverlapRejectionCheckBox.checked = true;
-        displayOverlapRejectionCheckBox.enabled = false;
+        displayTargetModelCheckBox.checked = false;
+        displayTargetModelCheckBox.enabled = false;
     }
     
     let sampleControls = new SampleControls;
@@ -337,15 +337,14 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         // Update the join position control.
         // The main dialog's control will be update at the end of the drag
         joinPosition_Control.setValue(data.joinPosition);
-        // Draw the rectangle, and update the target view's JoinRegion preview
+        // Draw the rectangle
         previewControl.forceRedraw();
-        joinRegion.createPreview(data.targetView);
     };
     addFinalUpdateListener(joinSize_Control, finalJoinSizeUpdateFunction);
     joinSize_Control.enabled = 
             !data.useMosaicOverlay &&
             !data.useCropTargetToReplaceRegion && 
-            displayOverlapRejectionCheckBox.checked;
+            !displayTargetModelCheckBox.checked;
     
     joinPosition_Control = sampleControls.createJoinPositionControl(this, data, 0);
     joinPosition_Control.onValueUpdated = function (value) {
@@ -356,10 +355,9 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         joinPath = createMidJoinPathLimittedByOverlap(data.targetView.image,
                 data.cache.overlap, joinRect, isHorizontal, data);
         previewControl.forceRedraw();
-        joinRegion.createPreview(data.targetView);
     };
     addFinalUpdateListener(joinPosition_Control, finalJoinPositionUpdateFunction);
-    joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && displayOverlapRejectionCheckBox.checked;
+    joinPosition_Control.enabled = !data.useCropTargetToReplaceRegion && !displayTargetModelCheckBox.checked;
     
     let joinPositionSection = new Control(this);
     joinPositionSection.sizer = new VerticalSizer;
@@ -419,7 +417,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
     };
     addFinalUpdateListener(sampleStarGrowthLimit_Control, finalUpdateFunction);
-    sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && displayOverlapRejectionCheckBox.checked;
+    sampleStarGrowthLimit_Control.enabled = !data.useAutoSampleGeneration && !displayTargetModelCheckBox.checked;
     
     sampleStarGrowthLimitTarget_Control = 
             sampleControls.createSampleStarGrowthLimitTargetControl(this, data, labelLength);
@@ -429,7 +427,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
     };
     addFinalUpdateListener(sampleStarGrowthLimitTarget_Control, finalUpdateFunction);
-    sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && !displayOverlapRejectionCheckBox.checked;
+    sampleStarGrowthLimitTarget_Control.enabled = !data.useAutoSampleGeneration && displayTargetModelCheckBox.checked;
     
     sampleStarGrowthRateTarget_Control =
             sampleControls.createSampleStarGrowthRateTargetControl(this, data, labelLength);
@@ -439,10 +437,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
         previewControl.forceRedraw();
     };
     addFinalUpdateListener(sampleStarGrowthRateTarget_Control, finalUpdateFunction);
-    sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && !displayOverlapRejectionCheckBox.checked;
+    sampleStarGrowthRateTarget_Control.enabled = !data.useAutoSampleGeneration && displayTargetModelCheckBox.checked;
     
     let rejectRadiusGroupBox = new GroupBox(this);
-    rejectRadiusGroupBox.title = "Overlap star rejection radius";
+    rejectRadiusGroupBox.title = "Overlap model sample rejection";
     rejectRadiusGroupBox.sizer = new VerticalSizer();
     rejectRadiusGroupBox.sizer.margin = 2;
     rejectRadiusGroupBox.sizer.spacing = 2;
@@ -450,7 +448,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     rejectRadiusGroupBox.sizer.add(sampleStarGrowthLimit_Control);
     
     let rejectRadiusTargetGroupBox = new GroupBox(this);
-    rejectRadiusTargetGroupBox.title = "Target star rejection radius";
+    rejectRadiusTargetGroupBox.title = "Target model sample rejection";
     rejectRadiusTargetGroupBox.sizer = new VerticalSizer();
     rejectRadiusTargetGroupBox.sizer.margin = 2;
     rejectRadiusTargetGroupBox.sizer.spacing = 2;
@@ -514,13 +512,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     
     let autoCheckBox = new CheckBox(this);
     autoCheckBox.text = "Auto";
-    autoCheckBox.toolTip = "<p>Calculates default values for the following parameters:</p>" +
-            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
-            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
-            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
-            "</ul>";
+    autoCheckBox.toolTip = "<p>Calculates default values for most of the Sample Generation parameters.</p>" +
+            "<p>These are calculated from the headers:" +
+            "<ul><li><b>'XPIXSZ'</b> (Pixel size, including binning, in microns)</li>" +
+            "<li><b>'CDELT1'</b> (degrees per pixel). Plate solving an image creates the 'CDELT1' header.</li></p>";
     autoCheckBox.onClick = function (checked) {
         photometricMosaicDialog.setSampleGenerationAutoValues(checked);
         if (checked){
@@ -534,10 +529,10 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
             updateSampleGrid();
             self.enabled = true;
         }
-        sampleStarGrowthRate_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
-        sampleStarGrowthLimit_Control.enabled = !checked && displayOverlapRejectionCheckBox.checked;
-        sampleStarGrowthRateTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
-        sampleStarGrowthLimitTarget_Control.enabled = !checked && !displayOverlapRejectionCheckBox.checked;
+        sampleStarGrowthRate_Control.enabled = !checked && !displayTargetModelCheckBox.checked;
+        sampleStarGrowthLimit_Control.enabled = !checked && !displayTargetModelCheckBox.checked;
+        sampleStarGrowthRateTarget_Control.enabled = !checked && displayTargetModelCheckBox.checked;
+        sampleStarGrowthLimitTarget_Control.enabled = !checked && displayTargetModelCheckBox.checked;
         sampleSize_Control.enabled = !checked && showGridFlag;
     };
     autoCheckBox.checked = data.useAutoSampleGeneration;
@@ -561,7 +556,7 @@ function SampleGridDialog(title, refBitmap, tgtBitmap, sampleGridMap, detectedSt
     optionsSizer.addSpacing(20);
     optionsSizer.add(gridCheckBox);
     optionsSizer.addSpacing(20);
-    optionsSizer.add(displayOverlapRejectionCheckBox);
+    optionsSizer.add(displayTargetModelCheckBox);
     optionsSizer.addStretch();
     
     controlsHeight += refCheckBox.height;

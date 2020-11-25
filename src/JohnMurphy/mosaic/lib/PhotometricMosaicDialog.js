@@ -17,6 +17,7 @@
 //"use strict";
 #include <pjsr/DataType.jsh>
 #include "DialogLib.js"
+#include "STFAutoStretch.js"
 #define KEYPREFIX "PhotometricMosaic"
 #define APERTURE_ADD 1
 #define APERTURE_GROWTH 0.2
@@ -679,11 +680,21 @@ function PhotometricMosaicDialog(data) {
     referenceImage_ViewList.onViewSelected = function (view) {
         data.referenceView = view;
     };
+    let referenceAutoStf_button = new PushButton(this);
+    referenceAutoStf_button.text = "Auto STF";
+    referenceAutoStf_button.toolTip =
+            "<p>Apply an auto ScreenTransferFunction to the reference image.</p>" +
+            "<p>The dialogs that display image data from the reference image " +
+            "rely on its STF to display the images correctly.</p>";
+    referenceAutoStf_button.onClick = function () {
+        STFAutoStretch(data.referenceView);
+    };
 
     let referenceImage_Sizer = new HorizontalSizer(this);
     referenceImage_Sizer.spacing = 4;
     referenceImage_Sizer.add(referenceImage_Label);
     referenceImage_Sizer.add(referenceImage_ViewList, 100);
+    referenceImage_Sizer.add(referenceAutoStf_button);
 
     let targetImage_Label = new Label(this);
     targetImage_Label.text = "Target view:";
@@ -707,11 +718,22 @@ function PhotometricMosaicDialog(data) {
         self.setSampleStarGrowthLimitAutoValue();
         self.setSampleStarGrowthLimitTargetAutoValue();
     };
+    
+    let targetAutoStf_button = new PushButton(this);
+    targetAutoStf_button.text = "Auto STF";
+    targetAutoStf_button.toolTip =
+            "<p>Apply an auto ScreenTransferFunction to the target image.</p>" +
+            "<p>The dialogs that display image data from the target image " +
+            "rely on its STF to display the images correctly.</p>";
+    targetAutoStf_button.onClick = function () {
+        STFAutoStretch(data.targetView);
+    };
 
     let targetImage_Sizer = new HorizontalSizer(this);
     targetImage_Sizer.spacing = 4;
     targetImage_Sizer.add(targetImage_Label);
     targetImage_Sizer.add(targetImage_ViewList, 100);
+    targetImage_Sizer.add(targetAutoStf_button);
     
     let selectViewSection = new Control(this);
     selectViewSection.sizer = new VerticalSizer;
@@ -931,8 +953,9 @@ function PhotometricMosaicDialog(data) {
             "<li><b>Growth rate</b></li>" +
             "<li><b>Background delta</b></li>" +
             "<li><b>Limit stars %</b></li>" +
-            "<li><b>Linear range</b></li>" +
-            "</ul>";
+            "<li><b>Linear range</b></li></ul>" +
+            "<p>The 'Background delta' is calculated from the header entry " +
+            "'XPIXSZ' (pixel size, including binning, in microns).</p>";
     this.autoPhotometryCheckBox.onCheck = function (checked){
         self.setPhotometryAutoValues(checked);
     };
@@ -1020,7 +1043,7 @@ function PhotometricMosaicDialog(data) {
     // =======================================
     const sampleGenerationStrLen = this.font.width("Multiply star radius:");
     let sampleControls = new SampleControls;
-    
+
     this.limitSampleStarsPercent_Control = sampleControls.createLimitSampleStarsPercentEdit(this, data);       
     this.limitSampleStarsPercent_Control.onValueUpdated = function (value) {
         data.limitSampleStarsPercent = value;
@@ -1057,13 +1080,10 @@ function PhotometricMosaicDialog(data) {
     this.autoSampleGenerationCheckBox = new CheckBox(this);
     this.autoSampleGenerationCheckBox.text = "Auto";
     this.autoSampleGenerationCheckBox.toolTip = 
-            "<p>Calculates default values for the following parameters:</p>" +
-            "<ul><li><b>Radius add</b> - set to 'Radius add' from Photometry section.</li>" +
-            "<li><b>Growth rate</b> - set to 'Growth rate' from Photometry section.</li>" +
-            "<li><b>Growth Limit (Overlap)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Growth Limit (Target)</b> - calculated from ImageSolver header 'CDELT1'</li>" +
-            "<li><b>Sample size</b> - calculated from ImageSolver headers 'XPIXSZ' and 'CDELT1'</li>" +
-            "</ul>";
+            "<p>Calculates default values for most of the Sample Generation parameters.</p>" +
+            "<p>These are calculated from the headers:" +
+            "<ul><li><b>'XPIXSZ'</b> (Pixel size, including binning, in microns)</li>" +
+            "<li><b>'CDELT1'</b> (degrees per pixel). Plate solving an image creates the 'CDELT1' header.</li></p>";
     this.autoSampleGenerationCheckBox.onCheck = function (checked){
         self.setSampleGenerationAutoValues(checked);
     };
@@ -1076,7 +1096,13 @@ function PhotometricMosaicDialog(data) {
     sampleAutoGroupBox.sizer.addSpacing(10);
     
     let sampleStarRejectRadiusGroupBox = new GroupBox(this);
-    sampleStarRejectRadiusGroupBox.title = "Overlap star rejection radius";
+    sampleStarRejectRadiusGroupBox.title = "Overlap model sample rejection";
+    sampleStarRejectRadiusGroupBox.toolTip = "<p>This section determines which " +
+            "samples are used to create the Overlap region's background gradient model. " +
+            "This determines the gradient correction applied to the Overlap region.</p>" +
+            "<p>The aim is to reject samples that contain bright stars. " +
+            "It is not necessary to reject samples that only contain filter halos " +
+            "or the scattered light around bright stars.</p>";
     sampleStarRejectRadiusGroupBox.sizer = new HorizontalSizer();
     sampleStarRejectRadiusGroupBox.sizer.margin = 2;
     sampleStarRejectRadiusGroupBox.sizer.spacing = 10;
@@ -1085,7 +1111,14 @@ function PhotometricMosaicDialog(data) {
     sampleStarRejectRadiusGroupBox.sizer.addStretch();
     
     let sampleStarRejectRadiusGroupBox2 = new GroupBox(this);
-    sampleStarRejectRadiusGroupBox2.title = "Target star rejection radius";
+    sampleStarRejectRadiusGroupBox2.title = "Target model sample rejection";
+    sampleStarRejectRadiusGroupBox2.toolTip = "<p>This section determines which " +
+            "samples are used to create the target image's background gradient model. " +
+            "This determines the gradient correction applied to the rest of the target image.</p>" +
+            "<p>The aim is to reject samples that cover any light from bright stars. " +
+            "This includes diffraction spikes, filter halos " +
+            "and the scattered light around bright stars. " +
+            "Typically, the rejection radius needs to be quite large.</p>";
     sampleStarRejectRadiusGroupBox2.sizer = new HorizontalSizer();
     sampleStarRejectRadiusGroupBox2.sizer.margin = 2;
     sampleStarRejectRadiusGroupBox2.sizer.spacing = 10;
@@ -1111,18 +1144,7 @@ function PhotometricMosaicDialog(data) {
     this.joinPosition_Control = sampleControls.createJoinPositionEdit(this, data);
     this.joinPosition_Control.onValueUpdated = function (value){
         data.joinPosition = value;
-        if (data.cache.overlap !== null){
-            let joinRegion = new JoinRegion(data);
-            joinRegion.createPreview(data.targetView);
-        }
     };
-
-    let joinSizeTooltip = 
-        "<p>Limits the Join Region to a long thin rectangle that is centered within the overlap region.</p>" +
-        "<p>In most cases this option produces excellent results.</p>" +
-        "<p>For more information on how to use a Join Region, read the Help sections:" +
-        "<ul><li>Join Region: Taking control of the join</li>" +
-        "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
 
     this.joinSize_Control = sampleControls.createJoinSizeEdit(this, data);
     this.joinSize_Control.onValueUpdated = function (value) {
@@ -1132,7 +1154,6 @@ function PhotometricMosaicDialog(data) {
     
     this.joinSizeGroupBox = new GroupBox(this);
     this.joinSizeGroupBox.title = "Join";
-    this.joinSizeGroupBox.toolTip = joinSizeTooltip;
     this.joinSizeGroupBox.sizer = new HorizontalSizer;
     this.joinSizeGroupBox.sizer.margin = 2;
     this.joinSizeGroupBox.sizer.spacing = 10;
@@ -1435,7 +1456,8 @@ function PhotometricMosaicDialog(data) {
     
     this.autoTaperLengthCheckBox = new CheckBox(this);
     this.autoTaperLengthCheckBox.text = "Auto";
-    this.autoTaperLengthCheckBox.toolTip = "<p>Automatically determine taper length.</p>";
+    this.autoTaperLengthCheckBox.toolTip = "<p>Automatically determine the taper length.</p>" +
+            "<p>The calculation uses the header entry 'CDELT1' (degrees per pixel).</p>";
     this.autoTaperLengthCheckBox.onCheck = function (checked){
         data.useAutoTaperLength = checked;
         self.setTaperLengthAutoValue(data);
@@ -1486,17 +1508,13 @@ function PhotometricMosaicDialog(data) {
     // ===========================================
     const getAreaFromPreviewStr = "From preview:";
     const GET_AREA_FROM_PREVIEW_STRLEN = this.font.width(getAreaFromPreviewStr);
-    const JoinRegionTooltip =
-            "<p>This section provides total control over the Join Region.</p>" +
-            "<p>The Join Region is based on a user specified rectangle. This can " +
-            "be entered directly, or specified by a Preview. The Join Region is " +
-            "created by extending this rectangle to cover the full length of the join.</p>" +
-            "<p>Aim to make the Join Region thin and close to the center of the " +
-            "overlap (away from image corners), " +
-            "but try to avoid bright stars and star halos.</p>" +
-            "For more information on how to use a Join Region, read the Help sections:" +
-            "<ul><li>Join Region: Taking control of the join</li>" +
-            "<li>Join Region: Avoiding bright star artifacts</li></ul></p>";
+    const replaceUpdateRegionTooltip =
+            "<p>This section is used to add extra data inside a completed mosaic. " +
+            "<p>For example, extra data could be added to improve the signal to noise " +
+            "of an existing region (use Mosaic Join Mode 'Average').</p>" +
+            "<p>Alternatively, an area with poor resolution - for example areas " +
+            "that were close to image corners - can be replaced " +
+            "(use Mosaic Join Mode 'Overlay').</p>";
     
     /**
      * 
@@ -1518,7 +1536,7 @@ function PhotometricMosaicDialog(data) {
         return control;
     }
     
-    let x0ToolTip = "X-coordinate of Join Region's top left corner";
+    let x0ToolTip = "X-coordinate of region's top left corner";
     this.rectangleX0_Control = createPreviewNumericEdit("Left:", x0ToolTip,
             data.cropTargetPreviewRect.x0, 50);
     this.rectangleX0_Control.label.setFixedWidth(
@@ -1526,18 +1544,18 @@ function PhotometricMosaicDialog(data) {
     this.rectangleX0_Control.onValueUpdated = function (value){
         data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
-    let y0ToolTip = "Y-coordinate of Join Region's top left corner";
+    let y0ToolTip = "Y-coordinate of region's top left corner";
     this.rectangleY0_Control = createPreviewNumericEdit("Top:", y0ToolTip,
             data.cropTargetPreviewRect.y0, 50);
     this.rectangleY0_Control.onValueUpdated = function (value){
         data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
-    this.rectangleWidth_Control = createPreviewNumericEdit("Width:", "Join Region width",
+    this.rectangleWidth_Control = createPreviewNumericEdit("Width:", "Region's width",
             data.cropTargetPreviewRect.width, 50);
     this.rectangleWidth_Control.onValueUpdated = function (value){
         data.cropTargetPreviewRect = getCropTargetPreviewRect();
     };
-    this.rectangleHeight_Control = createPreviewNumericEdit("Height:", "Join Region height",
+    this.rectangleHeight_Control = createPreviewNumericEdit("Height:", "Region's height",
             data.cropTargetPreviewRect.height, 50);
     this.rectangleHeight_Control.onValueUpdated = function (value){
         data.cropTargetPreviewRect = getCropTargetPreviewRect();
@@ -1582,7 +1600,7 @@ function PhotometricMosaicDialog(data) {
     this.previewImage_ViewList = new ViewList(this);
     this.previewImage_ViewList.getPreviews();
     this.previewImage_ViewList.minWidth = 300;
-    this.previewImage_ViewList.toolTip = "<p>Initialize the 'Join Region' from a preview.</p>";
+    this.previewImage_ViewList.toolTip = "<p>Get the area of the mosaic to be replaced/updated from a preview.</p>";
     this.previewImage_ViewList.onViewSelected = function (view) {
         previewUpdateActions(this.dialog);
     };
@@ -1590,6 +1608,7 @@ function PhotometricMosaicDialog(data) {
     let previewUpdateButton = new PushButton(this);
     previewUpdateButton.hasFocus = false;
     previewUpdateButton.text = "Update";
+    previewUpdateButton.toolTip = "<p>Reset the text boxes to the selected preview's coordinates.</p>";
     previewUpdateButton.onClick = function () {
         if (!this.isUnderMouse){
             // Ensure pressing return in a different field does not trigger this callback!
@@ -1618,8 +1637,8 @@ function PhotometricMosaicDialog(data) {
     };
     
     this.cropTargetGroupBox = new GroupBox(this);
-    this.cropTargetGroupBox.title = "Area of mosiac to be replaced";
-    this.cropTargetGroupBox.toolTip = JoinRegionTooltip;
+    this.cropTargetGroupBox.title = "Area of mosiac to be replaced/updated";
+    this.cropTargetGroupBox.toolTip = replaceUpdateRegionTooltip;
     this.cropTargetGroupBox.sizer = new VerticalSizer(this);
     this.cropTargetGroupBox.sizer.margin = 2;
     this.cropTargetGroupBox.sizer.spacing = 4;
@@ -1636,12 +1655,7 @@ function PhotometricMosaicDialog(data) {
     replaceUpdateBar.checkBox.onCheck = this.setUseCropTargetToReplaceRegion;
     replaceUpdateBar.setSection(replaceUpdateSection);
     replaceUpdateBar.onToggleSection = this.onToggleSection;
-    replaceUpdateBar.toolTip = 
-            "<p>This section is used to add extra data inside a completed mosaic. " +
-            "<p>For example, extra data could be added to improve the signal to noise " +
-            "of an existing region (use 'Average' mode).</p>" +
-            "<p>Alternatively, an area with poor resolution - for example areas " +
-            "that were close to image corners - can be replaced (use 'Overlay' mode).</p>";
+    replaceUpdateBar.toolTip = replaceUpdateRegionTooltip;
     // SectionBar "Join Region" End
 
 
@@ -1656,12 +1670,9 @@ function PhotometricMosaicDialog(data) {
     this.mosaicOverlay_Control = new RadioButton(this);
     this.mosaicOverlay_Control.text = "Overlay";
     this.mosaicOverlay_Control.toolTip =
-            "The Join Region is divided in half along its length:" +
-            "<ul><li>On the target side, target pixels are drawn on top.</li>" +
-            "<li>On the reference side, reference pixels " +
-            "are drawn on top.</li></ul>" +
-            "<p>For a pure 'target overlay' or 'reference overlay', create " +
-            "a Join Region at one side of the overlap region.</p>";
+        "<p>Reference pixels are drawn on top of target pixels on the reference side of the join.</p>" +
+        "<p>Target pixels are drawn on top of reference pixels on the target side of the join.</p>" +
+        "<p>Use the 'Sample Generation' dialog to view and adjust the position of the join.</p>";
     this.mosaicOverlay_Control.checked = data.useMosaicOverlay;
     this.mosaicOverlay_Control.onClick = function (checked) {
         updateMosaicMode(true, false, false);
@@ -1669,8 +1680,10 @@ function PhotometricMosaicDialog(data) {
 
     this.mosaicRandom_Control = new RadioButton(this);
     this.mosaicRandom_Control.text = "Random";
-    this.mosaicRandom_Control.toolTip = "<p>Over the join region, pixels " +
+    this.mosaicRandom_Control.toolTip = "<p>Within the Join Region, pixels " +
             "are randomly chosen from the reference and target images.</p>" +
+            "<p>Use the 'Sample Generation' dialog to view and adjust the " +
+            "size and position of the Join Region.</p>" +
             "<p>This mode is particularly effective at hiding the join, but if " +
             "the star profiles in the reference and target images don't match, " +
             "this can lead to speckled pixels around the stars.</p>" +
@@ -1685,13 +1698,14 @@ function PhotometricMosaicDialog(data) {
     
     this.mosaicAverage_Control = new RadioButton(this);
     this.mosaicAverage_Control.text = "Average";
-    this.mosaicAverage_Control.toolTip = "<p>Over the join region, " +
+    this.mosaicAverage_Control.toolTip = "<p>Within the join region, " +
             "pixels are set to the average of the reference and target pixels.</p>" +
+            "<p>Use the 'Sample Generation' dialog to view and adjust the " +
+            "size and position of the Join Region.</p>" +
             "<p>This mode has the advantage of increasing the signal to noise ratio " +
             "over the join, but this can also make the join more visible.</p>" +
-            "<p>To average the whole of the overlap region, unselect " +
-            "both 'Join Region (Centered)' and 'Join Region (From preview)' " +
-            "within the 'Join Region' section.</p>";
+            "<p>To average the whole of the overlap region, " +
+            "set the Join Region to its maximum size.</p>";
     this.mosaicAverage_Control.checked = data.useMosaicAverage;
     this.mosaicAverage_Control.onClick = function (checked) {
         updateMosaicMode(false, false, true);
@@ -1751,15 +1765,15 @@ function PhotometricMosaicDialog(data) {
     let joinMaskButton = new PushButton(this);
     joinMaskButton.text = "Join mask";
     joinMaskButton.toolTip =
-            "<p>Creates a mask of the mosaic join. " +
-            "This mask indicates the pixels used to create the mosaic join.</p>" +
-            "<p>If the mask extends into the 'black', this indicates this area " +
-            "is slightly above zero. To correct, use Pixel Math expression similar to:</p>" +
-            "<p>iif($T &lt; 0.0005, 0, $T)</p>" +
-            "<p>If a 'Join Region' has not been defined, the join area is " +
-            "simply the overlapping pixels. However, if it has been specified, " +
-            "the join extends along the full length of the join but it is " +
-            "otherwise limited to the 'Join Region'.</p>";
+            "<p><b><u>Mosaic Join Mode: Overlay</u></b><br />" +
+            "Creates a mask showing the Join line. Apply the mask to the " +
+            "mosaic view to see the position of the join.</p>" +
+            "<p><b><u>Mosaic Join Mode: Random or Average</u></b><br />" +
+            "Creates a mask revealing the Join Region. Within this area the " +
+            "mosaic pixels are either randomly choosen from the reference " +
+            "and target image, or averaged. Apply the mask to the " +
+            "mosaic view to see the size and position of this region.</p>" +
+            "<p>Show/Hide the mask (Ctrl K) to check the quality of the join.</p>";
     joinMaskButton.onClick = function () {
         data.viewFlag = CREATE_JOIN_MASK();
         this.dialog.ok();
@@ -1906,11 +1920,6 @@ function main() {
             (new MessageBox("ERROR: Target and Reference are set to the same view", TITLE(), StdIcon_Error, StdButton_Ok)).execute();
             continue;
         }
-        if (data.useTargetGradientCorrection && data.targetGradientSmoothness < data.overlapGradientSmoothness){
-            (new MessageBox("'Gradient Correction (Target image)' Smoothness must be less than or equal to 'Gradient Correction (Overlap Region)' Smoothness", 
-                    TITLE(), StdIcon_Error, StdButton_Ok)).execute();
-            continue;
-        }
         if (data.useCropTargetToReplaceRegion && data.useMosaicRandom){
             (new MessageBox("The 'Replace/Update Region' option is incompatible with the 'Random' mosaic mode.", 
                     TITLE(), StdIcon_Error, StdButton_Ok)).execute();
@@ -1924,7 +1933,7 @@ function main() {
                     "Registration and Image integration or color combine can produce ragged edges. " +
                     "Soft edges can also be introduced by the MosaicByCoordinates script.</p>" +
                     "<p>A soft edge can produce fine lines at some places in the join.\n" +
-                    "Rough edges can cause a complete failure to match the two images, especially at the ends of the join.</p>" +
+                    "Rough edges can cause a complete failure to blend the two images, especially at the ends of the join.</p>" +
                     "<p>Use <b>" + TRIM_NAME() + "</b> to errode pixels from the edges of the registered mosaic tiles.</p>";
             return new MessageBox(msg, "Warning: Image may have soft or rough edges", 
                 StdIcon_Warning, StdButton_Ignore, StdButton_Abort);

@@ -102,6 +102,7 @@ function photometricMosaic(data, photometricMosaicDialog)
     // or the overlapBox if the preview was not specified
     let overlapBox = overlap.overlapBox;
     createPreview(targetView, overlapBox, "Overlap");
+    createPreview(referenceView, overlapBox, "Overlap");
     let joinRegion = new JoinRegion(data);
     let joinRect = joinRegion.joinRect;
     if (joinRect === null){
@@ -109,10 +110,14 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
     let isHorizontal = joinRegion.isJoinHorizontal();
-    joinRegion.createPreview(targetView);
 
     if (data.viewFlag === CREATE_JOIN_MASK()){
         createJoinMask(data, joinRect);
+        if (data.useMosaicOverlay){
+            console.writeln("Created join path mask");
+        } else {
+            console.writeln("Created join region mask " + joinRect);
+        }
         return;
     }
 
@@ -252,10 +257,7 @@ function photometricMosaic(data, photometricMosaicDialog)
         let tgtBitmap = extractOverlapImage(targetView, overlap.overlapBox, overlap.getOverlapMaskBuffer());
         let dialog = new SampleGridDialog("Sample Generation", refBitmap, tgtBitmap, sampleGridMap, detectedStars, 
                 data, maxSampleSize, joinPath, targetSide, photometricMosaicDialog);
-        console.hide();
-        targetView.window.bringToFront();
         dialog.execute();
-        console.show();
         return;
     }
     
@@ -294,7 +296,8 @@ function photometricMosaic(data, photometricMosaicDialog)
     
     if (data.viewFlag === DISPLAY_MOSAIC_MASK_STARS()){
         console.writeln("\n<b><u>Displaying mosaic mask stars</u></b>");
-        let dialog = new MaskStarsDialog(joinRect, detectedStars, data,
+        let maskArea = data.useMosaicOverlay ? data.cache.overlap.overlapBox : joinRect;
+        let dialog = new MaskStarsDialog(maskArea, detectedStars, data,
             binnedColorSamplePairs, isHorizontal, isTargetAfterRef, scaleFactors);
         dialog.execute();
         return;
@@ -506,9 +509,6 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
     view.endProcess();
     view.stf = refView.stf;
 
-    if (createMosaicFlag){
-        imgWindow.createPreview(joinRect, "JoinRegion");
-    }
     // But show the main mosaic view.
     imgWindow.currentView = view;
     imgWindow.zoomToFit();
@@ -519,12 +519,12 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
 
 /**
  * Create a preview if it does not already exist
- * @param {View} targetView
+ * @param {View} view
  * @param {Rect} rect
  * @param {String} previewName
  */
-function createPreview(targetView, rect, previewName){
-    let w = targetView.window;
+function createPreview(view, rect, previewName){
+    let w = view.window;
     
     let preview = w.previewById(previewName);
     if (!preview.isNull){

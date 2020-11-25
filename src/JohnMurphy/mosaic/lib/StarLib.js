@@ -926,28 +926,57 @@ function createJoinMask(data, joinRect){
     let overlap = data.cache.overlap;
     const width = tgtView.image.width;
     const height = tgtView.image.height;
-    const overlapMask = overlap.getFullImageMask(width, height);
-    const maskValue = 0.8;
-    // Restrict the mask to the joinRect rather than using the whole overlap
-    let maskRect = data.useMosaicOverlay ? overlap.overlapBox : joinRect;
-    let maskSamples = new Float32Array(maskRect.area);
-    overlapMask.getSamples(maskSamples, maskRect);
-    overlapMask.free();
-    for (let i = 0; i < maskSamples.length; i++){
-        // When overlapMask is 1, mask will be transparent, which is what we want.
-        if (maskSamples[i] === 0){
-            // When overlapMask is 0, it will be solid red. We want some transparency.
-            maskSamples[i] = maskValue;
+    if (data.useCropTargetToReplaceRegion || !data.useMosaicOverlay){
+        const overlapMask = overlap.getFullImageMask(width, height);
+        const maskValue = 0.8;
+        // Restrict the mask to the joinRect rather than using the whole overlap
+        let maskRect = data.useMosaicOverlay ? overlap.overlapBox : joinRect;
+        let maskSamples = new Float32Array(maskRect.area);
+        overlapMask.getSamples(maskSamples, maskRect);
+        overlapMask.free();
+        for (let i = 0; i < maskSamples.length; i++){
+            // When overlapMask is 1, mask will be transparent, which is what we want.
+            if (maskSamples[i] === 0){
+                // When overlapMask is 0, it will be solid red. We want some transparency.
+                maskSamples[i] = maskValue;
+            }
         }
+        let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinRegion";
+        let w = new ImageWindow(width, height, 1, 8, false, false, title);
+        let view = w.mainView;
+        view.beginProcess(UndoFlag_NoSwapFile);
+        view.image.fill(maskValue);
+        view.image.setSamples(maskSamples, maskRect);
+        view.endProcess();
+        w.show();
+    } else {
+        // In overlay mode the join's path is drawn in black. This creates a
+        // solid red line when the image is applied as a mask.
+        let bmp = new Bitmap(width, height);
+        bmp.fill(0xffffffff);
+        let graphics = new VectorGraphics(bmp);
+        graphics.pen = new Pen(0xff000000);
+        graphics.antialiasing = false;
+        let isHorizontal = overlap.overlapBox.width > overlap.overlapBox.height;
+        let joinPath = createMidJoinPathLimittedByOverlap(data.targetView.image,
+                data.cache.overlap, joinRect, isHorizontal, data);
+        for (let i=1; i < joinPath.length; i++){
+            let x = joinPath[i-1].x;
+            let x2 = joinPath[i].x;
+            let y = joinPath[i-1].y;
+            let y2 = joinPath[i].y;
+            graphics.drawLine(x, y, x2, y2);
+        }
+        graphics.end();
+        
+        let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinLine";
+        let w = new ImageWindow(width, height, 1, 8, false, false, title);
+        let view = w.mainView;
+        view.beginProcess(UndoFlag_NoSwapFile);
+        view.image.blend(bmp);
+        view.endProcess();
+        w.show();
     }
-    let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinMask";
-    let w = new ImageWindow(width, height, 1, 8, false, false, title);
-    let view = w.mainView;
-    view.beginProcess(UndoFlag_NoSwapFile);
-    view.image.fill(maskValue);
-    view.image.setSamples(maskSamples, maskRect);
-    view.endProcess();
-    w.show();
 }
 
 /**
