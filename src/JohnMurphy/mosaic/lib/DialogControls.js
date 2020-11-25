@@ -787,7 +787,11 @@ function GradientControls(){
  * Sets the JoinPosition control min, max range. The range depends on data.joinSize
  * @param {Control} control Update this controls min, max range
  * @param {PhotometricMosaicData} data
- * @param {Boolean} updateData If true, update data.joinPosition to be within range
+ * @param {Boolean} updateData If true, update data.joinPosition to be within range.
+ * This is set to true if the range changes because:
+ * (1) The overlap has just been calculated
+ * (2) A change in the join size means the join position range has changed.
+ * We then need to make sure that the data.joinPosition is within the allowed range.
  */
 function setJoinPositionRange(control, data, updateData){
     if (data.cache.overlap !== null){
@@ -797,14 +801,22 @@ function setJoinPositionRange(control, data, updateData){
         if (updateData){
             data.joinPosition = control.value;
         }
+    } else {
+        // We don't know what the real range is, so just make sure the range is 
+        // big enough to accept the data.joinPosition value.
+        control.setRange(
+                Math.min(control.lowerBound, data.joinPosition), 
+                Math.max(control.upperBound, data.joinPosition));
     }
-};
+}
 
 /**
  * Sets the JoinSize control min, max range. This only depends on the overlap bounding box.
  * @param {Control} control Update this controls min, max range
  * @param {PhotometricMosaicData} data
- * @param {Boolean} updateData If true, update data.joinSize to be within range
+ * @param {Boolean} updateData If true, update data.joinSize to be within range. This should
+ * only be set to true when the overlap is first calculated. We then make sure that
+ * data.joinSize is within the allowed range.
  */
 function setJoinSizeRange(control, data, updateData){
     if (data.cache.overlap !== null){
@@ -813,5 +825,11 @@ function setJoinSizeRange(control, data, updateData){
         if (updateData){
             data.joinSize = control.value;
         }
+    }else {
+        // We don't know what the real range is, so just make sure the range is 
+        // big enough to accept the data.joinSize value.
+        control.setRange(
+                Math.min(control.lowerBound, data.joinSize), 
+                Math.max(control.upperBound, data.joinSize));
     }
-};
+}

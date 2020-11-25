@@ -920,12 +920,14 @@ function displayStarGraph(refView, tgtView, detectedStars, data, photometricMosa
  * If overlay mode, return mask of overlap. Otherwise mask uses joinRect.
  * @param {PhotometricMosaicData} data
  * @param {Rect} joinRect Restricts the mask to join instead of using all overlap pixels
+ * @param {String} viewId Mosaic view id
  */
-function createJoinMask(data, joinRect){
+function createJoinMask(data, joinRect, viewId){
     let tgtView = data.targetView;
     let overlap = data.cache.overlap;
     const width = tgtView.image.width;
     const height = tgtView.image.height;
+    let title = viewId + "__JoinMask";
     if (data.useCropTargetToReplaceRegion || !data.useMosaicOverlay){
         const overlapMask = overlap.getFullImageMask(width, height);
         const maskValue = 0.8;
@@ -941,7 +943,7 @@ function createJoinMask(data, joinRect){
                 maskSamples[i] = maskValue;
             }
         }
-        let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinRegion";
+        
         let w = new ImageWindow(width, height, 1, 8, false, false, title);
         let view = w.mainView;
         view.beginProcess(UndoFlag_NoSwapFile);
@@ -969,7 +971,6 @@ function createJoinMask(data, joinRect){
         }
         graphics.end();
         
-        let title = WINDOW_ID_PREFIX() + tgtView.fullId + "__JoinLine";
         let w = new ImageWindow(width, height, 1, 8, false, false, title);
         let view = w.mainView;
         view.beginProcess(UndoFlag_NoSwapFile);

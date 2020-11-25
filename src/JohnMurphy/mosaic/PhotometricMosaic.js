@@ -55,7 +55,6 @@ function DISPLAY_GRADIENT_SAMPLES(){return 8;}
 function DISPLAY_TARGET_GRADIENT_GRAPH(){return 16;}
 function DISPLAY_OVERLAP_GRADIENT_GRAPH(){return 32;}
 function DISPLAY_MOSAIC_MASK_STARS(){return 128;}
-function CREATE_JOIN_MASK(){return 256;}
 function DISPLAY_BINNED_SAMPLES(){return 512;}
 
 /**
@@ -110,16 +109,6 @@ function photometricMosaic(data, photometricMosaicDialog)
         return;
     }
     let isHorizontal = joinRegion.isJoinHorizontal();
-
-    if (data.viewFlag === CREATE_JOIN_MASK()){
-        createJoinMask(data, joinRect);
-        if (data.useMosaicOverlay){
-            console.writeln("Created join path mask");
-        } else {
-            console.writeln("Created join region mask " + joinRect);
-        }
-        return;
-    }
 
     let detectedStars = new StarsDetected(referenceView, targetView);
     detectedStars.detectStars(data.logStarDetection, data.cache);
@@ -450,6 +439,11 @@ function createCorrectedView(isHorizontal, isTargetAfterRef,
             w.isFloatSample, nChannels > 1, viewId);    
     imgWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
     let view = imgWindow.mainView;
+    
+    if (data.createJoinMask && createMosaicFlag){
+        createJoinMask(data, joinRect, view.fullId);
+    }
+    
     if (createMosaicFlag){
         // Start with the ref image and add then modify it with the target image
         view.image.assign(refView.image);

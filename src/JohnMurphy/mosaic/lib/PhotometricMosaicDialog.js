@@ -151,7 +151,8 @@ function PhotometricMosaicData() {
         // Mosaic Join Mode
         Parameters.set("useMosaicOverlay", this.useMosaicOverlay);
         Parameters.set("useMosaicRandom", this.useMosaicRandom);
-        Parameters.set("useMosaicAverage", this.useMosaicAverage); 
+        Parameters.set("useMosaicAverage", this.useMosaicAverage);
+        Parameters.set("createJoinMask", this.createJoinMask);
         
         Parameters.set("graphWidth", this.graphWidth);
         Parameters.set("graphHeight", this.graphHeight);
@@ -277,7 +278,9 @@ function PhotometricMosaicData() {
             this.useMosaicRandom = Parameters.getBoolean("useMosaicRandom");
         if (Parameters.has("useMosaicAverage"))
             this.useMosaicAverage = Parameters.getBoolean("useMosaicAverage");
-
+        if (Parameters.has("createJoinMask"))
+            this.createJoinMask = Parameters.getBoolean("createJoinMask");
+        
         if (Parameters.has("graphWidth"))
             this.graphWidth = Parameters.getInteger("graphWidth");
         if (Parameters.has("graphHeight"))
@@ -341,6 +344,7 @@ function PhotometricMosaicData() {
         this.useMosaicOverlay = true;
         this.useMosaicRandom = false;
         this.useMosaicAverage = false;
+        this.createJoinMask = true;
         
         this.graphWidth = 1200; // gradient and photometry graph width
         this.graphHeight = 800; // gradient and photometry graph height
@@ -379,6 +383,7 @@ function PhotometricMosaicData() {
         photometricMosaicDialog.mosaicOverlay_Control.checked = this.useMosaicOverlay;
         photometricMosaicDialog.mosaicRandom_Control.checked = this.useMosaicRandom;
         photometricMosaicDialog.mosaicAverage_Control.checked = this.useMosaicAverage;
+        photometricMosaicDialog.joinMask_CheckBox.checked = this.createJoinMask;
         
         // Join Region
         photometricMosaicDialog.joinSize_Control.setValue(this.joinSize);
@@ -477,6 +482,7 @@ function saveSettings(data){
     Settings.write( KEYPREFIX+"/useMosaicOverlay", DataType_Boolean, data.useMosaicOverlay );
     Settings.write( KEYPREFIX+"/useMosaicRandom", DataType_Boolean, data.useMosaicRandom );
     Settings.write( KEYPREFIX+"/useMosaicAverage", DataType_Boolean, data.useMosaicAverage );
+    Settings.write( KEYPREFIX+"/createJoinMask", DataType_Boolean, data.createJoinMask );
     
     Settings.write( KEYPREFIX+"/graphWidth", DataType_Int32, data.graphWidth );
     Settings.write( KEYPREFIX+"/graphHeight", DataType_Int32, data.graphHeight );
@@ -613,6 +619,9 @@ function restoreSettings(data){
     keyValue = Settings.read( KEYPREFIX+"/useMosaicAverage", DataType_Boolean );
     if ( Settings.lastReadOK )
         data.useMosaicAverage = keyValue;
+    keyValue = Settings.read( KEYPREFIX+"/createJoinMask", DataType_Boolean );
+    if ( Settings.lastReadOK )
+        data.createJoinMask = keyValue;
     
     keyValue = Settings.read( KEYPREFIX+"/graphWidth", DataType_Int32 );
     if ( Settings.lastReadOK )
@@ -1762,22 +1771,22 @@ function PhotometricMosaicDialog(data) {
         this.dialog.ok();
     };
     
-    let joinMaskButton = new PushButton(this);
-    joinMaskButton.text = "Join mask";
-    joinMaskButton.toolTip =
-            "<p><b><u>Mosaic Join Mode: Overlay</u></b><br />" +
-            "Creates a mask showing the Join line. Apply the mask to the " +
-            "mosaic view to see the position of the join.</p>" +
-            "<p><b><u>Mosaic Join Mode: Random or Average</u></b><br />" +
-            "Creates a mask revealing the Join Region. Within this area the " +
-            "mosaic pixels are either randomly choosen from the reference " +
-            "and target image, or averaged. Apply the mask to the " +
-            "mosaic view to see the size and position of this region.</p>" +
-            "<p>Show/Hide the mask (Ctrl K) to check the quality of the join.</p>";
-    joinMaskButton.onClick = function () {
-        data.viewFlag = CREATE_JOIN_MASK();
-        this.dialog.ok();
+    this.joinMask_CheckBox = new CheckBox(this);
+    this.joinMask_CheckBox.text = "Join mask";
+    this.joinMask_CheckBox.toolTip =
+            "<p>Create a mask of the join. Appy this to the mosaic to view " +
+            "the position of the join. Use <b>Ctrl K</b> to show/hide the mask " +
+            "to judge the join's quality.</p>" + 
+            "<p><u>Mosaic Join Mode: Overlay</u><br />" +
+            "The mask is a line that indicates the path of the join.</p>" +
+            "<p><u>Mosaic Join Mode: Random or Average</u><br />" +
+            "The mask reveals the Join Region. Within this area the " +
+            "mosaic pixels where either randomly choosen from the reference " +
+            "and target image, or averaged.</p>";
+    this.joinMask_CheckBox.onCheck = function (checked) {
+        data.createJoinMask = checked;
     };
+    this.joinMask_CheckBox.checked = data.createJoinMask;
     
     let mosaicSection = new Control(this);
     mosaicSection.sizer = new HorizontalSizer(this);
@@ -1786,10 +1795,10 @@ function PhotometricMosaicDialog(data) {
     mosaicSection.sizer.add(this.mosaicOverlay_Control);
     mosaicSection.sizer.add(this.mosaicRandom_Control);
     mosaicSection.sizer.add(this.mosaicAverage_Control);
+    mosaicSection.sizer.addSpacing(20);
+    mosaicSection.sizer.add(this.joinMask_CheckBox);
     mosaicSection.sizer.addStretch();
     mosaicSection.sizer.add(starsMaskButton);
-    mosaicSection.sizer.spacing = 6;
-    mosaicSection.sizer.add(joinMaskButton);
     this.mosaicBar = new SectionBar(this, "Mosaic Join Mode");
     this.mosaicBar.setSection(mosaicSection);
     this.mosaicBar.onToggleSection = this.onToggleSection;
