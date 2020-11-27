@@ -43,7 +43,7 @@ StarDetector.jsh: Copyright &copy; 2003-2019 Pleiades Astrophoto S.L. All Rights
 #include "extraControls/BinnedSampleGridDialog.js"
 
 // To stop my IDE from generating warnings...
-function VERSION(){return "3.0 Beta";}
+function VERSION(){return "3.0";}
 function TITLE(){return "Photometric Mosaic";}
 function SCRIPT_NAME(){return "PhotometricMosaic";}
 function TRIM_NAME(){return "TrimMosaicTile";}

@@ -488,8 +488,6 @@ function StarsDetected(refView, tgtView){
         const y0 = overlapBox.y0;
         let stars = starDetector.stars(starImage);
         starImage.free();
-        // Use 0.3 instead of 0.2 to compensate for smaller initial flux (smaller rectangle)
-        let apertureGrowth = APERTURE_GROWTH * 1.5;
         let apertureGrowthLimit = Math.round(calcDefaultGrowthLimit(tgtView));
         apertureGrowthLimit = Math.max(apertureGrowthLimit, 1);
         
@@ -497,7 +495,7 @@ function StarsDetected(refView, tgtView){
             star.moveBy(x0, y0);
             // Calculate the flux, this time using an inflated star aperture
             star.recalcStarFlux(view.image, channel, 
-                    APERTURE_ADD, apertureGrowth, apertureGrowthLimit, apertureBgDelta);
+                    APERTURE_ADD, APERTURE_GROWTH, apertureGrowthLimit, apertureBgDelta);
         }
         return stars;
     }
@@ -932,9 +930,8 @@ function createJoinMask(data, joinRect, viewId){
         const overlapMask = overlap.getFullImageMask(width, height);
         const maskValue = 0.8;
         // Restrict the mask to the joinRect rather than using the whole overlap
-        let maskRect = data.useMosaicOverlay ? overlap.overlapBox : joinRect;
-        let maskSamples = new Float32Array(maskRect.area);
-        overlapMask.getSamples(maskSamples, maskRect);
+        let maskSamples = new Float32Array(joinRect.area);
+        overlapMask.getSamples(maskSamples, joinRect);
         overlapMask.free();
         for (let i = 0; i < maskSamples.length; i++){
             // When overlapMask is 1, mask will be transparent, which is what we want.
@@ -948,7 +945,7 @@ function createJoinMask(data, joinRect, viewId){
         let view = w.mainView;
         view.beginProcess(UndoFlag_NoSwapFile);
         view.image.fill(maskValue);
-        view.image.setSamples(maskSamples, maskRect);
+        view.image.setSamples(maskSamples, joinRect);
         view.endProcess();
         w.show();
     } else {

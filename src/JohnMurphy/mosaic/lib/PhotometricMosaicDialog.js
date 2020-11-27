@@ -20,7 +20,7 @@
 #include "STFAutoStretch.js"
 #define KEYPREFIX "PhotometricMosaic"
 #define APERTURE_ADD 1
-#define APERTURE_GROWTH 0.2
+#define APERTURE_GROWTH 0.5
 #define APERTURE_BKG_DELTA 10
 
 function EXTRA_CONTROLS(){return false;}
@@ -840,7 +840,7 @@ function PhotometricMosaicDialog(data) {
     photometrySearchSection.sizer.spacing = 4;
     photometrySearchSection.sizer.add(this.starFluxTolerance_Control);
     photometrySearchSection.sizer.add(this.starSearchRadius_Control);
-    photometrySearchBar = new SectionBar(this, "Photometric Star Search");
+    photometrySearchBar = new SectionBar(this, "Photometry Star Search");
     photometrySearchBar.setSection(photometrySearchSection);
     photometrySearchBar.onToggleSection = this.onToggleSection;
     photometrySearchBar.toolTip = "<p>Search criteria used to match reference and target stars.</p>" +
@@ -1294,8 +1294,8 @@ function PhotometricMosaicDialog(data) {
     this.setSampleSizeAutoValue = function(){
         if (data.useAutoSampleGeneration){
             let pixelAngle = getPixelAngularSize(data.targetView, 0.00025);
-            // Make sure we sample at least 70 x 70 microns on the sensor
-            let minSampleSize = Math.round(70 / getPixelSize(data.targetView, 5));
+            // Make sure we sample at least 100 x 100 microns on the sensor
+            let minSampleSize = Math.round(100 / getPixelSize(data.targetView, 5));
             minSampleSize = Math.max(minSampleSize, self.sampleSize_Control.lowerBound);
             // 0.005 deg = 18 arcsec (18 >> than than 4 arcsecond seeing)
             let size = Math.max(minSampleSize, Math.round(0.005 / pixelAngle));

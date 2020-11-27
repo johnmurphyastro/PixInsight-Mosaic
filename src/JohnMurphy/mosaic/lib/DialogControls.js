@@ -203,7 +203,7 @@ function PhotometryControls(){
             "<p>It is not necessary to include diffraction spikes, " +
             "filter halos or scattered light.</p>" +
             "<p>If the photometry stars are too faint for this control to have " +
-            "much effect, leave the control at its default of 0.2</p>"
+            "much effect, leave the control at its default of 0.5</p>"
     };
     /**
      * @param {PhotometricMosaicDialog} dialog
